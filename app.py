@@ -1,6 +1,6 @@
 """
 3PL 반품 관리 및 화주사 관리 시스템 서버
-버전: v3.0 (SQLite 데이터베이스 기반)
+버전: v4.0 (PostgreSQL/Neon 데이터베이스 기반)
 """
 from flask import Flask, render_template, send_from_directory, send_file
 from flask_cors import CORS

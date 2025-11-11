@@ -2,6 +2,8 @@ flask==3.0.0
 flask-cors==4.0.0
 gunicorn==21.2.0
 python-dotenv==1.0.0
+# PostgreSQL (Neon 데이터베이스)
+psycopg2-binary==2.9.9
 # Google Sheets API (마이그레이션용 - 선택사항)
 google-api-python-client==2.108.0
 google-auth==2.25.2

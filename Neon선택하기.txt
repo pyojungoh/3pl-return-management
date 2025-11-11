@@ -1,0 +1,21 @@
+==========================================
+Vercel 데이터베이스 선택
+==========================================
+
+[선택 방법]
+
+1. Marketplace Database Providers 섹션에서
+2. "Neon" 선택 (Serverless Postgres)
+3. "Continue" 클릭
+
+[왜 Neon?]
+- Serverless Postgres (서버리스 최적화)
+- 무료 플랜 제공
+- Vercel과 완벽 통합
+- 자동 환경 변수 설정
+
+[대안]
+- Supabase도 좋은 선택입니다 (Postgres backend)
+
+==========================================
+

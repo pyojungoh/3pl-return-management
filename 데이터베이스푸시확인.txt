@@ -1,0 +1,55 @@
+==========================================
+데이터베이스 푸시 확인 방법
+==========================================
+
+[상황 확인]
+"nothing to commit"이 나온 이유:
+1. data.db 파일이 이미 GitHub에 커밋되어 있거나
+2. data.db 파일이 변경되지 않았거나
+3. data.db 파일이 .gitignore에 의해 제외되고 있을 수 있습니다
+
+[확인 방법]
+
+1. data.db가 GitHub에 있는지 확인:
+   git ls-files | findstr data.db
+
+   만약 결과가 나오면 → 이미 커밋되어 있음
+   결과가 안 나오면 → 아직 커밋 안 됨
+
+2. data.db 파일이 실제로 있는지 확인:
+   dir data.db
+
+3. .gitignore 확인:
+   type .gitignore | findstr data.db
+
+[해결 방법]
+
+방법 1: data.db가 이미 커밋되어 있다면
+→ 그냥 푸시하면 됩니다 (이미 완료된 상태)
+git push origin main
+
+방법 2: data.db를 강제로 추가하려면
+→ .gitignore에서 data.db 제외 확인 후:
+git add -f data.db
+git commit -m "데이터베이스 파일 추가"
+git push origin main
+
+방법 3: .gitignore 수정
+→ .gitignore 파일에서 data.db 라인을 주석 처리 (# 제거)
+그 후:
+git add data.db
+git commit -m "데이터베이스 파일 추가"
+git push origin main
+
+==========================================
+[가장 간단한 확인 방법]
+==========================================
+
+GitHub 웹사이트에서 직접 확인:
+1. GitHub 저장소 접속
+2. data.db 파일이 있는지 확인
+3. 있으면 → 이미 푸시 완료
+4. 없으면 → 위 방법으로 추가
+
+==========================================
+
