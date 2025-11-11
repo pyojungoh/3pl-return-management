@@ -160,27 +160,38 @@ def register():
             }), 400
         
         # 화주사 계정 생성
-        success = create_company(
-            company_name=company_name,
-            username=username,
-            password=password,
-            role=role,
-            business_number=business_number,
-            business_name=business_name,
-            business_address=business_address,
-            business_tel=business_tel,
-            business_email=business_email
-        )
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': '화주사 계정이 생성되었습니다.'
-            })
-        else:
+        try:
+            success = create_company(
+                company_name=company_name,
+                username=username,
+                password=password,
+                role=role,
+                business_number=business_number,
+                business_name=business_name,
+                business_address=business_address,
+                business_tel=business_tel,
+                business_email=business_email
+            )
+            
+            if success:
+                print(f"✅ 화주사 계정 생성 성공: {company_name} ({username})")
+                return jsonify({
+                    'success': True,
+                    'message': '화주사 계정이 생성되었습니다.'
+                })
+            else:
+                print(f"❌ 화주사 계정 생성 실패: {company_name} ({username}) - 중복 또는 오류")
+                return jsonify({
+                    'success': False,
+                    'message': '화주사 계정 생성에 실패했습니다. (아이디 중복 가능성)'
+                }), 500
+        except Exception as e:
+            print(f"❌ 화주사 계정 생성 중 예외 발생: {e}")
+            import traceback
+            traceback.print_exc()
             return jsonify({
                 'success': False,
-                'message': '화주사 계정 생성에 실패했습니다.'
+                'message': f'화주사 계정 생성 중 오류가 발생했습니다: {str(e)}'
             }), 500
         
     except Exception as e:

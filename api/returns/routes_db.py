@@ -75,8 +75,25 @@ def get_returns_data():
             today = datetime.now()
             month = f"{today.year}년{today.month}월"
         
+        # 화주사인 경우 company 파라미터가 필수
+        if role != '관리자' and not company:
+            return jsonify({
+                'success': False,
+                'data': [],
+                'count': 0,
+                'message': '화주사명이 필요합니다.'
+            }), 400
+        
+        # 디버깅: 파라미터 확인
+        print(f"📊 반품 데이터 조회 - company: '{company}', month: '{month}', role: '{role}'")
+        
         # 데이터베이스에서 조회
         returns = get_returns_by_company(company, month, role)
+        
+        # 디버깅: 조회 결과 확인
+        print(f"   조회된 데이터: {len(returns)}건")
+        if returns and len(returns) > 0:
+            print(f"   첫 번째 데이터의 화주명: {returns[0].get('company_name', 'N/A')}")
         
         # 날짜에서 일자만 추출하는 함수
         def extract_day(date_str):

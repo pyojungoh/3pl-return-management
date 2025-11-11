@@ -305,6 +305,8 @@ def create_company(company_name: str, username: str, password: str, role: str = 
     """화주사 계정 생성"""
     conn = get_db_connection()
     
+    print(f"📝 create_company 호출 - company_name: '{company_name}', username: '{username}', role: '{role}'")
+    
     if USE_POSTGRESQL:
         cursor = conn.cursor()
         try:
@@ -317,9 +319,17 @@ def create_company(company_name: str, username: str, password: str, role: str = 
                   business_number, business_name, business_address,
                   business_tel, business_email, business_certificate_url))
             conn.commit()
+            print(f"✅ 화주사 계정 생성 성공: {company_name} ({username})")
             return True
-        except IntegrityError:
+        except IntegrityError as e:
             conn.rollback()
+            print(f"❌ 화주사 계정 생성 실패 (중복): {username} - {e}")
+            return False
+        except Exception as e:
+            conn.rollback()
+            print(f"❌ 화주사 계정 생성 실패 (오류): {username} - {e}")
+            import traceback
+            traceback.print_exc()
             return False
         finally:
             cursor.close()
@@ -336,8 +346,15 @@ def create_company(company_name: str, username: str, password: str, role: str = 
                   business_number, business_name, business_address,
                   business_tel, business_email, business_certificate_url))
             conn.commit()
+            print(f"✅ 화주사 계정 생성 성공: {company_name} ({username})")
             return True
-        except IntegrityError:
+        except sqlite3.IntegrityError as e:
+            print(f"❌ 화주사 계정 생성 실패 (중복): {username} - {e}")
+            return False
+        except Exception as e:
+            print(f"❌ 화주사 계정 생성 실패 (오류): {username} - {e}")
+            import traceback
+            traceback.print_exc()
             return False
         finally:
             conn.close()
@@ -713,15 +730,36 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
     """화주사별 반품 데이터 조회 (최신 날짜부터 정렬)"""
     conn = get_db_connection()
     
+    # 디버깅: 파라미터 확인
+    print(f"🔍 get_returns_by_company - company: '{company}', month: '{month}', role: '{role}'")
+    
     if USE_POSTGRESQL:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         try:
             if role == '관리자':
+                # 관리자는 모든 데이터 조회
                 cursor.execute('SELECT * FROM returns WHERE month = %s', (month,))
+                print(f"   관리자 모드: 모든 데이터 조회 (month: {month})")
             else:
-                cursor.execute('SELECT * FROM returns WHERE company_name = %s AND month = %s', (company, month))
+                # 화주사는 자신의 데이터만 조회
+                if not company or not company.strip():
+                    print(f"   ⚠️ 화주사인데 company가 비어있음! 빈 리스트 반환")
+                    return []
+                cursor.execute('SELECT * FROM returns WHERE company_name = %s AND month = %s', (company.strip(), month))
+                print(f"   화주사 모드: '{company.strip()}' 데이터만 조회 (month: {month})")
             rows = cursor.fetchall()
             result = [dict(row) for row in rows]
+            
+            print(f"   조회된 데이터: {len(result)}건")
+            if result and len(result) > 0:
+                # 화주사별로 몇 건인지 확인 (디버깅용)
+                company_counts = {}
+                for item in result:
+                    comp_name = item.get('company_name', '')
+                    company_counts[comp_name] = company_counts.get(comp_name, 0) + 1
+                print(f"   화주사별 데이터 개수: {company_counts}")
+                if role != '관리자' and len(company_counts) > 1:
+                    print(f"   ⚠️ 경고: 화주사 모드인데 여러 화주사 데이터가 조회됨!")
             
             result.sort(key=lambda x: (
                 not x.get('return_date') or x.get('return_date') == '',
@@ -737,10 +775,25 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
         try:
             if role == '관리자':
                 cursor.execute('SELECT * FROM returns WHERE month = ?', (month,))
+                print(f"   관리자 모드: 모든 데이터 조회 (month: {month})")
             else:
-                cursor.execute('SELECT * FROM returns WHERE company_name = ? AND month = ?', (company, month))
+                if not company or not company.strip():
+                    print(f"   ⚠️ 화주사인데 company가 비어있음! 빈 리스트 반환")
+                    return []
+                cursor.execute('SELECT * FROM returns WHERE company_name = ? AND month = ?', (company.strip(), month))
+                print(f"   화주사 모드: '{company.strip()}' 데이터만 조회 (month: {month})")
             rows = cursor.fetchall()
             result = [dict(row) for row in rows]
+            
+            print(f"   조회된 데이터: {len(result)}건")
+            if result and len(result) > 0:
+                company_counts = {}
+                for item in result:
+                    comp_name = item.get('company_name', '')
+                    company_counts[comp_name] = company_counts.get(comp_name, 0) + 1
+                print(f"   화주사별 데이터 개수: {company_counts}")
+                if role != '관리자' and len(company_counts) > 1:
+                    print(f"   ⚠️ 경고: 화주사 모드인데 여러 화주사 데이터가 조회됨!")
             
             result.sort(key=lambda x: (
                 not x.get('return_date') or x.get('return_date') == '',

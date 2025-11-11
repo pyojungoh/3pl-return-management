@@ -1119,8 +1119,8 @@
       <!-- 관리자 전용 탭 (관리자만 표시) -->
       <div id="adminTabs" style="display: none;">
         <div class="tabs">
-          <button type="button" class="tab-btn active" onclick="switchAdminTab('returns')">📦 반품 내역</button>
-          <button type="button" class="tab-btn" onclick="switchAdminTab('register')">🏢 화주사 등록</button>
+          <button type="button" class="tab-btn active" id="returnsTabBtn" onclick="switchAdminTab('returns')">📦 반품 내역</button>
+          <button type="button" class="tab-btn admin-only-tab" id="registerTabBtn" onclick="switchAdminTab('register')" style="display: none;">🏢 화주사 등록</button>
         </div>
       </div>
       
@@ -1510,11 +1510,25 @@
         adminTabs.style.display = isAdmin ? 'block' : 'none';
       }
       
+      // 화주사 등록 탭 버튼 (관리자 전용)
+      const registerTabBtn = document.getElementById('registerTabBtn');
+      if (registerTabBtn) {
+        registerTabBtn.style.display = isAdmin ? 'inline-block' : 'none';
+      }
+      
       // 관리자가 아니면 반품 내역 탭만 표시
       if (!isAdmin) {
-        document.getElementById('returnsTab').classList.remove('hidden');
-        document.getElementById('registerTab').classList.add('hidden');
-        document.getElementById('passwordTab').classList.add('hidden');
+        // 화주사는 반품 내역 탭만 보임
+        const returnsTab = document.getElementById('returnsTab');
+        if (returnsTab) {
+          returnsTab.classList.remove('hidden');
+          returnsTab.style.display = 'block';
+        }
+        const registerTab = document.getElementById('registerTab');
+        if (registerTab) {
+          registerTab.classList.add('hidden');
+          registerTab.style.display = 'none';
+        }
         // 화주사는 항상 반품 내역 탭만 보이므로 localStorage에 저장할 필요 없음
       } else {
         // 관리자면 저장된 탭 정보 확인 (페이지 새로고침 시 유지)
@@ -1524,10 +1538,23 @@
         switchAdminTab(activeTab);
       }
       
-          // 관리자 접이식 버튼 표시/숨기기
+          // 관리자 접이식 버튼 표시/숨기기 (화주사는 반품 등록 불가)
           const addReturnSection = document.getElementById('addReturnSection');
           if (addReturnSection) {
-            addReturnSection.style.display = isAdmin ? 'block' : 'none';
+            if (isAdmin) {
+              addReturnSection.style.display = 'block';
+            } else {
+              addReturnSection.style.display = 'none';
+              // 폼도 강제로 숨기기
+              const addReturnForm = document.getElementById('addReturnForm');
+              if (addReturnForm) {
+                addReturnForm.style.display = 'none';
+              }
+              const addReturnBtn = document.getElementById('addReturnBtn');
+              if (addReturnBtn) {
+                addReturnBtn.style.display = 'none';
+              }
+            }
             console.log('반품 등록 섹션 표시:', isAdmin, '섹션 요소:', addReturnSection); // 디버깅용
           }
           const addReturnForm = document.getElementById('addReturnForm');
@@ -1668,7 +1695,15 @@
       
       showMessage('데이터를 불러오는 중...', 'success');
       
-      const url = `${API_BASE_URL}/api/returns/data?company=${encodeURIComponent(currentCompany)}&month=${encodeURIComponent(selectedMonth)}&role=${encodeURIComponent(currentRole)}`;
+      // 화주사인 경우 자신의 company_name으로 필터링
+      // 관리자인 경우 빈 문자열로 모든 데이터 조회
+      const companyFilter = (currentRole === '관리자') ? '' : currentCompany;
+      
+      console.log('데이터 로드 - company:', companyFilter, 'month:', selectedMonth, 'role:', currentRole);
+      
+      const url = `${API_BASE_URL}/api/returns/data?company=${encodeURIComponent(companyFilter)}&month=${encodeURIComponent(selectedMonth)}&role=${encodeURIComponent(currentRole)}`;
+      
+      console.log('API URL:', url);
       
       fetch(url)
         .then(response => response.json())
@@ -2331,8 +2366,15 @@
     }
     window.toggleAddForm = toggleAddForm;
     
-    // 반품 등록
+    // 반품 등록 (관리자 전용)
     function addReturn() {
+      // 관리자 권한 확인
+      const isAdmin = (currentRole === '관리자');
+      if (!isAdmin) {
+        alert('반품 등록은 관리자만 가능합니다.');
+        return;
+      }
+      
       const selectedMonth = document.getElementById('monthSelect').value;
       if (!selectedMonth) {
         alert('월을 선택해주세요.');
@@ -2354,6 +2396,11 @@
       
       if (!customerName || !trackingNumber) {
         alert('고객명과 송장번호는 필수입니다.');
+        return;
+      }
+      
+      if (!companyName) {
+        alert('화주명은 필수입니다.');
         return;
       }
       
@@ -2709,28 +2756,45 @@
         business_email: businessEmail || null
       };
 
-      fetch('/api/auth/register', {
+      console.log('화주사 등록 요청 데이터:', data);
+      
+      fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(data)
       })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
+      .then(response => {
+        console.log('화주사 등록 응답 상태:', response.status, response.statusText);
+        if (!response.ok) {
+          return response.json().then(err => {
+            console.error('화주사 등록 서버 오류:', err);
+            throw new Error(err.message || `서버 오류: ${response.status}`);
+          });
+        }
+        return response.json();
+      })
+      .then(result => {
+        console.log('화주사 등록 응답 데이터:', result);
+        if (result.success) {
           status.className = 'admin-status success';
-          status.textContent = data.message || '화주사 계정이 생성되었습니다.';
+          status.textContent = result.message || '화주사 계정이 생성되었습니다.';
           document.getElementById('adminRegisterForm').reset();
           // 화주사 목록 새로고침
-          loadCompanies();
+          if (typeof loadCompanies === 'function') {
+            loadCompanies();
+          }
           // 폼 닫기
           setTimeout(() => {
-            toggleAddCompanyForm();
+            if (typeof toggleAddCompanyForm === 'function') {
+              toggleAddCompanyForm();
+            }
           }, 1500);
         } else {
           status.className = 'admin-status error';
-          status.textContent = data.message || '화주사 등록에 실패했습니다.';
+          status.textContent = result.message || '화주사 등록에 실패했습니다.';
+          console.error('화주사 등록 실패:', result);
         }
         btn.disabled = false;
         btn.textContent = '등록하기';
@@ -2738,7 +2802,7 @@
       .catch(error => {
         console.error('화주사 등록 오류:', error);
         status.className = 'admin-status error';
-        status.textContent = '화주사 등록 중 오류가 발생했습니다: ' + error.message;
+        status.textContent = '화주사 등록 중 오류가 발생했습니다: ' + (error.message || error);
         btn.disabled = false;
         btn.textContent = '등록하기';
       });
