@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>화주사 반품 내역 조회</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    /* 로그인 섹션 */
+    .login-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+    }
+    
+    .login-form {
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .login-form h1 {
+      text-align: center;
+      color: #667eea;
+      margin-bottom: 10px;
+      font-size: 24px;
+    }
+    
+    .login-form input {
+      padding: 12px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 15px;
+      transition: all 0.3s ease;
+    }
+    
+    .login-form input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .login-form button {
+      padding: 12px 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .login-form button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .login-form button:disabled {
+      background: #bdbdbd;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    /* 대시보드 섹션 */
+    .dashboard-section {
+      display: none;
+    }
+    
+    .header {
+      background: white;
+      padding: 20px 25px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .header h1 {
+      color: #333;
+      font-size: 24px;
+      margin-bottom: 5px;
+    }
+    
+    .company-info {
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .logout-btn {
+      padding: 10px 20px;
+      background: #f44336;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    
+    .logout-btn:hover {
+      background: #d32f2f;
+    }
+    
+    .filters {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      margin-bottom: 20px;
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    
+    .filters label {
+      font-weight: 600;
+      color: #333;
+    }
+    
+    .filters select {
+      padding: 10px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fafafa;
+      cursor: pointer;
+    }
+    
+    .refresh-btn {
+      padding: 10px 20px;
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    
+    .refresh-btn:hover {
+      background: #1976D2;
+    }
+    
+    .stats {
+      background: white;
+      padding: 15px 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    
+    .stat-item {
+      text-align: center;
+      padding: 15px;
+      border-radius: 10px;
+      min-width: 120px;
+    }
+    
+    .stat-number {
+      font-size: 28px;
+      font-weight: 800;
+      color: #667eea;
+    }
+    
+    .stat-label {
+      font-size: 13px;
+      color: #666;
+      margin-top: 5px;
+    }
+    
+    .table-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      overflow-x: auto;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    thead {
+      background: #667eea;
+      color: white;
+    }
+    
+    th {
+      padding: 15px 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    
+    td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 13px;
+    }
+    
+    tr:hover {
+      background: #f8f9fa;
+    }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    
+    .status-completed {
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .status-pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+    
+    .request-input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 13px;
+      resize: vertical;
+      min-height: 60px;
+    }
+    
+    .save-btn {
+      padding: 8px 16px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 5px;
+    }
+    
+    .save-btn:hover {
+      background: #45a049;
+    }
+    
+    .message {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      font-weight: 600;
+      z-index: 1000;
+      display: none;
+    }
+    
+    .message.success {
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .message.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    
+    .no-data {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+    
+    .admin-only {
+      display: none;
+    }
+    
+    #loginMessage {
+      margin-top: 15px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 로그인 섹션 -->
+    <div id="loginSection" class="login-section">
+      <div class="login-form">
+        <h1>🏢 화주사 반품 내역 조회</h1>
+        <input type="text" id="username" placeholder="아이디" autocomplete="username">
+        <input type="password" id="password" placeholder="비밀번호" autocomplete="current-password">
+        <button id="loginBtn" type="button" onclick="doLogin(); return false;">로그인</button>
+        <div id="loginMessage"></div>
+      </div>
+    </div>
+    
+    <!-- 대시보드 섹션 -->
+    <div id="dashboardSection" class="dashboard-section">
+      <!-- 헤더 -->
+      <div class="header">
+        <div>
+          <h1>📦 반품 내역 조회</h1>
+          <div class="company-info" id="companyInfo"></div>
+        </div>
+        <button class="logout-btn" onclick="logout()">로그아웃</button>
+      </div>
+      
+      <!-- 필터 -->
+      <div class="filters">
+        <label for="monthSelect">📅 조회 월:</label>
+        <select id="monthSelect">
+          <option value="">로딩 중...</option>
+        </select>
+        <button class="refresh-btn" onclick="loadData()">🔄 새로고침</button>
+      </div>
+      
+      <!-- 통계 -->
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-number" id="totalCount">0</div>
+          <div class="stat-label">전체 반품 건</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number" id="completedCount">0</div>
+          <div class="stat-label">처리 완료</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number" id="pendingCount">0</div>
+          <div class="stat-label">처리 대기</div>
+        </div>
+      </div>
+      
+      <!-- 테이블 -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>접수일</th>
+              <th class="admin-only">화주사</th>
+              <th>제품</th>
+              <th>고객명</th>
+              <th>송장번호</th>
+              <th>반품/교환</th>
+              <th>재고상태</th>
+              <th>처리완료</th>
+              <th>사진</th>
+              <th class="admin-only">비고</th>
+              <th>화주사 요청사항</th>
+              <th class="admin-only">QR</th>
+              <th class="admin-only">관리</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr>
+              <td colspan="9" class="no-data">데이터를 불러오는 중...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 메시지 -->
+  <div id="message" class="message"></div>
+  
+  <script>
+    // API 기본 URL (서버 주소)
+    const API_BASE_URL = window.location.origin; // 현재 도메인 사용
+    
+    // 전역 변수
+    let currentCompany = '';
+    let currentUsername = '';
+    let currentRole = '';
+    let currentData = [];
+    
+    // 로그인 메시지 표시
+    function showLoginMessage(text, type) {
+      const div = document.getElementById('loginMessage');
+      if (!div) return;
+      
+      let bgColor = '#d1ecf1';
+      let textColor = '#0c5460';
+      
+      if (type === 'success') {
+        bgColor = '#d4edda';
+        textColor = '#155724';
+      } else if (type === 'error') {
+        bgColor = '#f8d7da';
+        textColor = '#721c24';
+      }
+      
+      div.innerHTML = `<div style="padding: 10px 15px; border-radius: 8px; background: ${bgColor}; color: ${textColor}; font-weight: 600;">${text}</div>`;
+      
+      if (type !== 'loading') {
+        setTimeout(() => { div.innerHTML = ''; }, 5000);
+      }
+    }
+    
+    // 메시지 표시
+    function showMessage(text, type) {
+      const messageDiv = document.getElementById('message');
+      messageDiv.textContent = text;
+      messageDiv.className = 'message ' + type;
+      messageDiv.style.display = 'block';
+      
+      setTimeout(() => {
+        messageDiv.style.display = 'none';
+      }, 5000);
+    }
+    
+    // 로그인 함수
+    window.doLogin = function doLogin() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const loginBtn = document.getElementById('loginBtn');
+      
+      if (!username || !password) {
+        showLoginMessage('아이디와 비밀번호를 입력해주세요.', 'error');
+        return false;
+      }
+      
+      loginBtn.disabled = true;
+      loginBtn.innerHTML = '로그인 중...';
+      showLoginMessage('로그인 중입니다...', 'loading');
+      
+      // 서버 API 호출
+      fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username: username,
+          password: password
+        })
+      })
+      .then(response => response.json())
+      .then(result => {
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = '로그인';
+        
+        if (result.success) {
+          currentCompany = result.company;
+          currentUsername = result.username;
+          currentRole = result.role || '';
+          
+          localStorage.setItem('client_company', result.company);
+          localStorage.setItem('client_username', result.username);
+          localStorage.setItem('client_role', result.role || '');
+          localStorage.setItem('client_loginTime', new Date().toISOString());
+          
+          showLoginMessage('✅ 로그인 성공!', 'success');
+          setTimeout(() => {
+            showDashboard();
+          }, 500);
+        } else {
+          showLoginMessage('❌ ' + (result.message || '로그인 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = '로그인';
+        console.error('로그인 오류:', error);
+        showLoginMessage('❌ 로그인 중 오류: ' + error.message, 'error');
+      });
+      
+      return false;
+    }
+    
+    // 로그아웃
+    function logout() {
+      localStorage.removeItem('client_company');
+      localStorage.removeItem('client_username');
+      localStorage.removeItem('client_role');
+      localStorage.removeItem('client_loginTime');
+      
+      currentCompany = '';
+      currentUsername = '';
+      currentRole = '';
+      
+      document.getElementById('dashboardSection').style.display = 'none';
+      document.getElementById('loginSection').style.display = 'flex';
+      document.getElementById('username').value = '';
+      document.getElementById('password').value = '';
+      document.getElementById('loginMessage').innerHTML = '';
+    }
+    
+    // 대시보드 표시
+    function showDashboard() {
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('dashboardSection').style.display = 'block';
+      
+      const isAdmin = (currentRole === '관리자');
+      const roleText = isAdmin ? ' [관리자]' : '';
+      document.getElementById('companyInfo').textContent = `${currentCompany}${roleText} (${currentUsername})`;
+      
+      // 관리자 열 표시/숨기기
+      document.querySelectorAll('.admin-only').forEach(cell => {
+        cell.style.display = isAdmin ? 'table-cell' : 'none';
+      });
+      
+      // 월 목록 로드
+      loadAvailableSheets();
+    }
+    
+    // 사용 가능한 시트 목록 로드
+    function loadAvailableSheets() {
+      fetch(`${API_BASE_URL}/api/returns/sheets`)
+        .then(response => response.json())
+        .then(result => {
+          const monthSelect = document.getElementById('monthSelect');
+          monthSelect.innerHTML = '';
+          
+          if (result.success && result.sheets && result.sheets.length > 0) {
+            result.sheets.forEach(sheetName => {
+              const option = document.createElement('option');
+              option.value = sheetName;
+              option.textContent = sheetName;
+              monthSelect.appendChild(option);
+            });
+            
+            // 현재 월 선택
+            const today = new Date();
+            const currentMonth = `${today.getFullYear()}년${today.getMonth() + 1}월`;
+            const found = result.sheets.find(s => s === currentMonth);
+            monthSelect.value = found || result.sheets[0];
+            
+            // 데이터 로드
+            loadData();
+          } else {
+            monthSelect.innerHTML = '<option value="">사용 가능한 월이 없습니다</option>';
+          }
+        })
+        .catch(error => {
+          console.error('시트 목록 로드 오류:', error);
+          showMessage('❌ 시트 목록을 불러올 수 없습니다.', 'error');
+        });
+      
+      // 월 변경 이벤트
+      document.getElementById('monthSelect').onchange = loadData;
+    }
+    
+    // 데이터 로드
+    function loadData() {
+      const selectedMonth = document.getElementById('monthSelect').value;
+      
+      if (!selectedMonth) {
+        return;
+      }
+      
+      showMessage('데이터를 불러오는 중...', 'success');
+      
+      const url = `${API_BASE_URL}/api/returns/data?company=${encodeURIComponent(currentCompany)}&month=${encodeURIComponent(selectedMonth)}&role=${encodeURIComponent(currentRole)}`;
+      
+      fetch(url)
+        .then(response => response.json())
+        .then(result => {
+          if (result.success) {
+            currentData = result.data || [];
+            renderTable(currentData);
+            updateStats(currentData);
+            showMessage(`✅ ${result.count}건의 데이터를 불러왔습니다.`, 'success');
+          } else {
+            showMessage('❌ ' + (result.message || '데이터 로드 실패'), 'error');
+            document.getElementById('tableBody').innerHTML = 
+              '<tr><td colspan="9" class="no-data">데이터를 불러올 수 없습니다.</td></tr>';
+          }
+        })
+        .catch(error => {
+          console.error('데이터 로드 오류:', error);
+          showMessage('❌ 데이터 로드 중 오류: ' + error.message, 'error');
+        });
+    }
+    
+    // 테이블 렌더링
+    function renderTable(data) {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+      
+      const isAdmin = (currentRole === '관리자');
+      const colspan = isAdmin ? 13 : 9;
+      
+      if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${colspan}" class="no-data">반품 내역이 없습니다.</td></tr>`;
+        return;
+      }
+      
+      data.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        
+        const isCompleted = row['처리완료'] && row['처리완료'].toString().trim();
+        const isConfirmed = row['화주사확인완료'] && row['화주사확인완료'].toString().trim();
+        const memoText = row['비고'] || '';
+        
+        // 사진 링크 처리
+        let photoHtml = '-';
+        if (row['사진'] && Array.isArray(row['사진']) && row['사진'].length > 0) {
+          photoHtml = '<div class="photo-links">';
+          row['사진'].forEach(photo => {
+            if (photo.url) {
+              photoHtml += `<a href="${photo.url}" target="_blank" class="photo-link">${photo.text || '사진'}</a>`;
+            }
+          });
+          photoHtml += '</div>';
+        }
+        
+        // 요청사항 처리
+        const requestValue = row['화주사요청'] || '';
+        let requestHtml = '';
+        
+        if (isAdmin) {
+          // 관리자: 읽기 전용
+          if (requestValue) {
+            requestHtml = `<textarea class="request-input" readonly>${requestValue}</textarea>`;
+          } else {
+            requestHtml = '<div style="color: #999; text-align: center; padding: 20px;">요청사항 없음</div>';
+          }
+        } else {
+          // 화주사: 입력 및 저장 가능
+          if (isConfirmed) {
+            requestHtml = `
+              <textarea class="request-input" readonly>${requestValue}</textarea>
+              <div style="margin-top:5px; font-size:12px; color:#0c5460; font-weight:600;">✓ 화주사확인완료</div>
+            `;
+          } else {
+            requestHtml = `
+              <textarea class="request-input" id="request_${index}" placeholder="요청사항을 입력하세요">${requestValue}</textarea>
+              <button class="save-btn" onclick="saveRequest(${index}, ${row.rowIndex})">저장</button>
+            `;
+          }
+        }
+        
+        // 처리완료 상태
+        let statusHtml = '';
+        if (isCompleted) {
+          statusHtml = `<span class="status-badge status-completed">✓ ${row['처리완료']}</span>`;
+        } else if (isConfirmed) {
+          statusHtml = '<span class="status-badge" style="background: #d1ecf1; color: #0c5460;">⏳ 요청완료</span>';
+        } else {
+          statusHtml = '<span class="status-badge status-pending">⏳ 대기중</span>';
+        }
+        
+        // 관리자 전용 셀
+        const companyCell = isAdmin ? `<td class="admin-only">${row['화주명'] || ''}</td>` : '';
+        const memoCell = isAdmin ? `
+          <td class="admin-only" style="text-align: center;">
+            <button class="save-btn" onclick="alert('비고: ${(memoText || '없음').replace(/'/g, "\\'")}')" style="background: #607D8B; padding: 5px 10px; font-size: 11px;">
+              ${memoText ? '📝 비고' : '📝 추가'}
+            </button>
+          </td>
+        ` : '';
+        const trackingNumber = row['송장번호'] ? row['송장번호'].toString().trim() : '';
+        const qrCell = isAdmin ? `
+          <td class="admin-only" style="text-align: center;">
+            ${trackingNumber ? 
+              `<button class="save-btn" onclick="showQRCode('${trackingNumber}')" style="background: #9C27B0; padding: 5px 10px; font-size: 11px;">📱 QR</button>` : 
+              '<span style="color: #999; font-size: 11px;">미생성</span>'}
+          </td>
+        ` : '';
+        const manageCell = isAdmin ? `
+          <td class="admin-only" style="text-align: center;">
+            ${isCompleted ? 
+              '<span style="color: #4CAF50; font-size: 11px; font-weight: 600;">✓ 완료</span>' : 
+              `<button class="save-btn" onclick="completeReturn(${index}, ${row.rowIndex})" style="background: #FF5722; padding: 5px 10px; font-size: 11px;">처리완료</button>`}
+          </td>
+        ` : '';
+        
+        tr.innerHTML = `
+          <td>${row['반품 접수일'] || ''}</td>
+          ${companyCell}
+          <td>${row['제품'] || ''}</td>
+          <td>${row['고객명'] || ''}</td>
+          <td>${row['송장번호'] || ''}</td>
+          <td>${row['반품/교환/오배송'] || ''}</td>
+          <td>${row['재고상태'] || ''}</td>
+          <td>${statusHtml}</td>
+          <td>${photoHtml}</td>
+          ${memoCell}
+          <td style="min-width: 250px;">${requestHtml}</td>
+          ${qrCell}
+          ${manageCell}
+        `;
+        
+        tbody.appendChild(tr);
+      });
+    }
+    
+    // 통계 업데이트
+    function updateStats(data) {
+      const total = data.length;
+      const completed = data.filter(row => row['처리완료'] && row['처리완료'].toString().trim()).length;
+      const pending = total - completed;
+      
+      document.getElementById('totalCount').textContent = total;
+      document.getElementById('completedCount').textContent = completed;
+      document.getElementById('pendingCount').textContent = pending;
+    }
+    
+    // 요청사항 저장
+    function saveRequest(dataIndex, rowIndex) {
+      const requestText = document.getElementById(`request_${dataIndex}`).value.trim();
+      const selectedMonth = document.getElementById('monthSelect').value;
+      
+      if (!requestText) {
+        alert('요청사항을 입력해주세요.');
+        return;
+      }
+      
+      if (!confirm('요청사항을 저장하시겠습니까?\n저장 후에는 수정할 수 없습니다.')) {
+        return;
+      }
+      
+      fetch(`${API_BASE_URL}/api/returns/save-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          rowIndex: rowIndex,
+          month: selectedMonth,
+          requestText: requestText
+        })
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          showMessage('✅ ' + result.message, 'success');
+          // 부분 업데이트
+          const row = document.querySelector(`tr:has(#request_${dataIndex})`);
+          if (row) {
+            const requestCell = row.querySelector(`td:has(#request_${dataIndex})`).parentElement;
+            requestCell.innerHTML = `
+              <textarea class="request-input" readonly>${requestText}</textarea>
+              <div style="margin-top:5px; font-size:12px; color:#0c5460; font-weight:600;">✓ 화주사확인완료</div>
+            `;
+          }
+          // 데이터 업데이트
+          if (currentData && currentData[dataIndex]) {
+            currentData[dataIndex]['화주사요청'] = requestText;
+            currentData[dataIndex]['화주사확인완료'] = '요청완료';
+          }
+          updateStats(currentData);
+        } else {
+          showMessage('❌ ' + (result.message || '저장 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('저장 오류:', error);
+        showMessage('❌ 저장 중 오류: ' + error.message, 'error');
+      });
+    }
+    
+    // 처리완료 표시 (관리자)
+    function completeReturn(dataIndex, rowIndex) {
+      if (!confirm('이 반품 건을 처리완료로 표시하시겠습니까?')) {
+        return;
+      }
+      
+      const selectedMonth = document.getElementById('monthSelect').value;
+      const managerName = currentUsername;
+      
+      fetch(`${API_BASE_URL}/api/returns/mark-completed`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          rowIndex: rowIndex,
+          month: selectedMonth,
+          managerName: managerName
+        })
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          showMessage('✅ ' + result.message, 'success');
+          loadData(); // 데이터 다시 로드
+        } else {
+          showMessage('❌ ' + (result.message || '처리 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('처리완료 오류:', error);
+        showMessage('❌ 처리 중 오류: ' + error.message, 'error');
+      });
+    }
+    
+    // QR 코드 표시
+    function showQRCode(trackingNumber) {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(trackingNumber)}`;
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+      modal.innerHTML = `
+        <div style="background: white; padding: 20px; border-radius: 10px; text-align: center;">
+          <h3>QR 코드</h3>
+          <img src="${qrUrl}" alt="QR Code" style="margin: 20px 0;">
+          <p>송장번호: ${trackingNumber}</p>
+          <button onclick="this.closest('div[style*=\"position: fixed\"]').remove()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">닫기</button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+    
+    // 페이지 로드 시 초기화
+    window.addEventListener('DOMContentLoaded', function() {
+      // 자동 로그인 확인
+      const savedCompany = localStorage.getItem('client_company');
+      const savedUsername = localStorage.getItem('client_username');
+      const savedRole = localStorage.getItem('client_role');
+      const loginTime = localStorage.getItem('client_loginTime');
+      
+      if (savedCompany && savedUsername && loginTime) {
+        const loginDate = new Date(loginTime);
+        const now = new Date();
+        const hoursDiff = (now - loginDate) / (1000 * 60 * 60);
+        
+        if (hoursDiff < 24) {
+          currentCompany = savedCompany;
+          currentUsername = savedUsername;
+          currentRole = savedRole || '';
+          showDashboard();
+          return;
+        } else {
+          localStorage.removeItem('client_company');
+          localStorage.removeItem('client_username');
+          localStorage.removeItem('client_role');
+          localStorage.removeItem('client_loginTime');
+        }
+      }
+      
+      // 로그인 섹션 표시
+      document.getElementById('loginSection').style.display = 'flex';
+      document.getElementById('dashboardSection').style.display = 'none';
+      
+      // 엔터키 이벤트
+      document.getElementById('username').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          document.getElementById('password').focus();
+        }
+      });
+      
+      document.getElementById('password').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          doLogin();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
+

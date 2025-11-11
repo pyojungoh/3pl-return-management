@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  
+  <!-- PWA 설정 -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="반품교환">
+  <meta name="theme-color" content="#4CAF50">
+  
+  <!-- 아이콘 설정 -->
+  <link rel="apple-touch-icon" sizes="180x180" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDE4MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxODAiIGhlaWdodD0iMTgwIiBmaWxsPSIjNENBRjUwIiByeD0iMjAiLz4KPHN2ZyB4PSI0MCIgeT0iNDAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9IndoaXRlIj4KPHA+CjxwYXRoIGQ9Ik0xOSA3SDE4VjZhMSAxIDAgMDAtMS0xSDdhMSAxIDAgMDAtMSAxdjFINWMtMS4xIDAtMiAuOS0yIDJ2MTBjMCAxLjEuOSAyIDIgMmgxNGMxLjEgMCAyLS45IDItMlY5YzAtMS4xLS45LTItMi0yem0tMiAwSDdWNmgxMHYxeiIvPgo8L3N2Zz4KPHA+Cjx0ZXh0IHg9IjkwIiB5PSIxNTAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7rsJXtkpE8L3RleHQ+Cjwvc3ZnPgo=">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgdmlld0JveD0iMCAwIDE4MCAxODAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxODAiIGhlaWdodD0iMTgwIiBmaWxsPSIjNENBRjUwIiByeD0iMjAiLz4KPHN2ZyB4PSI0MCIgeT0iNDAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9IndoaXRlIj4KPHA+CjxwYXRoIGQ9Ik0xOSA3SDE4VjZhMSAxIDAgMDAtMS0xSDdhMSAxIDAgMDAtMSAxdjFINWMtMS4xIDAtMiAuOS0yIDJ2MTBjMCAxLjEuOSAyIDIgMmgxNGMxLjEgMCAyLS45IDItMlY5YzAtMS4xLS45LTItMi0yem0tMiAwSDdWNmgxMHYxeiIvPgo8L3N2Zz4KPHA+Cjx0ZXh0IHg9IjkwIiB5PSIxNTAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7rsJXtkpE8L3RleHQ+Cjwvc3ZnPgo=">
+  
+  <title>반품교환 등록</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      margin: 0;
+      padding: 10px;
+      background-color: #f5f5f5;
+      font-size: 16px;
+      line-height: 1.4;
+      -webkit-text-size-adjust: 100%;
+    }
+    
+    .container {
+      max-width: 100%;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    h2 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 24px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: #333;
+      font-size: 18px;
+    }
+    
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 18px;
+      background-color: #fff;
+      transition: border-color 0.3s ease;
+      -webkit-appearance: none;
+      appearance: none;
+      min-height: 48px;
+    }
+    
+    /* 숫자 입력 필드는 더 작게 */
+    input[type="number"] {
+      padding: 12px 16px;
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+      min-height: 48px;
+    }
+    
+    /* 읽기 전용 필드는 작게 */
+    input[readonly] {
+      background-color: #f8f9fa;
+      color: #6c757d;
+      padding: 10px 12px;
+      font-size: 16px;
+      min-height: 40px;
+    }
+    
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #4CAF50;
+      box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+    }
+    
+    input[readonly] {
+      background-color: #f8f9fa;
+      color: #6c757d;
+    }
+    
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: 600;
+      width: 100%;
+      margin: 8px 0;
+      transition: all 0.3s ease;
+      min-height: 50px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    button:hover, button:active {
+      background-color: #45a049;
+      transform: translateY(-1px);
+    }
+    
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .scan-btn {
+      background-color: #2196F3;
+      margin-top: 8px;
+    }
+    
+    .scan-btn:hover, .scan-btn:active {
+      background-color: #1976D2;
+    }
+    
+    .photo-btn {
+      background-color: #FF9800;
+      margin-top: 8px;
+    }
+    
+    .photo-btn:hover, .photo-btn:active {
+      background-color: #F57C00;
+    }
+    
+    .test-btn {
+      background-color: #9C27B0;
+      margin-top: 10px;
+      font-size: 14px;
+      padding: 12px 16px;
+    }
+    
+    .test-btn:hover, .test-btn:active {
+      background-color: #7B1FA2;
+    }
+    
+    .preview {
+      margin-top: 15px;
+      display: none;
+      text-align: center;
+    }
+    
+    .preview .photo-item {
+      display: inline-block;
+      margin: 8px;
+      text-align: center;
+      vertical-align: top;
+    }
+    
+    .preview img {
+      max-width: 120px;
+      max-height: 120px;
+      border-radius: 8px;
+      border: 2px solid #ddd;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: block;
+      margin-bottom: 5px;
+    }
+    
+    .photo-label {
+      font-size: 14px;
+      color: #666;
+      font-weight: 500;
+    }
+    
+    .delete-btn {
+      background-color: #f44336;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      font-size: 12px;
+      cursor: pointer;
+      margin-top: 5px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .status {
+      padding: 16px;
+      margin: 15px 0;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: 500;
+      font-size: 16px;
+    }
+    
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    
+    .loading {
+      background-color: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    
+    /* 모바일 특화 스타일 */
+    @media (max-width: 768px) {
+      body {
+        padding: 5px;
+        font-size: 18px;
+      }
+      
+      .container {
+        padding: 15px;
+        border-radius: 0;
+        margin: 0;
+        min-height: 100vh;
+      }
+      
+      h2 {
+        font-size: 22px;
+        margin-bottom: 20px;
+      }
+      
+      .form-group {
+        margin-bottom: 18px;
+      }
+      
+      label {
+        font-size: 19px;
+        margin-bottom: 8px;
+      }
+      
+      input, select, textarea {
+        font-size: 18px;
+        padding: 12px 14px;
+        min-height: 48px;
+      }
+      
+      input[type="number"] {
+        font-size: 22px;
+        font-weight: bold;
+        text-align: center;
+        padding: 12px;
+        min-height: 50px;
+      }
+      
+      input[readonly] {
+        font-size: 16px;
+        padding: 10px 12px;
+        min-height: 42px;
+      }
+      
+      button {
+        font-size: 18px;
+        padding: 14px 16px;
+        min-height: 52px;
+      }
+      
+      textarea {
+        min-height: 70px;
+        font-size: 17px;
+      }
+      
+      .status {
+        font-size: 17px;
+        padding: 14px;
+      }
+    }
+    
+    /* 터치 디바이스 최적화 */
+    @media (hover: none) and (pointer: coarse) {
+      button:hover {
+        transform: none;
+      }
+      
+      button:active {
+        transform: scale(0.98);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>반품교환 등록</h2>
+    
+    <form id="returnForm">
+      <!-- 고객명과 송장번호 뒤4자리 검색 (분리) -->
+      <div class="form-group">
+        <label>고객명</label>
+        <input type="text" id="customerName" placeholder="고객명 입력" required>
+      </div>
+
+      <div class="form-group">
+        <label>송장번호 뒤4자리</label>
+        <input type="number" id="last4Digits" placeholder="1234" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" required>
+        <button type="button" class="scan-btn" onclick="searchData()">🔍 검색</button>
+      </div>
+
+      <!-- 자동완성 필드들 -->
+      <div class="form-group">
+        <label>화주명</label>
+        <input type="text" id="company" placeholder="검색 후 자동 입력됩니다" readonly>
+      </div>
+
+      <div class="form-group">
+        <label>제품</label>
+        <input type="text" id="product" placeholder="검색 후 자동 입력됩니다" readonly>
+      </div>
+
+      <div class="form-group">
+        <label>고객명 (확인)</label>
+        <input type="text" id="customer" placeholder="검색 후 자동 입력됩니다" readonly>
+      </div>
+
+      <div class="form-group">
+        <label>송장번호</label>
+        <input type="text" id="trackingNumber" placeholder="검색 후 자동 입력됩니다" readonly>
+      </div>
+
+      <!-- 선택 필드들 -->
+      <div class="form-group">
+        <label>구분</label>
+        <select id="returnType" required>
+          <option value="">선택하세요</option>
+          <option value="반품">반품</option>
+          <option value="교환">교환</option>
+          <option value="오배송">오배송</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>재고상태</label>
+        <select id="stockStatus" required>
+          <option value="">선택하세요</option>
+          <option value="정상">정상</option>
+          <option value="불량">불량</option>
+        </select>
+      </div>
+
+      <!-- 사진 업로드 -->
+      <div class="form-group">
+        <label>사진 (여러 장 가능)</label>
+        <input type="file" id="photos" accept="image/*" multiple capture="camera" style="display: none;">
+        <button type="button" class="photo-btn" onclick="document.getElementById('photos').click()">📷 사진 찍기</button>
+        <div id="photoPreview" class="preview"></div>
+        <div id="photoCount" style="margin-top: 10px; font-size: 16px; color: #666; text-align: center;"></div>
+      </div>
+
+      <!-- 메모 -->
+      <div class="form-group">
+        <label>비고</label>
+        <textarea id="memo" rows="3" placeholder="추가 메모사항"></textarea>
+      </div>
+
+      <!-- 제출 버튼 -->
+      <button type="submit" id="submitBtn">등록하기</button>
+      
+      <!-- 테스트 버튼 추가 -->
+      <button type="button" onclick="testConnection()" class="test-btn">🔧 연결 테스트</button>
+    </form>
+
+    <!-- 상태 메시지 -->
+    <div id="statusMessage" style="display: none;"></div>
+  </div>
+
+  <script>
+    let selectedImages = [];
+
+    // 고객명 + 뒤4자리로 데이터 검색
+    function searchData() {
+      const customerName = document.getElementById('customerName').value.trim();
+      const last4Digits = document.getElementById('last4Digits').value.trim();
+      
+      if (!customerName) {
+        showStatus('고객명을 입력해주세요.', 'error');
+        return;
+      }
+      
+      if (!last4Digits || last4Digits.length !== 4) {
+        showStatus('송장번호 뒤4자리를 정확히 입력해주세요.', 'error');
+        return;
+      }
+      
+      const searchText = customerName + ' ' + last4Digits;
+      
+      showStatus('검색 중...', 'loading');
+      
+      google.script.run
+        .withSuccessHandler(function(data) {
+          if (data) {
+            document.getElementById('company').value = data.company || '';
+            document.getElementById('product').value = data.product || '';
+            document.getElementById('customer').value = data.customer || '';
+            document.getElementById('trackingNumber').value = data.trackingNumber || '';
+            
+            // 기존 선택값이 있으면 유지
+            if (data.returnType) {
+              document.getElementById('returnType').value = data.returnType;
+            }
+            if (data.stockStatus) {
+              document.getElementById('stockStatus').value = data.stockStatus;
+            }
+            
+            showStatus('검색 완료! 정보를 확인해주세요.', 'success');
+          } else {
+            showStatus('일치하는 데이터를 찾을 수 없습니다. 고객명과 송장번호를 확인해주세요.', 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('검색 오류:', error);
+          showStatus('검색 실패: ' + error, 'error');
+        })
+        .findDataByCustomerAndLast4(searchText);
+    }
+
+    // 뒤4자리 입력 시 자동으로 4자리 제한
+    document.addEventListener('DOMContentLoaded', function() {
+      // 사진 선택 시 미리보기
+      document.getElementById('photos').addEventListener('change', function(e) {
+        handleImageSelection(e.target.files);
+      });
+
+      // 뒤4자리 입력 제한
+      document.getElementById('last4Digits').addEventListener('input', function(e) {
+        // 숫자만 입력되도록 필터링
+        this.value = this.value.replace(/[^0-9]/g, '');
+        
+        // 4자리 제한
+        if (this.value.length > 4) {
+          this.value = this.value.slice(0, 4);
+        }
+        
+        // 4자리 입력 완료 시 자동 검색 (옵션)
+        if (this.value.length === 4 && document.getElementById('customerName').value.trim()) {
+          // 자동 검색을 원하지 않으면 이 부분 주석 처리
+          // searchData();
+        }
+      });
+
+      // 엔터키로 검색
+      document.getElementById('customerName').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          document.getElementById('last4Digits').focus();
+        }
+      });
+
+      document.getElementById('last4Digits').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          searchData();
+        }
+      });
+
+      // 폼 제출
+      document.getElementById('returnForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        submitForm();
+      });
+    });
+
+    // 이미지 선택 처리 (누적 추가 방식)
+    function handleImageSelection(files) {
+      // selectedImages = []; // 이 줄을 제거해서 기존 사진 유지
+      
+      if (files.length > 0) {
+        Array.from(files).forEach((file, index) => {
+          if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              selectedImages.push(e.target.result); // 기존 배열에 추가
+              updatePhotoPreview(); // 미리보기 업데이트
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      }
+    }
+    
+    // 사진 미리보기 업데이트 함수
+    function updatePhotoPreview() {
+      const preview = document.getElementById('photoPreview');
+      const photoCount = document.getElementById('photoCount');
+      preview.innerHTML = '';
+      
+      if (selectedImages.length > 0) {
+        preview.style.display = 'block';
+        photoCount.textContent = `선택된 사진: ${selectedImages.length}장`;
+        
+        selectedImages.forEach((imageData, index) => {
+          const photoItem = document.createElement('div');
+          photoItem.className = 'photo-item';
+          
+          const img = document.createElement('img');
+          img.src = imageData;
+          
+          const label = document.createElement('div');
+          label.className = 'photo-label';
+          label.textContent = `사진 ${index + 1}`;
+          
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'delete-btn';
+          deleteBtn.innerHTML = '×';
+          deleteBtn.type = 'button';
+          deleteBtn.onclick = function() {
+            removePhoto(index);
+          };
+          
+          photoItem.appendChild(img);
+          photoItem.appendChild(label);
+          photoItem.appendChild(deleteBtn);
+          preview.appendChild(photoItem);
+        });
+      } else {
+        preview.style.display = 'none';
+        photoCount.textContent = '';
+      }
+    }
+    
+    // 사진 삭제 함수 (단순화)
+    function removePhoto(index) {
+      selectedImages.splice(index, 1);
+      updatePhotoPreview(); // 미리보기 다시 업데이트
+    }
+
+    // 폼 제출
+    function submitForm() {
+      const submitBtn = document.getElementById('submitBtn');
+      const statusDiv = document.getElementById('statusMessage');
+      
+      console.log('submitForm 함수 시작');
+      
+      // 필수 필드 검증
+      const trackingNumber = document.getElementById('trackingNumber').value.trim();
+      const returnType = document.getElementById('returnType').value;
+      const stockStatus = document.getElementById('stockStatus').value;
+      
+      console.log('필수 필드 값:', {trackingNumber, returnType, stockStatus});
+      
+      if (!trackingNumber) {
+        showStatus('먼저 고객 정보를 검색해주세요.', 'error');
+        return;
+      }
+      
+      if (!returnType || !stockStatus) {
+        showStatus('구분과 재고상태를 선택해주세요.', 'error');
+        return;
+      }
+      
+      // 버튼 비활성화
+      submitBtn.disabled = true;
+      showStatus('등록 중...', 'loading');
+      
+      // 데이터 준비
+      const formData = {
+        trackingNumber: trackingNumber,
+        company: document.getElementById('company').value.trim(),
+        product: document.getElementById('product').value.trim(),
+        customer: document.getElementById('customer').value.trim(),
+        returnType: returnType,
+        stockStatus: stockStatus,
+        memo: document.getElementById('memo').value.trim()
+      };
+      
+      console.log('준비된 폼 데이터:', formData);
+      console.log('선택된 이미지 개수:', selectedImages.length);
+      
+      // 이미지가 있으면 먼저 업로드
+      if (selectedImages.length > 0) {
+        console.log('이미지 업로드 시작');
+        google.script.run
+          .withSuccessHandler(function(photoLinks) {
+            console.log('이미지 업로드 성공, 받은 링크:', photoLinks);
+            formData.photoLinks = photoLinks;
+            saveData(formData);
+          })
+          .withFailureHandler(function(error) {
+            console.error('이미지 업로드 오류:', error);
+            showStatus('이미지 업로드 실패: ' + error, 'error');
+            submitBtn.disabled = false;
+          })
+          .uploadImages(selectedImages, trackingNumber);
+      } else {
+        console.log('이미지 없음, 바로 데이터 저장');
+        saveData(formData);
+      }
+    }
+
+    // 데이터 저장
+    function saveData(formData) {
+      console.log('saveData 함수 시작, 데이터:', formData);
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          console.log('서버 응답 성공:', result);
+          showStatus(result, 'success');
+          document.getElementById('returnForm').reset();
+          document.getElementById('photoPreview').style.display = 'none';
+          selectedImages = [];
+          document.getElementById('submitBtn').disabled = false;
+        })
+        .withFailureHandler(function(error) {
+          console.error('서버 응답 실패:', error);
+          showStatus('저장 실패: ' + error, 'error');
+          document.getElementById('submitBtn').disabled = false;
+        })
+        .addReturnData(formData);
+        
+      console.log('addReturnData 함수 호출 완료');
+    }
+
+    // 테스트 연결 함수
+    function testConnection() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          alert('연결 성공: ' + result);
+        })
+        .withFailureHandler(function(error) {
+          alert('연결 실패: ' + error);
+        })
+        .simpleTest();
+    }
+
+    // 상태 메시지 표시
+    function showStatus(message, type) {
+      const statusDiv = document.getElementById('statusMessage');
+      statusDiv.textContent = message;
+      statusDiv.className = 'status ' + type;
+      statusDiv.style.display = 'block';
+      
+      if (type === 'success') {
+        setTimeout(() => {
+          statusDiv.style.display = 'none';
+        }, 3000);
+      }
+    }
+  </script>
+</body>
+</html>

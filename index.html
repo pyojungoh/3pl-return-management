@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="반품교환">
+  <meta name="theme-color" content="#4CAF50">
+  <title>반품교환 등록</title>
+
+
+  <style>
+    /* ========= 유동 스케일 변수: 화면폭에 따라 자동 조정 =========
+       - baseWidth 430px(일반 폰 기준) 대비 비율을 잡되 과하게 크거나 작아지는 것 방지
+       - 폰트/칸/버튼/썸네일 모두 clamp()로 반응형
+    */
+:root{
+  --fs-body:  clamp(32px, 8.4vw, 40px);
+  --fs-label: clamp(32px, 9.2vw, 44px);
+  --fs-input: clamp(32px, 9.6vw, 44px);
+  --fs-btn:   clamp(32px, 10vw, 44px);
+  --fs-title: clamp(36px, 11.2vw, 52px);
+
+  --h-control: clamp(44px, 19vw, 88px);
+  --h-button:  clamp(52px, 22vw, 100px);
+
+  --pad-v:     clamp(8px, 2.4vh, 20px);
+  --pad-h:     clamp(16px, 6.4vw, 32px);
+  --radius:    clamp(12px, 4.8vw, 20px);
+  --gap:       clamp(16px, 4.8vw, 32px);
+
+  --thumb:     clamp(112px, 36vw, 200px);
+  --status-fs: clamp(28px, 8vw, 36px);
+}
+
+    *{ box-sizing: border-box; }
+    html, body { height: 100%; -webkit-overflow-scrolling: touch; }
+    body{
+  margin: 0;
+  padding: 0;
+  background:#fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-size: var(--fs-body);
+  line-height: 1.35;
+  -webkit-text-size-adjust: 100%;
+}
+
+    .container{
+  width: 100vw;              /* 화면 가로 꽉 차게 */
+  max-width: 100vw;
+  margin: 0;
+  background: #fff;
+  /* 노치/홈바 안전 여백 + 내부 패딩 동시 반영 */
+  padding: max(env(safe-area-inset-top, 0px), clamp(8px, 2.6vw, 20px))
+           max(env(safe-area-inset-right, 0px), clamp(8px, 2.6vw, 20px))
+           max(env(safe-area-inset-bottom, 0px), clamp(8px, 2.6vw, 20px))
+           max(env(safe-area-inset-left, 0px), clamp(8px, 2.6vw, 20px));
+  border-radius: 0;          /* 가장자리 라운드 제거 */
+  box-shadow: none;          /* 카드 그림자 제거 (풀블리드) */
+  min-height: 100dvh;        /* 화면 높이 꽉 차게 */
+}
+
+
+    h2{
+      margin: 0 0 var(--gap);
+      text-align: center;
+      color: #222;
+      font-size: var(--fs-title);
+      font-weight: 800;
+      letter-spacing: -0.2px;
+    }
+
+    .form-group{ margin-bottom: calc(var(--gap) * 0.8); }
+
+    label{
+      display:block;
+      margin-bottom: clamp(2px, 1vw, 6px);
+      color:#222;
+      font-weight: 700;
+      font-size: var(--fs-label);
+      letter-spacing: -0.2px;
+    }
+
+    input, select, textarea{
+      width:100%;
+      border: 1.5px solid #ddd;
+      border-radius: var(--radius);
+      background:#fff;
+      font-size: var(--fs-input);
+      padding: calc(var(--pad-v) * 0.8) var(--pad-h);
+      min-height: var(--h-control);
+      transition: border-color .2s ease, box-shadow .2s ease, transform .02s ease;
+      -webkit-appearance: none; appearance: none;
+    }
+    input[type="number"]{ text-align:center; font-weight:700; }
+    input[readonly]{ background:#f8f9fa; color:#555; }
+
+    textarea{ min-height: calc(var(--h-control) * 1.6); resize: vertical; }
+
+    input:focus, select:focus, textarea:focus{
+      outline:none;
+      border-color:#4CAF50;
+      box-shadow:0 0 0 3px rgba(76,175,80,0.12);
+    }
+
+    button{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:100%;
+      border:none; border-radius: var(--radius);
+      background:#4CAF50; color:#fff;
+      font-size: var(--fs-btn); font-weight: 800;
+      padding: calc(var(--pad-v) * 0.8) var(--pad-h);
+      min-height: var(--h-button);
+      margin: clamp(4px, 1.6vw, 8px) 0;
+      cursor:pointer;
+      transition: transform .08s ease, background .2s ease;
+      -webkit-tap-highlight-color: transparent;
+      letter-spacing:-0.2px;
+    }
+    button:hover, button:active{ background:#45a049; transform: translateY(-1px); }
+    button:disabled{ background:#bdbdbd; transform:none; cursor:not-allowed; }
+
+    .scan-btn{ background:#2196F3; }
+    .scan-btn:hover,.scan-btn:active{ background:#1976D2; }
+
+    .photo-btn{ background:#FF9800; }
+    .photo-btn:hover,.photo-btn:active{ background:#F57C00; }
+
+    .refresh-btn{ background:#607D8B; }
+    .refresh-btn:hover{ background:#455A64; }
+
+    .test-btn{ background:#9C27B0; }
+    .test-btn:hover{ background:#7B1FA2; }
+
+    .month-selector{
+      background:#e3f2fd;
+      border: 1.5px solid #2196F3;
+      color:#0D47A1;
+      font-weight: 700;
+    }
+    .month-selector:focus{ border-color:#1976D2; box-shadow:0 0 0 3px rgba(33,150,243,0.12); }
+
+    .preview{ margin-top: calc(var(--gap) * 0.6); display:none; text-align:center; }
+    .preview .photo-item{ display:inline-block; margin: clamp(4px, 1.6vw, 8px); text-align:center; vertical-align:top; }
+    .preview img{
+      width: var(--thumb);
+      height: var(--thumb);
+      object-fit: cover;
+      border-radius: var(--radius);
+      border: 1.5px solid #ddd;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      display:block; margin-bottom: clamp(2px, 1vw, 6px);
+    }
+    .photo-label{ font-size: clamp(12px, 3.6vw, 16px); color:#666; font-weight:600; }
+
+    .delete-btn{
+      background:#f44336; color:#fff; border:none; border-radius:50%;
+      width: clamp(18px, 5.2vw, 24px); height: clamp(18px, 5.2vw, 24px);
+      font-size: clamp(11px, 3.4vw, 13px);
+      cursor:pointer; padding:0;
+      display:inline-flex; align-items:center; justify-content:center;
+    }
+
+    .qr-status{
+      margin-top: clamp(6px, 2vw, 12px);
+      color:#0D47A1;
+      font-size: clamp(14px, 4vw, 18px);
+      font-weight: 600;
+      background:#e3f2fd;
+      border:1.5px solid rgba(33,150,243,0.35);
+      padding: clamp(6px, 2vw, 12px);
+      border-radius: var(--radius);
+      text-align:center;
+    }
+    
+    .cancel-btn{
+      background:#9e9e9e;
+      color:#fff;
+    }
+    
+    .cancel-btn:hover,
+    .cancel-btn:active{
+      background:#757575;
+    }
+
+    .status{
+      padding: clamp(8px, 2.2vw, 14px);
+      margin: var(--gap) 0;
+      border-radius: var(--radius);
+      text-align:center;
+      font-weight:700;
+      font-size: var(--status-fs);
+    }
+    .success{ background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+    .error{   background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
+    .loading{ background:#d1ecf1; color:#0c5460; border:1px solid #bee5eb; }
+
+    /* 전체 화면 진행 오버레이(업로드/저장 동안) */
+    .overlay{
+      position:fixed; inset:0; z-index:9999;
+      background:rgba(0,0,0,0.45);
+      display:none; align-items:center; justify-content:center;
+      backdrop-filter: blur(1px);
+    }
+    .overlay.show{ display:flex; }
+    .overlay-card{
+      background:#fff;
+      width: min(86vw, 420px);
+      padding: clamp(12px, 3.2vw, 18px);
+      border-radius: calc(var(--radius) + 2px);
+      box-shadow: 0 12px 36px rgba(0,0,0,0.22);
+      text-align:center;
+    }
+    .spinner{
+      width: clamp(28px, 8vw, 40px); height: clamp(28px, 8vw, 40px);
+      border: 3px solid #e0e0e0; border-top-color:#4CAF50;
+      border-radius:50%; margin: 0 auto clamp(6px, 2vw, 10px);
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin{ to{ transform: rotate(360deg); } }
+    .overlay-title{ font-size: clamp(16px, 4.6vw, 20px); font-weight: 800; color:#222; margin-bottom: clamp(4px, 1.4vw, 8px); }
+    .overlay-desc{  font-size: clamp(13px, 3.8vw, 16px); color:#555; margin-bottom: clamp(6px, 1.8vw, 10px); }
+    .progressbar{ width:100%; height: clamp(5px, 1.2vw, 8px); background:#eee; border-radius:999px; overflow:hidden; }
+    .progressbar>div{ width:0%; height:100%; background:#4CAF50; transition: width .25s ease; }
+
+    /* 터치 장치에서 호버 애니메이션 축소 */
+    @media (hover:none) and (pointer:coarse){
+      button:hover{ transform:none; }
+      button:active{ transform: scale(0.98); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>반품교환 등록</h2>
+
+    <form id="returnForm">
+      <!-- 월 선택 -->
+      <div class="form-group">
+        <label>📅 검색할 월</label>
+        <select id="monthSelector" class="month-selector" required>
+          <option value="">월 정보를 불러오는 중...</option>
+        </select>
+        <button type="button" class="refresh-btn" onclick="loadAvailableSheets()">🔄 월 목록 새로고침</button>
+      </div>
+
+      <!-- QR 검색 안내 -->
+      <div class="form-group">
+        <label>📷 QR 코드 스캔</label>
+        <button type="button" class="scan-btn" onclick="startQRScan()" id="qrScanBtn">📷 QR 코드 스캔</button>
+        <div id="qrStatus" class="qr-status">QR 코드를 스캔하거나 송장번호를 직접 입력하세요.</div>
+        <div id="qrScanner" style="display:none; margin-top: 10px;">
+          <video id="qrVideo" autoplay playsinline style="width: 100%; max-width: 400px; border-radius: 8px;"></video>
+          <button type="button" class="cancel-btn" onclick="stopQRScan()" style="margin-top: 10px; width: 100%;">⏹️ 스캔 중단</button>
+        </div>
+      </div>
+
+      <!-- 송장번호 검색 -->
+      <div class="form-group">
+        <label>송장번호</label>
+        <input type="text" id="trackingNumber" placeholder="QR 스캔 또는 송장번호 직접 입력" required>
+        <button type="button" class="scan-btn" onclick="searchByTracking()">🔍 검색</button>
+      </div>
+
+      <!-- 검색 결과 확인 -->
+      <div class="form-group">
+        <label>화주명</label>
+        <input type="text" id="company" placeholder="검색 후 자동 입력됩니다" readonly>
+      </div>
+      <div class="form-group">
+        <label>제품</label>
+        <input type="text" id="product" placeholder="검색 후 자동 입력됩니다" readonly>
+      </div>
+      <div class="form-group">
+        <label>고객명 (확인)</label>
+        <input type="text" id="customer" placeholder="검색 후 자동 입력됩니다" readonly>
+      </div>
+
+      <!-- 사진 업로드 -->
+      <div class="form-group">
+        <label>사진 (여러 장 가능)</label>
+        <input type="file" id="photos" accept="image/*" multiple capture="camera" style="display:none;">
+        <button type="button" class="photo-btn" onclick="document.getElementById('photos').click()">📷 사진 찍기</button>
+        <div id="photoPreview" class="preview"></div>
+        <div id="photoCount" style="margin-top: 6px; color:#666; text-align:center; font-size: clamp(13px, 3.8vw, 16px);"></div>
+      </div>
+
+      <!-- 제출 -->
+      <button type="submit" id="submitBtn">등록하기</button>
+      <button type="button" onclick="testConnection()" class="test-btn">🔧 연결 테스트</button>
+    </form>
+
+    <!-- 상태 메시지 -->
+    <div id="statusMessage" style="display:none;"></div>
+  </div>
+
+  <!-- 업로드/저장 진행 오버레이 -->
+  <div id="overlay" class="overlay" role="alert" aria-live="assertive">
+    <div class="overlay-card">
+      <div class="spinner"></div>
+      <div id="overlayTitle" class="overlay-title">준비 중…</div>
+      <div id="overlayDesc"  class="overlay-desc">잠시만 기다려주세요.</div>
+      <div class="progressbar"><div id="overlayBar"></div></div>
+    </div>
+  </div>
+
+  <script>
+    let selectedImages = [];
+    let availableSheets = [];
+    let overlayTimer = null;
+    let pseudoProgress = 0;
+
+    document.addEventListener('DOMContentLoaded', function () {
+      loadAvailableSheets();
+
+      document.getElementById('photos').addEventListener('change', function(e){
+        handleImageSelection(e.target.files);
+      });
+
+      document.getElementById('returnForm').addEventListener('submit', function(e){
+        e.preventDefault();
+        submitForm();
+      });
+      
+      // 엔터키로 검색
+      document.getElementById('trackingNumber').addEventListener('keypress', function(e){
+        if (e.key === 'Enter'){
+          e.preventDefault();
+          searchByTracking();
+        }
+      });
+    });
+
+    /* ========== 진행 오버레이 ========== */
+    function showOverlay(titleText, descText){
+      const overlay = document.getElementById('overlay');
+      const title = document.getElementById('overlayTitle');
+      const desc  = document.getElementById('overlayDesc');
+      const bar   = document.getElementById('overlayBar');
+
+      title.textContent = titleText || '처리 중…';
+      desc.textContent  = descText  || '잠시만 기다려주세요.';
+      pseudoProgress = 0;
+      bar.style.width = '0%';
+      overlay.classList.add('show');
+
+      clearInterval(overlayTimer);
+      overlayTimer = setInterval(() => {
+        if (pseudoProgress < 92){
+          pseudoProgress += Math.random()*6 + 2; // 2~8%
+          if (pseudoProgress > 92) pseudoProgress = 92;
+          bar.style.width = pseudoProgress.toFixed(0) + '%';
+        }
+      }, 320);
+    }
+    function updateOverlay(titleText, descText){
+      if (titleText) document.getElementById('overlayTitle').textContent = titleText;
+      if (descText)  document.getElementById('overlayDesc').textContent  = descText;
+    }
+    function fillOverlayBar(){ document.getElementById('overlayBar').style.width = '100%'; }
+    function hideOverlay(){ clearInterval(overlayTimer); document.getElementById('overlay').classList.remove('show'); }
+
+    /* ========== 시트 목록 로드 ========== */
+    function loadAvailableSheets(){
+      showStatus('월 목록을 불러오는 중...', 'loading');
+      google.script.run
+        .withSuccessHandler(function(sheets){
+          availableSheets = sheets || [];
+          const sel = document.getElementById('monthSelector');
+          sel.innerHTML = '';
+
+          if (availableSheets.length === 0){
+            const o = document.createElement('option');
+            o.value = '';
+            o.textContent = '사용 가능한 월이 없습니다';
+            sel.appendChild(o);
+            showStatus('사용 가능한 월 시트가 없습니다.', 'error');
+            return;
+          }
+
+          availableSheets.forEach(name=>{
+            const o = document.createElement('option');
+            o.value = name; o.textContent = name;
+            sel.appendChild(o);
+          });
+
+          const today = new Date();
+          const current = `${today.getFullYear()}년${today.getMonth()+1}월`;
+          let found = availableSheets.find(s=> s===current)
+              || availableSheets.find(s=> s.replace(/\s/g,'').toLowerCase() === current.replace(/\s/g,'').toLowerCase());
+          sel.value = found || availableSheets[0];
+          showStatus(`현재 월 ${sel.value}로 설정되었습니다.`, 'success');
+        })
+        .withFailureHandler(function(error){
+          showStatus('월 목록 로드 실패: ' + error, 'error');
+          const sel = document.getElementById('monthSelector');
+          sel.innerHTML = '';
+          const o = document.createElement('option');
+          o.value = '';
+          o.textContent = '월 목록 로드 실패 - 새로고침 버튼';
+          sel.appendChild(o);
+        })
+        .getAvailableSheets();
+    }
+
+    /* ========== 이미지 선택/미리보기 ========== */
+    function handleImageSelection(files){
+      if (!files || files.length === 0) return;
+      Array.from(files).forEach(file=>{
+        if (file.type.startsWith('image/')){
+          const reader = new FileReader();
+          reader.onload = e=>{
+            selectedImages.push(e.target.result); // base64 저장
+            updatePhotoPreview();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    function updatePhotoPreview(){
+      const preview = document.getElementById('photoPreview');
+      const photoCount = document.getElementById('photoCount');
+      preview.innerHTML = '';
+
+      if (selectedImages.length > 0){
+        preview.style.display = 'block';
+        photoCount.textContent = `선택된 사진: ${selectedImages.length}장`;
+        selectedImages.forEach((imgData, idx)=>{
+          const wrap = document.createElement('div');
+          wrap.className = 'photo-item';
+
+          const img = document.createElement('img');
+          img.src = imgData;
+
+          const label = document.createElement('div');
+          label.className = 'photo-label';
+          label.textContent = `사진 ${idx+1}`;
+
+          const del = document.createElement('button');
+          del.className = 'delete-btn'; del.type='button'; del.innerHTML='×';
+          del.onclick = ()=> removePhoto(idx);
+
+          wrap.appendChild(img); wrap.appendChild(label); wrap.appendChild(del);
+          preview.appendChild(wrap);
+        });
+      }else{
+        preview.style.display = 'none';
+        photoCount.textContent = '';
+      }
+    }
+
+    function removePhoto(index){
+      selectedImages.splice(index,1);
+      updatePhotoPreview();
+    }
+
+    /* ========== 제출 ========== */
+    function submitForm(){
+      const btn = document.getElementById('submitBtn');
+      const selectedMonth = document.getElementById('monthSelector').value;
+      const trackingNumber = document.getElementById('trackingNumber').value.trim();
+
+      if (!selectedMonth) return showStatus('월이 선택되지 않았습니다. 새로고침 버튼을 눌러주세요.', 'error');
+      if (!trackingNumber) return showStatus('먼저 QR 코드로 접속하거나 정보를 입력해주세요.', 'error');
+
+      // UI 잠금 + 진행 오버레이
+      btn.disabled = true;
+      btn.textContent = '등록 중…';
+      if (selectedImages.length > 0){
+        showOverlay('이미지 업로드 중…', `총 ${selectedImages.length}장 업로드를 시작합니다.`);
+      }else{
+        showOverlay('저장 중…', '잠시만 기다려주세요.');
+      }
+
+      const formData = {
+        trackingNumber,
+        company:  document.getElementById('company').value.trim(),
+        product:  document.getElementById('product').value.trim(),
+        customer: document.getElementById('customer').value.trim(),
+        selectedMonth
+      };
+
+      if (selectedImages.length > 0){
+        google.script.run
+          .withSuccessHandler(function(photoLinks){
+            updateOverlay('사진 링크 저장 중…', '시트에 링크를 기록하고 있습니다.');
+            document.getElementById('overlayBar').style.width = '96%';
+            formData.photoLinks = photoLinks;
+            saveData(formData);
+          })
+          .withFailureHandler(function(error){
+            hideOverlay();
+            showStatus('이미지 업로드 실패: ' + error, 'error');
+            btn.disabled = false;
+            btn.textContent = '등록하기';
+          })
+          .uploadImages(selectedImages, trackingNumber);
+      }else{
+        updateOverlay('저장 중…', '시트에 기록하고 있습니다.');
+        saveData(formData);
+      }
+    }
+
+    function saveData(formData){
+      google.script.run
+        .withSuccessHandler(function(result){
+          fillOverlayBar();
+          setTimeout(hideOverlay, 240);
+
+          showStatus(result, 'success');
+          document.getElementById('returnForm').reset();
+          document.getElementById('photoPreview').style.display = 'none';
+          selectedImages = [];
+
+          const btn = document.getElementById('submitBtn');
+          btn.disabled = false;
+          btn.textContent = '등록하기';
+
+          if (formData.selectedMonth){
+            document.getElementById('monthSelector').value = formData.selectedMonth;
+          }
+          document.getElementById('statusMessage').scrollIntoView({behavior:'smooth', block:'center'});
+        })
+        .withFailureHandler(function(error){
+          hideOverlay();
+          showStatus('저장 실패: ' + error, 'error');
+          const btn = document.getElementById('submitBtn');
+          btn.disabled = false;
+          btn.textContent = '등록하기';
+        })
+        .addReturnData(formData);
+    }
+
+    /* ========== 테스트 ========== */
+    function testConnection(){
+      google.script.run
+        .withSuccessHandler(result=> alert('연결 성공: ' + result))
+        .withFailureHandler(error=> alert('연결 실패: ' + error))
+        .simpleTest();
+    }
+
+    /* ========== 상태 메시지 ========== */
+    function showStatus(message, type){
+      const el = document.getElementById('statusMessage');
+      el.textContent = message;
+      el.className = 'status ' + type;
+      el.style.display = 'block';
+    }
+
+
+    // QR 스캔 관련 변수
+    let qrStream = null;
+    let qrScanInterval = null;
+    let barcodeDetector = null;
+    
+    // QR 스캔 시작 (브라우저 네이티브 API 사용)
+    async function startQRScan(){
+      const qrStatus = document.getElementById('qrStatus');
+      const qrScanner = document.getElementById('qrScanner');
+      const qrVideo = document.getElementById('qrVideo');
+      const qrScanBtn = document.getElementById('qrScanBtn');
+      
+      try {
+        // BarcodeDetector API 지원 확인
+        if ('BarcodeDetector' in window) {
+          barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+        } else {
+          // BarcodeDetector가 없으면 jsQR 라이브러리 시도
+          if (typeof jsQR === 'undefined') {
+            // jsQR 라이브러리 동적 로드
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+            script.onload = function(){
+              startQRScanWithLibrary();
+            };
+            script.onerror = function(){
+              qrStatus.textContent = 'QR 스캔을 사용할 수 없습니다. 송장번호를 직접 입력해주세요.';
+              qrStatus.style.background = '#f8d7da';
+              qrStatus.style.color = '#721c24';
+            };
+            document.head.appendChild(script);
+            return;
+          } else {
+            startQRScanWithLibrary();
+            return;
+          }
+        }
+        
+        // 카메라 권한 요청
+        qrStatus.textContent = '카메라 권한을 확인하는 중...';
+        qrStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          } 
+        });
+        
+        qrVideo.srcObject = qrStream;
+        qrScanner.style.display = 'block';
+        qrScanBtn.style.display = 'none';
+        qrStatus.textContent = 'QR 코드를 카메라에 비춰주세요.';
+        qrStatus.style.background = '#d1ecf1';
+        qrStatus.style.color = '#0c5460';
+        
+        // QR 코드 감지 시작
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        
+        qrVideo.addEventListener('loadedmetadata', function(){
+          canvas.width = qrVideo.videoWidth;
+          canvas.height = qrVideo.videoHeight;
+        });
+        
+        qrScanInterval = setInterval(async function(){
+          if (qrVideo.readyState === qrVideo.HAVE_ENOUGH_DATA && canvas.width > 0) {
+            try {
+              context.drawImage(qrVideo, 0, 0, canvas.width, canvas.height);
+              const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+              const barcodes = await barcodeDetector.detect(imageData);
+              if (barcodes.length > 0) {
+                const qrData = barcodes[0].rawValue;
+                stopQRScan();
+                document.getElementById('trackingNumber').value = qrData;
+                qrStatus.textContent = 'QR 코드 인식 완료! 자동으로 검색 중...';
+                qrStatus.style.background = '#d4edda';
+                qrStatus.style.color = '#155724';
+                showStatus('QR 코드가 인식되었습니다. 자동으로 검색합니다.', 'success');
+                // 자동 검색 실행 (월 자동 선택 포함)
+                autoSearchAfterQR(qrData);
+              }
+            } catch (err) {
+              // 감지 실패는 무시 (계속 시도)
+            }
+          }
+        }, 200);
+        
+      } catch (error) {
+        console.error('QR 스캔 오류:', error);
+        qrStatus.textContent = '카메라를 사용할 수 없습니다. 송장번호를 직접 입력해주세요.';
+        qrStatus.style.background = '#f8d7da';
+        qrStatus.style.color = '#721c24';
+        if (qrStream) {
+          qrStream.getTracks().forEach(track => track.stop());
+        }
+      }
+    }
+    
+    // jsQR 라이브러리 사용
+    function startQRScanWithLibrary(){
+      const qrStatus = document.getElementById('qrStatus');
+      const qrScanner = document.getElementById('qrScanner');
+      const qrVideo = document.getElementById('qrVideo');
+      const qrScanBtn = document.getElementById('qrScanBtn');
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      
+      navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      }).then(function(stream){
+        qrStream = stream;
+        qrVideo.srcObject = stream;
+        qrScanner.style.display = 'block';
+        qrScanBtn.style.display = 'none';
+        qrStatus.textContent = 'QR 코드를 카메라에 비춰주세요.';
+        qrStatus.style.background = '#d1ecf1';
+        qrStatus.style.color = '#0c5460';
+        
+        qrVideo.addEventListener('loadedmetadata', function(){
+          canvas.width = qrVideo.videoWidth;
+          canvas.height = qrVideo.videoHeight;
+        });
+        
+        qrScanInterval = setInterval(function(){
+          if (qrVideo.readyState === qrVideo.HAVE_ENOUGH_DATA) {
+            context.drawImage(qrVideo, 0, 0, canvas.width, canvas.height);
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            
+            if (code) {
+              stopQRScan();
+              document.getElementById('trackingNumber').value = code.data;
+              qrStatus.textContent = 'QR 코드 인식 완료! 자동으로 검색 중...';
+              qrStatus.style.background = '#d4edda';
+              qrStatus.style.color = '#155724';
+              showStatus('QR 코드가 인식되었습니다. 자동으로 검색합니다.', 'success');
+              // 자동 검색 실행 (월 자동 선택 포함)
+              autoSearchAfterQR(code.data);
+            }
+          }
+        }, 100);
+      }).catch(function(error){
+        console.error('카메라 오류:', error);
+        qrStatus.textContent = '카메라를 사용할 수 없습니다. 송장번호를 직접 입력해주세요.';
+        qrStatus.style.background = '#f8d7da';
+        qrStatus.style.color = '#721c24';
+      });
+    }
+    
+    // QR 스캔 후 자동 검색 (월 자동 선택 포함)
+    function autoSearchAfterQR(trackingNumber){
+      console.log('자동 검색 시작, 송장번호:', trackingNumber);
+      
+      // 이미 월이 선택되어 있으면 바로 검색
+      const monthSelector = document.getElementById('monthSelector');
+      if (monthSelector && monthSelector.value) {
+        console.log('월이 이미 선택됨:', monthSelector.value);
+        setTimeout(function(){
+          fetchDataByTracking(trackingNumber);
+        }, 300);
+        return;
+      }
+      
+      // 월 목록이 로드될 때까지 대기
+      let waitCount = 0;
+      const checkSheets = setInterval(function(){
+        waitCount++;
+        if (availableSheets.length > 0) {
+          clearInterval(checkSheets);
+          console.log('월 목록 로드 완료:', availableSheets);
+          
+          // 현재 월을 기본으로 선택
+          const today = new Date();
+          const currentMonth = `${today.getFullYear()}년${today.getMonth()+1}월`;
+          
+          // 현재 월이 목록에 있으면 선택, 없으면 첫 번째 항목 선택
+          let selectedMonth = currentMonth;
+          if (!availableSheets.includes(currentMonth)) {
+            selectedMonth = availableSheets[0] || '';
+          }
+          
+          if (monthSelector && selectedMonth) {
+            monthSelector.value = selectedMonth;
+            console.log('월 자동 선택:', selectedMonth);
+          }
+          
+          // 검색 실행
+          setTimeout(function(){
+            console.log('자동 검색 실행');
+            fetchDataByTracking(trackingNumber);
+          }, 300);
+        } else if (waitCount > 50) {
+          // 5초 대기 후에도 목록이 없으면 타임아웃
+          clearInterval(checkSheets);
+          console.warn('월 목록 로드 타임아웃');
+          showStatus('월 목록을 불러오는 중입니다. 잠시 후 검색 버튼을 눌러주세요.', 'error');
+        }
+      }, 100);
+    }
+    
+    // QR 스캔 중단
+    function stopQRScan(){
+      if (qrScanInterval) {
+        clearInterval(qrScanInterval);
+        qrScanInterval = null;
+      }
+      if (qrStream) {
+        qrStream.getTracks().forEach(track => track.stop());
+        qrStream = null;
+      }
+      const qrVideo = document.getElementById('qrVideo');
+      if (qrVideo) {
+        qrVideo.srcObject = null;
+      }
+      document.getElementById('qrScanner').style.display = 'none';
+      document.getElementById('qrScanBtn').style.display = 'inline-block';
+    }
+    
+    // 송장번호로 검색 (검색 버튼 클릭 시)
+    function searchByTracking(){
+      const trackingInput = document.getElementById('trackingNumber');
+      const trackingNumber = trackingInput ? trackingInput.value.trim() : '';
+      
+      if (!trackingNumber){
+        showStatus('송장번호를 입력해주세요.', 'error');
+        return;
+      }
+      
+      fetchDataByTracking(trackingNumber);
+    }
+    
+    function fetchDataByTracking(trackingNumber){
+      const selectedMonth = document.getElementById('monthSelector').value;
+      const cleaned = trackingNumber ? trackingNumber.toString().trim() : '';
+
+      if (!selectedMonth){
+        showStatus('먼저 월을 선택해주세요.', 'error');
+        return;
+      }
+
+      if (!cleaned){
+        showStatus('송장번호를 입력해주세요.', 'error');
+        return;
+      }
+
+      showStatus(`${selectedMonth}에서 데이터 조회 중...`, 'loading');
+
+      google.script.run
+        .withSuccessHandler(function(data){
+          if (data){
+            fillFormWithData(data);
+            showStatus('QR 데이터 조회 완료! 정보를 확인해주세요.', 'success');
+          }else{
+            clearFormData(cleaned);
+            showStatus(`${selectedMonth}에서 해당 송장번호 데이터를 찾을 수 없습니다.`, 'error');
+          }
+        })
+        .withFailureHandler(function(error){
+          showStatus('QR 데이터 조회 실패: ' + error, 'error');
+        })
+        .findDataByTrackingNumber(cleaned, selectedMonth);
+    }
+
+    function fillFormWithData(data){
+      document.getElementById('company').value        = data.company || '';
+      document.getElementById('product').value        = data.product || '';
+      document.getElementById('customer').value       = data.customer || '';
+      document.getElementById('trackingNumber').value = data.trackingNumber || '';
+    }
+
+    function clearFormData(trackingValue){
+      document.getElementById('company').value = '';
+      document.getElementById('product').value = '';
+      document.getElementById('customer').value = '';
+      document.getElementById('trackingNumber').value = trackingValue || '';
+    }
+  </script>
+</body>
+</html>

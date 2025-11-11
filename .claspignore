@@ -1,0 +1,53 @@
+# Python files
+*.py
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment files
+.env
+.venv
+venv/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git files
+.git/
+.gitignore
+
+# Documentation
+*.md
+화주사시스템_사용가이드.md
+
+# Backup files
+*.bak
+백업.html
+백업.html.html
+
+# Templates (if not needed)
+templates/
+
+# API files (Python Flask)
+api/
+server_new.py
+requirements.txt
+read_sheets_simple.py
+
+# Other
+*.log
+.DS_Store
+Thumbs.db
+
