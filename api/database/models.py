@@ -12,6 +12,24 @@ from typing import Optional, List, Dict
 if os.environ.get('VERCEL'):
     # Vercel 환경: /tmp 디렉토리 사용 (쓰기 가능)
     DB_PATH = os.path.join('/tmp', 'data.db')
+    
+    # Vercel 환경에서 초기 데이터베이스 파일 복사
+    # GitHub에 푸시된 data.db 파일을 /tmp로 복사
+    try:
+        import shutil
+        # 프로젝트 루트의 data.db 파일 경로
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(current_dir))
+        source_db = os.path.join(project_root, 'data.db')
+        
+        # source_db 파일이 있고, /tmp/data.db가 없거나 더 오래된 경우 복사
+        if os.path.exists(source_db):
+            if not os.path.exists(DB_PATH) or os.path.getmtime(source_db) > os.path.getmtime(DB_PATH):
+                shutil.copy2(source_db, DB_PATH)
+                print(f"✅ 데이터베이스 파일을 /tmp로 복사했습니다: {DB_PATH}")
+    except Exception as e:
+        print(f"⚠️ 데이터베이스 파일 복사 중 오류 (무시 가능): {e}")
+        # 복사 실패해도 계속 진행 (새 데이터베이스 생성)
 else:
     # 로컬 환경: 프로젝트 루트 디렉토리 사용
     current_dir = os.path.dirname(os.path.abspath(__file__))
