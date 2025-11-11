@@ -161,6 +161,9 @@ def register():
         
         # 화주사 계정 생성
         try:
+            print(f"📝 화주사 계정 생성 시도 - company_name: '{company_name}', username: '{username}', role: '{role}'")
+            
+            # create_company 함수 호출 (True/False 반환)
             success = create_company(
                 company_name=company_name,
                 username=username,
@@ -173,18 +176,35 @@ def register():
                 business_email=business_email
             )
             
+            print(f"📝 create_company 반환값: {success} (타입: {type(success)})")
+            
             if success:
                 print(f"✅ 화주사 계정 생성 성공: {company_name} ({username})")
+                # 생성된 계정 확인
+                created_company = get_company_by_username(username)
+                if created_company:
+                    print(f"✅ 생성된 계정 확인: {created_company.get('company_name')} ({created_company.get('username')})")
+                else:
+                    print(f"⚠️ 생성된 계정을 찾을 수 없음: {username}")
+                
                 return jsonify({
                     'success': True,
                     'message': '화주사 계정이 생성되었습니다.'
                 })
             else:
-                print(f"❌ 화주사 계정 생성 실패: {company_name} ({username}) - 중복 또는 오류")
-                return jsonify({
-                    'success': False,
-                    'message': '화주사 계정 생성에 실패했습니다. (아이디 중복 가능성)'
-                }), 500
+                print(f"❌ 화주사 계정 생성 실패: {company_name} ({username}) - create_company가 False 반환")
+                # 중복 확인
+                existing = get_company_by_username(username)
+                if existing:
+                    return jsonify({
+                        'success': False,
+                        'message': '이미 사용 중인 아이디입니다.'
+                    }), 400
+                else:
+                    return jsonify({
+                        'success': False,
+                        'message': '화주사 계정 생성에 실패했습니다. (알 수 없는 오류)'
+                    }), 500
         except Exception as e:
             print(f"❌ 화주사 계정 생성 중 예외 발생: {e}")
             import traceback
