@@ -36,8 +36,28 @@ app.config['JSON_AS_ASCII'] = False  # 한글 지원
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # 데이터베이스 초기화
-from api.database.models import init_db
+from api.database.models import init_db, get_company_by_username, create_company
 init_db()
+
+# 초기 관리자 계정 자동 생성 (없는 경우에만)
+try:
+    admin_user = get_company_by_username('admin')
+    if not admin_user:
+        print("🔧 초기 관리자 계정이 없습니다. 생성 중...")
+        create_company(
+            company_name='관리자',
+            username='admin',
+            password='admin123',  # ⚠️ 배포 후 비밀번호 변경 권장
+            role='관리자'
+        )
+        print("✅ 초기 관리자 계정이 생성되었습니다.")
+        print("   아이디: admin")
+        print("   비밀번호: admin123")
+        print("   ⚠️ 보안을 위해 배포 후 비밀번호를 변경하세요!")
+    else:
+        print("✅ 관리자 계정이 이미 존재합니다.")
+except Exception as e:
+    print(f"⚠️ 초기 관리자 계정 생성 중 오류 (무시 가능): {e}")
 
 # API 블루프린트 등록 (데이터베이스 기반)
 from api.auth.routes_db import auth_bp

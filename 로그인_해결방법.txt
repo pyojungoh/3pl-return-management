@@ -1,0 +1,54 @@
+==========================================
+로그인 문제 해결 방법
+==========================================
+
+[문제]
+Vercel 배포 후 데이터베이스가 비어있어서 로그인이 안 됩니다.
+
+[해결 방법 1] 브라우저 콘솔에서 관리자 계정 생성 (가장 빠름!)
+
+1. 배포된 사이트 접속 (예: https://your-app.vercel.app)
+2. F12 키를 눌러 개발자 도구 열기
+3. Console 탭 클릭
+4. 아래 명령어 복사해서 붙여넣기 후 Enter:
+
+fetch('/api/auth/register', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({
+    company_name: '관리자',
+    username: 'admin',
+    password: 'admin123',
+    role: '관리자'
+  })
+})
+.then(r => r.json())
+.then(data => {
+  console.log('결과:', data);
+  if (data.success) {
+    alert('✅ 관리자 계정이 생성되었습니다!\n아이디: admin\n비밀번호: admin123');
+  } else {
+    alert('❌ 오류: ' + data.message);
+  }
+});
+
+5. 성공 메시지가 나오면 로그인 가능!
+
+[해결 방법 2] 코드 수정 후 재배포
+
+1. app.py 파일에 이미 자동 생성 코드가 추가되어 있음
+2. GitHub에 푸시:
+   git add .
+   git commit -m "관리자 계정 자동 생성 추가"
+   git push origin main
+3. Vercel에서 자동 재배포
+4. 재배포 후 자동으로 관리자 계정 생성됨
+
+[기본 로그인 정보]
+아이디: admin
+비밀번호: admin123
+
+⚠️ 보안을 위해 로그인 후 비밀번호를 변경하세요!
+
+==========================================
+

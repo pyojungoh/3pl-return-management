@@ -9,11 +9,13 @@ env/
 ENV/
 .venv
 
-# 데이터베이스
-*.db
-*.sqlite
-*.sqlite3
-data.db
+# 데이터베이스 (Vercel 배포를 위해 포함 - 주석 처리)
+# *.db
+# *.sqlite
+# *.sqlite3
+# data.db
+# 주의: data.db는 포함시켜야 Vercel에서 초기 데이터 사용 가능
+# 하지만 Vercel 서버리스 환경에서는 /tmp 디렉토리 사용으로 제한적
 
 # 환경 변수
 .env

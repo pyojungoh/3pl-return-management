@@ -1,0 +1,42 @@
+==========================================
+GitHub에 푸시하기 (복사해서 사용)
+==========================================
+
+[1단계] 프로젝트 폴더로 이동
+cd C:\3pl반품관리및화주사관리
+
+[2단계] 변경사항 확인
+git status
+
+[3단계] data.db 파일이 제외되어 있는지 확인
+(만약 data.db가 안 보이면 .gitignore에서 제외해야 함)
+
+[4단계] 모든 변경사항 추가
+git add .
+
+또는 data.db만 추가하려면:
+git add data.db
+git add app.py
+git add *.py
+git add *.html
+
+[5단계] 커밋
+git commit -m "데이터베이스 마이그레이션 완료"
+
+[6단계] GitHub에 푸시
+git push origin main
+
+==========================================
+완료! GitHub에 푸시되면 Vercel에서 자동 재배포됩니다.
+==========================================
+
+[문제 해결]
+- data.db가 추가되지 않으면:
+  git add -f data.db  (강제 추가)
+
+- 커밋이 안 되면:
+  git config user.email "your-email@example.com"
+  git config user.name "Your Name"
+
+==========================================
+
