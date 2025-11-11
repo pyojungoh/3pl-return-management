@@ -446,71 +446,71 @@
   
   <!-- 대시보드 섹션 -->
   <div id="dashboardSection" class="dashboard-section">
-    <!-- 헤더 -->
-    <div class="header">
-      <div>
-        <h1>📦 반품 내역 조회</h1>
-        <div class="company-info" id="companyInfo"></div>
-      </div>
-      <button class="logout-btn" id="logoutBtn" type="button">로그아웃</button>
+  <!-- 헤더 -->
+  <div class="header">
+    <div>
+      <h1>📦 반품 내역 조회</h1>
+      <div class="company-info" id="companyInfo"></div>
     </div>
-    
-    <!-- 필터 -->
-    <div class="filters">
-      <label for="monthSelect">📅 조회 월:</label>
-      <select id="monthSelect">
-        <option value="">로딩 중...</option>
-      </select>
+      <button class="logout-btn" id="logoutBtn" type="button">로그아웃</button>
+  </div>
+  
+  <!-- 필터 -->
+  <div class="filters">
+    <label for="monthSelect">📅 조회 월:</label>
+    <select id="monthSelect">
+      <option value="">로딩 중...</option>
+    </select>
       <button class="refresh-btn" id="refreshBtn" type="button">🔄 새로고침</button>
       <button class="refresh-btn" id="testBtn" type="button" style="background: #9C27B0;">🔧 연결 테스트</button>
+  </div>
+  
+  <!-- 통계 -->
+  <div class="stats">
+    <div class="stat-item">
+      <div class="stat-number" id="totalCount">0</div>
+      <div class="stat-label">전체 반품 건</div>
     </div>
-    
-    <!-- 통계 -->
-    <div class="stats">
-      <div class="stat-item">
-        <div class="stat-number" id="totalCount">0</div>
-        <div class="stat-label">전체 반품 건</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-number" id="completedCount">0</div>
-        <div class="stat-label">처리 완료</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-number" id="pendingCount">0</div>
-        <div class="stat-label">처리 대기</div>
-      </div>
+    <div class="stat-item">
+      <div class="stat-number" id="completedCount">0</div>
+      <div class="stat-label">처리 완료</div>
     </div>
-    
-    <!-- 테이블 -->
-    <div class="table-container">
-      <table>
-        <thead>
+    <div class="stat-item">
+      <div class="stat-number" id="pendingCount">0</div>
+      <div class="stat-label">처리 대기</div>
+    </div>
+  </div>
+  
+  <!-- 테이블 -->
+  <div class="table-container">
+    <table>
+      <thead>
           <tr id="tableHeaderRow">
-            <th>접수일</th>
+          <th>접수일</th>
             <th class="admin-only" style="display: none;">화주사</th>
-            <th>제품</th>
-            <th>고객명</th>
-            <th>송장번호</th>
-            <th>반품/교환</th>
-            <th>재고상태</th>
-            <th>처리완료</th>
-            <th>사진</th>
+          <th>제품</th>
+          <th>고객명</th>
+          <th>송장번호</th>
+          <th>반품/교환</th>
+          <th>재고상태</th>
+          <th>처리완료</th>
+          <th>사진</th>
             <th class="admin-only" style="display: none;">비고</th>
-            <th>화주사 요청사항</th>
+          <th>화주사 요청사항</th>
             <th class="admin-only" style="display: none;">QR</th>
             <th class="admin-only" style="display: none;">관리</th>
-          </tr>
-        </thead>
-        <tbody id="tableBody">
-          <tr>
-            <td colspan="9" class="no-data">데이터를 불러오는 중...</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    
-    <!-- 메시지 -->
-    <div id="message" class="message"></div>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr>
+          <td colspan="9" class="no-data">데이터를 불러오는 중...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- 메시지 -->
+  <div id="message" class="message"></div>
   </div>
   
   <script>
@@ -645,7 +645,7 @@
     // 페이지 로드 시 초기화
     function initializeApp() {
       console.log('=== 대시보드 초기화 시작 ===');
-      
+        
       // 1. Google Apps Script 확인
       if (!checkGoogleScriptReady()) {
         showLoginMessage('❌ Google Apps Script를 로드할 수 없습니다. 페이지를 새로고침해주세요.', 'error');
@@ -655,15 +655,15 @@
       // 2. 먼저 로그인 섹션 표시 (기본 상태)
       const loginSection = document.getElementById('loginSection');
       const dashboardSection = document.getElementById('dashboardSection');
-      
+          
       if (!loginSection || !dashboardSection) {
         console.error('❌ 섹션을 찾을 수 없습니다!', {
           loginSection: !!loginSection,
           dashboardSection: !!dashboardSection
         });
-        return;
-      }
-      
+            return;
+          }
+          
       loginSection.style.display = 'block';
       dashboardSection.style.display = 'none';
       console.log('✅ 섹션 초기화 완료');
@@ -708,9 +708,9 @@
         } else {
           console.log('저장된 로그인 정보 없음 - 로그인 필요');
         }
-        
-      } catch (storageError) {
-        console.error('localStorage 접근 오류:', storageError);
+          
+        } catch (storageError) {
+          console.error('localStorage 접근 오류:', storageError);
       }
       
       // 4. 로그인 섹션 표시
@@ -729,8 +729,8 @@
       
       if (!usernameInput || !passwordInput) {
         console.error('❌ 로그인 요소를 찾을 수 없습니다!');
-        return;
-      }
+          return;
+        }
       
       // 엔터키 이벤트만 추가 (onclick은 HTML에 이미 있음)
       usernameInput.addEventListener('keydown', function(e) {
@@ -801,12 +801,12 @@
         updateTableHeaderForAdmin(false);
         console.log('✅ 화주사 모드 활성화');
       }
-      
-      // 월 목록 로드
-      console.log('월 목록 로드 시작...');
-      loadAvailableSheets();
-      
-      // 월 변경 이벤트
+        
+        // 월 목록 로드
+        console.log('월 목록 로드 시작...');
+        loadAvailableSheets();
+        
+        // 월 변경 이벤트
       const monthSelect = document.getElementById('monthSelect');
       if (monthSelect) {
         monthSelect.onchange = loadData; // 직접 할당

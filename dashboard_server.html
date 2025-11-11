@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>화주사 반품 내역 조회</title>
+  <title>JJAY 3PL 종합 물류 - 통합 관리 시스템</title>
   <style>
     * {
       margin: 0;
@@ -13,7 +13,7 @@
     
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #fff9e6 0%, #fff5d6 50%, #ffeaa7 100%);
       min-height: 100vh;
       padding: 20px;
     }
@@ -33,10 +33,11 @@
     }
     
     .login-form {
-      background: white;
+      background: #ffffff;
       padding: 40px;
       border-radius: 20px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 10px 30px rgba(255, 152, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.08);
+      border: none;
       width: 100%;
       max-width: 400px;
       display: flex;
@@ -46,45 +47,62 @@
     
     .login-form h1 {
       text-align: center;
-      color: #667eea;
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
       margin-bottom: 10px;
-      font-size: 24px;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
     }
     
     .login-form input {
-      padding: 12px 15px;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
+      padding: 14px 18px;
+      border: 2px solid #ffeaa7;
+      border-radius: 12px;
       font-size: 15px;
+      background: #ffffff;
+      color: #2d3436;
       transition: all 0.3s ease;
+    }
+    
+    .login-form input::placeholder {
+      color: #b2bec3;
     }
     
     .login-form input:focus {
       outline: none;
-      border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      border-color: #ffa502;
+      box-shadow: 0 0 0 4px rgba(255, 165, 2, 0.1);
+      background: #fffef9;
     }
     
     .login-form button {
-      padding: 12px 30px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 14px 30px;
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
       color: white;
       border: none;
-      border-radius: 8px;
+      border-radius: 12px;
       font-size: 15px;
-      font-weight: 700;
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
     }
     
     .login-form button:hover {
       transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+      box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+      background: linear-gradient(135deg, #ff5722 0%, #ffb74d 100%);
     }
     
     .login-form button:disabled {
-      background: #bdbdbd;
+      background: #ddd;
+      color: #999;
       cursor: not-allowed;
+      border: none;
+      box-shadow: none;
       transform: none;
     }
     
@@ -93,48 +111,360 @@
       display: none;
     }
     
+    .dashboard-section.show {
+      display: block;
+    }
+    
+    /* 로고 스타일 */
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .logo-letters {
+      display: flex;
+      align-items: center;
+      position: relative;
+      height: 32px;
+    }
+    
+    .logo-j {
+      font-size: 36px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ff6b35 0%, #ff5722 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      position: relative;
+      z-index: 2;
+      font-family: 'Arial', sans-serif;
+      letter-spacing: -3px;
+    }
+    
+    .logo-c {
+      font-size: 36px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #feca57 0%, #ffa502 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      position: relative;
+      margin-left: -20px;
+      z-index: 1;
+      font-family: 'Arial', sans-serif;
+      letter-spacing: -3px;
+    }
+    
+    .logo-text {
+      font-size: 11px;
+      font-weight: 500;
+      color: #636e72;
+      letter-spacing: 3px;
+      margin-top: 4px;
+    }
+    
     .header {
-      background: white;
-      padding: 20px 25px;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      background: linear-gradient(135deg, #ffffff 0%, #fffef9 100%);
+      padding: 16px 24px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(255, 152, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+      border: none;
       margin-bottom: 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      position: relative;
+    }
+    
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      position: relative;
+      z-index: 1;
+      flex: 1;
+    }
+    
+    .header-logo {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
     }
     
     .header h1 {
-      color: #333;
-      font-size: 24px;
-      margin-bottom: 5px;
+      color: #ff6b35;
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.3px;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    
+    .header-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      border-left: 2px solid #ffeaa7;
+      padding-left: 15px;
+    }
+    
+    .header .subtitle {
+      color: #636e72;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    
+    .header .creator {
+      color: #b2bec3;
+      font-size: 10px;
+      font-style: italic;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+      z-index: 1;
     }
     
     .company-info {
-      color: #666;
-      font-size: 14px;
+      color: #2d3436;
+      font-size: 13px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #fff9e6 0%, #ffeaa7 100%);
+      padding: 8px 16px;
+      border-radius: 20px;
+      display: inline-block;
+      border: 2px solid #ffa502;
+      line-height: 1.3;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(255, 165, 2, 0.15);
+    }
+    
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+      z-index: 1;
     }
     
     .logout-btn {
       padding: 10px 20px;
-      background: #f44336;
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
       color: white;
       border: none;
-      border-radius: 8px;
+      border-radius: 12px;
       cursor: pointer;
       font-weight: 600;
+      font-size: 13px;
       transition: all 0.3s ease;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
     }
     
     .logout-btn:hover {
-      background: #d32f2f;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(255, 107, 53, 0.35);
+      background: linear-gradient(135deg, #ff5722 0%, #ffb74d 100%);
+    }
+    
+    /* 탭 스타일 */
+    .tabs {
+      background: #ffffff;
+      padding: 6px;
+      border-radius: 14px;
+      box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+      border: none;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 6px;
+    }
+    
+    .tab-btn {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      background: transparent;
+      border-radius: 10px;
+      color: #636e72;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .tab-btn:hover {
+      background: #fff9e6;
+      color: #ff6b35;
+    }
+    
+    .tab-btn.active {
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      color: white;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+    }
+    
+    .tab-content {
+      display: block;
+      visibility: visible;
+      opacity: 1;
+    }
+    
+    .tab-content.hidden {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+    }
+    
+    /* 화주사 등록 폼 스타일 */
+    .admin-form {
+      background: #ffffff;
+      padding: 28px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(255, 152, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+      border: none;
+      margin-bottom: 20px;
+    }
+    
+    .admin-form h3 {
+      margin: 0 0 24px;
+      color: #ff6b35;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    
+    .admin-form .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .admin-form label {
+      display: block;
+      margin-bottom: 10px;
+      color: #2d3436;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    .admin-form input,
+    .admin-form textarea,
+    .admin-form select {
+      width: 100%;
+      padding: 14px 18px;
+      border: 2px solid #ffeaa7;
+      border-radius: 12px;
+      font-size: 14px;
+      background: #ffffff;
+      color: #2d3436;
+      transition: all 0.3s ease;
+    }
+    
+    .admin-form input::placeholder,
+    .admin-form textarea::placeholder {
+      color: #b2bec3;
+    }
+    
+    .admin-form input:focus,
+    .admin-form textarea:focus,
+    .admin-form select:focus {
+      outline: none;
+      border-color: #ffa502;
+      box-shadow: 0 0 0 4px rgba(255, 165, 2, 0.1);
+      background: #fffef9;
+    }
+    
+    .admin-form textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    
+    .admin-form button {
+      padding: 14px 32px;
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
+    }
+    
+    .admin-form button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(255, 107, 53, 0.35);
+      background: linear-gradient(135deg, #ff5722 0%, #ffb74d 100%);
+    }
+    
+    .admin-form button:disabled {
+      background: #ddd;
+      color: #999;
+      cursor: not-allowed;
+      border: none;
+      box-shadow: none;
+      transform: none;
+    }
+    
+    .admin-form .form-section {
+      margin-top: 30px;
+      padding-top: 24px;
+      border-top: 2px solid #ffeaa7;
+    }
+    
+    .admin-form .form-section h4 {
+      margin: 0 0 18px;
+      color: #636e72;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    
+    .admin-status {
+      margin-top: 18px;
+      padding: 14px 18px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      display: none;
+    }
+    
+    .admin-status.success {
+      background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+      color: white;
+      border: none;
+      display: block;
+      box-shadow: 0 4px 12px rgba(0, 184, 148, 0.25);
+    }
+    
+    .admin-status.error {
+      background: linear-gradient(135deg, #ff6b35 0%, #ee5a6f 100%);
+      color: white;
+      border: none;
+      display: block;
+      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
+    }
+    
+    .admin-status.loading {
+      background: linear-gradient(135deg, #ffeaa7 0%, #fff9e6 100%);
+      color: #ff6b35;
+      border: 2px solid #ffa502;
+      display: block;
     }
     
     .filters {
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      background: #ffffff;
+      padding: 20px 24px;
+      border-radius: 16px;
+      box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+      border: none;
       margin-bottom: 20px;
       display: flex;
       gap: 15px;
@@ -144,39 +474,51 @@
     
     .filters label {
       font-weight: 600;
-      color: #333;
+      color: #2d3436;
     }
     
     .filters select {
-      padding: 10px 15px;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
+      padding: 12px 18px;
+      border: 2px solid #ffeaa7;
+      border-radius: 12px;
       font-size: 14px;
-      background: #fafafa;
+      background: #ffffff;
+      color: #2d3436;
       cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .filters select:focus {
+      outline: none;
+      border-color: #ffa502;
+      box-shadow: 0 0 0 4px rgba(255, 165, 2, 0.1);
     }
     
     .refresh-btn {
-      padding: 10px 20px;
-      background: #2196F3;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
       color: white;
       border: none;
-      border-radius: 8px;
+      border-radius: 12px;
       cursor: pointer;
       font-size: 14px;
       font-weight: 600;
       transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
     }
     
     .refresh-btn:hover {
-      background: #1976D2;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(255, 107, 53, 0.35);
+      background: linear-gradient(135deg, #ff5722 0%, #ffb74d 100%);
     }
     
     .stats {
-      background: white;
-      padding: 15px 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+      border: none;
       margin-bottom: 20px;
       display: flex;
       justify-content: space-around;
@@ -186,132 +528,396 @@
     
     .stat-item {
       text-align: center;
-      padding: 15px;
-      border-radius: 10px;
+      padding: 20px 24px;
+      border-radius: 14px;
       min-width: 120px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 2px solid #ffeaa7;
+      background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%);
+    }
+    
+    .stat-item:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(255, 152, 0, 0.2);
+      border-color: #ffa502;
+    }
+    
+    .stat-item.active {
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      border-color: #ff6b35;
+      box-shadow: 0 6px 20px rgba(255, 107, 53, 0.3);
+      transform: translateY(-3px);
     }
     
     .stat-number {
-      font-size: 28px;
+      font-size: 32px;
       font-weight: 800;
-      color: #667eea;
+      color: #ff6b35;
+      user-select: none;
+    }
+    
+    .stat-item.active .stat-number {
+      color: white;
     }
     
     .stat-label {
       font-size: 13px;
-      color: #666;
-      margin-top: 5px;
+      color: #636e72;
+      margin-top: 8px;
+      user-select: none;
+    }
+    
+    .stat-item.active .stat-label {
+      color: white;
+      font-weight: 600;
     }
     
     .table-container {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(255, 152, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+      border: none;
       overflow-x: auto;
+      overflow-y: hidden;
     }
     
     table {
       width: 100%;
       border-collapse: collapse;
+      border-spacing: 0;
     }
     
     thead {
-      background: #667eea;
-      color: white;
+      background: linear-gradient(135deg, #ff9500 0%, #ffa502 100%) !important;
+      background-color: #ff9500 !important;
+      color: white !important;
+    }
+    
+    thead tr {
+      background: linear-gradient(135deg, #ff9500 0%, #ffa502 100%) !important;
+      background-color: #ff9500 !important;
+      border: none !important;
+      margin: 0 !important;
+    }
+    
+    thead,
+    thead:hover,
+    thead:active,
+    thead:focus,
+    thead:visited {
+      background: linear-gradient(135deg, #ff9500 0%, #ffa502 100%) !important;
+      background-color: #ff9500 !important;
+      color: white !important;
+    }
+    
+    thead *,
+    thead *:hover,
+    thead *:active,
+    thead *:focus {
+      background: linear-gradient(135deg, #ff9500 0%, #ffa502 100%) !important;
+      background-color: #ff9500 !important;
+      color: white !important;
     }
     
     th {
-      padding: 15px 12px;
-      text-align: left;
+      padding: 12px 10px;
+      text-align: center;
       font-weight: 600;
-      font-size: 13px;
+      font-size: 12px;
       white-space: nowrap;
+      cursor: default !important;
+      transition: none !important;
+      -webkit-transition: none !important;
+      -moz-transition: none !important;
+      -o-transition: none !important;
+      pointer-events: auto;
+      user-select: none;
+      background: linear-gradient(135deg, #ff9500 0%, #ffa502 100%) !important;
+      background-color: #ff9500 !important;
+      color: white !important;
+      border: none !important;
+      margin: 0 !important;
+      border-spacing: 0 !important;
+    }
+    
+    thead tr:first-child th:first-child {
+      border-top-left-radius: 12px;
+    }
+    
+    thead tr:first-child th:last-child {
+      border-top-right-radius: 12px;
+    }
+    
+    /* 헤더 hover 효과 완전히 제거 - 모든 가능한 상태와 조합 */
+    th,
+    th:hover,
+    th:active,
+    th:focus,
+    th:visited,
+    th:link,
+    th::before,
+    th::after {
+      background: linear-gradient(135deg, #ff9500 0%, #ffa502 100%) !important;
+      background-color: #ff9500 !important;
+      color: white !important;
+      cursor: default !important;
+      outline: none !important;
+      box-shadow: none !important;
+      transform: none !important;
+      border: none !important;
+      opacity: 1 !important;
+    }
+    
+    thead th,
+    thead th:hover,
+    thead th:active,
+    thead th:focus,
+    thead th:visited,
+    thead th:link,
+    thead:hover th,
+    thead:active th,
+    thead:focus th,
+    thead:hover th:hover,
+    thead:active th:active {
+      background: linear-gradient(135deg, #ff9500 0%, #ffa502 100%) !important;
+      background-color: #ff9500 !important;
+      color: white !important;
+      cursor: default !important;
+      border: none !important;
+    }
+    
+    /* 모든 th 자식 요소에도 적용 */
+    th *,
+    th *:hover,
+    th *:active,
+    th *:focus {
+      background: transparent !important;
+      background-color: transparent !important;
+      color: white !important;
+    }
+    
+    /* thead의 모든 요소에 hover 효과 없음 */
+    thead *:hover,
+    thead *:active,
+    thead *:focus {
+      background: linear-gradient(135deg, #ff9500 0%, #ffa502 100%) !important;
+      background-color: #ff9500 !important;
+      color: white !important;
+    }
+    
+    /* 테이블 헤더의 모든 상태에서 동일한 스타일 유지 - 모든 조합 */
+    table thead,
+    table thead:hover,
+    table thead:active,
+    table thead th,
+    table thead th:hover,
+    table thead th:active,
+    table thead th:focus,
+    table thead:hover th,
+    table thead:hover th:hover {
+      background: linear-gradient(135deg, #ff9500 0%, #ffa502 100%) !important;
+      background-color: #ff9500 !important;
+      color: white !important;
+    }
+    
+    /* 인라인 스타일보다 우선순위 높이기 */
+    thead[style],
+    th[style] {
+      background: linear-gradient(135deg, #ff9500 0%, #ffa502 100%) !important;
+      background-color: #ff9500 !important;
+      color: white !important;
+    }
+    
+    thead[style]:hover,
+    th[style]:hover {
+      background: linear-gradient(135deg, #ff9500 0%, #ffa502 100%) !important;
+      background-color: #ff9500 !important;
+      color: white !important;
     }
     
     td {
       padding: 10px 8px;
-      border-bottom: 1px solid #f0f0f0;
-      font-size: 13px;
+      border-bottom: 1px solid #e0e0e0;
+      border-left: none !important;
+      border-right: none !important;
+      border-top: none !important;
+      font-size: 12px;
+      color: #2d3436;
+      background: #ffffff;
+      vertical-align: middle;
+      line-height: 1.4;
+    }
+    
+    /* th와 td 사이의 세로 경계선 제거 */
+    th + th,
+    td + td {
+      border-left: none !important;
+    }
+    
+    /* 테이블 셀 간 간격 제거 */
+    table th,
+    table td {
+      border-collapse: collapse;
     }
     
     tr:hover {
-      background: #f8f9fa;
+      background: #fff9e6;
+    }
+    
+    tr {
+      background: #ffffff;
+      transition: background 0.2s ease;
+    }
+    
+    tr:last-child td:first-child {
+      border-bottom-left-radius: 12px;
+    }
+    
+    tr:last-child td:last-child {
+      border-bottom-right-radius: 12px;
     }
     
     .status-badge {
       display: inline-block;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 10px;
       font-weight: 600;
+      border: none;
+      line-height: 1.2;
     }
     
     .status-completed {
-      background: #d4edda;
-      color: #155724;
+      background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+      color: white;
+      border: none;
+      box-shadow: none;
     }
     
     .status-pending {
-      background: #fff3cd;
-      color: #856404;
+      background: linear-gradient(135deg, #ffa502 0%, #ff9500 100%);
+      color: white;
+      border: none;
     }
     
     .request-input {
       width: 100%;
-      padding: 8px 10px;
-      border: 1.5px solid #e0e0e0;
-      border-radius: 6px;
+      padding: 12px 16px;
+      border: 2px solid #ffeaa7;
+      border-radius: 12px;
       font-size: 13px;
       resize: vertical;
       min-height: 60px;
+      background: #ffffff;
+      color: #2d3436;
+      transition: all 0.3s ease;
+    }
+    
+    .request-input:focus {
+      outline: none;
+      border-color: #ffa502;
+      box-shadow: 0 0 0 4px rgba(255, 165, 2, 0.1);
+      background: #fffef9;
     }
     
     .save-btn {
-      padding: 8px 16px;
-      background: #4CAF50;
+      padding: 4px 8px;
+      background: linear-gradient(135deg, #ffa502 0%, #ff9500 100%);
       color: white;
       border: none;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 12px;
-      font-weight: 600;
-      margin-top: 5px;
+      font-size: 11px;
+      font-weight: 500;
+      margin: 0;
+      transition: all 0.2s ease;
+      box-shadow: none;
+      display: inline-block;
+      line-height: 1.2;
+      height: auto;
     }
     
     .save-btn:hover {
-      background: #45a049;
+      background: linear-gradient(135deg, #ff9500 0%, #ff8800 100%);
+      transform: none;
+      box-shadow: none;
+    }
+    
+    /* 수정 버튼 스타일 */
+    .edit-btn {
+      background: linear-gradient(135deg, #ffeaa7 0%, #fff9e6 100%) !important;
+      color: #ff6b35 !important;
+      border: 2px solid #ffa502 !important;
+    }
+    
+    .edit-btn:hover {
+      background: linear-gradient(135deg, #ffa502 0%, #ffeaa7 100%) !important;
+      color: white !important;
+      border-color: #ff6b35 !important;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(255, 165, 2, 0.3);
+    }
+    
+    .edit-btn:disabled {
+      background: #ddd !important;
+      color: #999 !important;
+      border-color: #ddd !important;
+      cursor: not-allowed;
+      opacity: 0.7;
+      transform: none;
+      box-shadow: none;
     }
     
     .message {
       position: fixed;
       top: 20px;
       right: 20px;
-      padding: 15px 20px;
-      border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      padding: 16px 24px;
+      border-radius: 14px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+      border: none;
       font-weight: 600;
       z-index: 1000;
       display: none;
+      background: #ffffff;
+      animation: slideInRight 0.3s ease;
+    }
+    
+    @keyframes slideInRight {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
     }
     
     .message.success {
-      background: #d4edda;
-      color: #155724;
+      background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+      color: white;
+      border: none;
+      box-shadow: 0 6px 20px rgba(0, 184, 148, 0.3);
     }
     
     .message.error {
-      background: #f8d7da;
-      color: #721c24;
+      background: linear-gradient(135deg, #ff6b35 0%, #ee5a6f 100%);
+      color: white;
+      border: none;
+      box-shadow: 0 6px 20px rgba(255, 107, 53, 0.3);
     }
     
     .no-data {
       text-align: center;
-      padding: 40px;
-      color: #999;
+      padding: 60px 40px;
+      color: #b2bec3;
+      font-size: 15px;
     }
     
     .admin-only {
-      display: none;
+      display: none; /* 기본적으로 숨김, JavaScript로 표시/숨김 제어 */
     }
     
     #loginMessage {
@@ -320,6 +926,152 @@
       font-size: 14px;
       font-weight: 600;
     }
+    
+    /* 비고 툴팁 스타일 */
+    .memo-tooltip {
+      position: fixed;
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      max-width: 300px;
+      z-index: 10000;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    
+    .memo-tooltip::before {
+      content: '';
+      position: absolute;
+      top: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-bottom: 5px solid rgba(0, 0, 0, 0.9);
+    }
+    
+    /* 제품명 셀 스타일 */
+    table th:nth-child(3) {
+      text-align: center;
+      min-width: 120px;
+      max-width: 150px;
+    }
+    
+    table td:nth-child(3) {
+      text-align: center;
+      min-width: 120px;
+      max-width: 150px;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      padding: 10px 8px !important;
+      vertical-align: middle !important;
+    }
+    
+    .product-cell {
+      text-align: center !important;
+      font-weight: normal;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      display: table-cell !important;
+      max-width: 100% !important;
+      vertical-align: middle !important;
+      line-height: 1.4 !important;
+    }
+    
+    .product-cell.has-memo {
+      color: #e74c3c !important;
+      font-weight: 700 !important;
+      text-decoration: none !important;
+      background: transparent !important;
+      vertical-align: middle !important;
+      line-height: 1.4 !important;
+    }
+    
+    /* 사진 링크 스타일 */
+    .photo-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      justify-content: center;
+      align-items: center;
+      line-height: 1.4;
+    }
+    
+    .photo-link {
+      color: #4a90e2;
+      text-decoration: underline;
+      font-size: 11px;
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+    
+    .photo-link:hover {
+      color: #357abd;
+    }
+    
+    /* 처리완료 상태 - 작은 그라디언트 박스에 체크와 이름 */
+    .status-completed-circle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+      color: white;
+      padding: 3px 8px;
+      border: none;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      box-shadow: none;
+      line-height: 1.2;
+    }
+    
+    .status-completed-circle::before {
+      content: '✓';
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      background: rgba(255, 255, 255, 0.3);
+      color: white;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 14px;
+      font-size: 10px;
+      font-weight: bold;
+    }
+    
+    /* 접이식 버튼 애니메이션 */
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    #addReturnBtn:hover {
+      background: linear-gradient(135deg, #fff9e6 0%, #ffeaa7 100%) !important;
+      border-color: #ffa502 !important;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255, 152, 0, 0.2) !important;
+    }
+    
+    #addCompanyBtn:hover {
+      background: linear-gradient(135deg, #fff9e6 0%, #ffeaa7 100%) !important;
+      border-color: #ffa502 !important;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255, 152, 0, 0.2) !important;
+    }
   </style>
 </head>
 <body>
@@ -327,7 +1079,9 @@
     <!-- 로그인 섹션 -->
     <div id="loginSection" class="login-section">
       <div class="login-form">
-        <h1>🏢 화주사 반품 내역 조회</h1>
+        <h1>JJAY 3PL 종합 물류</h1>
+        <p style="text-align: center; color: #636e72; margin-top: 10px; margin-bottom: 5px; font-size: 14px; font-weight: 500;">통합 관리 시스템</p>
+        <p style="text-align: center; color: #b2bec3; margin-bottom: 20px; font-size: 12px; font-style: italic;">Developed by pyojungoh</p>
         <input type="text" id="username" placeholder="아이디" autocomplete="username">
         <input type="password" id="password" placeholder="비밀번호" autocomplete="current-password">
         <button id="loginBtn" type="button" onclick="doLogin(); return false;">로그인</button>
@@ -339,33 +1093,120 @@
     <div id="dashboardSection" class="dashboard-section">
       <!-- 헤더 -->
       <div class="header">
-        <div>
-          <h1>📦 반품 내역 조회</h1>
+        <div class="header-left">
+          <div class="header-logo">
+            <div class="logo-container">
+              <div class="logo-letters">
+                <span class="logo-j">J</span>
+                <span class="logo-c">C</span>
+              </div>
+            </div>
+            <div class="logo-text">JAY JAY</div>
+          </div>
+          <div class="header-info">
+            <div class="subtitle">통합 관리 시스템</div>
+            <div class="creator">Developed by pyojungoh</div>
+          </div>
+        </div>
+        <div class="header-center">
           <div class="company-info" id="companyInfo"></div>
         </div>
-        <button class="logout-btn" onclick="logout()">로그아웃</button>
+        <div class="header-right">
+          <button class="logout-btn" onclick="logout()">로그아웃</button>
+        </div>
       </div>
       
+      <!-- 관리자 전용 탭 (관리자만 표시) -->
+      <div id="adminTabs" style="display: none;">
+        <div class="tabs">
+          <button type="button" class="tab-btn active" onclick="switchAdminTab('returns')">📦 반품 내역</button>
+          <button type="button" class="tab-btn" onclick="switchAdminTab('register')">🏢 화주사 등록</button>
+        </div>
+      </div>
+      
+      <!-- 반품 내역 탭 -->
+      <div id="returnsTab" class="tab-content">
       <!-- 필터 -->
       <div class="filters">
         <label for="monthSelect">📅 조회 월:</label>
         <select id="monthSelect">
           <option value="">로딩 중...</option>
         </select>
-        <button class="refresh-btn" onclick="loadData()">🔄 새로고침</button>
+        <button class="refresh-btn" onclick="refreshReturnsData()" id="refreshReturnsBtn">🔄 새로고침</button>
+      </div>
+      
+      <!-- 반품 등록 접이식 버튼 (관리자 전용) -->
+      <div id="addReturnSection" style="display: none; margin-bottom: 20px;">
+        <button id="addReturnBtn" class="refresh-btn" onclick="toggleAddForm()" style="background: linear-gradient(135deg, #ffffff 0%, #fffef9 100%); width: 100%; text-align: left; padding: 16px 24px; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; border-radius: 14px; border: 2px solid #ffeaa7; color: #ff6b35; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(255, 152, 0, 0.1);">
+          <span>➕ 반품 등록</span>
+          <span id="addReturnIcon" style="font-size: 14px; transition: transform 0.3s ease;">▼</span>
+        </button>
+        
+        <!-- 반품 등록 폼 (접이식) -->
+        <div id="addReturnForm" style="display: none; background: #ffffff; padding: 24px; border-radius: 0 0 14px 14px; border: 2px solid #ffeaa7; border-top: none; animation: slideDown 0.3s ease; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1);">
+          <h3 style="margin-bottom: 20px; color: #ff6b35; font-weight: 700;">반품 내역 등록</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+            <div>
+              <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">반품 접수일 (일자만):</label>
+              <input type="number" id="newReturnDate" class="request-input" style="min-height: auto;" placeholder="일자 (1-31)" min="1" max="31">
+            </div>
+            <div>
+              <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">화주명:</label>
+              <input type="text" id="newCompanyName" class="request-input" style="min-height: auto;" placeholder="화주명">
+            </div>
+            <div>
+              <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">제품:</label>
+              <input type="text" id="newProduct" class="request-input" style="min-height: auto;" placeholder="제품명">
+            </div>
+            <div>
+              <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">고객명:</label>
+              <input type="text" id="newCustomerName" class="request-input" style="min-height: auto;" placeholder="고객명" required>
+            </div>
+            <div>
+              <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">송장번호:</label>
+              <input type="text" id="newTrackingNumber" class="request-input" style="min-height: auto;" placeholder="송장번호" required>
+            </div>
+            <div>
+              <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">반품/교환/오배송:</label>
+              <select id="newReturnType" class="request-input" style="min-height: auto;">
+                <option value="">선택</option>
+                <option value="반품">반품</option>
+                <option value="교환">교환</option>
+                <option value="오배송">오배송</option>
+                <option value="누락">누락</option>
+              </select>
+            </div>
+            <div>
+              <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">재고상태:</label>
+              <select id="newStockStatus" class="request-input" style="min-height: auto;">
+                <option value="">선택</option>
+                <option value="정상">정상</option>
+                <option value="불량">불량</option>
+              </select>
+            </div>
+            <div>
+              <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">비고:</label>
+              <textarea id="newMemo" class="request-input" style="min-height: 60px;" placeholder="비고"></textarea>
+            </div>
+          </div>
+          <div style="margin-top: 20px; display: flex; gap: 12px;">
+            <button class="save-btn" onclick="addReturn()">저장</button>
+            <button class="save-btn" onclick="toggleAddForm()" style="background: linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%); box-shadow: 0 3px 10px rgba(178, 190, 195, 0.25);">취소</button>
+          </div>
+        </div>
       </div>
       
       <!-- 통계 -->
       <div class="stats">
-        <div class="stat-item">
+        <div class="stat-item active" id="filterAll" onclick="filterByStatus('all')">
           <div class="stat-number" id="totalCount">0</div>
           <div class="stat-label">전체 반품 건</div>
         </div>
-        <div class="stat-item">
+        <div class="stat-item" id="filterCompleted" onclick="filterByStatus('completed')">
           <div class="stat-number" id="completedCount">0</div>
           <div class="stat-label">처리 완료</div>
         </div>
-        <div class="stat-item">
+        <div class="stat-item" id="filterPending" onclick="filterByStatus('pending')">
           <div class="stat-number" id="pendingCount">0</div>
           <div class="stat-label">처리 대기</div>
         </div>
@@ -377,7 +1218,7 @@
           <thead>
             <tr>
               <th>접수일</th>
-              <th class="admin-only">화주사</th>
+              <th class="admin-only" style="display: none;">화주사</th>
               <th>제품</th>
               <th>고객명</th>
               <th>송장번호</th>
@@ -385,10 +1226,10 @@
               <th>재고상태</th>
               <th>처리완료</th>
               <th>사진</th>
-              <th class="admin-only">비고</th>
+              <th class="admin-only" style="display: none;">비고</th>
               <th>화주사 요청사항</th>
-              <th class="admin-only">QR</th>
-              <th class="admin-only">관리</th>
+              <th class="admin-only" style="display: none;">QR</th>
+              <th class="admin-only" style="display: none;">관리</th>
             </tr>
           </thead>
           <tbody id="tableBody">
@@ -397,6 +1238,116 @@
             </tr>
           </tbody>
         </table>
+      </div>
+      </div>
+      <!-- 반품 내역 탭 끝 -->
+      
+      <!-- 화주사 등록 탭 -->
+      <div id="registerTab" class="tab-content hidden">
+        <!-- 화주사 등록 접이식 버튼 -->
+        <div style="margin-bottom: 20px;">
+          <button id="addCompanyBtn" class="refresh-btn" onclick="toggleAddCompanyForm()" style="background: linear-gradient(135deg, #ffffff 0%, #fffef9 100%); width: 100%; text-align: left; padding: 16px 24px; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; border-radius: 14px; border: 2px solid #ffeaa7; color: #ff6b35; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(255, 152, 0, 0.1);">
+            <span>➕ 화주사 등록</span>
+            <span id="addCompanyIcon" style="font-size: 14px; transition: transform 0.3s ease;">▼</span>
+          </button>
+          
+          <!-- 화주사 등록 폼 (접이식) -->
+          <div id="addCompanyForm" style="display: none; background: #ffffff; padding: 24px; border-radius: 0 0 14px 14px; border: 2px solid #ffeaa7; border-top: none; margin-top: -2px; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1);">
+            <h3 style="margin-bottom: 20px; color: #ff6b35; font-weight: 700;">화주사 등록</h3>
+            <form id="adminRegisterForm">
+              <!-- 필수 정보 -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                <div>
+                  <label style="display: block; margin-bottom: 10px; color: #2d3436; font-weight: 600; font-size: 14px;">화주사명 *</label>
+                  <input type="text" id="adminRegCompanyName" placeholder="화주사명을 입력하세요" required style="width: 100%; padding: 14px 18px; border: 2px solid #ffeaa7; border-radius: 12px; font-size: 14px; background: #ffffff; color: #2d3436; transition: all 0.3s ease;">
+                </div>
+                <div>
+                  <label style="display: block; margin-bottom: 10px; color: #2d3436; font-weight: 600; font-size: 14px;">아이디 *</label>
+                  <input type="text" id="adminRegUsername" placeholder="아이디를 입력하세요" required style="width: 100%; padding: 14px 18px; border: 2px solid #ffeaa7; border-radius: 12px; font-size: 14px; background: #ffffff; color: #2d3436; transition: all 0.3s ease;">
+                </div>
+                <div>
+                  <label style="display: block; margin-bottom: 10px; color: #2d3436; font-weight: 600; font-size: 14px;">비밀번호 *</label>
+                  <input type="password" id="adminRegPassword" placeholder="비밀번호를 입력하세요" required style="width: 100%; padding: 14px 18px; border: 2px solid #ffeaa7; border-radius: 12px; font-size: 14px; background: #ffffff; color: #2d3436; transition: all 0.3s ease;">
+                </div>
+                <div>
+                  <label style="display: block; margin-bottom: 10px; color: #2d3436; font-weight: 600; font-size: 14px;">권한 *</label>
+                  <select id="adminRegRole" required style="width: 100%; padding: 14px 18px; border: 2px solid #ffeaa7; border-radius: 12px; font-size: 14px; background: #ffffff; color: #2d3436; transition: all 0.3s ease;">
+                    <option value="">권한을 선택하세요</option>
+                    <option value="화주사">화주사</option>
+                    <option value="관리자">관리자</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- 사업자 정보 (선택) -->
+              <div style="margin-top: 30px; padding-top: 24px; border-top: 2px solid #ffeaa7;">
+                <h4 style="margin: 0 0 18px; color: #636e72; font-size: 16px; font-weight: 600;">사업자 정보 (선택사항)</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                  <div>
+                    <label style="display: block; margin-bottom: 10px; color: #2d3436; font-weight: 600; font-size: 14px;">사업자번호</label>
+                    <input type="text" id="adminRegBusinessNumber" placeholder="사업자번호를 입력하세요" style="width: 100%; padding: 14px 18px; border: 2px solid #ffeaa7; border-radius: 12px; font-size: 14px; background: #ffffff; color: #2d3436; transition: all 0.3s ease;">
+                  </div>
+                  <div>
+                    <label style="display: block; margin-bottom: 10px; color: #2d3436; font-weight: 600; font-size: 14px;">사업자명</label>
+                    <input type="text" id="adminRegBusinessName" placeholder="사업자명을 입력하세요" style="width: 100%; padding: 14px 18px; border: 2px solid #ffeaa7; border-radius: 12px; font-size: 14px; background: #ffffff; color: #2d3436; transition: all 0.3s ease;">
+                  </div>
+                  <div>
+                    <label style="display: block; margin-bottom: 10px; color: #2d3436; font-weight: 600; font-size: 14px;">주소</label>
+                    <input type="text" id="adminRegBusinessAddress" placeholder="주소를 입력하세요" style="width: 100%; padding: 14px 18px; border: 2px solid #ffeaa7; border-radius: 12px; font-size: 14px; background: #ffffff; color: #2d3436; transition: all 0.3s ease;">
+                  </div>
+                  <div>
+                    <label style="display: block; margin-bottom: 10px; color: #2d3436; font-weight: 600; font-size: 14px;">전화번호</label>
+                    <input type="tel" id="adminRegBusinessTel" placeholder="전화번호를 입력하세요" style="width: 100%; padding: 14px 18px; border: 2px solid #ffeaa7; border-radius: 12px; font-size: 14px; background: #ffffff; color: #2d3436; transition: all 0.3s ease;">
+                  </div>
+                  <div>
+                    <label style="display: block; margin-bottom: 10px; color: #2d3436; font-weight: 600; font-size: 14px;">이메일</label>
+                    <input type="email" id="adminRegBusinessEmail" placeholder="이메일을 입력하세요" style="width: 100%; padding: 14px 18px; border: 2px solid #ffeaa7; border-radius: 12px; font-size: 14px; background: #ffffff; color: #2d3436; transition: all 0.3s ease;">
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top: 24px; display: flex; gap: 12px;">
+                <button type="submit" id="adminRegisterBtn" style="padding: 14px 32px; background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);">등록하기</button>
+                <button type="button" onclick="toggleAddCompanyForm()" style="padding: 14px 32px; background: linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 3px 10px rgba(178, 190, 195, 0.25);">취소</button>
+              </div>
+              <div id="adminRegisterStatus" class="admin-status" style="margin-top: 15px;"></div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- 화주사 목록 테이블 -->
+        <div class="table-container">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <div>
+              <h3 style="margin: 0; color: #333; font-size: 18px; display: inline-block; margin-right: 15px;">등록된 화주사 목록</h3>
+              <span id="companiesStatistics" style="color: #666; font-size: 14px;">(관리자: 0, 화주사: 0)</span>
+            </div>
+            <button class="refresh-btn" onclick="refreshCompaniesData()" id="refreshCompaniesBtn" style="padding: 8px 15px; font-size: 14px;">🔄 새로고침</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>화주사명</th>
+                <th>아이디</th>
+                <th>권한</th>
+                <th>사업자번호</th>
+                <th>사업자명</th>
+                <th>주소</th>
+                <th>전화번호</th>
+                <th>이메일</th>
+                <th>사업자 등록증</th>
+                <th>최근 로그인</th>
+                <th>등록일</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="companiesTableBody">
+              <tr>
+                <td colspan="12" class="no-data">데이터를 불러오는 중...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -413,6 +1364,7 @@
     let currentUsername = '';
     let currentRole = '';
     let currentData = [];
+    let currentFilter = 'all'; // 'all', 'completed', 'pending'
     
     // 로그인 메시지 표시
     function showLoginMessage(text, type) {
@@ -435,6 +1387,14 @@
       if (type !== 'loading') {
         setTimeout(() => { div.innerHTML = ''; }, 5000);
       }
+    }
+    
+    // HTML 이스케이프 함수
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
     }
     
     // 메시지 표시
@@ -483,11 +1443,15 @@
         if (result.success) {
           currentCompany = result.company;
           currentUsername = result.username;
-          currentRole = result.role || '';
+          currentRole = (result.role || '').toString().trim();
+          
+          console.log('로그인 성공 - result:', result); // 디버깅용
+          console.log('로그인 성공 - 권한:', currentRole, '타입:', typeof currentRole, '길이:', currentRole.length); // 디버깅용
+          console.log('관리자 여부:', currentRole === '관리자'); // 디버깅용
           
           localStorage.setItem('client_company', result.company);
           localStorage.setItem('client_username', result.username);
-          localStorage.setItem('client_role', result.role || '');
+          localStorage.setItem('client_role', currentRole);
           localStorage.setItem('client_loginTime', new Date().toISOString());
           
           showLoginMessage('✅ 로그인 성공!', 'success');
@@ -531,58 +1495,171 @@
       document.getElementById('loginSection').style.display = 'none';
       document.getElementById('dashboardSection').style.display = 'block';
       
-      const isAdmin = (currentRole === '관리자');
+      // 관리자 여부 확인 (대소문자 무시, 공백 제거)
+      const roleNormalized = (currentRole || '').toString().trim();
+      const isAdmin = (roleNormalized === '관리자');
+      
+      console.log('showDashboard - currentRole:', currentRole, 'roleNormalized:', roleNormalized, 'isAdmin:', isAdmin); // 디버깅용
+      
       const roleText = isAdmin ? ' [관리자]' : '';
       document.getElementById('companyInfo').textContent = `${currentCompany}${roleText} (${currentUsername})`;
       
-      // 관리자 열 표시/숨기기
-      document.querySelectorAll('.admin-only').forEach(cell => {
-        cell.style.display = isAdmin ? 'table-cell' : 'none';
-      });
+      // 관리자 탭 표시/숨기기
+      const adminTabs = document.getElementById('adminTabs');
+      if (adminTabs) {
+        adminTabs.style.display = isAdmin ? 'block' : 'none';
+      }
+      
+      // 관리자가 아니면 반품 내역 탭만 표시
+      if (!isAdmin) {
+        document.getElementById('returnsTab').classList.remove('hidden');
+        document.getElementById('registerTab').classList.add('hidden');
+        document.getElementById('passwordTab').classList.add('hidden');
+        // 화주사는 항상 반품 내역 탭만 보이므로 localStorage에 저장할 필요 없음
+      } else {
+        // 관리자면 저장된 탭 정보 확인 (페이지 새로고침 시 유지)
+        const savedTab = localStorage.getItem('activeAdminTab');
+        const activeTab = savedTab && ['returns', 'register'].includes(savedTab) ? savedTab : 'returns';
+        console.log('저장된 탭:', savedTab, '활성화할 탭:', activeTab);
+        switchAdminTab(activeTab);
+      }
+      
+          // 관리자 접이식 버튼 표시/숨기기
+          const addReturnSection = document.getElementById('addReturnSection');
+          if (addReturnSection) {
+            addReturnSection.style.display = isAdmin ? 'block' : 'none';
+            console.log('반품 등록 섹션 표시:', isAdmin, '섹션 요소:', addReturnSection); // 디버깅용
+          }
+          const addReturnForm = document.getElementById('addReturnForm');
+          if (addReturnForm && !isAdmin) {
+            addReturnForm.style.display = 'none';
+          }
+      
+      // 관리자 열 표시/숨기기 (초기화 - 테이블 헤더)
+      updateAdminColumns();
+      
+      // 헤더 hover 효과 차단 (테이블이 있을 때)
+      setTimeout(() => {
+        if (typeof disableHeaderHover === 'function') {
+          disableHeaderHover();
+        }
+      }, 500);
       
       // 월 목록 로드
-      loadAvailableSheets();
+      loadAvailableMonths();
     }
     
-    // 사용 가능한 시트 목록 로드
-    function loadAvailableSheets() {
-      fetch(`${API_BASE_URL}/api/returns/sheets`)
+    // 사용 가능한 월 목록 로드
+    function loadAvailableMonths() {
+      fetch(`${API_BASE_URL}/api/auth/months`)
         .then(response => response.json())
         .then(result => {
           const monthSelect = document.getElementById('monthSelect');
           monthSelect.innerHTML = '';
           
-          if (result.success && result.sheets && result.sheets.length > 0) {
-            result.sheets.forEach(sheetName => {
-              const option = document.createElement('option');
-              option.value = sheetName;
-              option.textContent = sheetName;
-              monthSelect.appendChild(option);
+          if (result.success && result.months && result.months.length > 0) {
+            // 년도별로 그룹화
+            const monthsByYear = {};
+            result.months.forEach(monthStr => {
+              try {
+                const year = monthStr.split('년')[0];
+                if (!monthsByYear[year]) {
+                  monthsByYear[year] = [];
+                }
+                monthsByYear[year].push(monthStr);
+              } catch (e) {
+                // 파싱 실패 시 그냥 추가
+                if (!monthsByYear['기타']) {
+                  monthsByYear['기타'] = [];
+                }
+                monthsByYear['기타'].push(monthStr);
+              }
             });
             
-            // 현재 월 선택
-            const today = new Date();
-            const currentMonth = `${today.getFullYear()}년${today.getMonth() + 1}월`;
-            const found = result.sheets.find(s => s === currentMonth);
-            monthSelect.value = found || result.sheets[0];
+            // 년도별로 정렬 (최신 년도가 먼저)
+            const years = Object.keys(monthsByYear).sort((a, b) => {
+              if (a === '기타') return 1;
+              if (b === '기타') return -1;
+              return parseInt(b) - parseInt(a);
+            });
+            
+            // 옵션 그룹으로 년도별 표시
+            years.forEach(year => {
+              const optgroup = document.createElement('optgroup');
+              optgroup.label = `${year}년`;
+              monthsByYear[year].forEach(monthStr => {
+                const option = document.createElement('option');
+                option.value = monthStr;
+                option.textContent = monthStr;
+                optgroup.appendChild(option);
+              });
+              monthSelect.appendChild(optgroup);
+            });
+            
+            // 현재 월 선택 (기본값)
+            const currentMonth = result.current_month || '';
+            if (currentMonth) {
+              monthSelect.value = currentMonth;
+            } else if (result.months.length > 0) {
+              monthSelect.value = result.months[0];
+            }
             
             // 데이터 로드
             loadData();
           } else {
-            monthSelect.innerHTML = '<option value="">사용 가능한 월이 없습니다</option>';
+            // 현재 월 추가 (데이터가 없을 때)
+            const today = new Date();
+            const currentMonth = `${today.getFullYear()}년${today.getMonth() + 1}월`;
+            const option = document.createElement('option');
+            option.value = currentMonth;
+            option.textContent = currentMonth;
+            monthSelect.appendChild(option);
+            monthSelect.value = currentMonth;
           }
         })
         .catch(error => {
-          console.error('시트 목록 로드 오류:', error);
-          showMessage('❌ 시트 목록을 불러올 수 없습니다.', 'error');
+          console.error('월 목록 로드 오류:', error);
+          // 오류 발생 시 현재 월로 기본 설정
+          const monthSelect = document.getElementById('monthSelect');
+          const today = new Date();
+          const currentMonth = `${today.getFullYear()}년${today.getMonth() + 1}월`;
+          monthSelect.innerHTML = `<option value="${currentMonth}">${currentMonth}</option>`;
+          monthSelect.value = currentMonth;
+          showMessage('⚠️ 월 목록을 불러올 수 없어 현재 월로 설정했습니다.', 'error');
         });
       
       // 월 변경 이벤트
-      document.getElementById('monthSelect').onchange = loadData;
+      const monthSelect = document.getElementById('monthSelect');
+      if (monthSelect) {
+        monthSelect.onchange = function() {
+          // 반품 내역 탭이 활성화되어 있을 때만 로드
+          refreshReturnsData();
+        };
+      }
     }
+    
+    /* ========== 반품 내역 새로고침 ========== */
+    function refreshReturnsData() {
+      console.log('반품 내역 새로고침');
+      // 반품 내역 탭이 활성화되어 있는지 확인
+      const returnsTab = document.getElementById('returnsTab');
+      if (returnsTab && !returnsTab.classList.contains('hidden') && returnsTab.style.display !== 'none') {
+        loadData();
+      } else {
+        console.log('반품 내역 탭이 활성화되지 않아 새로고침을 건너뜁니다.');
+      }
+    }
+    window.refreshReturnsData = refreshReturnsData;
     
     // 데이터 로드
     function loadData() {
+      // 반품 내역 탭이 활성화되어 있는지 확인
+      const returnsTab = document.getElementById('returnsTab');
+      if (returnsTab && (returnsTab.classList.contains('hidden') || returnsTab.style.display === 'none')) {
+        console.log('반품 내역 탭이 활성화되지 않아 데이터 로드를 건너뜁니다.');
+        return;
+      }
+      
       const selectedMonth = document.getElementById('monthSelect').value;
       
       if (!selectedMonth) {
@@ -598,13 +1675,24 @@
         .then(result => {
           if (result.success) {
             currentData = result.data || [];
-            renderTable(currentData);
+            // 통계 업데이트 (전체 데이터 기준)
             updateStats(currentData);
+            // 필터 적용 (현재 선택된 필터에 따라)
+            applyFilter();
             showMessage(`✅ ${result.count}건의 데이터를 불러왔습니다.`, 'success');
           } else {
             showMessage('❌ ' + (result.message || '데이터 로드 실패'), 'error');
+            const isAdmin = ((currentRole || '').toString().trim() === '관리자');
+            const colspan = isAdmin ? 13 : 9;
             document.getElementById('tableBody').innerHTML = 
-              '<tr><td colspan="9" class="no-data">데이터를 불러올 수 없습니다.</td></tr>';
+              `<tr><td colspan="${colspan}" class="no-data">데이터를 불러올 수 없습니다.</td></tr>`;
+            setTimeout(() => {
+              updateAdminColumns();
+              // 헤더 hover 효과 완전히 차단
+              if (typeof disableHeaderHover === 'function') {
+                disableHeaderHover();
+              }
+            }, 150);
           }
         })
         .catch(error => {
@@ -618,11 +1706,18 @@
       const tbody = document.getElementById('tableBody');
       tbody.innerHTML = '';
       
-      const isAdmin = (currentRole === '관리자');
+      // 관리자 여부 확인 (대소문자 무시, 공백 제거)
+      const roleNormalized = (currentRole || '').toString().trim();
+      const isAdmin = (roleNormalized === '관리자');
+      
+      console.log('renderTable - currentRole:', currentRole, 'roleNormalized:', roleNormalized, 'isAdmin:', isAdmin); // 디버깅용
+      
       const colspan = isAdmin ? 13 : 9;
       
       if (!data || data.length === 0) {
         tbody.innerHTML = `<tr><td colspan="${colspan}" class="no-data">반품 내역이 없습니다.</td></tr>`;
+        // 빈 데이터일 때도 관리자 열 업데이트
+        updateAdminColumns();
         return;
       }
       
@@ -657,59 +1752,100 @@
             requestHtml = '<div style="color: #999; text-align: center; padding: 20px;">요청사항 없음</div>';
           }
         } else {
-          // 화주사: 입력 및 저장 가능
-          if (isConfirmed) {
-            requestHtml = `
-              <textarea class="request-input" readonly>${requestValue}</textarea>
-              <div style="margin-top:5px; font-size:12px; color:#0c5460; font-weight:600;">✓ 화주사확인완료</div>
-            `;
-          } else {
-            requestHtml = `
-              <textarea class="request-input" id="request_${index}" placeholder="요청사항을 입력하세요">${requestValue}</textarea>
-              <button class="save-btn" onclick="saveRequest(${index}, ${row.rowIndex})">저장</button>
-            `;
+          // 화주사: 입력 및 저장 가능 (저장 후에도 수정 가능)
+          // 저장된 내용이 있으면 "수정" 버튼, 없으면 "저장" 버튼
+          const buttonText = requestValue ? '수정' : '저장';
+          const buttonClass = requestValue ? 'save-btn edit-btn' : 'save-btn';
+          requestHtml = `
+            <textarea class="request-input" id="request_${index}" placeholder="요청사항을 입력하세요">${escapeHtml(requestValue)}</textarea>
+            <button class="${buttonClass}" onclick="saveRequest(${index}, ${row.rowIndex})">${buttonText}</button>
+          `;
+        }
+        
+        // 처리완료 상태 (초록색 동그라미에 체크와 이름만)
+        let statusHtml = '';
+        const confirmedText = row['화주사확인완료'] || '';
+        let completedName = row['처리완료'] || '';
+        
+        // "완료 (이름)" 형식에서 이름만 추출
+        if (completedName) {
+          // "완료 (이름)" 형식 처리
+          if (completedName.includes('(') && completedName.includes(')')) {
+            const match = completedName.match(/\(([^)]+)\)/);
+            if (match && match[1]) {
+              completedName = match[1].trim();
+            }
+          }
+          // "완료 이름" 형식 처리 (공백으로 분리)
+          else if (completedName.includes('완료')) {
+            completedName = completedName.replace(/완료\s*/g, '').trim();
           }
         }
         
-        // 처리완료 상태
-        let statusHtml = '';
-        if (isCompleted) {
-          statusHtml = `<span class="status-badge status-completed">✓ ${row['처리완료']}</span>`;
-        } else if (isConfirmed) {
-          statusHtml = '<span class="status-badge" style="background: #d1ecf1; color: #0c5460;">⏳ 요청완료</span>';
+        if (isCompleted && completedName) {
+          // 처리완료일 때 초록색 동그라미에 체크와 이름만 표시
+          statusHtml = `<span class="status-completed-circle">${escapeHtml(completedName)}</span>`;
+        } else if (isConfirmed || confirmedText) {
+          // 화주사확인완료가 있으면 관리자 이름 표시
+          statusHtml = `<span class="status-badge" style="background: linear-gradient(135deg, #ffeaa7 0%, #ffd93d 100%); color: #2d3436; border: none; border-radius: 12px; padding: 3px 8px; font-size: 10px;">⏳ ${escapeHtml(confirmedText) || '요청완료'}</span>`;
         } else {
           statusHtml = '<span class="status-badge status-pending">⏳ 대기중</span>';
         }
         
-        // 관리자 전용 셀
-        const companyCell = isAdmin ? `<td class="admin-only">${row['화주명'] || ''}</td>` : '';
-        const memoCell = isAdmin ? `
-          <td class="admin-only" style="text-align: center;">
-            <button class="save-btn" onclick="alert('비고: ${(memoText || '없음').replace(/'/g, "\\'")}')" style="background: #607D8B; padding: 5px 10px; font-size: 11px;">
+        // 관리자 전용 셀 (항상 생성, updateAdminColumns에서 표시/숨김 제어)
+        const companyCell = `<td class="admin-only">${row['화주명'] || ''}</td>`;
+        const memoTextSafe = escapeHtml(memoText || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
+        const memoCell = `
+          <td class="admin-only" style="text-align: center; min-width: 80px;">
+            <button class="save-btn" onclick="editMemo(${index}, ${row.rowIndex}, '${memoTextSafe}')" style="background: linear-gradient(135deg, #ffeaa7 0%, #ffd93d 100%); color: #2d3436; border: none; padding: 3px 8px; font-size: 10px; border-radius: 4px; box-shadow: none;">
               ${memoText ? '📝 비고' : '📝 추가'}
             </button>
           </td>
-        ` : '';
+        `;
         const trackingNumber = row['송장번호'] ? row['송장번호'].toString().trim() : '';
-        const qrCell = isAdmin ? `
-          <td class="admin-only" style="text-align: center;">
+        const trackingNumberSafe = escapeHtml(trackingNumber).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const qrCell = `
+          <td class="admin-only" style="text-align: center; min-width: 70px;">
             ${trackingNumber ? 
-              `<button class="save-btn" onclick="showQRCode('${trackingNumber}')" style="background: #9C27B0; padding: 5px 10px; font-size: 11px;">📱 QR</button>` : 
-              '<span style="color: #999; font-size: 11px;">미생성</span>'}
+              `<button class="save-btn" onclick="showQRCode('${trackingNumberSafe}')" style="background: linear-gradient(135deg, #ffeaa7 0%, #ffd93d 100%); color: #2d3436; border: none; padding: 3px 8px; font-size: 10px; border-radius: 4px; box-shadow: none;">📱 QR</button>` :
+              '<span style="color: #b2bec3; font-size: 10px;">미생성</span>'}
           </td>
-        ` : '';
-        const manageCell = isAdmin ? `
-          <td class="admin-only" style="text-align: center;">
-            ${isCompleted ? 
-              '<span style="color: #4CAF50; font-size: 11px; font-weight: 600;">✓ 완료</span>' : 
-              `<button class="save-btn" onclick="completeReturn(${index}, ${row.rowIndex})" style="background: #FF5722; padding: 5px 10px; font-size: 11px;">처리완료</button>`}
+        `;
+        
+        // 관리 셀 (삭제 버튼을 옆으로 배치하여 실수 클릭 방지)
+        const hasCompleted = isCompleted && completedName;
+        const manageCell = `
+          <td class="admin-only" style="text-align: center; min-width: 140px;">
+            <div style="display: flex; flex-direction: row; gap: 4px; align-items: center; justify-content: center;">
+              ${hasCompleted ? 
+                `<span style="color: #00b894; font-size: 11px; font-weight: 600; flex: 1; text-align: center;">완료</span>` : 
+                `<button class="save-btn" onclick="completeReturn(${index}, ${row.rowIndex})" style="background: linear-gradient(135deg, #ffa502 0%, #ff9500 100%); color: white; border: none; padding: 3px 8px; font-size: 10px; flex: 1; border-radius: 4px; box-shadow: none;">처리완료</button>`}
+              <button class="save-btn" onclick="if(confirm('정말 삭제하시겠습니까?\\n삭제된 데이터는 복구할 수 없습니다.')) deleteReturn(${index}, ${row.rowIndex})" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border: none; padding: 3px 6px; font-size: 9px; min-width: 28px; border-radius: 4px; box-shadow: none;" title="삭제">🗑️</button>
+            </div>
           </td>
-        ` : '';
+        `;
+        
+        // 상품명 셀에 비고 툴팁 추가 (비고가 있을 때만, 빨간색 두껍게)
+        const productName = escapeHtml(row['제품'] || '');
+        const hasMemo = memoText && memoText.trim() !== '';
+        const productCellClass = hasMemo ? 'product-cell has-memo' : 'product-cell';
+        const productCellAttributes = hasMemo 
+          ? `class="${productCellClass}" style="text-align: center; position: relative; cursor: help;" 
+             data-memo="${escapeHtml(memoText || '')}" 
+             title="${escapeHtml(memoText || '')}"
+             onmouseenter="showMemoTooltip(event, '${memoTextSafe.replace(/'/g, "\\'")}')" 
+             onmouseleave="hideMemoTooltip()"`
+          : `class="${productCellClass}" style="text-align: center;"`;
+        const productCell = `
+          <td ${productCellAttributes}>
+            ${productName}
+          </td>
+        `;
         
         tr.innerHTML = `
           <td>${row['반품 접수일'] || ''}</td>
           ${companyCell}
-          <td>${row['제품'] || ''}</td>
+          ${productCell}
           <td>${row['고객명'] || ''}</td>
           <td>${row['송장번호'] || ''}</td>
           <td>${row['반품/교환/오배송'] || ''}</td>
@@ -724,7 +1860,150 @@
         
         tbody.appendChild(tr);
       });
+      
+      // 테이블 렌더링 후 관리자 열 표시/숨기기 업데이트
+      // DOM 업데이트를 위해 약간의 지연
+      setTimeout(() => {
+        if (typeof updateAdminColumns === 'function') {
+          updateAdminColumns();
+        }
+        // 헤더 hover 효과 완전히 차단
+        if (typeof disableHeaderHover === 'function') {
+          disableHeaderHover();
+        }
+      }, 150);
     }
+    
+    // 관리자 열 표시/숨기기 업데이트 (전역 함수로 노출)
+    window.updateAdminColumns = function updateAdminColumns() {
+      const roleNormalized = (currentRole || '').toString().trim();
+      const isAdmin = (roleNormalized === '관리자');
+      
+      console.log('=== updateAdminColumns 호출 ===');
+      console.log('currentRole:', JSON.stringify(currentRole));
+      console.log('roleNormalized:', JSON.stringify(roleNormalized));
+      console.log('isAdmin:', isAdmin);
+      
+      // 테이블 헤더와 본문의 모든 admin-only 요소 찾기
+      const adminElements = document.querySelectorAll('.admin-only');
+      console.log('관리자 요소 개수:', adminElements.length);
+      
+      if (adminElements.length === 0) {
+        console.warn('⚠️ admin-only 요소를 찾을 수 없습니다! 테이블이 렌더링되지 않았을 수 있습니다.');
+        // 테이블이 아직 렌더링되지 않았을 수 있으므로 잠시 후 다시 시도
+        setTimeout(() => {
+          console.log('재시도: updateAdminColumns');
+          updateAdminColumns();
+        }, 300);
+        return;
+      }
+      
+      const displayValue = isAdmin ? 'table-cell' : 'none';
+      let updatedCount = 0;
+      
+      adminElements.forEach((cell, index) => {
+        cell.style.display = displayValue;
+        updatedCount++;
+        if (index < 15) { // 처음 15개만 상세 로그
+          const text = (cell.textContent || cell.innerText || cell.innerHTML || '').substring(0, 40).replace(/\s+/g, ' ');
+          console.log(`요소 ${index}:`, cell.tagName, text, '→ display:', displayValue);
+        }
+      });
+      
+      console.log(`✅ 관리자 열 업데이트 완료 - ${updatedCount}개 요소, 표시: ${isAdmin}`);
+      console.log('=== updateAdminColumns 완료 ===');
+    };
+    
+    // 필터링 함수
+    function filterByStatus(status) {
+      currentFilter = status;
+      
+      // 활성화된 필터 표시
+      document.querySelectorAll('.stat-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      
+      if (status === 'all') {
+        document.getElementById('filterAll').classList.add('active');
+      } else if (status === 'completed') {
+        document.getElementById('filterCompleted').classList.add('active');
+      } else if (status === 'pending') {
+        document.getElementById('filterPending').classList.add('active');
+      }
+      
+      // 필터링된 데이터로 테이블 다시 렌더링
+      applyFilter();
+    }
+    
+    // 필터 적용 함수
+    function applyFilter() {
+      if (!currentData || currentData.length === 0) {
+        return;
+      }
+      
+      let filteredData = [];
+      
+      if (currentFilter === 'all') {
+        filteredData = [...currentData];
+      } else if (currentFilter === 'completed') {
+        filteredData = currentData.filter(row => {
+          const completed = row['처리완료'] && row['처리완료'].toString().trim();
+          return completed && completed.length > 0;
+        });
+      } else if (currentFilter === 'pending') {
+        filteredData = currentData.filter(row => {
+          const completed = row['처리완료'] && row['처리완료'].toString().trim();
+          return !completed || completed.length === 0;
+        });
+      }
+      
+      // 날짜 최신순 정렬 (일자 기준, 내림차순)
+      filteredData.sort((a, b) => {
+        const dateA = a['반품 접수일'] || '';
+        const dateB = b['반품 접수일'] || '';
+        
+        // 일자 숫자 추출
+        const getDayNumber = (dateStr) => {
+          if (!dateStr) return 0;
+          const str = dateStr.toString().trim();
+          if (str.includes('-')) {
+            const parts = str.split('-');
+            return parseInt(parts[parts.length - 1]) || 0;
+          } else if (str.includes('/')) {
+            const parts = str.split('/');
+            return parseInt(parts[parts.length - 1]) || 0;
+          } else if (str.match(/^\d+$/)) {
+            return parseInt(str) || 0;
+          }
+          return 0;
+        };
+        
+        const dayA = getDayNumber(dateA);
+        const dayB = getDayNumber(dateB);
+        
+        // 일자가 같으면 ID로 정렬 (최신순)
+        if (dayA === dayB) {
+          return (b.id || b.rowIndex || 0) - (a.id || a.rowIndex || 0);
+        }
+        
+        // 일자 기준 내림차순 (최신순)
+        return dayB - dayA;
+      });
+      
+      // 필터링된 데이터로 테이블 렌더링
+      renderTable(filteredData);
+      
+      // 관리자 열 업데이트
+      setTimeout(() => {
+        updateAdminColumns();
+        if (typeof disableHeaderHover === 'function') {
+          disableHeaderHover();
+        }
+      }, 150);
+    }
+    
+    // 전역으로 노출
+    window.filterByStatus = filterByStatus;
     
     // 통계 업데이트
     function updateStats(data) {
@@ -747,8 +2026,12 @@
         return;
       }
       
-      if (!confirm('요청사항을 저장하시겠습니까?\n저장 후에는 수정할 수 없습니다.')) {
-        return;
+      // 저장 버튼 비활성화 (중복 저장 방지)
+      const textarea = document.getElementById(`request_${dataIndex}`);
+      const saveButton = textarea ? textarea.nextElementSibling : null;
+      if (saveButton && saveButton.tagName === 'BUTTON') {
+        saveButton.disabled = true;
+        saveButton.textContent = '저장 중...';
       }
       
       fetch(`${API_BASE_URL}/api/returns/save-request`, {
@@ -764,41 +2047,68 @@
       })
       .then(response => response.json())
       .then(result => {
+        // 저장 버튼 찾기 (textarea 다음 요소)
+        const textareaEl = document.getElementById(`request_${dataIndex}`);
+        const saveBtn = textareaEl ? textareaEl.nextElementSibling : null;
+        
         if (result.success) {
-          showMessage('✅ ' + result.message, 'success');
-          // 부분 업데이트
-          const row = document.querySelector(`tr:has(#request_${dataIndex})`);
-          if (row) {
-            const requestCell = row.querySelector(`td:has(#request_${dataIndex})`).parentElement;
-            requestCell.innerHTML = `
-              <textarea class="request-input" readonly>${requestText}</textarea>
-              <div style="margin-top:5px; font-size:12px; color:#0c5460; font-weight:600;">✓ 화주사확인완료</div>
-            `;
+          // 원본 데이터에서 해당 항목 찾기 (rowIndex 기준)
+          const dataItem = currentData.find(item => 
+            item.rowIndex === rowIndex || item.id === rowIndex
+          );
+          
+          if (dataItem) {
+            dataItem['화주사요청'] = requestText;
           }
-          // 데이터 업데이트
-          if (currentData && currentData[dataIndex]) {
-            currentData[dataIndex]['화주사요청'] = requestText;
-            currentData[dataIndex]['화주사확인완료'] = '요청완료';
-          }
+          
+          // 통계 업데이트 (전체 데이터 기준)
           updateStats(currentData);
+          // 필터 재적용 (현재 필터 상태 유지, 버튼 상태도 유지됨)
+          applyFilter();
         } else {
+          // 실패 시 버튼 원래 상태로 복원
+          if (saveBtn && saveBtn.tagName === 'BUTTON') {
+            saveBtn.disabled = false;
+            const currentText = document.getElementById(`request_${dataIndex}`).value.trim();
+            if (currentText) {
+              saveBtn.textContent = '수정';
+              saveBtn.classList.add('edit-btn');
+            } else {
+              saveBtn.textContent = '저장';
+              saveBtn.classList.remove('edit-btn');
+            }
+          }
           showMessage('❌ ' + (result.message || '저장 실패'), 'error');
         }
       })
       .catch(error => {
         console.error('저장 오류:', error);
+        // 오류 시 버튼 원래 상태로 복원
+        const textareaEl = document.getElementById(`request_${dataIndex}`);
+        const saveBtn = textareaEl ? textareaEl.nextElementSibling : null;
+        if (saveBtn && saveBtn.tagName === 'BUTTON') {
+          saveBtn.disabled = false;
+          const currentText = document.getElementById(`request_${dataIndex}`).value.trim();
+          if (currentText) {
+            saveBtn.textContent = '수정';
+            saveBtn.classList.add('edit-btn');
+          } else {
+            saveBtn.textContent = '저장';
+            saveBtn.classList.remove('edit-btn');
+          }
+        }
         showMessage('❌ 저장 중 오류: ' + error.message, 'error');
       });
     }
     
     // 처리완료 표시 (관리자)
-    function completeReturn(dataIndex, rowIndex) {
+    window.completeReturn = function completeReturn(dataIndex, rowIndex) {
       if (!confirm('이 반품 건을 처리완료로 표시하시겠습니까?')) {
         return;
       }
       
       const selectedMonth = document.getElementById('monthSelect').value;
-      const managerName = currentUsername;
+      const managerName = currentCompany; // 화주명 사용
       
       fetch(`${API_BASE_URL}/api/returns/mark-completed`, {
         method: 'POST',
@@ -815,7 +2125,7 @@
       .then(result => {
         if (result.success) {
           showMessage('✅ ' + result.message, 'success');
-          loadData(); // 데이터 다시 로드
+          refreshReturnsData(); // 반품 내역 데이터 다시 로드
         } else {
           showMessage('❌ ' + (result.message || '처리 실패'), 'error');
         }
@@ -824,23 +2134,914 @@
         console.error('처리완료 오류:', error);
         showMessage('❌ 처리 중 오류: ' + error.message, 'error');
       });
-    }
+    };
     
     // QR 코드 표시
-    function showQRCode(trackingNumber) {
+    window.showQRCode = function showQRCode(trackingNumber) {
+      if (!trackingNumber) {
+        alert('송장번호가 없습니다.');
+        return;
+      }
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(trackingNumber)}`;
       const modal = document.createElement('div');
+      modal.id = 'qrModal';
       modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
       modal.innerHTML = `
-        <div style="background: white; padding: 20px; border-radius: 10px; text-align: center;">
-          <h3>QR 코드</h3>
-          <img src="${qrUrl}" alt="QR Code" style="margin: 20px 0;">
-          <p>송장번호: ${trackingNumber}</p>
-          <button onclick="this.closest('div[style*=\"position: fixed\"]').remove()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">닫기</button>
+        <div style="background: white; padding: 30px; border-radius: 12px; text-align: center; max-width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+          <h3 style="margin-bottom: 20px;">📱 QR 코드</h3>
+          <img src="${qrUrl}" alt="QR Code" style="margin: 20px 0; max-width: 100%; border: 2px solid #e0e0e0; padding: 10px; border-radius: 8px;">
+          <p style="margin: 15px 0; font-size: 14px; color: #666;">송장번호: <strong>${trackingNumber}</strong></p>
+          <button onclick="document.getElementById('qrModal').remove()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">닫기</button>
         </div>
       `;
       document.body.appendChild(modal);
+    };
+    
+    // 비고 수정
+    window.editMemo = function editMemo(dataIndex, returnId, currentMemo) {
+      const memoText = prompt('비고를 입력하세요:', currentMemo || '');
+      if (memoText === null) return; // 취소
+      
+      fetch(`${API_BASE_URL}/api/returns/update-memo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          rowIndex: returnId,
+          memo: memoText
+        })
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          showMessage('✅ 비고가 저장되었습니다.', 'success');
+          refreshReturnsData(); // 반품 내역 데이터 다시 로드
+        } else {
+          showMessage('❌ ' + (result.message || '저장 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('비고 저장 오류:', error);
+        showMessage('❌ 저장 중 오류: ' + error.message, 'error');
+      });
+    };
+    
+    // 반품 삭제
+    window.deleteReturn = function deleteReturn(dataIndex, returnId) {
+      if (!confirm('이 반품 건을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.')) {
+        return;
+      }
+      
+      fetch(`${API_BASE_URL}/api/returns/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          rowIndex: returnId
+        })
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          showMessage('✅ 반품 건이 삭제되었습니다.', 'success');
+          refreshReturnsData(); // 반품 내역 데이터 다시 로드
+        } else {
+          showMessage('❌ ' + (result.message || '삭제 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('삭제 오류:', error);
+        showMessage('❌ 삭제 중 오류: ' + error.message, 'error');
+      });
+    };
+    
+    // 비고 툴팁 표시
+    window.showMemoTooltip = function showMemoTooltip(event, memoText) {
+      if (!memoText || memoText.trim() === '' || memoText === 'undefined') {
+        return; // 비고가 없으면 툴팁 표시 안 함
+      }
+      
+      // 기존 툴팁 제거
+      hideMemoTooltip();
+      
+      // 툴팁 생성
+      const tooltip = document.createElement('div');
+      tooltip.id = 'memoTooltip';
+      tooltip.className = 'memo-tooltip';
+      tooltip.textContent = memoText.replace(/\\n/g, '\n');
+      document.body.appendChild(tooltip);
+      
+      // 마우스 위치에 툴팁 표시
+      updateTooltipPosition(event, tooltip);
+    };
+    
+    // 비고 툴팁 위치 업데이트 (마우스 따라다니기)
+    function updateTooltipPosition(event, tooltip) {
+      if (!tooltip) return;
+      
+      const x = event.clientX + 15;
+      const y = event.clientY + 15;
+      
+      tooltip.style.left = x + 'px';
+      tooltip.style.top = y + 'px';
+      
+      // 약간의 지연 후 화면 밖 체크 (렌더링 완료 후)
+      setTimeout(() => {
+        const rect = tooltip.getBoundingClientRect();
+        if (rect.right > window.innerWidth - 10) {
+          tooltip.style.left = (event.clientX - rect.width - 15) + 'px';
+        }
+        if (rect.bottom > window.innerHeight - 10) {
+          tooltip.style.top = (event.clientY - rect.height - 15) + 'px';
+        }
+        if (rect.left < 10) {
+          tooltip.style.left = '15px';
+        }
+        if (rect.top < 10) {
+          tooltip.style.top = '15px';
+        }
+      }, 10);
     }
+    
+    // 비고 툴팁 숨기기
+    window.hideMemoTooltip = function hideMemoTooltip() {
+      const tooltip = document.getElementById('memoTooltip');
+      if (tooltip) {
+        tooltip.remove();
+      }
+    };
+    
+    // 마우스 이동 시 툴팁 위치 업데이트
+    document.addEventListener('mousemove', function(event) {
+      const tooltip = document.getElementById('memoTooltip');
+      if (tooltip) {
+        updateTooltipPosition(event, tooltip);
+      }
+    });
+    
+    // 반품 등록 폼 토글 (접이식)
+    function toggleAddForm() {
+      const form = document.getElementById('addReturnForm');
+      const icon = document.getElementById('addReturnIcon');
+      const btn = document.getElementById('addReturnBtn');
+      
+      if (form.style.display === 'none') {
+        form.style.display = 'block';
+        icon.textContent = '▲';
+        btn.style.borderRadius = '12px 12px 0 0';
+        // 오늘 일자로 기본 설정
+        const today = new Date().getDate();
+        document.getElementById('newReturnDate').value = today;
+        // 현재 월로 기본 설정 (월 선택이 없으면 현재 월로 설정)
+        const monthSelect = document.getElementById('monthSelect');
+        if (!monthSelect.value) {
+          const now = new Date();
+          const currentMonth = `${now.getFullYear()}년${now.getMonth() + 1}월`;
+          monthSelect.value = currentMonth;
+        }
+      } else {
+        form.style.display = 'none';
+        icon.textContent = '▼';
+        btn.style.borderRadius = '12px';
+        // 폼 초기화
+        document.getElementById('addReturnForm').querySelectorAll('input, textarea, select').forEach(el => {
+          if (el.id !== 'newReturnDate') el.value = '';
+        });
+        // 날짜는 오늘 일자로 다시 설정
+        const today = new Date().getDate();
+        document.getElementById('newReturnDate').value = today;
+      }
+    }
+    window.toggleAddForm = toggleAddForm;
+    
+    // 반품 등록
+    function addReturn() {
+      const selectedMonth = document.getElementById('monthSelect').value;
+      if (!selectedMonth) {
+        alert('월을 선택해주세요.');
+        return;
+      }
+      
+      // 일자만 입력받음 (1-31)
+      const dayInput = document.getElementById('newReturnDate').value.trim();
+      const day = parseInt(dayInput);
+      if (!dayInput || isNaN(day) || day < 1 || day > 31) {
+        alert('일자를 1-31 사이의 숫자로 입력해주세요.');
+        return;
+      }
+      
+      const companyName = document.getElementById('newCompanyName').value.trim();
+      const product = document.getElementById('newProduct').value.trim();
+      const customerName = document.getElementById('newCustomerName').value.trim();
+      const trackingNumber = document.getElementById('newTrackingNumber').value.trim();
+      
+      if (!customerName || !trackingNumber) {
+        alert('고객명과 송장번호는 필수입니다.');
+        return;
+      }
+      
+      // 일자만 저장 (문자열로 저장하여 정렬이 잘 되도록)
+      const returnData = {
+        return_date: String(day),  // 일자만 저장
+        company_name: companyName,
+        product: product,
+        customer_name: customerName,
+        tracking_number: trackingNumber,
+        return_type: document.getElementById('newReturnType').value,
+        stock_status: document.getElementById('newStockStatus').value,
+        inspection: '',  // 검품유무 제거
+        completed: '',
+        memo: document.getElementById('newMemo').value.trim(),
+        photo_links: '',
+        other_courier: '',  // 다른외부택배사 제거
+        shipping_fee: '',  // 배송비 제거
+        client_request: '',
+        client_confirmed: '',
+        month: selectedMonth
+      };
+      
+      fetch(`${API_BASE_URL}/api/returns/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(returnData)
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          showMessage('✅ 반품 내역이 등록되었습니다.', 'success');
+          // 폼 접기 및 초기화
+          const form = document.getElementById('addReturnForm');
+          const icon = document.getElementById('addReturnIcon');
+          const btn = document.getElementById('addReturnBtn');
+          if (form && icon && btn) {
+            form.style.display = 'none';
+            icon.textContent = '▼';
+            btn.style.borderRadius = '12px';
+            // 폼 초기화
+            document.getElementById('addReturnForm').querySelectorAll('input, textarea, select').forEach(el => {
+              if (el.id !== 'newReturnDate') el.value = '';
+            });
+            // 날짜는 오늘 일자로 다시 설정
+            const today = new Date().getDate();
+            document.getElementById('newReturnDate').value = today;
+          }
+          refreshReturnsData(); // 반품 내역 데이터 다시 로드
+        } else {
+          showMessage('❌ ' + (result.message || '등록 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('등록 오류:', error);
+        showMessage('❌ 등록 중 오류: ' + error.message, 'error');
+      });
+    }
+    window.addReturn = addReturn;
+    
+    // 헤더 hover 이벤트 완전히 차단
+    function disableHeaderHover() {
+      const headerCells = document.querySelectorAll('thead th');
+      const thead = document.querySelector('thead');
+      
+      // thead 자체에도 스타일 강제 적용
+      if (thead) {
+        const theadRow = thead.querySelector('tr');
+        if (theadRow) {
+          theadRow.style.setProperty('background', 'linear-gradient(135deg, #ff9500 0%, #ffa502 100%)', 'important');
+          theadRow.style.setProperty('background-color', '#ff9500', 'important');
+        }
+        const forceTheadStyle = function() {
+          this.style.setProperty('background', 'linear-gradient(135deg, #ff9500 0%, #ffa502 100%)', 'important');
+          this.style.setProperty('background-color', '#ff9500', 'important');
+          this.style.setProperty('color', 'white', 'important');
+          const row = this.querySelector('tr');
+          if (row) {
+            row.style.setProperty('background', 'linear-gradient(135deg, #ff9500 0%, #ffa502 100%)', 'important');
+            row.style.setProperty('background-color', '#ff9500', 'important');
+          }
+        };
+        forceTheadStyle.call(thead);
+        ['mouseenter', 'mouseleave', 'mouseover', 'mouseout'].forEach(eventType => {
+          thead.addEventListener(eventType, forceTheadStyle, true);
+        });
+      }
+      
+      headerCells.forEach(th => {
+        // 강제 스타일 적용 함수
+        const forceStyle = function() {
+          this.style.setProperty('background', 'linear-gradient(135deg, #ff9500 0%, #ffa502 100%)', 'important');
+          this.style.setProperty('background-color', '#ff9500', 'important');
+          this.style.setProperty('color', 'white', 'important');
+          this.style.setProperty('cursor', 'default', 'important');
+          this.style.setProperty('transition', 'none', 'important');
+          this.style.setProperty('opacity', '1', 'important');
+          this.style.setProperty('text-align', 'center', 'important');
+          this.style.setProperty('border', 'none', 'important');
+          this.style.setProperty('margin', '0', 'important');
+          // 모든 자식 요소에도 적용
+          const children = this.querySelectorAll('*');
+          children.forEach(child => {
+            child.style.setProperty('background', 'transparent', 'important');
+            child.style.setProperty('background-color', 'transparent', 'important');
+            child.style.setProperty('color', 'white', 'important');
+          });
+        };
+        
+        // 모든 마우스 이벤트에서 스타일 강제 적용 (캡처 단계에서)
+        ['mouseenter', 'mouseleave', 'mouseover', 'mouseout', 'mousemove'].forEach(eventType => {
+          th.addEventListener(eventType, function(e) {
+            e.stopPropagation();
+            forceStyle.call(this);
+          }, true); // 캡처 단계에서 처리
+        });
+        
+        // 즉시 스타일 강제 적용
+        forceStyle.call(th);
+        
+        // requestAnimationFrame을 사용하여 지속적으로 스타일 확인
+        function checkAndForceStyle() {
+          const computedStyle = window.getComputedStyle(th);
+          const bg = computedStyle.backgroundColor;
+          const color = computedStyle.color;
+          const textAlign = computedStyle.textAlign;
+          // 색상이 변경되었는지 확인 (rgb(255, 149, 0) = #ff9500 주황색, rgb(255, 255, 255) = white)
+          // 주황색 계열이 아닌 경우에만 강제 적용 (rgb(255, 149, 0) 또는 rgb(255, 165, 2))
+          const isOrange = bg.includes('rgb(255, 149') || bg.includes('rgb(255, 165') || bg.includes('255, 149') || bg.includes('255, 165');
+          if (!isOrange || color !== 'rgb(255, 255, 255)' || textAlign !== 'center') {
+            forceStyle.call(th);
+          }
+          requestAnimationFrame(checkAndForceStyle);
+        }
+        checkAndForceStyle();
+      });
+    }
+    
+    // 전역으로 노출하여 언제든지 호출 가능하도록
+    window.disableHeaderHover = disableHeaderHover;
+    
+    /* ========== 관리자 탭 전환 ========== */
+    function switchAdminTab(tabName) {
+      console.log('=== switchAdminTab 호출 ===', tabName);
+      
+      // 모든 탭 요소 가져오기
+      const returnsTab = document.getElementById('returnsTab');
+      const registerTab = document.getElementById('registerTab');
+      const passwordTab = document.getElementById('passwordTab');
+      
+      console.log('탭 요소 확인:', {
+        returnsTab: returnsTab ? '존재' : '없음',
+        registerTab: registerTab ? '존재' : '없음',
+        passwordTab: passwordTab ? '존재' : '없음'
+      });
+      
+      // 모든 탭 버튼 가져오기
+      const tabButtons = document.querySelectorAll('#adminTabs .tab-btn');
+      console.log('탭 버튼 개수:', tabButtons.length);
+      
+      // 1. 모든 탭 버튼 비활성화
+      tabButtons.forEach((btn, index) => {
+        btn.classList.remove('active');
+      });
+      
+      // 2. 모든 탭 콘텐츠 숨기기 (강제로)
+      const allTabs = [
+        {tab: returnsTab, name: 'returnsTab'},
+        {tab: registerTab, name: 'registerTab'}
+      ];
+      
+      // passwordTab도 숨기기 (존재하는 경우)
+      if (passwordTab) {
+        passwordTab.classList.add('hidden');
+        passwordTab.style.setProperty('display', 'none', 'important');
+        passwordTab.style.setProperty('visibility', 'hidden', 'important');
+        passwordTab.style.setProperty('opacity', '0', 'important');
+      }
+      
+      allTabs.forEach((item) => {
+        if (item.tab) {
+          item.tab.classList.add('hidden');
+          item.tab.style.setProperty('display', 'none', 'important');
+          item.tab.style.setProperty('visibility', 'hidden', 'important');
+          item.tab.style.setProperty('opacity', '0', 'important');
+          console.log(`${item.name} 숨김`);
+        }
+      });
+      
+      // 3. 선택된 탭 표시
+      let selectedTab = null;
+      let selectedButtonIndex = -1;
+      
+      if (tabName === 'returns' && returnsTab) {
+        selectedTab = returnsTab;
+        selectedButtonIndex = 0;
+      } else if (tabName === 'register' && registerTab) {
+        selectedTab = registerTab;
+        selectedButtonIndex = 1;
+      }
+      // password 탭 제거됨
+      
+      if (selectedTab) {
+        // 선택된 탭 표시 (강제로)
+        selectedTab.classList.remove('hidden');
+        selectedTab.style.removeProperty('display');
+        selectedTab.style.removeProperty('visibility');
+        selectedTab.style.removeProperty('opacity');
+        selectedTab.style.setProperty('display', 'block', 'important');
+        selectedTab.style.setProperty('visibility', 'visible', 'important');
+        selectedTab.style.setProperty('opacity', '1', 'important');
+        
+        console.log('선택된 탭 표시:', selectedTab.id);
+        console.log('인라인 스타일:', {
+          display: selectedTab.style.display,
+          visibility: selectedTab.style.visibility,
+          opacity: selectedTab.style.opacity,
+          hasHidden: selectedTab.classList.contains('hidden')
+        });
+        
+        // 선택된 탭의 실제 표시 상태 확인
+        setTimeout(() => {
+          const computedStyle = window.getComputedStyle(selectedTab);
+          console.log('계산된 스타일:', {
+            display: computedStyle.display,
+            visibility: computedStyle.visibility,
+            opacity: computedStyle.opacity
+          });
+        }, 50);
+      } else {
+        console.error('선택된 탭을 찾을 수 없습니다:', tabName);
+      }
+      
+      // 4. 선택된 탭 버튼 활성화
+      if (selectedButtonIndex >= 0 && tabButtons[selectedButtonIndex]) {
+        tabButtons[selectedButtonIndex].classList.add('active');
+        console.log('탭 버튼 활성화:', selectedButtonIndex);
+      }
+      
+      // 5. 현재 활성화된 탭을 localStorage에 저장 (페이지 새로고침 시 유지)
+      localStorage.setItem('activeAdminTab', tabName);
+      
+      // 6. 화주사 등록 탭이 선택되면 화주사 목록 로드
+      if (tabName === 'register') {
+        setTimeout(() => {
+          try {
+            if (typeof loadCompanies === 'function') {
+              console.log('loadCompanies 함수 호출');
+              loadCompanies();
+            } else {
+              console.error('loadCompanies 함수를 찾을 수 없습니다.');
+            }
+          } catch (error) {
+            console.error('화주사 목록 로드 중 오류:', error);
+            console.error(error.stack);
+          }
+        }, 300);
+      }
+      
+      // 7. 반품 내역 탭이 선택되면 반품 내역 데이터 로드 (월이 선택되어 있을 때만)
+      if (tabName === 'returns') {
+        setTimeout(() => {
+          const monthSelect = document.getElementById('monthSelect');
+          if (monthSelect) {
+            // 월이 선택되어 있지 않으면 현재 월로 설정
+            if (!monthSelect.value) {
+              const today = new Date();
+              const currentMonth = `${today.getFullYear()}년${today.getMonth() + 1}월`;
+              monthSelect.value = currentMonth;
+            }
+            // 데이터 로드
+            if (monthSelect.value) {
+              try {
+                if (typeof refreshReturnsData === 'function') {
+                  console.log('반품 내역 데이터 로드');
+                  refreshReturnsData();
+                }
+              } catch (error) {
+                console.error('반품 내역 데이터 로드 중 오류:', error);
+              }
+            }
+          }
+        }, 300);
+      }
+      
+      console.log('=== switchAdminTab 완료 ===');
+    }
+    window.switchAdminTab = switchAdminTab;
+    
+    /* ========== 화주사 등록 폼 접이식 ========== */
+    function toggleAddCompanyForm() {
+      const form = document.getElementById('addCompanyForm');
+      const icon = document.getElementById('addCompanyIcon');
+      
+      if (form.style.display === 'none') {
+        form.style.display = 'block';
+        icon.textContent = '▲';
+        icon.style.transform = 'rotate(0deg)';
+      } else {
+        form.style.display = 'none';
+        icon.textContent = '▼';
+        icon.style.transform = 'rotate(0deg)';
+        document.getElementById('adminRegisterForm').reset();
+        document.getElementById('adminRegisterStatus').className = 'admin-status';
+        document.getElementById('adminRegisterStatus').textContent = '';
+      }
+    }
+    window.toggleAddCompanyForm = toggleAddCompanyForm;
+    
+    /* ========== 화주사 등록 ========== */
+    function registerCompany() {
+      const btn = document.getElementById('adminRegisterBtn');
+      const status = document.getElementById('adminRegisterStatus');
+      
+      const companyName = document.getElementById('adminRegCompanyName').value.trim();
+      const username = document.getElementById('adminRegUsername').value.trim();
+      const password = document.getElementById('adminRegPassword').value.trim();
+      const role = document.getElementById('adminRegRole').value.trim();
+      const businessNumber = document.getElementById('adminRegBusinessNumber').value.trim();
+      const businessName = document.getElementById('adminRegBusinessName').value.trim();
+      const businessAddress = document.getElementById('adminRegBusinessAddress').value.trim();
+      const businessTel = document.getElementById('adminRegBusinessTel').value.trim();
+      const businessEmail = document.getElementById('adminRegBusinessEmail').value.trim();
+
+      if (!companyName || !username || !password || !role) {
+        status.className = 'admin-status error';
+        status.textContent = '화주사명, 아이디, 비밀번호, 권한은 필수 입력 항목입니다.';
+        return;
+      }
+      
+      if (role !== '화주사' && role !== '관리자') {
+        status.className = 'admin-status error';
+        status.textContent = '권한은 화주사 또는 관리자 중 하나를 선택해야 합니다.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '등록 중...';
+      status.className = 'admin-status loading';
+      status.textContent = '화주사 등록 중...';
+      
+      const data = {
+        company_name: companyName,
+        username: username,
+        password: password,
+        role: role,
+        business_number: businessNumber || null,
+        business_name: businessName || null,
+        business_address: businessAddress || null,
+        business_tel: businessTel || null,
+        business_email: businessEmail || null
+      };
+
+      fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          status.className = 'admin-status success';
+          status.textContent = data.message || '화주사 계정이 생성되었습니다.';
+          document.getElementById('adminRegisterForm').reset();
+          // 화주사 목록 새로고침
+          loadCompanies();
+          // 폼 닫기
+          setTimeout(() => {
+            toggleAddCompanyForm();
+          }, 1500);
+        } else {
+          status.className = 'admin-status error';
+          status.textContent = data.message || '화주사 등록에 실패했습니다.';
+        }
+        btn.disabled = false;
+        btn.textContent = '등록하기';
+      })
+      .catch(error => {
+        console.error('화주사 등록 오류:', error);
+        status.className = 'admin-status error';
+        status.textContent = '화주사 등록 중 오류가 발생했습니다: ' + error.message;
+        btn.disabled = false;
+        btn.textContent = '등록하기';
+      });
+    }
+    window.registerCompany = registerCompany;
+    
+    /* ========== 화주사 목록 새로고침 ========== */
+    function refreshCompaniesData() {
+      console.log('화주사 목록 새로고침');
+      // 화주사 등록 탭이 활성화되어 있는지 확인
+      const registerTab = document.getElementById('registerTab');
+      if (registerTab && !registerTab.classList.contains('hidden') && registerTab.style.display !== 'none') {
+        loadCompanies();
+      } else {
+        console.log('화주사 등록 탭이 활성화되지 않아 새로고침을 건너뜁니다.');
+      }
+    }
+    window.refreshCompaniesData = refreshCompaniesData;
+    
+    /* ========== 화주사 목록 로드 ========== */
+    function loadCompanies() {
+      try {
+        const tbody = document.getElementById('companiesTableBody');
+        if (!tbody) {
+          console.error('companiesTableBody 요소를 찾을 수 없습니다.');
+          return;
+        }
+        
+        tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터를 불러오는 중...</td></tr>';
+        
+        fetch('/api/auth/companies', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.success && data.companies) {
+            // 통계 표시
+            if (data.statistics) {
+              const statsEl = document.getElementById('companiesStatistics');
+              if (statsEl) {
+                statsEl.textContent = `(관리자: ${data.statistics.admin_count}, 화주사: ${data.statistics.company_count})`;
+              }
+            }
+            renderCompaniesTable(data.companies);
+          } else {
+            tbody.innerHTML = '<tr><td colspan="12" class="no-data">화주사 목록을 불러올 수 없습니다.</td></tr>';
+          }
+        })
+        .catch(error => {
+          console.error('화주사 목록 로드 오류:', error);
+          if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="12" class="no-data">화주사 목록을 불러오는 중 오류가 발생했습니다: ' + error.message + '</td></tr>';
+          }
+        });
+      } catch (error) {
+        console.error('loadCompanies 함수 오류:', error);
+      }
+    }
+    window.loadCompanies = loadCompanies;
+    
+    /* ========== 화주사 목록 테이블 렌더링 ========== */
+    function renderCompaniesTable(companies) {
+      const tbody = document.getElementById('companiesTableBody');
+      tbody.innerHTML = '';
+      
+      if (!companies || companies.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" class="no-data">등록된 화주사가 없습니다.</td></tr>';
+        return;
+      }
+      
+      companies.forEach(company => {
+        const tr = document.createElement('tr');
+        
+        // 날짜 포맷팅
+        const createdAt = company.created_at ? new Date(company.created_at).toLocaleDateString('ko-KR') : '-';
+        
+        // 최근 로그인 날짜 포맷팅
+        let lastLogin = '-';
+        if (company.last_login) {
+          const lastLoginDate = new Date(company.last_login);
+          const now = new Date();
+          const diffMs = now - lastLoginDate;
+          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+          const diffMinutes = Math.floor(diffMs / (1000 * 60));
+          
+          if (diffMinutes < 1) {
+            lastLogin = '방금 전';
+          } else if (diffMinutes < 60) {
+            lastLogin = `${diffMinutes}분 전`;
+          } else if (diffHours < 24) {
+            lastLogin = `${diffHours}시간 전`;
+          } else if (diffDays < 7) {
+            lastLogin = `${diffDays}일 전`;
+          } else {
+            lastLogin = lastLoginDate.toLocaleDateString('ko-KR');
+          }
+        }
+        
+        // 권한 표시 (색상으로 구분)
+        const role = company.role || '화주사';
+        const roleColor = role === '관리자' ? '#ff6b35' : '#feca57';
+        const roleBg = role === '관리자' ? 'linear-gradient(135deg, #ff6b35 0%, #ff5722 100%)' : 'linear-gradient(135deg, #feca57 0%, #ffa502 100%)';
+        const roleHtml = `<span style="background: ${roleBg}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 700; font-size: 13px;">${escapeHtml(role)}</span>`;
+        
+        // 사업자 등록증 버튼
+        const certificateUrl = company.business_certificate_url || '';
+        let certificateHtml = '';
+        if (certificateUrl) {
+          certificateHtml = `<button class="save-btn" onclick="viewCertificate(${company.id}, '${escapeHtml(certificateUrl)}')" style="background: linear-gradient(135deg, #ffeaa7 0%, #fff9e6 100%); color: #ff6b35; border: 2px solid #ffa502; padding: 6px 12px; font-size: 12px; border-radius: 8px; box-shadow: 0 2px 6px rgba(255, 165, 2, 0.2); transition: all 0.3s ease;">📄 보기</button>`;
+        } else {
+          certificateHtml = `<button class="save-btn" onclick="uploadCertificate(${company.id})" style="background: linear-gradient(135deg, #fff9e6 0%, #ffeaa7 100%); color: #ff6b35; border: 2px solid #ffeaa7; padding: 6px 12px; font-size: 12px; border-radius: 8px; box-shadow: 0 2px 6px rgba(255, 152, 0, 0.15); transition: all 0.3s ease;">📤 업로드</button>`;
+        }
+        
+        // 관리 버튼
+        const manageHtml = `
+          <div style="display: flex; gap: 6px; justify-content: center;">
+            <button class="save-btn" onclick="changeCompanyPassword(${company.id}, '${escapeHtml(company.username || '')}')" style="background: linear-gradient(135deg, #ffeaa7 0%, #fff9e6 100%); color: #ff6b35; border: 2px solid #ffa502; padding: 6px 12px; font-size: 12px; border-radius: 8px; box-shadow: 0 2px 6px rgba(255, 165, 2, 0.2); transition: all 0.3s ease;">🔒 비밀번호</button>
+            <button class="save-btn" onclick="deleteCompany(${company.id}, '${escapeHtml(company.company_name || '')}')" style="background: linear-gradient(135deg, #ee5a6f 0%, #ff6b35 100%); color: white; border: none; padding: 6px 12px; font-size: 12px; border-radius: 8px; box-shadow: 0 2px 6px rgba(238, 90, 111, 0.25); transition: all 0.3s ease;">🗑️ 삭제</button>
+          </div>
+        `;
+        
+        tr.innerHTML = `
+          <td>${escapeHtml(company.company_name || '-')}</td>
+          <td>${escapeHtml(company.username || '-')}</td>
+          <td>${roleHtml}</td>
+          <td>${escapeHtml(company.business_number || '-')}</td>
+          <td>${escapeHtml(company.business_name || '-')}</td>
+          <td>${escapeHtml(company.business_address || '-')}</td>
+          <td>${escapeHtml(company.business_tel || '-')}</td>
+          <td>${escapeHtml(company.business_email || '-')}</td>
+          <td style="text-align: center;">${certificateHtml}</td>
+          <td>${lastLogin}</td>
+          <td>${createdAt}</td>
+          <td style="text-align: center;">${manageHtml}</td>
+        `;
+        
+        tbody.appendChild(tr);
+      });
+    }
+    window.renderCompaniesTable = renderCompaniesTable;
+    
+    /* ========== 화주사 삭제 ========== */
+    function deleteCompany(companyId, companyName) {
+      if (!confirm(`정말로 "${companyName}" 화주사를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) {
+        return;
+      }
+      
+      fetch(`/api/auth/company/${companyId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showMessage('✅ ' + data.message, 'success');
+          loadCompanies();
+        } else {
+          showMessage('❌ ' + (data.message || '삭제 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('화주사 삭제 오류:', error);
+        showMessage('❌ 화주사 삭제 중 오류가 발생했습니다: ' + error.message, 'error');
+      });
+    }
+    window.deleteCompany = deleteCompany;
+    
+    /* ========== 화주사 비밀번호 변경 ========== */
+    function changeCompanyPassword(companyId, username) {
+      const newPassword = prompt(`${username}의 새 비밀번호를 입력하세요:`, '');
+      
+      if (!newPassword) {
+        return;
+      }
+      
+      if (newPassword.length < 4) {
+        alert('비밀번호는 최소 4자 이상이어야 합니다.');
+        return;
+      }
+      
+      if (!confirm(`정말로 "${username}"의 비밀번호를 변경하시겠습니까?`)) {
+        return;
+      }
+      
+      fetch(`/api/auth/company/${companyId}/password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          new_password: newPassword
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showMessage('✅ ' + data.message, 'success');
+        } else {
+          showMessage('❌ ' + (data.message || '비밀번호 변경 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('비밀번호 변경 오류:', error);
+        showMessage('❌ 비밀번호 변경 중 오류가 발생했습니다: ' + error.message, 'error');
+      });
+    }
+    window.changeCompanyPassword = changeCompanyPassword;
+    
+    /* ========== 사업자 등록증 업로드 ========== */
+    function uploadCertificate(companyId) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*,.pdf';
+      input.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // 파일 크기 확인 (10MB 제한)
+        if (file.size > 10 * 1024 * 1024) {
+          alert('파일 크기는 10MB 이하여야 합니다.');
+          return;
+        }
+        
+        // 파일을 Base64로 변환
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const base64Data = event.target.result;
+          
+          // Cloudinary에 업로드
+          uploadCertificateToCloudinary(companyId, base64Data, file.name);
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    }
+    window.uploadCertificate = uploadCertificate;
+    
+    /* ========== 사업자 등록증 Cloudinary 업로드 ========== */
+    function uploadCertificateToCloudinary(companyId, base64Data, fileName) {
+      showMessage('사업자 등록증 업로드 중...', 'success');
+      
+      // Base64 데이터를 Blob으로 변환
+      const blob = dataURLtoBlob(base64Data);
+      
+      // FormData 생성
+      const formData = new FormData();
+      formData.append('file', blob, fileName);
+      
+      // 서버를 통해 Cloudinary에 업로드
+      fetch('/api/uploads/certificate', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success && data.url) {
+          // 업로드된 URL을 서버에 저장
+          return fetch(`/api/auth/company/${companyId}/certificate`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              certificate_url: data.url
+            })
+          });
+        } else {
+          throw new Error(data.message || '업로드 실패');
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showMessage('✅ 사업자 등록증이 업로드되었습니다.', 'success');
+          loadCompanies();
+        } else {
+          showMessage('❌ ' + (data.message || '업로드 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('사업자 등록증 업로드 오류:', error);
+        showMessage('❌ 사업자 등록증 업로드 중 오류가 발생했습니다: ' + error.message, 'error');
+      });
+    }
+    window.uploadCertificateToCloudinary = uploadCertificateToCloudinary;
+    
+    /* ========== Base64를 Blob으로 변환 ========== */
+    function dataURLtoBlob(dataurl) {
+      const arr = dataurl.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new Blob([u8arr], { type: mime });
+    }
+    window.dataURLtoBlob = dataURLtoBlob;
+    
+    /* ========== 사업자 등록증 보기 ========== */
+    function viewCertificate(companyId, certificateUrl) {
+      // 새 창에서 사업자 등록증 열기
+      window.open(certificateUrl, '_blank');
+    }
+    window.viewCertificate = viewCertificate;
+    
     
     // 페이지 로드 시 초기화
     window.addEventListener('DOMContentLoaded', function() {
@@ -858,8 +3059,12 @@
         if (hoursDiff < 24) {
           currentCompany = savedCompany;
           currentUsername = savedUsername;
-          currentRole = savedRole || '';
+          currentRole = (savedRole || '').toString().trim();
+          console.log('자동 로그인 - 권한:', currentRole, '타입:', typeof currentRole); // 디버깅용
+          console.log('자동 로그인 - 관리자 여부:', currentRole === '관리자'); // 디버깅용
           showDashboard();
+          // 헤더 hover 차단 적용
+          setTimeout(disableHeaderHover, 100);
           return;
         } else {
           localStorage.removeItem('client_company');
@@ -887,6 +3092,16 @@
           doLogin();
         }
       });
+      
+      // 관리자 폼 이벤트 리스너
+      const adminRegisterForm = document.getElementById('adminRegisterForm');
+      if (adminRegisterForm) {
+        adminRegisterForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          registerCompany();
+        });
+      }
+      
     });
   </script>
 </body>

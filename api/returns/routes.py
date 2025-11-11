@@ -26,22 +26,43 @@ def get_credentials():
         # 환경 변수에서 인증 정보 가져오기 (배포 시)
         creds_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
         if creds_json:
-            import json
-            creds_info = json.loads(creds_json)
-            credentials = service_account.Credentials.from_service_account_info(
-                creds_info, scopes=SCOPES)
-            return credentials
+            try:
+                import json
+                # JSON 문자열인 경우 파싱
+                if isinstance(creds_json, str):
+                    creds_info = json.loads(creds_json)
+                else:
+                    creds_info = creds_json
+                
+                credentials = service_account.Credentials.from_service_account_info(
+                    creds_info, scopes=SCOPES)
+                print("✅ 환경 변수에서 인증 정보 로드 성공")
+                return credentials
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON 파싱 오류: {e}")
+                return None
+            except Exception as e:
+                print(f"❌ 서비스 계정 인증 정보 생성 실패: {e}")
+                return None
         
         # 로컬 개발용: service_account.json 파일 사용
         creds_path = os.path.join(os.path.dirname(__file__), '../../service_account.json')
         if os.path.exists(creds_path):
-            credentials = service_account.Credentials.from_service_account_file(
-                creds_path, scopes=SCOPES)
-            return credentials
+            try:
+                credentials = service_account.Credentials.from_service_account_file(
+                    creds_path, scopes=SCOPES)
+                print("✅ 로컬 파일에서 인증 정보 로드 성공")
+                return credentials
+            except Exception as e:
+                print(f"❌ 로컬 파일 인증 정보 로드 실패: {e}")
+                return None
         
+        print("❌ 인증 정보를 찾을 수 없습니다.")
         return None
     except Exception as e:
-        print(f"인증 정보 로드 실패: {e}")
+        print(f"❌ 인증 정보 로드 실패: {e}")
+        import traceback
+        print(traceback.format_exc())
         return None
 
 

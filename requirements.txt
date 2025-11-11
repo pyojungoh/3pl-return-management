@@ -1,11 +1,14 @@
 flask==3.0.0
 flask-cors==4.0.0
+gunicorn==21.2.0
+python-dotenv==1.0.0
+# Google Sheets API (마이그레이션용 - 선택사항)
 google-api-python-client==2.108.0
 google-auth==2.25.2
 google-auth-oauthlib==1.2.0
 google-auth-httplib2==0.2.0
-gunicorn==21.2.0
-python-dotenv==1.0.0
+# Cloudinary (이미지 업로드)
+cloudinary==1.38.0
 
 
 

@@ -4,38 +4,38 @@
 
 ## 🚀 빠른 시작
 
-### GitHub에 푸시
+### 로컬 실행
 ```bash
-cd C:\3pl반품관리및화주사관리
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/pyojungoh/3pl-return-management.git
-git branch -M main
-git push -u origin main
+# 1. 패키지 설치
+pip install -r requirements.txt
+
+# 2. 서버 실행
+python app.py
 ```
 
-### Vercel 배포
-1. https://vercel.com 접속
-2. GitHub로 로그인
-3. 저장소 선택
-4. 환경 변수 설정:
-   - `GOOGLE_SERVICE_ACCOUNT_JSON`: 서비스 계정 JSON
-   - `SECRET_KEY`: 랜덤 문자열
-5. 배포 완료!
-
-## 📚 문서
-
-- [단계별 가이드](STEP_BY_STEP_GUIDE.md)
-- [GitHub 푸시 가이드](GITHUB_PUSH_GUIDE.md)
-- [배포 가이드](DEPLOYMENT_GUIDE.md)
+### 서버 배포 (Vercel)
+1. GitHub에 코드 푸시
+2. https://vercel.com 접속 → GitHub 로그인
+3. "New Project" → 저장소 선택
+4. 환경 변수 추가: `SECRET_KEY` (랜덤 문자열)
+5. "Deploy" 클릭
+6. 배포 완료!
 
 ## 🔧 기술 스택
 
 - **Backend**: Flask (Python)
 - **Frontend**: HTML, CSS, JavaScript
-- **Database**: Google Sheets
-- **Deployment**: Vercel
+- **Database**: SQLite
+- **Image Storage**: Cloudinary
+- **Deployment**: Railway / Render
+
+## 📋 주요 기능
+
+- 화주사별 반품 내역 조회
+- QR 코드 스캔을 통한 반품 등록
+- 이미지 업로드 (Cloudinary)
+- 월별 반품 통계
+- 관리자 페이지
 
 ## 📝 라이선스
 

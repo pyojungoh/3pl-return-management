@@ -11,6 +11,8 @@
   <meta name="theme-color" content="#4CAF50">
   <title>반품교환 등록</title>
 
+  <!-- jsQR 라이브러리 (QR 코드 스캔용) -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
   <style>
     /* ========= 유동 스케일 변수: 화면폭에 따라 자동 조정 =========
@@ -18,49 +20,43 @@
        - 폰트/칸/버튼/썸네일 모두 clamp()로 반응형
     */
 :root{
-  --fs-body:  clamp(32px, 8.4vw, 40px);
-  --fs-label: clamp(32px, 9.2vw, 44px);
-  --fs-input: clamp(32px, 9.6vw, 44px);
-  --fs-btn:   clamp(32px, 10vw, 44px);
-  --fs-title: clamp(36px, 11.2vw, 52px);
+  --fs-body:  16px;
+  --fs-label: 18px;
+  --fs-input: 18px;
+  --fs-btn:   18px;
+  --fs-title: 24px;
 
-  --h-control: clamp(44px, 19vw, 88px);
-  --h-button:  clamp(52px, 22vw, 100px);
+  --h-control: 48px;
+  --h-button:  48px;
 
-  --pad-v:     clamp(8px, 2.4vh, 20px);
-  --pad-h:     clamp(16px, 6.4vw, 32px);
-  --radius:    clamp(12px, 4.8vw, 20px);
-  --gap:       clamp(16px, 4.8vw, 32px);
+  --pad-v:     12px;
+  --pad-h:     16px;
+  --radius:    8px;
+  --gap:       20px;
 
-  --thumb:     clamp(112px, 36vw, 200px);
-  --status-fs: clamp(28px, 8vw, 36px);
+  --thumb:     clamp(100px, 30vw, 150px);
+  --status-fs: 16px;
 }
 
     *{ box-sizing: border-box; }
     html, body { height: 100%; -webkit-overflow-scrolling: touch; }
     body{
   margin: 0;
-  padding: 0;
-  background:#fff;
+  padding: 10px;
+  background:#f5f5f5;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   font-size: var(--fs-body);
-  line-height: 1.35;
+  line-height: 1.4;
   -webkit-text-size-adjust: 100%;
 }
 
     .container{
-  width: 100vw;              /* 화면 가로 꽉 차게 */
-  max-width: 100vw;
-  margin: 0;
+  max-width: 100%;
+  margin: 0 auto;
   background: #fff;
-  /* 노치/홈바 안전 여백 + 내부 패딩 동시 반영 */
-  padding: max(env(safe-area-inset-top, 0px), clamp(8px, 2.6vw, 20px))
-           max(env(safe-area-inset-right, 0px), clamp(8px, 2.6vw, 20px))
-           max(env(safe-area-inset-bottom, 0px), clamp(8px, 2.6vw, 20px))
-           max(env(safe-area-inset-left, 0px), clamp(8px, 2.6vw, 20px));
-  border-radius: 0;          /* 가장자리 라운드 제거 */
-  box-shadow: none;          /* 카드 그림자 제거 (풀블리드) */
-  min-height: 100dvh;        /* 화면 높이 꽉 차게 */
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
 
@@ -77,33 +73,32 @@
 
     label{
       display:block;
-      margin-bottom: clamp(2px, 1vw, 6px);
+      margin-bottom: 6px;
       color:#222;
-      font-weight: 700;
+      font-weight: 600;
       font-size: var(--fs-label);
-      letter-spacing: -0.2px;
     }
 
     input, select, textarea{
       width:100%;
-      border: 1.5px solid #ddd;
+      border: 2px solid #ddd;
       border-radius: var(--radius);
       background:#fff;
       font-size: var(--fs-input);
-      padding: calc(var(--pad-v) * 0.8) var(--pad-h);
+      padding: 12px 16px;
       min-height: var(--h-control);
-      transition: border-color .2s ease, box-shadow .2s ease, transform .02s ease;
+      transition: border-color 0.3s ease;
       -webkit-appearance: none; appearance: none;
     }
     input[type="number"]{ text-align:center; font-weight:700; }
-    input[readonly]{ background:#f8f9fa; color:#555; }
+    input[readonly]{ background:#f8f9fa; color:#555; font-size: 16px; padding: 10px 12px; min-height: 40px; }
 
     textarea{ min-height: calc(var(--h-control) * 1.6); resize: vertical; }
 
     input:focus, select:focus, textarea:focus{
       outline:none;
       border-color:#4CAF50;
-      box-shadow:0 0 0 3px rgba(76,175,80,0.12);
+      box-shadow:0 0 0 3px rgba(76,175,80,0.1);
     }
 
     button{
@@ -152,26 +147,26 @@
       border-radius: var(--radius);
       border: 1.5px solid #ddd;
       box-shadow: 0 1px 6px rgba(0,0,0,0.08);
-      display:block; margin-bottom: clamp(2px, 1vw, 6px);
+      display:block; margin-bottom: 6px;
     }
-    .photo-label{ font-size: clamp(12px, 3.6vw, 16px); color:#666; font-weight:600; }
+    .photo-label{ font-size: 14px; color:#666; font-weight:600; }
 
     .delete-btn{
       background:#f44336; color:#fff; border:none; border-radius:50%;
-      width: clamp(18px, 5.2vw, 24px); height: clamp(18px, 5.2vw, 24px);
-      font-size: clamp(11px, 3.4vw, 13px);
+      width: 24px; height: 24px;
+      font-size: 14px;
       cursor:pointer; padding:0;
       display:inline-flex; align-items:center; justify-content:center;
     }
 
     .qr-status{
-      margin-top: clamp(6px, 2vw, 12px);
+      margin-top: 10px;
       color:#0D47A1;
-      font-size: clamp(14px, 4vw, 18px);
+      font-size: 14px;
       font-weight: 600;
       background:#e3f2fd;
-      border:1.5px solid rgba(33,150,243,0.35);
-      padding: clamp(6px, 2vw, 12px);
+      border:2px solid rgba(33,150,243,0.35);
+      padding: 10px;
       border-radius: var(--radius);
       text-align:center;
     }
@@ -187,12 +182,12 @@
     }
 
     .status{
-      padding: clamp(8px, 2.2vw, 14px);
+      padding: 12px;
       margin: var(--gap) 0;
       border-radius: var(--radius);
       text-align:center;
       font-weight:700;
-      font-size: var(--status-fs);
+      font-size: 16px;
     }
     .success{ background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
     .error{   background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
@@ -209,21 +204,21 @@
     .overlay-card{
       background:#fff;
       width: min(86vw, 420px);
-      padding: clamp(12px, 3.2vw, 18px);
-      border-radius: calc(var(--radius) + 2px);
+      padding: 18px;
+      border-radius: 10px;
       box-shadow: 0 12px 36px rgba(0,0,0,0.22);
       text-align:center;
     }
     .spinner{
-      width: clamp(28px, 8vw, 40px); height: clamp(28px, 8vw, 40px);
+      width: 40px; height: 40px;
       border: 3px solid #e0e0e0; border-top-color:#4CAF50;
-      border-radius:50%; margin: 0 auto clamp(6px, 2vw, 10px);
+      border-radius:50%; margin: 0 auto 10px;
       animation: spin 1s linear infinite;
     }
     @keyframes spin{ to{ transform: rotate(360deg); } }
-    .overlay-title{ font-size: clamp(16px, 4.6vw, 20px); font-weight: 800; color:#222; margin-bottom: clamp(4px, 1.4vw, 8px); }
-    .overlay-desc{  font-size: clamp(13px, 3.8vw, 16px); color:#555; margin-bottom: clamp(6px, 1.8vw, 10px); }
-    .progressbar{ width:100%; height: clamp(5px, 1.2vw, 8px); background:#eee; border-radius:999px; overflow:hidden; }
+    .overlay-title{ font-size: 18px; font-weight: 800; color:#222; margin-bottom: 8px; }
+    .overlay-desc{  font-size: 16px; color:#555; margin-bottom: 10px; }
+    .progressbar{ width:100%; height: 6px; background:#eee; border-radius:999px; overflow:hidden; }
     .progressbar>div{ width:0%; height:100%; background:#4CAF50; transition: width .25s ease; }
 
     /* 터치 장치에서 호버 애니메이션 축소 */
@@ -235,8 +230,17 @@
 </head>
 <body>
   <div class="container">
-    <h2>반품교환 등록</h2>
+    <h2>관리자 페이지</h2>
 
+    <!-- 탭 메뉴 -->
+    <div class="tabs" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #ddd;">
+      <button type="button" class="tab-btn active" onclick="switchTab('return')" style="flex: 1; padding: 12px; border: none; background: transparent; border-bottom: 2px solid #4CAF50; color: #4CAF50; font-weight: 700; font-size: 16px; cursor: pointer;">📦 반품 등록</button>
+      <button type="button" class="tab-btn" onclick="switchTab('register')" style="flex: 1; padding: 12px; border: none; background: transparent; border-bottom: 2px solid transparent; color: #666; font-weight: 600; font-size: 16px; cursor: pointer;">🏢 화주사 등록</button>
+      <button type="button" class="tab-btn" onclick="switchTab('password')" style="flex: 1; padding: 12px; border: none; background: transparent; border-bottom: 2px solid transparent; color: #666; font-weight: 600; font-size: 16px; cursor: pointer;">🔒 비밀번호 변경</button>
+    </div>
+
+    <!-- 반품 등록 탭 -->
+    <div id="returnTab" class="tab-content">
     <form id="returnForm">
       <!-- 월 선택 -->
       <div class="form-group">
@@ -252,9 +256,9 @@
         <label>📷 QR 코드 스캔</label>
         <button type="button" class="scan-btn" onclick="startQRScan()" id="qrScanBtn">📷 QR 코드 스캔</button>
         <div id="qrStatus" class="qr-status">QR 코드를 스캔하거나 송장번호를 직접 입력하세요.</div>
-        <div id="qrScanner" style="display:none; margin-top: 10px;">
-          <video id="qrVideo" autoplay playsinline style="width: 100%; max-width: 400px; border-radius: 8px;"></video>
-          <button type="button" class="cancel-btn" onclick="stopQRScan()" style="margin-top: 10px; width: 100%;">⏹️ 스캔 중단</button>
+        <div id="qrScanner" style="display:none; margin-top: 10px; text-align: center;">
+          <video id="qrVideo" autoplay playsinline webkit-playsinline style="width: 240px; max-width: 240px; height: 240px; border-radius: 8px; background: #000; object-fit: cover; margin: 0 auto; display: block;"></video>
+          <button type="button" class="cancel-btn" onclick="stopQRScan()" style="margin-top: 10px; width: 240px; max-width: 100%;">⏹️ 스캔 중단</button>
         </div>
       </div>
 
@@ -285,7 +289,7 @@
         <input type="file" id="photos" accept="image/*" multiple capture="camera" style="display:none;">
         <button type="button" class="photo-btn" onclick="document.getElementById('photos').click()">📷 사진 찍기</button>
         <div id="photoPreview" class="preview"></div>
-        <div id="photoCount" style="margin-top: 6px; color:#666; text-align:center; font-size: clamp(13px, 3.8vw, 16px);"></div>
+        <div id="photoCount" style="margin-top: 10px; color:#666; text-align:center; font-size: 16px;"></div>
       </div>
 
       <!-- 제출 -->
@@ -295,6 +299,81 @@
 
     <!-- 상태 메시지 -->
     <div id="statusMessage" style="display:none;"></div>
+    </div>
+
+    <!-- 화주사 등록 탭 -->
+    <div id="registerTab" class="tab-content" style="display:none;">
+      <h3 style="margin: 0 0 20px; font-size: 20px; color: #222;">화주사 등록</h3>
+      <form id="registerForm">
+        <!-- 필수 정보 -->
+        <div class="form-group">
+          <label>화주사명 *</label>
+          <input type="text" id="regCompanyName" placeholder="화주사명을 입력하세요" required>
+        </div>
+        <div class="form-group">
+          <label>아이디 *</label>
+          <input type="text" id="regUsername" placeholder="아이디를 입력하세요" required>
+        </div>
+        <div class="form-group">
+          <label>비밀번호 *</label>
+          <input type="password" id="regPassword" placeholder="비밀번호를 입력하세요" required>
+        </div>
+
+        <!-- 사업자 정보 (선택) -->
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+          <h4 style="margin: 0 0 15px; font-size: 16px; color: #666;">사업자 정보 (선택사항)</h4>
+          <div class="form-group">
+            <label>사업자번호</label>
+            <input type="text" id="regBusinessNumber" placeholder="사업자번호를 입력하세요">
+          </div>
+          <div class="form-group">
+            <label>사업자명</label>
+            <input type="text" id="regBusinessName" placeholder="사업자명을 입력하세요">
+          </div>
+          <div class="form-group">
+            <label>주소</label>
+            <input type="text" id="regBusinessAddress" placeholder="주소를 입력하세요">
+          </div>
+          <div class="form-group">
+            <label>전화번호</label>
+            <input type="tel" id="regBusinessTel" placeholder="전화번호를 입력하세요">
+          </div>
+          <div class="form-group">
+            <label>이메일</label>
+            <input type="email" id="regBusinessEmail" placeholder="이메일을 입력하세요">
+          </div>
+        </div>
+
+        <button type="submit" id="registerBtn">등록하기</button>
+        <div id="registerStatus" style="display:none; margin-top: 10px;"></div>
+      </form>
+    </div>
+
+    <!-- 비밀번호 변경 탭 -->
+    <div id="passwordTab" class="tab-content" style="display:none;">
+      <h3 style="margin: 0 0 20px; font-size: 20px; color: #222;">비밀번호 변경</h3>
+      <form id="passwordForm">
+        <div class="form-group">
+          <label>아이디 *</label>
+          <input type="text" id="pwdUsername" placeholder="아이디를 입력하세요" required>
+        </div>
+        <div class="form-group">
+          <label>기존 비밀번호 *</label>
+          <input type="password" id="pwdOldPassword" placeholder="기존 비밀번호를 입력하세요" required>
+        </div>
+        <div class="form-group">
+          <label>새 비밀번호 *</label>
+          <input type="password" id="pwdNewPassword" placeholder="새 비밀번호를 입력하세요" required>
+        </div>
+        <div class="form-group">
+          <label>새 비밀번호 확인 *</label>
+          <input type="password" id="pwdNewPasswordConfirm" placeholder="새 비밀번호를 다시 입력하세요" required>
+        </div>
+
+        <button type="submit" id="passwordBtn">비밀번호 변경</button>
+        <div id="passwordStatus" style="display:none; margin-top: 10px;"></div>
+      </form>
+    </div>
   </div>
 
   <!-- 업로드/저장 진행 오버레이 -->
@@ -324,6 +403,18 @@
         e.preventDefault();
         submitForm();
       });
+
+      // 화주사 등록 폼
+      document.getElementById('registerForm').addEventListener('submit', function(e){
+        e.preventDefault();
+        registerCompany();
+      });
+
+      // 비밀번호 변경 폼
+      document.getElementById('passwordForm').addEventListener('submit', function(e){
+        e.preventDefault();
+        changePassword();
+      });
       
       // 엔터키로 검색
       document.getElementById('trackingNumber').addEventListener('keypress', function(e){
@@ -333,6 +424,172 @@
         }
       });
     });
+
+    /* ========== 탭 전환 ========== */
+    function switchTab(tabName){
+      // 모든 탭 콘텐츠 숨기기
+      document.getElementById('returnTab').style.display = 'none';
+      document.getElementById('registerTab').style.display = 'none';
+      document.getElementById('passwordTab').style.display = 'none';
+
+      // 모든 탭 버튼 비활성화
+      const tabButtons = document.querySelectorAll('.tab-btn');
+      tabButtons.forEach(btn => {
+        btn.style.borderBottom = '2px solid transparent';
+        btn.style.color = '#666';
+        btn.style.fontWeight = '600';
+      });
+
+      // 선택된 탭 표시
+      if (tabName === 'return') {
+        document.getElementById('returnTab').style.display = 'block';
+        tabButtons[0].style.borderBottom = '2px solid #4CAF50';
+        tabButtons[0].style.color = '#4CAF50';
+        tabButtons[0].style.fontWeight = '700';
+      } else if (tabName === 'register') {
+        document.getElementById('registerTab').style.display = 'block';
+        tabButtons[1].style.borderBottom = '2px solid #4CAF50';
+        tabButtons[1].style.color = '#4CAF50';
+        tabButtons[1].style.fontWeight = '700';
+      } else if (tabName === 'password') {
+        document.getElementById('passwordTab').style.display = 'block';
+        tabButtons[2].style.borderBottom = '2px solid #4CAF50';
+        tabButtons[2].style.color = '#4CAF50';
+        tabButtons[2].style.fontWeight = '700';
+      }
+    }
+
+    /* ========== 화주사 등록 ========== */
+    function registerCompany(){
+      const btn = document.getElementById('registerBtn');
+      const status = document.getElementById('registerStatus');
+      
+      const companyName = document.getElementById('regCompanyName').value.trim();
+      const username = document.getElementById('regUsername').value.trim();
+      const password = document.getElementById('regPassword').value.trim();
+      const businessNumber = document.getElementById('regBusinessNumber').value.trim();
+      const businessName = document.getElementById('regBusinessName').value.trim();
+      const businessAddress = document.getElementById('regBusinessAddress').value.trim();
+      const businessTel = document.getElementById('regBusinessTel').value.trim();
+      const businessEmail = document.getElementById('regBusinessEmail').value.trim();
+
+      if (!companyName || !username || !password) {
+        status.style.display = 'block';
+        status.className = 'status error';
+        status.textContent = '화주사명, 아이디, 비밀번호는 필수입니다.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '등록 중...';
+      status.style.display = 'block';
+      status.className = 'status loading';
+      status.textContent = '화주사 등록 중...';
+
+      const data = {
+        company_name: companyName,
+        username: username,
+        password: password,
+        business_number: businessNumber || null,
+        business_name: businessName || null,
+        business_address: businessAddress || null,
+        business_tel: businessTel || null,
+        business_email: businessEmail || null
+      };
+
+      fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          status.className = 'status success';
+          status.textContent = data.message || '화주사 계정이 생성되었습니다.';
+          document.getElementById('registerForm').reset();
+        } else {
+          status.className = 'status error';
+          status.textContent = data.message || '화주사 등록에 실패했습니다.';
+        }
+        btn.disabled = false;
+        btn.textContent = '등록하기';
+      })
+      .catch(error => {
+        console.error('화주사 등록 오류:', error);
+        status.className = 'status error';
+        status.textContent = '화주사 등록 중 오류가 발생했습니다: ' + error.message;
+        btn.disabled = false;
+        btn.textContent = '등록하기';
+      });
+    }
+
+    /* ========== 비밀번호 변경 ========== */
+    function changePassword(){
+      const btn = document.getElementById('passwordBtn');
+      const status = document.getElementById('passwordStatus');
+      
+      const username = document.getElementById('pwdUsername').value.trim();
+      const oldPassword = document.getElementById('pwdOldPassword').value.trim();
+      const newPassword = document.getElementById('pwdNewPassword').value.trim();
+      const newPasswordConfirm = document.getElementById('pwdNewPasswordConfirm').value.trim();
+
+      if (!username || !oldPassword || !newPassword || !newPasswordConfirm) {
+        status.style.display = 'block';
+        status.className = 'status error';
+        status.textContent = '모든 항목을 입력해주세요.';
+        return;
+      }
+
+      if (newPassword !== newPasswordConfirm) {
+        status.style.display = 'block';
+        status.className = 'status error';
+        status.textContent = '새 비밀번호가 일치하지 않습니다.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '변경 중...';
+      status.style.display = 'block';
+      status.className = 'status loading';
+      status.textContent = '비밀번호 변경 중...';
+
+      const data = {
+        username: username,
+        old_password: oldPassword,
+        new_password: newPassword
+      };
+
+      fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          status.className = 'status success';
+          status.textContent = data.message || '비밀번호가 변경되었습니다.';
+          document.getElementById('passwordForm').reset();
+        } else {
+          status.className = 'status error';
+          status.textContent = data.message || '비밀번호 변경에 실패했습니다.';
+        }
+        btn.disabled = false;
+        btn.textContent = '비밀번호 변경';
+      })
+      .catch(error => {
+        console.error('비밀번호 변경 오류:', error);
+        status.className = 'status error';
+        status.textContent = '비밀번호 변경 중 오류가 발생했습니다: ' + error.message;
+        btn.disabled = false;
+        btn.textContent = '비밀번호 변경';
+      });
+    }
 
     /* ========== 진행 오버레이 ========== */
     function showOverlay(titleText, descText){
@@ -366,44 +623,49 @@
     /* ========== 시트 목록 로드 ========== */
     function loadAvailableSheets(){
       showStatus('월 목록을 불러오는 중...', 'loading');
-      google.script.run
-        .withSuccessHandler(function(sheets){
-          availableSheets = sheets || [];
-          const sel = document.getElementById('monthSelector');
-          sel.innerHTML = '';
+      fetch('/api/returns/available-months')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            availableSheets = data.months || [];
+            const sel = document.getElementById('monthSelector');
+            sel.innerHTML = '';
 
-          if (availableSheets.length === 0){
-            const o = document.createElement('option');
-            o.value = '';
-            o.textContent = '사용 가능한 월이 없습니다';
-            sel.appendChild(o);
-            showStatus('사용 가능한 월 시트가 없습니다.', 'error');
-            return;
+            if (availableSheets.length === 0){
+              const o = document.createElement('option');
+              o.value = '';
+              o.textContent = '사용 가능한 월이 없습니다';
+              sel.appendChild(o);
+              showStatus('사용 가능한 월 시트가 없습니다.', 'error');
+              return;
+            }
+
+            availableSheets.forEach(name=>{
+              const o = document.createElement('option');
+              o.value = name; o.textContent = name;
+              sel.appendChild(o);
+            });
+
+            const today = new Date();
+            const current = `${today.getFullYear()}년${today.getMonth()+1}월`;
+            let found = availableSheets.find(s=> s===current)
+                || availableSheets.find(s=> s.replace(/\s/g,'').toLowerCase() === current.replace(/\s/g,'').toLowerCase());
+            sel.value = found || availableSheets[0];
+            showStatus(`현재 월 ${sel.value}로 설정되었습니다.`, 'success');
+          } else {
+            throw new Error(data.message || '월 목록 로드 실패');
           }
-
-          availableSheets.forEach(name=>{
-            const o = document.createElement('option');
-            o.value = name; o.textContent = name;
-            sel.appendChild(o);
-          });
-
-          const today = new Date();
-          const current = `${today.getFullYear()}년${today.getMonth()+1}월`;
-          let found = availableSheets.find(s=> s===current)
-              || availableSheets.find(s=> s.replace(/\s/g,'').toLowerCase() === current.replace(/\s/g,'').toLowerCase());
-          sel.value = found || availableSheets[0];
-          showStatus(`현재 월 ${sel.value}로 설정되었습니다.`, 'success');
         })
-        .withFailureHandler(function(error){
-          showStatus('월 목록 로드 실패: ' + error, 'error');
+        .catch(error => {
+          console.error('월 목록 로드 오류:', error);
+          showStatus('월 목록 로드 실패: ' + error.message, 'error');
           const sel = document.getElementById('monthSelector');
           sel.innerHTML = '';
           const o = document.createElement('option');
           o.value = '';
           o.textContent = '월 목록 로드 실패 - 새로고침 버튼';
           sel.appendChild(o);
-        })
-        .getAvailableSheets();
+        });
     }
 
     /* ========== 이미지 선택/미리보기 ========== */
@@ -484,34 +746,84 @@
         selectedMonth
       };
 
+      // 이미지가 있으면 먼저 업로드
       if (selectedImages.length > 0){
-        google.script.run
-          .withSuccessHandler(function(photoLinks){
-            updateOverlay('사진 링크 저장 중…', '시트에 링크를 기록하고 있습니다.');
+        fetch('/api/uploads/upload-images', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            images: selectedImages,
+            trackingNumber: trackingNumber
+          })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            updateOverlay('사진 링크 저장 중…', '데이터베이스에 링크를 기록하고 있습니다.');
             document.getElementById('overlayBar').style.width = '96%';
-            formData.photoLinks = photoLinks;
+            formData.photoLinks = data.photoLinks;
             saveData(formData);
-          })
-          .withFailureHandler(function(error){
-            hideOverlay();
-            showStatus('이미지 업로드 실패: ' + error, 'error');
-            btn.disabled = false;
-            btn.textContent = '등록하기';
-          })
-          .uploadImages(selectedImages, trackingNumber);
+          } else {
+            throw new Error(data.message || '이미지 업로드 실패');
+          }
+        })
+        .catch(error => {
+          console.error('이미지 업로드 오류:', error);
+          hideOverlay();
+          showStatus('이미지 업로드 실패: ' + error.message, 'error');
+          btn.disabled = false;
+          btn.textContent = '등록하기';
+        });
       }else{
-        updateOverlay('저장 중…', '시트에 기록하고 있습니다.');
+        updateOverlay('저장 중…', '데이터베이스에 기록하고 있습니다.');
         saveData(formData);
       }
     }
 
     function saveData(formData){
-      google.script.run
-        .withSuccessHandler(function(result){
+      // 날짜 설정 (오늘 날짜)
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = today.getMonth() + 1;
+      const day = today.getDate();
+      const returnDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+
+      // 반품 데이터 생성
+      const returnData = {
+        return_date: returnDate,
+        company_name: formData.company,
+        product: formData.product,
+        customer_name: formData.customer,
+        tracking_number: formData.trackingNumber,
+        return_type: '', // 기본값
+        stock_status: '', // 기본값
+        inspection: '', // 기본값
+        completed: '', // 기본값
+        memo: '', // 기본값
+        photo_links: formData.photoLinks || '', // 사진 링크
+        other_courier: '', // 기본값
+        shipping_fee: '', // 기본값
+        client_request: '', // 기본값
+        client_confirmed: '', // 기본값
+        month: formData.selectedMonth
+      };
+
+      fetch('/api/returns/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(returnData)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
           fillOverlayBar();
           setTimeout(hideOverlay, 240);
 
-          showStatus(result, 'success');
+          showStatus(data.message || '반품 내역이 등록되었습니다.', 'success');
           document.getElementById('returnForm').reset();
           document.getElementById('photoPreview').style.display = 'none';
           selectedImages = [];
@@ -524,23 +836,35 @@
             document.getElementById('monthSelector').value = formData.selectedMonth;
           }
           document.getElementById('statusMessage').scrollIntoView({behavior:'smooth', block:'center'});
-        })
-        .withFailureHandler(function(error){
-          hideOverlay();
-          showStatus('저장 실패: ' + error, 'error');
-          const btn = document.getElementById('submitBtn');
-          btn.disabled = false;
-          btn.textContent = '등록하기';
-        })
-        .addReturnData(formData);
+        } else {
+          throw new Error(data.message || '저장 실패');
+        }
+      })
+      .catch(error => {
+        console.error('저장 오류:', error);
+        hideOverlay();
+        showStatus('저장 실패: ' + error.message, 'error');
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = false;
+        btn.textContent = '등록하기';
+      });
     }
 
     /* ========== 테스트 ========== */
     function testConnection(){
-      google.script.run
-        .withSuccessHandler(result=> alert('연결 성공: ' + result))
-        .withFailureHandler(error=> alert('연결 실패: ' + error))
-        .simpleTest();
+      fetch('/api/returns/available-months')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert('연결 성공: 서버에 연결되었습니다.');
+          } else {
+            throw new Error(data.message || '연결 실패');
+          }
+        })
+        .catch(error => {
+          console.error('연결 테스트 오류:', error);
+          alert('연결 실패: ' + error.message);
+        });
     }
 
     /* ========== 상태 메시지 ========== */
@@ -555,151 +879,158 @@
     // QR 스캔 관련 변수
     let qrStream = null;
     let qrScanInterval = null;
-    let barcodeDetector = null;
     
-    // QR 스캔 시작 (브라우저 네이티브 API 사용)
+    // QR 스캔 시작 (개선된 버전)
     async function startQRScan(){
       const qrStatus = document.getElementById('qrStatus');
       const qrScanner = document.getElementById('qrScanner');
       const qrVideo = document.getElementById('qrVideo');
       const qrScanBtn = document.getElementById('qrScanBtn');
       
+      // HTTPS 체크 (모바일에서 카메라 접근을 위해 필요)
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        qrStatus.textContent = '⚠️ 카메라 사용을 위해 HTTPS가 필요합니다. ngrok을 사용하거나 서버를 배포해주세요.';
+        qrStatus.style.background = '#fff3cd';
+        qrStatus.style.color = '#856404';
+        showStatus('HTTPS가 필요합니다. HTTP에서는 카메라를 사용할 수 없습니다.', 'error');
+        return;
+      }
+      
+      // 미디어 디바이스 지원 확인
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        qrStatus.textContent = '⚠️ 이 브라우저는 카메라를 지원하지 않습니다. 송장번호를 직접 입력해주세요.';
+        qrStatus.style.background = '#f8d7da';
+        qrStatus.style.color = '#721c24';
+        showStatus('카메라를 지원하지 않는 브라우저입니다.', 'error');
+        return;
+      }
+      
+      // jsQR 라이브러리 확인
+      if (typeof jsQR === 'undefined') {
+        qrStatus.textContent = '⚠️ QR 스캔 라이브러리를 로드할 수 없습니다. 송장번호를 직접 입력해주세요.';
+        qrStatus.style.background = '#f8d7da';
+        qrStatus.style.color = '#721c24';
+        showStatus('QR 스캔 라이브러리를 로드할 수 없습니다.', 'error');
+        return;
+      }
+      
       try {
-        // BarcodeDetector API 지원 확인
-        if ('BarcodeDetector' in window) {
-          barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
-        } else {
-          // BarcodeDetector가 없으면 jsQR 라이브러리 시도
-          if (typeof jsQR === 'undefined') {
-            // jsQR 라이브러리 동적 로드
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
-            script.onload = function(){
-              startQRScanWithLibrary();
-            };
-            script.onerror = function(){
-              qrStatus.textContent = 'QR 스캔을 사용할 수 없습니다. 송장번호를 직접 입력해주세요.';
-              qrStatus.style.background = '#f8d7da';
-              qrStatus.style.color = '#721c24';
-            };
-            document.head.appendChild(script);
-            return;
-          } else {
-            startQRScanWithLibrary();
-            return;
-          }
-        }
-        
         // 카메라 권한 요청
-        qrStatus.textContent = '카메라 권한을 확인하는 중...';
-        qrStream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            facingMode: 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          } 
-        });
+        qrStatus.textContent = '카메라 권한을 요청하는 중...';
+        qrStatus.style.background = '#d1ecf1';
+        qrStatus.style.color = '#0c5460';
         
+        // 모바일에서는 후면 카메라 우선 사용
+        // 해상도를 낮춰서 더 넓은 범위 스캔 가능하도록 설정
+        const constraints = {
+          video: {
+            facingMode: 'environment', // 후면 카메라
+            width: { ideal: 640, max: 1280 },
+            height: { ideal: 480, max: 720 }
+          }
+        };
+        
+        qrStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // 비디오 요소 설정
         qrVideo.srcObject = qrStream;
+        qrVideo.setAttribute('playsinline', 'true');
+        qrVideo.setAttribute('webkit-playsinline', 'true');
+        
+        // 스캐너 UI 표시
         qrScanner.style.display = 'block';
         qrScanBtn.style.display = 'none';
         qrStatus.textContent = 'QR 코드를 카메라에 비춰주세요.';
         qrStatus.style.background = '#d1ecf1';
         qrStatus.style.color = '#0c5460';
         
-        // QR 코드 감지 시작
+        // 비디오 재생 시작
+        await qrVideo.play();
+        
+        // Canvas 생성
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         
+        // 비디오 메타데이터 로드 후 Canvas 크기 설정
+        // Canvas를 비디오보다 크게 설정하여 더 넓은 영역 스캔
         qrVideo.addEventListener('loadedmetadata', function(){
+          // 비디오의 전체 해상도를 Canvas에 사용 (작은 화면이지만 전체 영역 스캔)
           canvas.width = qrVideo.videoWidth;
           canvas.height = qrVideo.videoHeight;
-        });
+          console.log('비디오 크기:', canvas.width, 'x', canvas.height);
+        }, { once: true });
         
-        qrScanInterval = setInterval(async function(){
-          if (qrVideo.readyState === qrVideo.HAVE_ENOUGH_DATA && canvas.width > 0) {
+        // QR 코드 감지 시작 (jsQR 사용)
+        let scanAttempts = 0;
+        qrScanInterval = setInterval(function(){
+          if (qrVideo.readyState === qrVideo.HAVE_ENOUGH_DATA && canvas.width > 0 && canvas.height > 0) {
             try {
+              // 비디오의 전체 프레임을 Canvas에 그리기 (작은 화면이지만 전체 해상도 사용)
               context.drawImage(qrVideo, 0, 0, canvas.width, canvas.height);
+              
+              // 이미지 데이터 가져오기 (전체 해상도)
               const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-              const barcodes = await barcodeDetector.detect(imageData);
-              if (barcodes.length > 0) {
-                const qrData = barcodes[0].rawValue;
+              
+              // jsQR로 QR 코드 감지 (더 넓은 범위에서 인식 가능)
+              // 작은 QR 코드도 인식할 수 있도록 설정
+              const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'attemptBoth',
+              });
+              
+              if (code) {
+                console.log('QR 코드 감지됨:', code.data);
                 stopQRScan();
-                document.getElementById('trackingNumber').value = qrData;
-                qrStatus.textContent = 'QR 코드 인식 완료! 자동으로 검색 중...';
+                
+                // 송장번호 입력란에 값 설정
+                document.getElementById('trackingNumber').value = code.data;
+                
+                // 상태 메시지 업데이트
+                qrStatus.textContent = '✅ QR 코드 인식 완료! 자동으로 검색 중...';
                 qrStatus.style.background = '#d4edda';
                 qrStatus.style.color = '#155724';
                 showStatus('QR 코드가 인식되었습니다. 자동으로 검색합니다.', 'success');
-                // 자동 검색 실행 (월 자동 선택 포함)
-                autoSearchAfterQR(qrData);
+                
+                // 자동 검색 실행
+                setTimeout(function(){
+                  autoSearchAfterQR(code.data);
+                }, 500);
+              }
+              
+              scanAttempts++;
+              // 100번 시도 후 로그 (디버깅용)
+              if (scanAttempts % 100 === 0) {
+                console.log('QR 스캔 시도:', scanAttempts, '회');
               }
             } catch (err) {
-              // 감지 실패는 무시 (계속 시도)
+              console.error('QR 스캔 오류:', err);
+              // 오류 발생해도 계속 시도
             }
           }
-        }, 200);
+        }, 150); // 150ms마다 스캔 (적당한 주기로 조정)
         
       } catch (error) {
-        console.error('QR 스캔 오류:', error);
-        qrStatus.textContent = '카메라를 사용할 수 없습니다. 송장번호를 직접 입력해주세요.';
+        console.error('카메라 오류:', error);
+        stopQRScan();
+        
+        // 오류 메시지 개선
+        let errorMessage = '카메라를 사용할 수 없습니다.';
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+          errorMessage = '카메라 권한이 거부되었습니다. 브라우저 설정에서 카메라 권한을 허용해주세요.';
+        } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+          errorMessage = '카메라를 찾을 수 없습니다.';
+        } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+          errorMessage = '카메라가 다른 애플리케이션에서 사용 중입니다.';
+        } else if (error.name === 'OverconstrainedError' || error.name === 'ConstraintNotSatisfiedError') {
+          errorMessage = '요청한 카메라 설정을 지원하지 않습니다.';
+        }
+        
+        qrStatus.textContent = '⚠️ ' + errorMessage + ' 송장번호를 직접 입력해주세요.';
         qrStatus.style.background = '#f8d7da';
         qrStatus.style.color = '#721c24';
-        if (qrStream) {
-          qrStream.getTracks().forEach(track => track.stop());
-        }
+        showStatus(errorMessage, 'error');
       }
     }
     
-    // jsQR 라이브러리 사용
-    function startQRScanWithLibrary(){
-      const qrStatus = document.getElementById('qrStatus');
-      const qrScanner = document.getElementById('qrScanner');
-      const qrVideo = document.getElementById('qrVideo');
-      const qrScanBtn = document.getElementById('qrScanBtn');
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      
-      navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
-      }).then(function(stream){
-        qrStream = stream;
-        qrVideo.srcObject = stream;
-        qrScanner.style.display = 'block';
-        qrScanBtn.style.display = 'none';
-        qrStatus.textContent = 'QR 코드를 카메라에 비춰주세요.';
-        qrStatus.style.background = '#d1ecf1';
-        qrStatus.style.color = '#0c5460';
-        
-        qrVideo.addEventListener('loadedmetadata', function(){
-          canvas.width = qrVideo.videoWidth;
-          canvas.height = qrVideo.videoHeight;
-        });
-        
-        qrScanInterval = setInterval(function(){
-          if (qrVideo.readyState === qrVideo.HAVE_ENOUGH_DATA) {
-            context.drawImage(qrVideo, 0, 0, canvas.width, canvas.height);
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
-            
-            if (code) {
-              stopQRScan();
-              document.getElementById('trackingNumber').value = code.data;
-              qrStatus.textContent = 'QR 코드 인식 완료! 자동으로 검색 중...';
-              qrStatus.style.background = '#d4edda';
-              qrStatus.style.color = '#155724';
-              showStatus('QR 코드가 인식되었습니다. 자동으로 검색합니다.', 'success');
-              // 자동 검색 실행 (월 자동 선택 포함)
-              autoSearchAfterQR(code.data);
-            }
-          }
-        }, 100);
-      }).catch(function(error){
-        console.error('카메라 오류:', error);
-        qrStatus.textContent = '카메라를 사용할 수 없습니다. 송장번호를 직접 입력해주세요.';
-        qrStatus.style.background = '#f8d7da';
-        qrStatus.style.color = '#721c24';
-      });
-    }
     
     // QR 스캔 후 자동 검색 (월 자동 선택 포함)
     function autoSearchAfterQR(trackingNumber){
@@ -754,20 +1085,39 @@
     
     // QR 스캔 중단
     function stopQRScan(){
+      console.log('QR 스캔 중단');
+      
+      // 스캔 인터벌 정지
       if (qrScanInterval) {
         clearInterval(qrScanInterval);
         qrScanInterval = null;
       }
+      
+      // 카메라 스트림 정지
       if (qrStream) {
-        qrStream.getTracks().forEach(track => track.stop());
+        qrStream.getTracks().forEach(track => {
+          track.stop();
+          console.log('카메라 트랙 정지:', track.kind);
+        });
         qrStream = null;
       }
+      
+      // 비디오 요소 정리
       const qrVideo = document.getElementById('qrVideo');
       if (qrVideo) {
         qrVideo.srcObject = null;
+        qrVideo.pause();
       }
-      document.getElementById('qrScanner').style.display = 'none';
-      document.getElementById('qrScanBtn').style.display = 'inline-block';
+      
+      // UI 복원
+      const qrScanner = document.getElementById('qrScanner');
+      const qrScanBtn = document.getElementById('qrScanBtn');
+      if (qrScanner) {
+        qrScanner.style.display = 'none';
+      }
+      if (qrScanBtn) {
+        qrScanBtn.style.display = 'inline-block';
+      }
     }
     
     // 송장번호로 검색 (검색 버튼 클릭 시)
@@ -799,20 +1149,21 @@
 
       showStatus(`${selectedMonth}에서 데이터 조회 중...`, 'loading');
 
-      google.script.run
-        .withSuccessHandler(function(data){
-          if (data){
-            fillFormWithData(data);
+      fetch(`/api/uploads/find-by-tracking?trackingNumber=${encodeURIComponent(cleaned)}&month=${encodeURIComponent(selectedMonth)}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.data){
+            fillFormWithData(data.data);
             showStatus('QR 데이터 조회 완료! 정보를 확인해주세요.', 'success');
           }else{
             clearFormData(cleaned);
             showStatus(`${selectedMonth}에서 해당 송장번호 데이터를 찾을 수 없습니다.`, 'error');
           }
         })
-        .withFailureHandler(function(error){
-          showStatus('QR 데이터 조회 실패: ' + error, 'error');
-        })
-        .findDataByTrackingNumber(cleaned, selectedMonth);
+        .catch(error => {
+          console.error('QR 데이터 조회 오류:', error);
+          showStatus('QR 데이터 조회 실패: ' + error.message, 'error');
+        });
     }
 
     function fillFormWithData(data){

@@ -7,11 +7,15 @@ __pycache__/
 venv/
 env/
 ENV/
+.venv
 
-# Google Service Account
-service_account.json
+# 데이터베이스
+*.db
+*.sqlite
+*.sqlite3
+data.db
 
-# Environment variables
+# 환경 변수
 .env
 .env.local
 
@@ -20,18 +24,26 @@ service_account.json
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Logs
+# 서비스 계정 키 (보안)
+service_account.json
+*.json.key
+
+# 로그
 *.log
 
-# Backup files
+# 임시 파일
+*.tmp
+*.temp
+
+# Railway
+.railway/
+
+# 기타
 *.bak
-*~
-
-# Clasp
-.clasp.json
-
+*.backup
