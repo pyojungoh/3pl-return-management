@@ -31,13 +31,16 @@ app.register_blueprint(return_sheets_bp)
 def index():
     """화주사 대시보드 (로그인 포함)"""
     try:
+        # dashboard_server.html 파일 사용
         return send_file('dashboard_server.html')
-    except:
+    except FileNotFoundError:
         # 파일이 없으면 dashboard.html 사용
         try:
             return send_file('dashboard.html')
-        except:
-            return '<h1>대시보드 파일을 찾을 수 없습니다.</h1>', 404
+        except FileNotFoundError:
+            return '<h1>대시보드 파일을 찾을 수 없습니다.</h1><p>dashboard_server.html 또는 dashboard.html 파일이 필요합니다.</p>', 404
+    except Exception as e:
+        return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
 
 
 @app.route('/dashboard')
