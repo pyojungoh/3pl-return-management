@@ -106,13 +106,41 @@ def get_returns_data():
             # 사진 링크 파싱
             photo_links = []
             if ret.get('photo_links'):
-                for line in ret['photo_links'].split('\n'):
-                    if ':' in line:
-                        parts = line.split(':', 1)
-                        if len(parts) == 2:
+                photo_links_str = str(ret['photo_links']).strip()
+                if photo_links_str:
+                    # 여러 줄로 구분된 사진 링크 처리
+                    for line in photo_links_str.split('\n'):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        
+                        # "사진1: URL" 형식인 경우
+                        if ':' in line:
+                            parts = line.split(':', 1)
+                            if len(parts) == 2:
+                                text = parts[0].strip()
+                                url = parts[1].strip()
+                                if url:  # URL이 있으면 링크로 표시
+                                    photo_links.append({
+                                        'text': text,
+                                        'url': url
+                                    })
+                                else:  # URL이 없으면 텍스트만 표시
+                                    photo_links.append({
+                                        'text': text,
+                                        'url': None
+                                    })
+                        # URL만 있는 경우 (http:// 또는 https://로 시작)
+                        elif line.startswith('http://') or line.startswith('https://'):
                             photo_links.append({
-                                'text': parts[0].strip(),
-                                'url': parts[1].strip()
+                                'text': '사진',
+                                'url': line
+                            })
+                        # 텍스트만 있는 경우 (예: "사진1")
+                        else:
+                            photo_links.append({
+                                'text': line,
+                                'url': None
                             })
             
             # 날짜에서 일자만 추출

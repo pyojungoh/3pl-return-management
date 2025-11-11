@@ -343,7 +343,8 @@ def migrate_from_csv():
                                 print(f"     고객명: {customer_name}, 송장번호: {tracking_number}")
                                 print(f"     처리완료 컬럼 인덱스: {col_indices.get('completed')}, 값: '{completed_value}'")
                                 print(f"     검품유무: '{inspection_value}', 재고상태: '{stock_status_value}'")
-                                print(f"     전체 행: {row[:10]}")  # 처음 10개 컬럼만
+                                print(f"     사진 컬럼 인덱스: {col_indices.get('photo_links')}, 값: '{photo_links_value}'")
+                                print(f"     전체 행: {row[:12]}")  # 처음 12개 컬럼만 (사진 포함)
                             
                             return_data = {
                                 'return_date': return_date_value or None,

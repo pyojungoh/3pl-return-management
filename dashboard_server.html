@@ -1730,14 +1730,29 @@
         
         // 사진 링크 처리
         let photoHtml = '-';
-        if (row['사진'] && Array.isArray(row['사진']) && row['사진'].length > 0) {
-          photoHtml = '<div class="photo-links">';
-          row['사진'].forEach(photo => {
-            if (photo.url) {
-              photoHtml += `<a href="${photo.url}" target="_blank" class="photo-link">${photo.text || '사진'}</a>`;
-            }
-          });
-          photoHtml += '</div>';
+        if (row['사진']) {
+          // 배열인 경우
+          if (Array.isArray(row['사진']) && row['사진'].length > 0) {
+            photoHtml = '<div class="photo-links">';
+            row['사진'].forEach(photo => {
+              if (photo && typeof photo === 'object') {
+                // URL이 있으면 링크로 표시
+                if (photo.url) {
+                  photoHtml += `<a href="${photo.url}" target="_blank" class="photo-link">${photo.text || '사진'}</a>`;
+                } else if (photo.text) {
+                  // URL이 없으면 텍스트만 표시
+                  photoHtml += `<span class="photo-link" style="cursor: default; text-decoration: none;">${photo.text}</span>`;
+                }
+              }
+            });
+            photoHtml += '</div>';
+          }
+          // 문자열인 경우 (직접 텍스트)
+          else if (typeof row['사진'] === 'string' && row['사진'].trim()) {
+            photoHtml = '<div class="photo-links">';
+            photoHtml += `<span class="photo-link" style="cursor: default; text-decoration: none;">${row['사진']}</span>`;
+            photoHtml += '</div>';
+          }
         }
         
         // 요청사항 처리
