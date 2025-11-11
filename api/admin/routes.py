@@ -108,60 +108,163 @@ def migrate_from_csv():
             
             try:
                 with open(csv_file, 'r', encoding='utf-8') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        try:
-                            customer_name = row.get('고객명', row.get('customer_name', '')).strip()
-                            tracking_number = row.get('송장번호', row.get('tracking_number', '')).strip()
-                            
-                            # 빈 행 건너뛰기
-                            if not customer_name or not tracking_number:
+                    lines = f.readlines()
+                    
+                    # 헤더 찾기 (3번째 줄이 실제 헤더)
+                    header_line_index = 2  # 0-based index, 3번째 줄
+                    if len(lines) > header_line_index:
+                        # 헤더 줄 읽기
+                        header_line = lines[header_line_index].strip()
+                        # 헤더 정규화 (줄바꿈 제거, 공백 정리)
+                        header_line = header_line.replace('\n', ' ').replace('\r', ' ')
+                        header_line = ' '.join(header_line.split())  # 여러 공백을 하나로
+                        
+                        # CSV 파서로 헤더 파싱
+                        import io
+                        header_reader = csv.reader(io.StringIO(header_line))
+                        headers = next(header_reader)
+                        
+                        # 컬럼명 정규화 (공백 제거, 소문자 변환 없이 유지)
+                        normalized_headers = []
+                        header_map = {}
+                        for i, h in enumerate(headers):
+                            normalized = h.strip().replace('\n', ' ').replace('\r', ' ')
+                            normalized = ' '.join(normalized.split())
+                            normalized_headers.append(normalized)
+                            # 다양한 변형으로 매핑
+                            header_map[normalized] = i
+                            header_map[h.strip()] = i
+                            header_map[h.strip().replace('\n', ' ')] = i
+                            header_map[h.strip().replace('\r\n', ' ')] = i
+                        
+                        print(f"   헤더 발견: {len(headers)}개 컬럼")
+                        print(f"   컬럼명: {normalized_headers[:5]}...")
+                        
+                        # 데이터 읽기 (헤더 다음 줄부터)
+                        data_start_index = header_line_index + 1
+                        row_count = 0
+                        
+                        for line_idx in range(data_start_index, len(lines)):
+                            line = lines[line_idx].strip()
+                            if not line:
                                 continue
                             
-                            # 숫자만 있는 행 건너뛰기 (예: "3", "4" 등)
-                            if customer_name.isdigit() and tracking_number.isdigit():
-                                continue
-                            
-                            # 설명 행 건너뛰기
-                            if '예시' in customer_name or '댓글' in customer_name:
-                                continue
-                            
-                            # 반품 데이터 생성
-                            # CSV 컬럼명: 반품 접수일,화주명,제품,고객명,송장번호,반품/교환/오배송,재고상태(불량/정상),검품유무,처리완료,비고,사진,QR코드,금액,화주사요청,화주사확인완료
-                            return_data = {
-                                'return_date': row.get('반품 접수일', row.get('접수일', row.get('return_date', ''))).strip() or None,
-                                'company_name': row.get('화주명', row.get('company_name', '')).strip() or '',
-                                'product': row.get('제품', row.get('product', '')).strip() or None,
-                                'customer_name': customer_name,
-                                'tracking_number': tracking_number,
-                                'return_type': row.get('반품/교환/오배송', row.get('반품/교환', row.get('return_type', ''))).strip() or None,
-                                'stock_status': row.get('재고상태\n(불량/정상)', row.get('재고상태(불량/정상)', row.get('재고상태', row.get('stock_status', '')))).strip() or None,
-                                'inspection': row.get('검품유무', row.get('inspection', '')).strip() or None,
-                                'completed': row.get('처리완료', row.get('completed', '')).strip() or None,
-                                'memo': row.get('비고', row.get('memo', '')).strip() or None,
-                                'photo_links': row.get('사진', row.get('photo_links', '')).strip() or None,
-                                'other_courier': None,  # CSV에 타택배 컬럼이 없을 수 있음
-                                'shipping_fee': row.get('금액', row.get('배송비', row.get('shipping_fee', ''))).strip() or None,
-                                'client_request': row.get('화주사요청', row.get('화주사요청사항', row.get('client_request', ''))).strip() or None,
-                                'client_confirmed': row.get('화주사확인완료', row.get('화주사확인', row.get('client_confirmed', ''))).strip() or None,
-                                'month': month
-                            }
-                            
-                            return_id = create_return(return_data)
-                            if return_id:
-                                results['returns']['success'] += 1
-                            else:
-                                results['returns']['skip'] += 1
+                            try:
+                                # CSV 파서로 데이터 행 파싱
+                                row_reader = csv.reader(io.StringIO(line))
+                                row_values = next(row_reader)
                                 
-                            if results['returns']['success'] % 100 == 0:
-                                print(f"   진행 중: {results['returns']['success']}개")
-                        except Exception as e:
-                            results['returns']['error'] += 1
-                            error_msg = f"{customer_name}/{tracking_number}: {str(e)}"
-                            results['returns']['errors'].append(error_msg[:100])  # 오류 메시지 길이 제한
+                                # 컬럼 개수가 헤더보다 적으면 패딩
+                                while len(row_values) < len(headers):
+                                    row_values.append('')
+                                
+                                # 딕셔너리로 변환
+                                row_dict = {}
+                                for i, value in enumerate(row_values):
+                                    if i < len(normalized_headers):
+                                        row_dict[normalized_headers[i]] = value
+                                        # 원본 헤더명도 저장
+                                        if i < len(headers):
+                                            row_dict[headers[i]] = value
+                                
+                                # 데이터 추출 (다양한 컬럼명 시도)
+                                customer_name = (
+                                    row_dict.get('고객명') or 
+                                    row_dict.get('customer_name') or 
+                                    ''
+                                ).strip()
+                                
+                                tracking_number = (
+                                    row_dict.get('송장번호') or 
+                                    row_dict.get('tracking_number') or 
+                                    ''
+                                ).strip()
+                                
+                                company_name = (
+                                    row_dict.get('화주명') or 
+                                    row_dict.get('company_name') or 
+                                    ''
+                                ).strip()
+                                
+                                # 빈 행 건너뛰기
+                                if not customer_name or not tracking_number:
+                                    continue
+                                
+                                # 화주명이 없으면 건너뛰기
+                                if not company_name:
+                                    continue
+                                
+                                # 숫자만 있는 행 건너뛰기 (예: "3", "4" 등)
+                                if customer_name.isdigit() and tracking_number.isdigit():
+                                    continue
+                                
+                                # 설명 행 건너뛰기
+                                if '예시' in customer_name or '댓글' in customer_name or '제품에' in customer_name:
+                                    continue
+                                
+                                # 재고상태 컬럼명 정규화
+                                stock_status_key = None
+                                for key in row_dict.keys():
+                                    if '재고상태' in key:
+                                        stock_status_key = key
+                                        break
+                                
+                                # 반품 데이터 생성
+                                return_data = {
+                                    'return_date': (row_dict.get('반품 접수일') or row_dict.get('접수일') or '').strip() or None,
+                                    'company_name': company_name,
+                                    'product': (row_dict.get('제품') or '').strip() or None,
+                                    'customer_name': customer_name,
+                                    'tracking_number': tracking_number,
+                                    'return_type': (row_dict.get('반품/교환/오배송') or row_dict.get('반품/교환') or '').strip() or None,
+                                    'stock_status': (row_dict.get(stock_status_key) if stock_status_key else '').strip() or None,
+                                    'inspection': (row_dict.get('검품유무') or '').strip() or None,
+                                    'completed': (row_dict.get('처리완료') or '').strip() or None,
+                                    'memo': (row_dict.get('비고') or '').strip() or None,
+                                    'photo_links': (row_dict.get('사진') or '').strip() or None,
+                                    'other_courier': None,
+                                    'shipping_fee': (row_dict.get('금액') or row_dict.get('배송비') or '').strip() or None,
+                                    'client_request': (row_dict.get('화주사요청') or row_dict.get('화주사요청사항') or '').strip() or None,
+                                    'client_confirmed': (row_dict.get('화주사확인완료') or row_dict.get('화주사확인') or '').strip() or None,
+                                    'month': month
+                                }
+                                
+                                # 데이터 검증
+                                if not return_data['company_name']:
+                                    continue
+                                
+                                return_id = create_return(return_data)
+                                if return_id:
+                                    results['returns']['success'] += 1
+                                    row_count += 1
+                                else:
+                                    results['returns']['skip'] += 1
+                                    
+                                if results['returns']['success'] % 50 == 0 and results['returns']['success'] > 0:
+                                    print(f"   진행 중: {results['returns']['success']}개 성공")
+                                    
+                            except Exception as e:
+                                results['returns']['error'] += 1
+                                error_msg = f"줄 {line_idx+1}: {str(e)[:50]}"
+                                if len(results['returns']['errors']) < 20:  # 최대 20개 오류만 저장
+                                    results['returns']['errors'].append(error_msg)
+                                if results['returns']['error'] <= 5:  # 처음 5개만 출력
+                                    print(f"   ⚠️ 오류 (줄 {line_idx+1}): {str(e)[:100]}")
+                        
+                        print(f"   ✅ {filename} 완료: {results['returns']['success']}개 성공, {results['returns']['skip']}개 건너뜀, {results['returns']['error']}개 오류")
+                    else:
+                        results['returns']['error'] += 1
+                        results['returns']['errors'].append(f"{filename}: 헤더를 찾을 수 없습니다")
+                        print(f"   ❌ {filename}: 파일이 너무 짧습니다 (헤더 없음)")
+                        
             except Exception as e:
+                import traceback
+                error_detail = traceback.format_exc()
                 results['returns']['error'] += 1
-                results['returns']['errors'].append(f"{filename}: {str(e)}")
+                error_msg = f"{filename}: {str(e)}"
+                results['returns']['errors'].append(error_msg[:200])
+                print(f"   ❌ {filename} 파일 읽기 오류: {str(e)}")
+                print(f"   상세: {error_detail[:500]}")
         
         # 결과 요약
         total_companies = results['companies']['success'] + results['companies']['skip'] + results['companies']['error']
