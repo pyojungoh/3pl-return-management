@@ -1307,7 +1307,7 @@
               </div>
 
               <div style="margin-top: 24px; display: flex; gap: 12px;">
-                <button type="submit" id="adminRegisterBtn" style="padding: 14px 32px; background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);">등록하기</button>
+                <button type="button" id="adminRegisterBtn" onclick="registerCompany()" style="padding: 14px 32px; background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);">등록하기</button>
                 <button type="button" onclick="toggleAddCompanyForm()" style="padding: 14px 32px; background: linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 3px 10px rgba(178, 190, 195, 0.25);">취소</button>
               </div>
               <div id="adminRegisterStatus" class="admin-status" style="margin-top: 15px;"></div>
@@ -2785,11 +2785,11 @@
         username: username,
         password: password,
         role: role,
-        business_number: businessNumber || null,
-        business_name: businessName || null,
-        business_address: businessAddress || null,
-        business_tel: businessTel || null,
-        business_email: businessEmail || null
+        business_number: businessNumber || undefined,
+        business_name: businessName || undefined,
+        business_address: businessAddress || undefined,
+        business_tel: businessTel || undefined,
+        business_email: businessEmail || undefined
       };
 
       console.log('화주사 등록 요청 데이터:', { ...data, password: '***' });
@@ -3239,14 +3239,36 @@
         }
       });
       
-      // 관리자 폼 이벤트 리스너
-      const adminRegisterForm = document.getElementById('adminRegisterForm');
-      if (adminRegisterForm) {
-        adminRegisterForm.addEventListener('submit', function(e) {
+      // 관리자 폼 이벤트 리스너 (이벤트 위임 사용)
+      document.addEventListener('submit', function(e) {
+        if (e.target && e.target.id === 'adminRegisterForm') {
           e.preventDefault();
-          registerCompany();
-        });
-      }
+          e.stopPropagation();
+          console.log('폼 제출 이벤트 감지');
+          if (typeof registerCompany === 'function') {
+            registerCompany();
+          } else {
+            console.error('registerCompany 함수를 찾을 수 없습니다.');
+          }
+        }
+      });
+      
+      // 등록 버튼 클릭 이벤트도 추가 (이중 보안)
+      document.addEventListener('click', function(e) {
+        if (e.target && (e.target.id === 'adminRegisterBtn' || e.target.closest('#adminRegisterBtn'))) {
+          const btn = e.target.id === 'adminRegisterBtn' ? e.target : e.target.closest('#adminRegisterBtn');
+          if (btn && btn.type !== 'submit') {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('등록 버튼 클릭 이벤트 감지');
+            if (typeof registerCompany === 'function') {
+              registerCompany();
+            } else {
+              console.error('registerCompany 함수를 찾을 수 없습니다.');
+            }
+          }
+        }
+      });
       
     });
   </script>

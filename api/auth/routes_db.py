@@ -129,15 +129,27 @@ def register():
                 'message': '요청 데이터가 없습니다.'
             }), 400
         
-        company_name = data.get('company_name', '').strip()
-        username = data.get('username', '').strip()
-        password = data.get('password', '').strip()
-        role = data.get('role', '').strip() or '화주사'
-        business_number = data.get('business_number', '').strip() or None
-        business_name = data.get('business_name', '').strip() or None
-        business_address = data.get('business_address', '').strip() or None
-        business_tel = data.get('business_tel', '').strip() or None
-        business_email = data.get('business_email', '').strip() or None
+        # 필수 필드 처리 (None 체크)
+        company_name = (data.get('company_name') or '').strip()
+        username = (data.get('username') or '').strip()
+        password = (data.get('password') or '').strip()
+        role = (data.get('role') or '').strip() or '화주사'
+        
+        # 선택 필드 처리 (None 또는 빈 문자열 체크)
+        business_number_raw = data.get('business_number')
+        business_number = business_number_raw.strip() if business_number_raw else None
+        
+        business_name_raw = data.get('business_name')
+        business_name = business_name_raw.strip() if business_name_raw else None
+        
+        business_address_raw = data.get('business_address')
+        business_address = business_address_raw.strip() if business_address_raw else None
+        
+        business_tel_raw = data.get('business_tel')
+        business_tel = business_tel_raw.strip() if business_tel_raw else None
+        
+        business_email_raw = data.get('business_email')
+        business_email = business_email_raw.strip() if business_email_raw else None
         
         if not company_name or not username or not password:
             return jsonify({
