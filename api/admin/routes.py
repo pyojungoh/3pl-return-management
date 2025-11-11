@@ -149,28 +149,38 @@ def migrate_from_csv():
                     header_row = all_rows[header_row_idx]
                     
                     # 다음 행도 헤더일 수 있음 (재고상태가 2줄에 걸쳐 있음)
+                    # CSV 구조상 헤더가 2줄에 걸쳐 있는 경우가 있음
+                    merged_header_row = list(header_row)  # 복사
+                    
                     if header_row_idx + 1 < len(all_rows):
                         next_row = all_rows[header_row_idx + 1]
-                        # 다음 행의 첫 번째 셀이 비어있거나 "("로 시작하면 헤더의 연속
+                        # 다음 행의 첫 번째 셀이 비어있거나 "("로 시작하거나 "불량/정상"이 포함되면 헤더의 연속
                         if next_row and len(next_row) > 0:
-                            first_cell_next = str(next_row[0]).strip()
-                            if not first_cell_next or first_cell_next.startswith('(') or '불량/정상' in first_cell_next:
-                                # 두 번째 행의 헤더를 첫 번째 행에 병합
-                                # 첫 번째 행의 마지막 셀과 두 번째 행의 첫 번째 셀을 병합
-                                if header_row and next_row:
-                                    # 마지막 셀과 첫 번째 셀 병합
-                                    if header_row and len(header_row) > 0:
-                                        last_header = header_row[-1] if header_row else ''
-                                        if next_row and len(next_row) > 0:
-                                            first_next = next_row[0] if next_row else ''
-                                            # 병합
-                                            merged = (last_header + first_next).strip()
-                                            header_row = header_row[:-1] + [merged] + next_row[1:]
-                                            header_row_idx += 1  # 데이터 시작 인덱스 조정
+                            first_cell_next = str(next_row[0]).strip() if next_row[0] else ''
+                            # 헤더 연속 판단
+                            is_header_continuation = (
+                                not first_cell_next or 
+                                first_cell_next.startswith('(') or 
+                                '불량/정상' in first_cell_next or
+                                first_cell_next.startswith('(불량') or
+                                (len(merged_header_row) > 0 and merged_header_row[-1] and '재고상태' in str(merged_header_row[-1]))
+                            )
+                            
+                            if is_header_continuation:
+                                # 마지막 헤더 셀과 첫 번째 다음 셀 병합
+                                if merged_header_row and len(merged_header_row) > 0:
+                                    last_header_cell = str(merged_header_row[-1]) if merged_header_row[-1] else ''
+                                    first_next_cell = str(next_row[0]) if next_row and next_row[0] else ''
+                                    # 병합 (예: "재고상태\n(불량/정상)" -> "재고상태 (불량/정상)")
+                                    merged_cell = (last_header_cell + ' ' + first_next_cell).strip()
+                                    # 병합된 헤더 생성
+                                    merged_header_row = merged_header_row[:-1] + [merged_cell] + list(next_row[1:])
+                                    header_row_idx += 1  # 데이터 시작 인덱스 조정
+                                    print(f"   헤더 병합 완료: {len(merged_header_row)}개 컬럼")
                     
                     # 헤더 정규화 (줄바꿈 제거, 공백 정리)
                     normalized_headers = []
-                    for h in header_row:
+                    for h in merged_header_row:
                         if h:
                             normalized = str(h).strip().replace('\n', ' ').replace('\r', ' ')
                             normalized = ' '.join(normalized.split())  # 여러 공백을 하나로
@@ -178,41 +188,94 @@ def migrate_from_csv():
                         else:
                             normalized_headers.append('')
                     
-                    # 컬럼 인덱스 찾기
-                    col_indices = {}
-                    for i, header in enumerate(normalized_headers):
-                        header_lower = header.lower()
-                        if '접수일' in header or '반품 접수일' in header:
-                            col_indices['return_date'] = i
-                        elif '화주명' in header or '화주' in header:
-                            col_indices['company_name'] = i
-                        elif '제품' in header:
-                            col_indices['product'] = i
-                        elif '고객명' in header or '고객' in header:
-                            col_indices['customer_name'] = i
-                        elif '송장번호' in header or '송장' in header:
-                            col_indices['tracking_number'] = i
-                        elif '반품/교환' in header or '반품' in header:
-                            col_indices['return_type'] = i
-                        elif '재고상태' in header:
-                            col_indices['stock_status'] = i
-                        elif '검품유무' in header or '검품' in header:
-                            col_indices['inspection'] = i
-                        elif '처리완료' in header:
-                            col_indices['completed'] = i
-                        elif '비고' in header:
-                            col_indices['memo'] = i
-                        elif '사진' in header:
-                            col_indices['photo_links'] = i
-                        elif '금액' in header or '배송비' in header:
-                            col_indices['shipping_fee'] = i
-                        elif '화주사요청' in header or '요청' in header:
-                            col_indices['client_request'] = i
-                        elif '화주사확인' in header or '확인완료' in header:
-                            col_indices['client_confirmed'] = i
+                    print(f"   정규화된 헤더 ({len(normalized_headers)}개): {normalized_headers[:12]}")
                     
+                    # 컬럼 인덱스 찾기 (정확한 순서대로 매칭)
+                    col_indices = {}
+                    
+                    # 헤더를 순서대로 확인하고 정확한 컬럼 찾기
+                    for i, header in enumerate(normalized_headers):
+                        header_clean = header.strip().lower()
+                        
+                        # 정확한 매칭 우선
+                        if '반품 접수일' in header or ('접수일' in header and '반품' in header):
+                            if 'return_date' not in col_indices:
+                                col_indices['return_date'] = i
+                        elif header_clean == '화주명' or ('화주명' in header and '화주' in header):
+                            if 'company_name' not in col_indices:
+                                col_indices['company_name'] = i
+                        elif header_clean == '제품':
+                            if 'product' not in col_indices:
+                                col_indices['product'] = i
+                        elif header_clean == '고객명' or ('고객명' in header and '고객' in header):
+                            if 'customer_name' not in col_indices:
+                                col_indices['customer_name'] = i
+                        elif '송장번호' in header or ('송장' in header and '번호' in header):
+                            if 'tracking_number' not in col_indices:
+                                col_indices['tracking_number'] = i
+                        elif '반품/교환/오배송' in header or '반품/교환' in header:
+                            if 'return_type' not in col_indices:
+                                col_indices['return_type'] = i
+                        elif '재고상태' in header and ('불량' in header or '정상' in header):
+                            if 'stock_status' not in col_indices:
+                                col_indices['stock_status'] = i
+                        elif header_clean == '검품유무' or '검품유무' in header:
+                            if 'inspection' not in col_indices:
+                                col_indices['inspection'] = i
+                        elif header_clean == '처리완료' or '처리완료' in header:
+                            if 'completed' not in col_indices:
+                                col_indices['completed'] = i
+                        elif header_clean == '비고':
+                            if 'memo' not in col_indices:
+                                col_indices['memo'] = i
+                        elif header_clean == '사진':
+                            if 'photo_links' not in col_indices:
+                                col_indices['photo_links'] = i
+                        elif header_clean == 'qr코드' or 'qr' in header_clean:
+                            # QR코드는 사용하지 않지만 인덱스 추적용
+                            pass
+                        elif header_clean == '금액':
+                            if 'shipping_fee' not in col_indices:
+                                col_indices['shipping_fee'] = i
+                        elif '화주사요청' in header or ('화주사' in header and '요청' in header):
+                            if 'client_request' not in col_indices:
+                                col_indices['client_request'] = i
+                        elif '화주사확인완료' in header or ('화주사' in header and '확인' in header):
+                            if 'client_confirmed' not in col_indices:
+                                col_indices['client_confirmed'] = i
+                    
+                    # 디버깅: 헤더와 매핑 결과 출력
                     print(f"   헤더 발견: {len(normalized_headers)}개 컬럼")
-                    print(f"   컬럼 인덱스: {col_indices}")
+                    print(f"   헤더 목록: {normalized_headers[:15]}")  # 처음 15개만
+                    print(f"   컬럼 인덱스 매핑: {col_indices}")
+                    
+                    # 필수 컬럼 확인
+                    required_cols = ['customer_name', 'tracking_number', 'company_name']
+                    missing_cols = [col for col in required_cols if col not in col_indices]
+                    if missing_cols:
+                        print(f"   ⚠️ 필수 컬럼 누락: {missing_cols}")
+                        # 기본 인덱스 시도 (일반적인 CSV 구조 기준)
+                        if 'company_name' not in col_indices and len(normalized_headers) > 1:
+                            col_indices['company_name'] = 1
+                        if 'customer_name' not in col_indices and len(normalized_headers) > 3:
+                            col_indices['customer_name'] = 3
+                        if 'tracking_number' not in col_indices and len(normalized_headers) > 4:
+                            col_indices['tracking_number'] = 4
+                        if 'completed' not in col_indices and len(normalized_headers) > 8:
+                            col_indices['completed'] = 8
+                        if 'inspection' not in col_indices and len(normalized_headers) > 7:
+                            col_indices['inspection'] = 7
+                        if 'stock_status' not in col_indices and len(normalized_headers) > 6:
+                            col_indices['stock_status'] = 6
+                        if 'return_type' not in col_indices and len(normalized_headers) > 5:
+                            col_indices['return_type'] = 5
+                        if 'product' not in col_indices and len(normalized_headers) > 2:
+                            col_indices['product'] = 2
+                        if 'return_date' not in col_indices and len(normalized_headers) > 0:
+                            col_indices['return_date'] = 0
+                        if 'memo' not in col_indices and len(normalized_headers) > 9:
+                            col_indices['memo'] = 9
+                        print(f"   기본 인덱스 적용 후: {col_indices}")
                     
                     # 데이터 읽기 (헤더 다음 행부터, 인덱스 3부터)
                     data_start_idx = header_row_idx + 1
@@ -262,22 +325,42 @@ def migrate_from_csv():
                                 continue
                             
                             # 반품 데이터 생성
+                            completed_value = get_col(col_indices.get('completed'))
+                            inspection_value = get_col(col_indices.get('inspection'))
+                            stock_status_value = get_col(col_indices.get('stock_status'))
+                            return_type_value = get_col(col_indices.get('return_type'))
+                            return_date_value = get_col(col_indices.get('return_date'))
+                            product_value = get_col(col_indices.get('product'))
+                            memo_value = get_col(col_indices.get('memo'))
+                            photo_links_value = get_col(col_indices.get('photo_links'))
+                            shipping_fee_value = get_col(col_indices.get('shipping_fee'))
+                            client_request_value = get_col(col_indices.get('client_request'))
+                            client_confirmed_value = get_col(col_indices.get('client_confirmed'))
+                            
+                            # 디버깅: 처음 몇 개 데이터만 상세 로그
+                            if processed_count < 3:
+                                print(f"   데이터 샘플 #{processed_count + 1}:")
+                                print(f"     고객명: {customer_name}, 송장번호: {tracking_number}")
+                                print(f"     처리완료 컬럼 인덱스: {col_indices.get('completed')}, 값: '{completed_value}'")
+                                print(f"     검품유무: '{inspection_value}', 재고상태: '{stock_status_value}'")
+                                print(f"     전체 행: {row[:10]}")  # 처음 10개 컬럼만
+                            
                             return_data = {
-                                'return_date': get_col(col_indices.get('return_date')) or None,
+                                'return_date': return_date_value or None,
                                 'company_name': company_name,
-                                'product': get_col(col_indices.get('product')) or None,
+                                'product': product_value or None,
                                 'customer_name': customer_name,
                                 'tracking_number': tracking_number,
-                                'return_type': get_col(col_indices.get('return_type')) or None,
-                                'stock_status': get_col(col_indices.get('stock_status')) or None,
-                                'inspection': get_col(col_indices.get('inspection')) or None,
-                                'completed': get_col(col_indices.get('completed')) or None,
-                                'memo': get_col(col_indices.get('memo')) or None,
-                                'photo_links': get_col(col_indices.get('photo_links')) or None,
+                                'return_type': return_type_value or None,
+                                'stock_status': stock_status_value or None,
+                                'inspection': inspection_value or None,
+                                'completed': completed_value or None,  # 처리완료 값 (예: "강", "표", "표정오" 등)
+                                'memo': memo_value or None,
+                                'photo_links': photo_links_value or None,
                                 'other_courier': None,
-                                'shipping_fee': get_col(col_indices.get('shipping_fee')) or None,
-                                'client_request': get_col(col_indices.get('client_request')) or None,
-                                'client_confirmed': get_col(col_indices.get('client_confirmed')) or None,
+                                'shipping_fee': shipping_fee_value or None,
+                                'client_request': client_request_value or None,
+                                'client_confirmed': client_confirmed_value or None,
                                 'month': month
                             }
                             
