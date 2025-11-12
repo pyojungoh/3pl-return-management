@@ -2051,7 +2051,7 @@
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 15px;">
                 <div>
                   <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">제목 *</label>
-                  <input type="text" id="popupTitle" class="request-input" style="min-height: auto;" placeholder="팝업 제목" required>
+                  <input type="text" id="popupTitleInput" class="request-input" style="min-height: auto;" placeholder="팝업 제목" required>
                 </div>
                 <div>
                   <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">시작일 *</label>
@@ -5377,7 +5377,7 @@
     // 팝업 폼 초기화
     function resetPopupForm() {
       document.getElementById('popupId').value = '';
-      document.getElementById('popupTitle').value = '';
+      document.getElementById('popupTitleInput').value = '';
       document.getElementById('popupContentText').value = '';
       document.getElementById('popupStartDate').value = '';
       document.getElementById('popupEndDate').value = '';
@@ -5447,7 +5447,7 @@
     // 팝업 저장
     async function savePopup() {
       const popupId = document.getElementById('popupId');
-      const titleEl = document.getElementById('popupTitle');
+      const titleEl = document.getElementById('popupTitleInput');
       const contentEl = document.getElementById('popupContentText');
       const startDateEl = document.getElementById('popupStartDate');
       const endDateEl = document.getElementById('popupEndDate');
@@ -5567,7 +5567,7 @@
         if (result.success && result.data) {
           const popup = result.data;
           document.getElementById('popupId').value = popup.id;
-          document.getElementById('popupTitle').value = popup.title || '';
+          document.getElementById('popupTitleInput').value = popup.title || '';
           document.getElementById('popupContentText').value = popup.content || '';
           document.getElementById('popupStartDate').value = popup.start_date ? popup.start_date.split('T')[0] : '';
           document.getElementById('popupEndDate').value = popup.end_date ? popup.end_date.split('T')[0] : '';
