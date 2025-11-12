@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JJAY 반품 사진 입력</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: white;
+            padding: 10px;
+        }
+        
+        .logo h1 {
+            color: #ff6b35;
+            font-size: 24px;
+            margin-top: 10px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            color: #2d3436;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #ff6b35;
+            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        .btn-primary:disabled {
+            background: #b2bec3;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-secondary {
+            background: #636e72;
+            color: white;
+        }
+        
+        .result-box {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #ff6b35;
+            display: none;
+        }
+        
+        .result-box.show {
+            display: block;
+        }
+        
+        .result-box h3 {
+            color: #2d3436;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .result-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+        }
+        
+        .result-item strong {
+            color: #ff6b35;
+            display: inline-block;
+            width: 100px;
+        }
+        
+        .photo-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .photo-section.show {
+            display: block;
+        }
+        
+        .photo-preview {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .photo-preview-item {
+            position: relative;
+            width: 100%;
+            padding-top: 100%;
+            background: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .photo-preview-item img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .photo-preview-item .remove-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(231, 76, 60, 0.9);
+            color: white;
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .message {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .message.show {
+            display: block;
+        }
+        
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #ff6b35;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <img src="https://res.cloudinary.com/dokk81rjh/image/upload/v1762922695/logo_srff9i.png" alt="JJAY Logo" onerror="this.style.display='none';">
+            <h1>JJAY 반품 사진 입력</h1>
+        </div>
+        
+        <div class="input-group">
+            <label for="trackingNumber">📦 송장번호</label>
+            <input type="text" id="trackingNumber" placeholder="송장번호를 입력하세요" autocomplete="off">
+        </div>
+        
+        <button class="btn btn-primary" onclick="searchTracking()">검색</button>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 10px; color: #636e72;">검색 중...</p>
+        </div>
+        
+        <div class="message" id="message"></div>
+        
+        <div class="result-box" id="resultBox">
+            <h3>📋 반품 정보</h3>
+            <div class="result-item">
+                <strong>화주사:</strong> <span id="resultCompany">-</span>
+            </div>
+            <div class="result-item">
+                <strong>제품:</strong> <span id="resultProduct">-</span>
+            </div>
+            <div class="result-item">
+                <strong>고객명:</strong> <span id="resultCustomer">-</span>
+            </div>
+            <div class="result-item">
+                <strong>반품유형:</strong> <span id="resultType">-</span>
+            </div>
+            <div class="result-item">
+                <strong>재고상태:</strong> <span id="resultStatus">-</span>
+            </div>
+        </div>
+        
+        <div class="photo-section" id="photoSection">
+            <h3 style="color: #2d3436; margin-bottom: 15px;">📷 사진 업로드</h3>
+            <div class="file-input-wrapper">
+                <button class="btn btn-secondary" onclick="document.getElementById('photoInput').click()">
+                    사진 선택 (여러 장 가능)
+                </button>
+                <input type="file" id="photoInput" accept="image/*" multiple style="display: none;" onchange="handlePhotoSelect(event)">
+            </div>
+            <div class="photo-preview" id="photoPreview"></div>
+            <button class="btn btn-primary" id="uploadBtn" onclick="uploadPhotos()" style="margin-top: 15px;" disabled>
+                사진 업로드
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = window.location.origin;
+        let selectedPhotos = [];
+        let currentReturnId = null;
+        let currentTrackingNumber = '';
+        
+        // 엔터키로 검색
+        document.getElementById('trackingNumber').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchTracking();
+            }
+        });
+        
+        async function searchTracking() {
+            const trackingNumber = document.getElementById('trackingNumber').value.trim();
+            const loading = document.getElementById('loading');
+            const message = document.getElementById('message');
+            const resultBox = document.getElementById('resultBox');
+            const photoSection = document.getElementById('photoSection');
+            
+            // 초기화
+            selectedPhotos = [];
+            currentReturnId = null;
+            currentTrackingNumber = '';
+            document.getElementById('photoPreview').innerHTML = '';
+            document.getElementById('uploadBtn').disabled = true;
+            resultBox.classList.remove('show');
+            photoSection.classList.remove('show');
+            message.classList.remove('show');
+            
+            if (!trackingNumber) {
+                showMessage('송장번호를 입력해주세요.', 'error');
+                return;
+            }
+            
+            loading.classList.add('show');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/uploads/find-by-tracking?trackingNumber=${encodeURIComponent(trackingNumber)}`);
+                const data = await response.json();
+                
+                loading.classList.remove('show');
+                
+                if (data.success && data.data) {
+                    // 결과 표시
+                    document.getElementById('resultCompany').textContent = data.data.company || '-';
+                    document.getElementById('resultProduct').textContent = data.data.product || '-';
+                    document.getElementById('resultCustomer').textContent = data.data.customer || '-';
+                    document.getElementById('resultType').textContent = data.data.returnType || '-';
+                    document.getElementById('resultStatus').textContent = data.data.stockStatus || '-';
+                    
+                    resultBox.classList.add('show');
+                    photoSection.classList.add('show');
+                    currentTrackingNumber = trackingNumber;
+                    
+                    showMessage('반품 정보를 찾았습니다. 사진을 업로드해주세요.', 'success');
+                } else {
+                    showMessage(data.message || '해당 송장번호의 데이터를 찾을 수 없습니다.', 'error');
+                }
+            } catch (error) {
+                loading.classList.remove('show');
+                console.error('검색 오류:', error);
+                showMessage('검색 중 오류가 발생했습니다.', 'error');
+            }
+        }
+        
+        function handlePhotoSelect(event) {
+            const files = Array.from(event.target.files);
+            const preview = document.getElementById('photoPreview');
+            
+            files.forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const photoData = {
+                            file: file,
+                            dataUrl: e.target.result
+                        };
+                        selectedPhotos.push(photoData);
+                        renderPhotoPreview();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            
+            // 파일 입력 초기화 (같은 파일 다시 선택 가능하도록)
+            event.target.value = '';
+        }
+        
+        function renderPhotoPreview() {
+            const preview = document.getElementById('photoPreview');
+            const uploadBtn = document.getElementById('uploadBtn');
+            
+            preview.innerHTML = '';
+            
+            selectedPhotos.forEach((photo, index) => {
+                const item = document.createElement('div');
+                item.className = 'photo-preview-item';
+                item.innerHTML = `
+                    <img src="${photo.dataUrl}" alt="미리보기 ${index + 1}">
+                    <button class="remove-btn" onclick="removePhoto(${index})">×</button>
+                `;
+                preview.appendChild(item);
+            });
+            
+            uploadBtn.disabled = selectedPhotos.length === 0;
+        }
+        
+        function removePhoto(index) {
+            selectedPhotos.splice(index, 1);
+            renderPhotoPreview();
+        }
+        
+        async function uploadPhotos() {
+            if (selectedPhotos.length === 0) {
+                showMessage('사진을 선택해주세요.', 'error');
+                return;
+            }
+            
+            if (!currentTrackingNumber) {
+                showMessage('송장번호를 먼저 검색해주세요.', 'error');
+                return;
+            }
+            
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '업로드 중...';
+            
+            try {
+                // Base64로 변환
+                const images = selectedPhotos.map(photo => photo.dataUrl);
+                
+                // 이미지 업로드
+                const uploadResponse = await fetch(`${API_BASE}/api/uploads/upload-images`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        images: images,
+                        trackingNumber: currentTrackingNumber
+                    })
+                });
+                
+                const uploadData = await uploadResponse.json();
+                
+                if (uploadData.success) {
+                    showMessage(`✅ ${selectedPhotos.length}장의 사진이 업로드되었습니다!`, 'success');
+                    
+                    // 초기화
+                    selectedPhotos = [];
+                    document.getElementById('photoPreview').innerHTML = '';
+                    document.getElementById('photoInput').value = '';
+                    uploadBtn.textContent = '사진 업로드';
+                    
+                    // 2초 후 사진 섹션 숨기기
+                    setTimeout(() => {
+                        document.getElementById('photoSection').classList.remove('show');
+                    }, 2000);
+                } else {
+                    showMessage(uploadData.message || '사진 업로드에 실패했습니다.', 'error');
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = '사진 업로드';
+                }
+            } catch (error) {
+                console.error('업로드 오류:', error);
+                showMessage('사진 업로드 중 오류가 발생했습니다.', 'error');
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '사진 업로드';
+            }
+        }
+        
+        function showMessage(text, type) {
+            const message = document.getElementById('message');
+            message.textContent = text;
+            message.className = `message ${type} show`;
+            
+            // 3초 후 자동 숨김
+            setTimeout(() => {
+                message.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
+
