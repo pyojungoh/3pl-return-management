@@ -5381,6 +5381,10 @@
       document.getElementById('popupStartDate').value = '';
       document.getElementById('popupEndDate').value = '';
       document.getElementById('popupIsActive').checked = true;
+      document.getElementById('popupImageUrl').value = '';
+      document.getElementById('popupWidth').value = '600';
+      document.getElementById('popupHeight').value = '400';
+      removePopupImage();
       const message = document.getElementById('popupMessage');
       if (message) {
         message.textContent = '';
@@ -5389,20 +5393,92 @@
     }
     window.resetPopupForm = resetPopupForm;
     
+    // 팝업 이미지 선택 처리
+    async function handlePopupImageSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      if (!file.type.startsWith('image/')) {
+        alert('이미지 파일만 업로드 가능합니다.');
+        return;
+      }
+      
+      if (file.size > 5 * 1024 * 1024) {
+        alert('이미지 크기는 5MB 이하여야 합니다.');
+        return;
+      }
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      try {
+        const response = await fetch('/api/board/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const imageUrl = result.data.file_url;
+          document.getElementById('popupImageUrl').value = imageUrl;
+          document.getElementById('popupImagePreviewImg').src = imageUrl;
+          document.getElementById('popupImagePreview').style.display = 'block';
+          document.getElementById('removePopupImageBtn').style.display = 'inline-block';
+        } else {
+          alert('이미지 업로드에 실패했습니다: ' + (result.message || '알 수 없는 오류'));
+        }
+      } catch (error) {
+        console.error('이미지 업로드 오류:', error);
+        alert('이미지 업로드 중 오류가 발생했습니다.');
+      }
+    }
+    window.handlePopupImageSelect = handlePopupImageSelect;
+    
+    // 팝업 이미지 제거
+    function removePopupImage() {
+      document.getElementById('popupImageUrl').value = '';
+      document.getElementById('popupImageInput').value = '';
+      document.getElementById('popupImagePreview').style.display = 'none';
+      document.getElementById('removePopupImageBtn').style.display = 'none';
+    }
+    window.removePopupImage = removePopupImage;
+    
     // 팝업 저장
     async function savePopup() {
-      const popupId = document.getElementById('popupId').value;
-      const title = document.getElementById('popupTitle').value.trim();
-      const content = document.getElementById('popupContentText').value.trim();
-      const startDate = document.getElementById('popupStartDate').value;
-      const endDate = document.getElementById('popupEndDate').value;
-      const imageUrl = document.getElementById('popupImageUrl').value.trim();
-      const width = parseInt(document.getElementById('popupWidth').value) || 600;
-      const height = parseInt(document.getElementById('popupHeight').value) || 400;
-      const isActive = document.getElementById('popupIsActive').checked;
+      const popupId = document.getElementById('popupId');
+      const titleEl = document.getElementById('popupTitle');
+      const contentEl = document.getElementById('popupContentText');
+      const startDateEl = document.getElementById('popupStartDate');
+      const endDateEl = document.getElementById('popupEndDate');
+      const imageUrlEl = document.getElementById('popupImageUrl');
+      const widthEl = document.getElementById('popupWidth');
+      const heightEl = document.getElementById('popupHeight');
+      const isActiveEl = document.getElementById('popupIsActive');
       const message = document.getElementById('popupMessage');
       
+      if (!popupId || !titleEl || !contentEl || !startDateEl || !endDateEl) {
+        console.error('필수 요소를 찾을 수 없습니다.');
+        if (message) {
+          message.textContent = '❌ 폼 요소를 찾을 수 없습니다. 페이지를 새로고침해주세요.';
+          message.className = 'error';
+        }
+        return;
+      }
+      
+      const popupIdValue = popupId.value;
+      const title = titleEl.value.trim();
+      const content = contentEl.value.trim();
+      const startDate = startDateEl.value;
+      const endDate = endDateEl.value;
+      const imageUrl = imageUrlEl ? imageUrlEl.value.trim() : '';
+      const width = widthEl ? (parseInt(widthEl.value) || 600) : 600;
+      const height = heightEl ? (parseInt(heightEl.value) || 400) : 400;
+      const isActive = isActiveEl ? isActiveEl.checked : true;
+      
+      console.log('팝업 저장 시도:', { popupIdValue, title, content, startDate, endDate, imageUrl, width, height, isActive });
+      
       if (!title || !content || !startDate || !endDate) {
+        console.error('필수 필드 누락:', { title: !!title, content: !!content, startDate: !!startDate, endDate: !!endDate });
         if (message) {
           message.textContent = '❌ 모든 필드를 입력해주세요.';
           message.className = 'error';
@@ -5548,8 +5624,25 @@
     
     // 활성 팝업 확인 및 표시
     async function checkAndShowPopup() {
-      // 이미 닫은 팝업인지 확인 (localStorage)
-      const closedPopupId = localStorage.getItem('closedPopupId');
+      // 이미 닫은 팝업인지 확인 (localStorage - 하루 동안 표시 안 함)
+      const closedPopupData = localStorage.getItem('closedPopupData');
+      let closedPopupInfo = null;
+      
+      if (closedPopupData) {
+        try {
+          closedPopupInfo = JSON.parse(closedPopupData);
+          // 오늘 날짜와 비교
+          const today = new Date().toISOString().split('T')[0];
+          if (closedPopupInfo.date !== today) {
+            // 하루가 지났으면 삭제
+            localStorage.removeItem('closedPopupData');
+            closedPopupInfo = null;
+          }
+        } catch (e) {
+          // 파싱 오류 시 삭제
+          localStorage.removeItem('closedPopupData');
+        }
+      }
       
       try {
         const response = await fetch('/api/popups/active');
@@ -5558,8 +5651,8 @@
         if (result.success && result.data) {
           const popup = result.data;
           
-          // 이미 닫은 팝업이면 표시하지 않음
-          if (closedPopupId && parseInt(closedPopupId) === popup.id) {
+          // 이미 닫은 팝업이면 표시하지 않음 (하루 동안)
+          if (closedPopupInfo && closedPopupInfo.popupId === popup.id) {
             return;
           }
           
@@ -5606,19 +5699,33 @@
     }
     window.showPopup = showPopup;
     
-    // 팝업 닫기
+    // 팝업 닫기 (일시적으로만 닫기)
     function closePopup() {
       const layer = document.getElementById('popupLayer');
       if (layer) {
-        const popupId = layer.getAttribute('data-popup-id');
-        if (popupId) {
-          // 닫은 팝업 ID를 localStorage에 저장 (오늘 하루 동안 다시 표시하지 않음)
-          localStorage.setItem('closedPopupId', popupId);
-        }
         layer.style.display = 'none';
       }
     }
     window.closePopup = closePopup;
+    
+    // 팝업 닫기 (하루 동안 표시 안 함)
+    function closePopupForToday() {
+      const layer = document.getElementById('popupLayer');
+      if (layer) {
+        const popupId = layer.getAttribute('data-popup-id');
+        if (popupId) {
+          // 닫은 팝업 정보를 localStorage에 저장 (오늘 날짜와 함께 저장하여 하루 동안 다시 표시하지 않음)
+          const today = new Date().toISOString().split('T')[0];
+          const closedPopupData = {
+            popupId: parseInt(popupId),
+            date: today
+          };
+          localStorage.setItem('closedPopupData', JSON.stringify(closedPopupData));
+        }
+        layer.style.display = 'none';
+      }
+    }
+    window.closePopupForToday = closePopupForToday;
     
     // 화주사 모드: 카테고리 필터로 게시글 로드
     async function loadBoardPostsByCategoryFilter(categoryId = null) {
