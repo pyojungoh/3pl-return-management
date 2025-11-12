@@ -2,7 +2,7 @@
 3PL 반품 관리 및 화주사 관리 시스템 서버
 버전: v4.0 (PostgreSQL/Neon 데이터베이스 기반)
 """
-from flask import Flask, render_template, send_from_directory, send_file
+from flask import Flask, render_template, send_from_directory, send_file, request, jsonify
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
@@ -81,11 +81,7 @@ def index():
         # dashboard_server.html 파일 사용
         return send_file('dashboard_server.html')
     except FileNotFoundError:
-        # 파일이 없으면 dashboard.html 사용
-        try:
-            return send_file('dashboard.html')
-        except FileNotFoundError:
-            return '<h1>대시보드 파일을 찾을 수 없습니다.</h1><p>dashboard_server.html 또는 dashboard.html 파일이 필요합니다.</p>', 404
+        return '<h1>대시보드 파일을 찾을 수 없습니다.</h1><p>dashboard_server.html 파일이 필요합니다.</p>', 404
     except Exception as e:
         return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
 
@@ -126,6 +122,16 @@ def serve_static(filename):
 # 에러 핸들러
 @app.errorhandler(404)
 def not_found(error):
+    print(f"❌ 404 에러 발생: {request.url}")
+    print(f"   요청 경로: {request.path}")
+    print(f"   요청 메서드: {request.method}")
+    # API 요청인 경우 더 자세한 정보 제공
+    if request.path.startswith('/api/'):
+        return jsonify({
+            'error': 'API 엔드포인트를 찾을 수 없습니다.',
+            'path': request.path,
+            'method': request.method
+        }), 404
     return {'error': '페이지를 찾을 수 없습니다.'}, 404
 
 

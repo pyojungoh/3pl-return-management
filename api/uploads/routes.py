@@ -84,6 +84,7 @@ def upload_images():
 
 
 @uploads_bp.route('/find-by-tracking', methods=['GET'])
+@uploads_bp.route('/find-by-tracking/', methods=['GET'])  # trailing slash 지원
 def find_by_tracking():
     """
     송장번호로 반품 데이터 찾기 (QR 코드 검색용)
@@ -106,6 +107,10 @@ def find_by_tracking():
             "message": str
         }
     """
+    print(f"🔍 find_by_tracking 엔드포인트 호출됨!")
+    print(f"   요청 URL: {request.url}")
+    print(f"   요청 메서드: {request.method}")
+    print(f"   쿼리 파라미터: {request.args}")
     try:
         tracking_number = request.args.get('trackingNumber', '').strip()
         month = request.args.get('month', '').strip()
