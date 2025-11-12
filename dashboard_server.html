@@ -928,6 +928,50 @@
     }
     
     /* 비고 툴팁 스타일 */
+    .download-tooltip {
+      position: fixed;
+      background: linear-gradient(135deg, #2d3436 0%, #636e72 100%);
+      color: white;
+      padding: 16px 20px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      z-index: 10000;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      max-width: 350px;
+      pointer-events: none;
+      white-space: normal;
+      word-wrap: break-word;
+    }
+    
+    .download-tooltip::before {
+      content: '';
+      position: absolute;
+      top: -8px;
+      left: 20px;
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 8px solid #2d3436;
+    }
+    
+    .download-tooltip strong {
+      color: #ffeaa7;
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    .download-tooltip ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+    }
+    
+    .download-tooltip li {
+      margin: 4px 0;
+    }
+    
     .memo-tooltip {
       position: fixed;
       background: rgba(0, 0, 0, 0.9);
@@ -957,19 +1001,23 @@
     /* 제품명 셀 스타일 */
     table th:nth-child(3) {
       text-align: center;
-      min-width: 120px;
-      max-width: 150px;
+      width: 150px !important;
+      min-width: 120px !important;
+      max-width: 150px !important;
+      box-sizing: border-box !important;
     }
     
     table td:nth-child(3) {
       text-align: center;
-      min-width: 120px;
-      max-width: 150px;
+      width: 150px !important;
+      min-width: 120px !important;
+      max-width: 150px !important;
       white-space: nowrap !important;
       overflow: hidden !important;
       text-overflow: ellipsis !important;
       padding: 10px 8px !important;
       vertical-align: middle !important;
+      box-sizing: border-box !important;
     }
     
     .product-cell {
@@ -979,9 +1027,12 @@
       overflow: hidden !important;
       text-overflow: ellipsis !important;
       display: table-cell !important;
-      max-width: 100% !important;
+      width: 150px !important;
+      max-width: 150px !important;
+      min-width: 120px !important;
       vertical-align: middle !important;
       line-height: 1.4 !important;
+      box-sizing: border-box !important;
     }
     
     .product-cell.has-memo {
@@ -1133,6 +1184,11 @@
           <option value="">로딩 중...</option>
         </select>
         <button class="refresh-btn" onclick="refreshReturnsData()" id="refreshReturnsBtn">🔄 새로고침</button>
+        <button class="refresh-btn" id="downloadTemplateBtn" onclick="downloadCsvTemplate()" onmouseenter="showDownloadTooltip(event)" onmouseleave="hideDownloadTooltip()" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); position: relative;">📥 서식 다운로드</button>
+        <label for="csvUploadInput" style="cursor: pointer; display: inline-block; margin: 0;">
+          <span class="refresh-btn" style="display: inline-block; margin: 0;">📤 CSV 업로드</span>
+          <input type="file" id="csvUploadInput" accept=".csv" style="display: none;" onchange="handleCsvUpload(event)">
+        </label>
       </div>
       
       <!-- 반품 등록 접이식 버튼 (관리자 전용) -->
@@ -1677,6 +1733,189 @@
       }
     }
     window.refreshReturnsData = refreshReturnsData;
+    
+    /* ========== CSV 파일 업로드 ========== */
+    function handleCsvUpload(event) {
+      const file = event.target.files[0];
+      if (!file) {
+        return;
+      }
+      
+      if (!file.name.endsWith('.csv')) {
+        showMessage('❌ CSV 파일만 업로드 가능합니다.', 'error');
+        event.target.value = ''; // 파일 선택 초기화
+        return;
+      }
+      
+      // 파일명에서 월 추출 시도
+      let month = '';
+      const filenameWithoutExt = file.name.replace('.csv', '').trim();
+      if (filenameWithoutExt.includes('년') && filenameWithoutExt.includes('월')) {
+        month = filenameWithoutExt;
+      } else {
+        // 현재 선택된 월 사용
+        const monthSelect = document.getElementById('monthSelect');
+        if (monthSelect && monthSelect.value) {
+          month = monthSelect.value;
+        }
+      }
+      
+      // 월이 없으면 사용자에게 입력 요청
+      if (!month) {
+        const userMonth = prompt('월 정보를 입력해주세요. (예: 2025년11월)');
+        if (!userMonth) {
+          event.target.value = ''; // 파일 선택 초기화
+          return;
+        }
+        month = userMonth;
+      }
+      
+      // FormData 생성
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('month', month);
+      formData.append('force', 'false');
+      
+      // 업로드 시작 메시지
+      showMessage('📤 CSV 파일 업로드 중...', 'info');
+      
+      // API 호출
+      fetch('/api/returns/upload-csv', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showMessage(`✅ ${data.message}`, 'success');
+          // 파일 선택 초기화
+          event.target.value = '';
+          // 데이터 새로고침
+          setTimeout(() => {
+            refreshReturnsData();
+          }, 500);
+        } else {
+          showMessage(`❌ ${data.message}`, 'error');
+          event.target.value = ''; // 파일 선택 초기화
+        }
+      })
+      .catch(error => {
+        console.error('CSV 업로드 오류:', error);
+        showMessage(`❌ CSV 업로드 중 오류가 발생했습니다: ${error.message}`, 'error');
+        event.target.value = ''; // 파일 선택 초기화
+      });
+    }
+    
+    window.handleCsvUpload = handleCsvUpload;
+    
+    /* ========== CSV 서식 다운로드 ========== */
+    function downloadCsvTemplate() {
+      console.log('CSV 서식 다운로드 시작');
+      // 서버에서 UTF-8 BOM 인코딩으로 CSV 생성하여 다운로드
+      fetch('/api/returns/download-template')
+        .then(response => {
+          console.log('응답 상태:', response.status, response.statusText);
+          if (!response.ok) {
+            return response.text().then(text => {
+              console.error('서버 오류 응답:', text);
+              throw new Error(`다운로드 실패: ${response.status} ${response.statusText}`);
+            });
+          }
+          return response.blob();
+        })
+        .then(blob => {
+          console.log('Blob 생성 완료, 크기:', blob.size, '타입:', blob.type);
+          if (blob.size === 0) {
+            throw new Error('다운로드된 파일이 비어있습니다.');
+          }
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = '반품내역_서식.csv';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          showMessage('✅ CSV 서식 파일을 다운로드했습니다. (Excel에서 한글 정상 표시)', 'success');
+        })
+        .catch(error => {
+          console.error('CSV 템플릿 다운로드 오류:', error);
+          showMessage(`❌ CSV 서식 다운로드 중 오류가 발생했습니다: ${error.message}`, 'error');
+        });
+    }
+    
+    window.downloadCsvTemplate = downloadCsvTemplate;
+    
+    /* ========== 서식 다운로드 툴팁 ========== */
+    window.showDownloadTooltip = function showDownloadTooltip(event) {
+      // 기존 툴팁 제거
+      hideDownloadTooltip();
+      
+      const tooltip = document.createElement('div');
+      tooltip.id = 'downloadTooltip';
+      tooltip.className = 'download-tooltip';
+      tooltip.innerHTML = `
+        <strong>📥 CSV 서식 다운로드 사용 방법</strong>
+        <ul>
+          <li>1. 버튼 클릭하여 서식 파일 다운로드</li>
+          <li>2. Excel에서 파일 열기 (한글 정상 표시)</li>
+          <li>3. <strong>송장번호 컬럼 선택</strong> → 셀 서식 → 텍스트로 변경</li>
+          <li>4. 예시 데이터 참고하여 반품 내역 입력</li>
+          <li>5. 파일명에 월 정보 포함 (예: 2025년11월.csv)</li>
+          <li>6. CSV 업로드 버튼으로 파일 업로드</li>
+        </ul>
+        <div style="margin-top: 8px; font-size: 12px; color: #b2bec3;">
+          💡 필수 컬럼: 고객명, 송장번호<br>
+          💡 송장번호 컬럼을 텍스트 형식으로 설정하면 과학적 표기법 방지
+        </div>
+      `;
+      document.body.appendChild(tooltip);
+      
+      // 툴팁 위치 설정 (마우스 바로 아래)
+      updateDownloadTooltipPosition(event, tooltip);
+    };
+    
+    function updateDownloadTooltipPosition(event, tooltip) {
+      if (!tooltip) return;
+      
+      const x = event.clientX;
+      const y = event.clientY + 15; // 마우스 바로 아래
+      
+      tooltip.style.left = x + 'px';
+      tooltip.style.top = y + 'px';
+      
+      // 화면 밖으로 나가지 않도록 조정
+      setTimeout(() => {
+        const rect = tooltip.getBoundingClientRect();
+        if (rect.right > window.innerWidth) {
+          tooltip.style.left = (event.clientX - rect.width - 15) + 'px';
+        }
+        if (rect.bottom > window.innerHeight) {
+          tooltip.style.top = (event.clientY - rect.height - 15) + 'px';
+        }
+        if (rect.left < 0) {
+          tooltip.style.left = '15px';
+        }
+        if (rect.top < 0) {
+          tooltip.style.top = '15px';
+        }
+      }, 0);
+    }
+    
+    window.hideDownloadTooltip = function hideDownloadTooltip() {
+      const tooltip = document.getElementById('downloadTooltip');
+      if (tooltip) {
+        tooltip.remove();
+      }
+    };
+    
+    // 마우스 이동 시 툴팁 위치 업데이트
+    document.addEventListener('mousemove', function(event) {
+      const tooltip = document.getElementById('downloadTooltip');
+      if (tooltip) {
+        updateDownloadTooltipPosition(event, tooltip);
+      }
+    });
     
     // 데이터 로드
     function loadData() {
