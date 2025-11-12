@@ -210,6 +210,25 @@ def init_db():
                 ON board_files(board_id)
             ''')
             
+            # PostgreSQL - 팝업 관리 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS popups (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    start_date DATE NOT NULL,
+                    end_date DATE NOT NULL,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_popups_dates 
+                ON popups(start_date, end_date, is_active)
+            ''')
+            
         else:
             # SQLite 테이블 생성 (기존 코드)
             # 화주사 계정 테이블
@@ -388,6 +407,25 @@ def init_db():
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_board_files_board 
                 ON board_files(board_id)
+            ''')
+            
+            # SQLite - 팝업 관리 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS popups (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    start_date DATE NOT NULL,
+                    end_date DATE NOT NULL,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_popups_dates 
+                ON popups(start_date, end_date, is_active)
             ''')
         
         conn.commit()
@@ -2407,6 +2445,250 @@ def delete_schedule(schedule_id: int) -> bool:
             return cursor.rowcount > 0
         except Exception as e:
             print(f"스케쥴 삭제 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+# ========== 팝업 관리 관련 함수 ==========
+
+def create_popup(popup_data: Dict) -> int:
+    """팝업 생성"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO popups (title, content, start_date, end_date, is_active)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+            ''', (
+                popup_data.get('title'),
+                popup_data.get('content'),
+                popup_data.get('start_date'),
+                popup_data.get('end_date'),
+                popup_data.get('is_active', True)
+            ))
+            conn.commit()
+            row = cursor.fetchone()
+            return row[0] if row else 0
+        except Exception as e:
+            print(f"팝업 생성 오류: {e}")
+            conn.rollback()
+            return 0
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO popups (title, content, start_date, end_date, is_active)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (
+                popup_data.get('title'),
+                popup_data.get('content'),
+                popup_data.get('start_date'),
+                popup_data.get('end_date'),
+                1 if popup_data.get('is_active', True) else 0
+            ))
+            conn.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            print(f"팝업 생성 오류: {e}")
+            return 0
+        finally:
+            conn.close()
+
+
+def get_all_popups() -> List[Dict]:
+    """모든 팝업 조회"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT * FROM popups 
+                ORDER BY start_date DESC, created_at DESC
+            ''')
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT * FROM popups 
+                ORDER BY start_date DESC, created_at DESC
+            ''')
+            rows = cursor.fetchall()
+            # SQLite Row 객체를 딕셔너리로 변환
+            return [{key: row[key] for key in row.keys()} for row in rows]
+        finally:
+            conn.close()
+
+
+def get_active_popup() -> Optional[Dict]:
+    """현재 날짜에 활성화된 팝업 조회"""
+    from datetime import date
+    today = date.today().isoformat()
+    
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT * FROM popups 
+                WHERE is_active = TRUE 
+                AND start_date <= %s 
+                AND end_date >= %s
+                ORDER BY created_at DESC
+                LIMIT 1
+            ''', (today, today))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT * FROM popups 
+                WHERE is_active = 1 
+                AND start_date <= ? 
+                AND end_date >= ?
+                ORDER BY created_at DESC
+                LIMIT 1
+            ''', (today, today))
+            row = cursor.fetchone()
+            # SQLite Row 객체를 딕셔너리로 변환
+            return {key: row[key] for key in row.keys()} if row else None
+        finally:
+            conn.close()
+
+
+def get_popup_by_id(popup_id: int) -> Optional[Dict]:
+    """팝업 ID로 조회"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('SELECT * FROM popups WHERE id = %s', (popup_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('SELECT * FROM popups WHERE id = ?', (popup_id,))
+            row = cursor.fetchone()
+            # SQLite Row 객체를 딕셔너리로 변환
+            return {key: row[key] for key in row.keys()} if row else None
+        finally:
+            conn.close()
+
+
+def update_popup(popup_id: int, popup_data: Dict) -> bool:
+    """팝업 수정"""
+    conn = get_db_connection()
+    
+    updates = []
+    params = []
+    
+    if 'title' in popup_data:
+        updates.append('title = %s' if USE_POSTGRESQL else 'title = ?')
+        params.append(popup_data['title'])
+    if 'content' in popup_data:
+        updates.append('content = %s' if USE_POSTGRESQL else 'content = ?')
+        params.append(popup_data['content'])
+    if 'start_date' in popup_data:
+        updates.append('start_date = %s' if USE_POSTGRESQL else 'start_date = ?')
+        params.append(popup_data['start_date'])
+    if 'end_date' in popup_data:
+        updates.append('end_date = %s' if USE_POSTGRESQL else 'end_date = ?')
+        params.append(popup_data['end_date'])
+    if 'is_active' in popup_data:
+        if USE_POSTGRESQL:
+            updates.append('is_active = %s')
+            params.append(popup_data['is_active'])
+        else:
+            updates.append('is_active = ?')
+            params.append(1 if popup_data['is_active'] else 0)
+    
+    if not updates:
+        return False
+    
+    updates.append('updated_at = CURRENT_TIMESTAMP')
+    params.append(popup_id)
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f'''
+                UPDATE popups 
+                SET {', '.join(updates)}
+                WHERE id = %s
+            ''', params)
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"팝업 수정 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f'''
+                UPDATE popups 
+                SET {', '.join(updates)}
+                WHERE id = ?
+            ''', params)
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"팝업 수정 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+def delete_popup(popup_id: int) -> bool:
+    """팝업 삭제"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM popups WHERE id = %s', (popup_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"팝업 삭제 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM popups WHERE id = ?', (popup_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"팝업 삭제 오류: {e}")
             return False
         finally:
             conn.close()
