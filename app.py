@@ -65,12 +65,16 @@ from api.returns.routes_db import returns_bp
 from api.return_sheets.routes_db import return_sheets_bp
 from api.uploads.routes import uploads_bp
 from api.admin.routes import admin_bp
+from api.schedules.routes_db import schedules_bp
+from api.board.routes_db import board_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(returns_bp)
 app.register_blueprint(return_sheets_bp)
 app.register_blueprint(uploads_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(schedules_bp)
+app.register_blueprint(board_bp)
 
 
 # 메인 페이지 라우트 (화주사 대시보드)

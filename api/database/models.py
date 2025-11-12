@@ -128,6 +128,32 @@ def init_db():
                 ON returns(return_date)
             ''')
             
+            # 판매 스케쥴 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS schedules (
+                    id SERIAL PRIMARY KEY,
+                    company_name TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    start_date DATE NOT NULL,
+                    end_date DATE NOT NULL,
+                    event_description TEXT,
+                    request_note TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 스케쥴 인덱스 생성
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_schedules_company 
+                ON schedules(company_name)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_schedules_dates 
+                ON schedules(start_date, end_date)
+            ''')
+            
         else:
             # SQLite 테이블 생성 (기존 코드)
             # 화주사 계정 테이블
@@ -224,6 +250,88 @@ def init_db():
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_returns_date 
                 ON returns(return_date)
+            ''')
+            
+            # SQLite - 스케쥴 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS schedules (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    company_name TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    start_date DATE NOT NULL,
+                    end_date DATE NOT NULL,
+                    event_description TEXT,
+                    request_note TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 스케쥴 인덱스 생성
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_schedules_company 
+                ON schedules(company_name)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_schedules_dates 
+                ON schedules(start_date, end_date)
+            ''')
+            
+            # SQLite - 게시판 카테고리 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS board_categories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    display_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # SQLite - 게시판 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS boards (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    category_id INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    author_name TEXT NOT NULL,
+                    author_role TEXT NOT NULL,
+                    is_pinned INTEGER DEFAULT 0,
+                    view_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (category_id) REFERENCES board_categories(id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # SQLite - 게시판 첨부파일 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS board_files (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    board_id INTEGER NOT NULL,
+                    file_name TEXT NOT NULL,
+                    file_url TEXT NOT NULL,
+                    file_size INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # 게시판 인덱스 생성
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_boards_category 
+                ON boards(category_id)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_boards_pinned 
+                ON boards(is_pinned, created_at DESC)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_board_files_board 
+                ON board_files(board_id)
             ''')
         
         conn.commit()
@@ -1408,7 +1516,7 @@ def update_photo_links(return_id: int, photo_links: str) -> bool:
                 WHERE id = %s
             ''', (photo_links, return_id))
             conn.commit()
-            return True
+            return cursor.rowcount > 0
         except Exception as e:
             print(f"사진 링크 업데이트 오류: {e}")
             conn.rollback()
@@ -1425,9 +1533,819 @@ def update_photo_links(return_id: int, photo_links: str) -> bool:
                 WHERE id = ?
             ''', (photo_links, return_id))
             conn.commit()
-            return True
+            return cursor.rowcount > 0
         except Exception as e:
             print(f"사진 링크 업데이트 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+# ========== 게시판 관련 함수 ==========
+
+def create_board_category(name: str, display_order: int = 0) -> int:
+    """게시판 카테고리 생성"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO board_categories (name, display_order)
+                VALUES (%s, %s)
+                RETURNING id
+            ''', (name, display_order))
+            conn.commit()
+            row = cursor.fetchone()
+            return row[0] if row else 0
+        except Exception as e:
+            print(f"카테고리 생성 오류: {e}")
+            conn.rollback()
+            return 0
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO board_categories (name, display_order)
+                VALUES (?, ?)
+            ''', (name, display_order))
+            conn.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            print(f"카테고리 생성 오류: {e}")
+            return 0
+        finally:
+            conn.close()
+
+
+def get_all_board_categories() -> List[Dict]:
+    """모든 게시판 카테고리 조회"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT * FROM board_categories 
+                ORDER BY display_order ASC, created_at ASC
+            ''')
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT * FROM board_categories 
+                ORDER BY display_order ASC, created_at ASC
+            ''')
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
+
+def update_board_category(category_id: int, name: str = None, display_order: int = None) -> bool:
+    """게시판 카테고리 수정"""
+    conn = get_db_connection()
+    
+    updates = []
+    params = []
+    
+    if name is not None:
+        updates.append('name = %s' if USE_POSTGRESQL else 'name = ?')
+        params.append(name)
+    if display_order is not None:
+        updates.append('display_order = %s' if USE_POSTGRESQL else 'display_order = ?')
+        params.append(display_order)
+    
+    if not updates:
+        return False
+    
+    params.append(category_id)
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f'''
+                UPDATE board_categories 
+                SET {', '.join(updates)}
+                WHERE id = %s
+            ''', params)
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"카테고리 수정 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f'''
+                UPDATE board_categories 
+                SET {', '.join(updates)}
+                WHERE id = ?
+            ''', params)
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"카테고리 수정 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+def delete_board_category(category_id: int) -> bool:
+    """게시판 카테고리 삭제"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM board_categories WHERE id = %s', (category_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"카테고리 삭제 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM board_categories WHERE id = ?', (category_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"카테고리 삭제 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+def create_board(board_data: Dict) -> int:
+    """게시글 생성"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO boards (
+                    category_id, title, content, author_name, author_role, is_pinned
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+            ''', (
+                board_data.get('category_id'),
+                board_data.get('title'),
+                board_data.get('content'),
+                board_data.get('author_name'),
+                board_data.get('author_role'),
+                board_data.get('is_pinned', False)
+            ))
+            conn.commit()
+            row = cursor.fetchone()
+            return row[0] if row else 0
+        except Exception as e:
+            print(f"게시글 생성 오류: {e}")
+            conn.rollback()
+            return 0
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO boards (
+                    category_id, title, content, author_name, author_role, is_pinned
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                board_data.get('category_id'),
+                board_data.get('title'),
+                board_data.get('content'),
+                board_data.get('author_name'),
+                board_data.get('author_role'),
+                1 if board_data.get('is_pinned', False) else 0
+            ))
+            conn.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            print(f"게시글 생성 오류: {e}")
+            return 0
+        finally:
+            conn.close()
+
+
+def get_boards_by_category(category_id: int) -> List[Dict]:
+    """카테고리별 게시글 조회 (공지사항 먼저, 그 다음 최신순)"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT b.*, bc.name as category_name
+                FROM boards b
+                JOIN board_categories bc ON b.category_id = bc.id
+                WHERE b.category_id = %s
+                ORDER BY b.is_pinned DESC, b.created_at DESC
+            ''', (category_id,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT b.*, bc.name as category_name
+                FROM boards b
+                JOIN board_categories bc ON b.category_id = bc.id
+                WHERE b.category_id = ?
+                ORDER BY b.is_pinned DESC, b.created_at DESC
+            ''', (category_id,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
+
+def get_all_boards() -> List[Dict]:
+    """전체 게시글 조회 (관리자용)"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT b.*, bc.name as category_name
+                FROM boards b
+                JOIN board_categories bc ON b.category_id = bc.id
+                ORDER BY b.is_pinned DESC, b.created_at DESC
+            ''')
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT b.*, bc.name as category_name
+                FROM boards b
+                JOIN board_categories bc ON b.category_id = bc.id
+                ORDER BY b.is_pinned DESC, b.created_at DESC
+            ''')
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
+
+def get_board_by_id(board_id: int) -> Optional[Dict]:
+    """게시글 ID로 조회"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT b.*, bc.name as category_name
+                FROM boards b
+                JOIN board_categories bc ON b.category_id = bc.id
+                WHERE b.id = %s
+            ''', (board_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT b.*, bc.name as category_name
+                FROM boards b
+                JOIN board_categories bc ON b.category_id = bc.id
+                WHERE b.id = ?
+            ''', (board_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()
+
+
+def update_board(board_id: int, board_data: Dict) -> bool:
+    """게시글 수정"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE boards SET
+                    category_id = %s,
+                    title = %s,
+                    content = %s,
+                    is_pinned = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            ''', (
+                board_data.get('category_id'),
+                board_data.get('title'),
+                board_data.get('content'),
+                board_data.get('is_pinned', False),
+                board_id
+            ))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"게시글 수정 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE boards SET
+                    category_id = ?,
+                    title = ?,
+                    content = ?,
+                    is_pinned = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (
+                board_data.get('category_id'),
+                board_data.get('title'),
+                board_data.get('content'),
+                1 if board_data.get('is_pinned', False) else 0,
+                board_id
+            ))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"게시글 수정 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+def delete_board(board_id: int) -> bool:
+    """게시글 삭제"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM boards WHERE id = %s', (board_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"게시글 삭제 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM boards WHERE id = ?', (board_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"게시글 삭제 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+def increment_board_view_count(board_id: int) -> bool:
+    """게시글 조회수 증가"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE boards 
+                SET view_count = view_count + 1
+                WHERE id = %s
+            ''', (board_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"조회수 증가 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE boards 
+                SET view_count = view_count + 1
+                WHERE id = ?
+            ''', (board_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"조회수 증가 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+def create_board_file(file_data: Dict) -> int:
+    """게시글 첨부파일 생성"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO board_files (board_id, file_name, file_url, file_size)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id
+            ''', (
+                file_data.get('board_id'),
+                file_data.get('file_name'),
+                file_data.get('file_url'),
+                file_data.get('file_size')
+            ))
+            conn.commit()
+            row = cursor.fetchone()
+            return row[0] if row else 0
+        except Exception as e:
+            print(f"첨부파일 생성 오류: {e}")
+            conn.rollback()
+            return 0
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO board_files (board_id, file_name, file_url, file_size)
+                VALUES (?, ?, ?, ?)
+            ''', (
+                file_data.get('board_id'),
+                file_data.get('file_name'),
+                file_data.get('file_url'),
+                file_data.get('file_size')
+            ))
+            conn.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            print(f"첨부파일 생성 오류: {e}")
+            return 0
+        finally:
+            conn.close()
+
+
+def get_board_files(board_id: int) -> List[Dict]:
+    """게시글 첨부파일 조회"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT * FROM board_files 
+                WHERE board_id = %s
+                ORDER BY created_at ASC
+            ''', (board_id,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT * FROM board_files 
+                WHERE board_id = ?
+                ORDER BY created_at ASC
+            ''', (board_id,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
+
+def delete_board_file(file_id: int) -> bool:
+    """게시글 첨부파일 삭제"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM board_files WHERE id = %s', (file_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"첨부파일 삭제 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM board_files WHERE id = ?', (file_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"첨부파일 삭제 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+# ========== 판매 스케쥴 관련 함수 ==========
+
+def create_schedule(schedule_data: Dict) -> int:
+    """판매 스케쥴 생성"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO schedules (
+                    company_name, title, start_date, end_date, 
+                    event_description, request_note
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+            ''', (
+                schedule_data.get('company_name'),
+                schedule_data.get('title'),
+                schedule_data.get('start_date'),
+                schedule_data.get('end_date'),
+                schedule_data.get('event_description'),
+                schedule_data.get('request_note')
+            ))
+            conn.commit()
+            row = cursor.fetchone()
+            return row[0] if row else 0
+        except Exception as e:
+            print(f"스케쥴 생성 오류: {e}")
+            conn.rollback()
+            return 0
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO schedules (
+                    company_name, title, start_date, end_date, 
+                    event_description, request_note
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                schedule_data.get('company_name'),
+                schedule_data.get('title'),
+                schedule_data.get('start_date'),
+                schedule_data.get('end_date'),
+                schedule_data.get('event_description'),
+                schedule_data.get('request_note')
+            ))
+            conn.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            print(f"스케쥴 생성 오류: {e}")
+            return 0
+        finally:
+            conn.close()
+
+
+def get_schedules_by_company(company_name: str) -> List[Dict]:
+    """화주사별 스케쥴 조회"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT * FROM schedules 
+                WHERE company_name = %s
+                ORDER BY start_date DESC, created_at DESC
+            ''', (company_name,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT * FROM schedules 
+                WHERE company_name = ?
+                ORDER BY start_date DESC, created_at DESC
+            ''', (company_name,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
+
+def get_all_schedules() -> List[Dict]:
+    """전체 스케쥴 조회 (관리자용)"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT * FROM schedules 
+                ORDER BY start_date DESC, created_at DESC
+            ''')
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT * FROM schedules 
+                ORDER BY start_date DESC, created_at DESC
+            ''')
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
+
+def get_schedules_by_date_range(start_date: str, end_date: str) -> List[Dict]:
+    """날짜 범위로 스케쥴 조회 (달력용)"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT * FROM schedules 
+                WHERE (start_date <= %s AND end_date >= %s)
+                   OR (start_date BETWEEN %s AND %s)
+                   OR (end_date BETWEEN %s AND %s)
+                ORDER BY start_date ASC, company_name ASC
+            ''', (end_date, start_date, start_date, end_date, start_date, end_date))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT * FROM schedules 
+                WHERE (start_date <= ? AND end_date >= ?)
+                   OR (start_date BETWEEN ? AND ?)
+                   OR (end_date BETWEEN ? AND ?)
+                ORDER BY start_date ASC, company_name ASC
+            ''', (end_date, start_date, start_date, end_date, start_date, end_date))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
+
+def get_schedule_by_id(schedule_id: int) -> Optional[Dict]:
+    """스케쥴 ID로 조회"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('SELECT * FROM schedules WHERE id = %s', (schedule_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('SELECT * FROM schedules WHERE id = ?', (schedule_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()
+
+
+def update_schedule(schedule_id: int, schedule_data: Dict) -> bool:
+    """스케쥴 수정"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE schedules SET
+                    title = %s,
+                    start_date = %s,
+                    end_date = %s,
+                    event_description = %s,
+                    request_note = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            ''', (
+                schedule_data.get('title'),
+                schedule_data.get('start_date'),
+                schedule_data.get('end_date'),
+                schedule_data.get('event_description'),
+                schedule_data.get('request_note'),
+                schedule_id
+            ))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"스케쥴 수정 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE schedules SET
+                    title = ?,
+                    start_date = ?,
+                    end_date = ?,
+                    event_description = ?,
+                    request_note = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (
+                schedule_data.get('title'),
+                schedule_data.get('start_date'),
+                schedule_data.get('end_date'),
+                schedule_data.get('event_description'),
+                schedule_data.get('request_note'),
+                schedule_id
+            ))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"스케쥴 수정 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+def delete_schedule(schedule_id: int) -> bool:
+    """스케쥴 삭제"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM schedules WHERE id = %s', (schedule_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"스케쥴 삭제 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM schedules WHERE id = ?', (schedule_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"스케쥴 삭제 오류: {e}")
             return False
         finally:
             conn.close()

@@ -58,16 +58,28 @@ def login():
             }), 400
         
         # 데이터베이스에서 계정 정보 조회
-        company = get_company_by_username(username)
+        try:
+            company = get_company_by_username(username)
+            print(f"🔍 계정 조회 결과: {company}")
+        except Exception as db_error:
+            print(f"❌ 데이터베이스 조회 오류: {db_error}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'데이터베이스 조회 중 오류가 발생했습니다: {str(db_error)}'
+            }), 500
         
         if not company:
+            print(f"⚠️ 계정을 찾을 수 없음: {username}")
             return jsonify({
                 'success': False,
                 'message': '아이디 또는 비밀번호가 일치하지 않습니다.'
             }), 401
         
         # 비밀번호 확인
-        if company['password'] != password:
+        print(f"🔐 비밀번호 확인: 입력된 비밀번호 길이={len(password)}, 저장된 비밀번호 길이={len(company.get('password', ''))}")
+        if company.get('password') != password:
             return jsonify({
                 'success': False,
                 'message': '아이디 또는 비밀번호가 일치하지 않습니다.'
@@ -582,6 +594,55 @@ def get_months():
             'message': f'월 목록 조회 중 오류가 발생했습니다: {str(e)}',
             'months': [],
             'current_month': ''
+        }), 500
+
+
+@auth_bp.route('/my-info', methods=['GET'])
+def get_my_info():
+    """
+    현재 로그인한 사용자의 정보 조회 API
+    
+    Query Parameters:
+        username: str (필수)
+    
+    Returns:
+        {
+            "success": bool,
+            "data": Dict (화주사 정보, 비밀번호 제외)
+        }
+    """
+    try:
+        username = request.args.get('username', '').strip()
+        
+        if not username:
+            return jsonify({
+                'success': False,
+                'message': '아이디가 필요합니다.'
+            }), 400
+        
+        company = get_company_by_username(username)
+        
+        if not company:
+            return jsonify({
+                'success': False,
+                'message': '화주사 정보를 찾을 수 없습니다.'
+            }), 404
+        
+        # 비밀번호 필드 제외
+        company_info = {k: v for k, v in company.items() if k != 'password'}
+        
+        return jsonify({
+            'success': True,
+            'data': company_info
+        })
+        
+    except Exception as e:
+        print(f"❌ 화주사 정보 조회 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'화주사 정보 조회 중 오류가 발생했습니다: {str(e)}'
         }), 500
 
 

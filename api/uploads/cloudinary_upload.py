@@ -222,3 +222,59 @@ def upload_single_file_to_cloudinary(base64_data: str, filename: str, folder: st
         traceback.print_exc()
         raise
 
+
+def upload_to_cloudinary(file, folder: str = 'uploads') -> dict:
+    """
+    Cloudinary에 파일 업로드 (Werkzeug FileStorage 객체 사용)
+    
+    Args:
+        file: Werkzeug FileStorage 객체
+        folder: 업로드할 폴더명
+    
+    Returns:
+        업로드 결과 딕셔너리 (secure_url, bytes 등 포함)
+    """
+    try:
+        # 파일 데이터 읽기
+        file_data = file.read()
+        
+        # 파일명에서 확장자 추출
+        filename = file.filename or 'file'
+        file_extension = filename.split('.')[-1] if '.' in filename else ''
+        
+        # 타임스탬프 생성
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        # 파일명에서 확장자 제거하고 타임스탬프 추가
+        file_name_without_ext = filename.rsplit('.', 1)[0] if '.' in filename else filename
+        public_id = f"{folder}/{file_name_without_ext}_{timestamp}"
+        
+        # Cloudinary에 업로드
+        result = cloudinary.uploader.upload(
+            file_data,
+            public_id=public_id,
+            folder=folder,
+            resource_type='auto',  # 자동으로 이미지/비디오/원시 파일 감지
+            overwrite=False,
+            use_filename=False,
+            unique_filename=True
+        )
+        
+        url = result.get('secure_url', result.get('url', ''))
+        file_size = result.get('bytes', len(file_data))
+        
+        print(f"✅ 파일 업로드 완료: {url}")
+        return {
+            'secure_url': url,
+            'url': url,
+            'bytes': file_size,
+            'public_id': result.get('public_id', ''),
+            'format': result.get('format', file_extension)
+        }
+        
+    except Exception as e:
+        print(f"❌ 파일 업로드 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
