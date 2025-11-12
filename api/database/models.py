@@ -154,6 +154,62 @@ def init_db():
                 ON schedules(start_date, end_date)
             ''')
             
+            # PostgreSQL - 게시판 카테고리 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS board_categories (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL UNIQUE,
+                    display_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # PostgreSQL - 게시판 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS boards (
+                    id SERIAL PRIMARY KEY,
+                    category_id INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    author_name TEXT NOT NULL,
+                    author_role TEXT NOT NULL,
+                    is_pinned BOOLEAN DEFAULT FALSE,
+                    view_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (category_id) REFERENCES board_categories(id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # PostgreSQL - 게시판 첨부파일 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS board_files (
+                    id SERIAL PRIMARY KEY,
+                    board_id INTEGER NOT NULL,
+                    file_name TEXT NOT NULL,
+                    file_url TEXT NOT NULL,
+                    file_size INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # 게시판 인덱스 생성
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_boards_category 
+                ON boards(category_id)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_boards_pinned 
+                ON boards(is_pinned, created_at DESC)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_board_files_board 
+                ON board_files(board_id)
+            ''')
+            
         else:
             # SQLite 테이블 생성 (기존 코드)
             # 화주사 계정 테이블
@@ -1605,7 +1661,8 @@ def get_all_board_categories() -> List[Dict]:
                 ORDER BY display_order ASC, created_at ASC
             ''')
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            # SQLite Row 객체를 딕셔너리로 변환
+            return [{key: row[key] for key in row.keys()} for row in rows]
         finally:
             conn.close()
 
@@ -1777,7 +1834,8 @@ def get_boards_by_category(category_id: int) -> List[Dict]:
                 ORDER BY b.is_pinned DESC, b.created_at DESC
             ''', (category_id,))
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            # SQLite Row 객체를 딕셔너리로 변환
+            return [{key: row[key] for key in row.keys()} for row in rows]
         finally:
             conn.close()
 
@@ -1810,7 +1868,8 @@ def get_all_boards() -> List[Dict]:
                 ORDER BY b.is_pinned DESC, b.created_at DESC
             ''')
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            # SQLite Row 객체를 딕셔너리로 변환
+            return [{key: row[key] for key in row.keys()} for row in rows]
         finally:
             conn.close()
 
@@ -1843,7 +1902,8 @@ def get_board_by_id(board_id: int) -> Optional[Dict]:
                 WHERE b.id = ?
             ''', (board_id,))
             row = cursor.fetchone()
-            return dict(row) if row else None
+            # SQLite Row 객체를 딕셔너리로 변환
+            return {key: row[key] for key in row.keys()} if row else None
         finally:
             conn.close()
 
@@ -2048,7 +2108,8 @@ def get_board_files(board_id: int) -> List[Dict]:
                 ORDER BY created_at ASC
             ''', (board_id,))
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            # SQLite Row 객체를 딕셔너리로 변환
+            return [{key: row[key] for key in row.keys()} for row in rows]
         finally:
             conn.close()
 
