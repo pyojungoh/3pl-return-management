@@ -216,6 +216,9 @@ def init_db():
                     id SERIAL PRIMARY KEY,
                     title TEXT NOT NULL,
                     content TEXT NOT NULL,
+                    image_url TEXT,
+                    width INTEGER DEFAULT 600,
+                    height INTEGER DEFAULT 400,
                     start_date DATE NOT NULL,
                     end_date DATE NOT NULL,
                     is_active BOOLEAN DEFAULT TRUE,
@@ -223,6 +226,20 @@ def init_db():
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+            
+            # 기존 테이블에 컬럼 추가 (마이그레이션)
+            try:
+                cursor.execute('ALTER TABLE popups ADD COLUMN IF NOT EXISTS image_url TEXT')
+            except Exception:
+                pass
+            try:
+                cursor.execute('ALTER TABLE popups ADD COLUMN IF NOT EXISTS width INTEGER DEFAULT 600')
+            except Exception:
+                pass
+            try:
+                cursor.execute('ALTER TABLE popups ADD COLUMN IF NOT EXISTS height INTEGER DEFAULT 400')
+            except Exception:
+                pass
             
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_popups_dates 
@@ -415,6 +432,9 @@ def init_db():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     title TEXT NOT NULL,
                     content TEXT NOT NULL,
+                    image_url TEXT,
+                    width INTEGER DEFAULT 600,
+                    height INTEGER DEFAULT 400,
                     start_date DATE NOT NULL,
                     end_date DATE NOT NULL,
                     is_active INTEGER DEFAULT 1,
@@ -422,6 +442,20 @@ def init_db():
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+            
+            # 기존 테이블에 컬럼 추가 (마이그레이션)
+            try:
+                cursor.execute('ALTER TABLE popups ADD COLUMN image_url TEXT')
+            except OperationalError:
+                pass
+            try:
+                cursor.execute('ALTER TABLE popups ADD COLUMN width INTEGER DEFAULT 600')
+            except OperationalError:
+                pass
+            try:
+                cursor.execute('ALTER TABLE popups ADD COLUMN height INTEGER DEFAULT 400')
+            except OperationalError:
+                pass
             
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_popups_dates 
@@ -2460,12 +2494,15 @@ def create_popup(popup_data: Dict) -> int:
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                INSERT INTO popups (title, content, start_date, end_date, is_active)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO popups (title, content, image_url, width, height, start_date, end_date, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             ''', (
                 popup_data.get('title'),
                 popup_data.get('content'),
+                popup_data.get('image_url'),
+                popup_data.get('width', 600),
+                popup_data.get('height', 400),
                 popup_data.get('start_date'),
                 popup_data.get('end_date'),
                 popup_data.get('is_active', True)
@@ -2484,11 +2521,14 @@ def create_popup(popup_data: Dict) -> int:
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                INSERT INTO popups (title, content, start_date, end_date, is_active)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO popups (title, content, image_url, width, height, start_date, end_date, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 popup_data.get('title'),
                 popup_data.get('content'),
+                popup_data.get('image_url'),
+                popup_data.get('width', 600),
+                popup_data.get('height', 400),
                 popup_data.get('start_date'),
                 popup_data.get('end_date'),
                 1 if popup_data.get('is_active', True) else 0
@@ -2616,6 +2656,15 @@ def update_popup(popup_id: int, popup_data: Dict) -> bool:
     if 'end_date' in popup_data:
         updates.append('end_date = %s' if USE_POSTGRESQL else 'end_date = ?')
         params.append(popup_data['end_date'])
+    if 'image_url' in popup_data:
+        updates.append('image_url = %s' if USE_POSTGRESQL else 'image_url = ?')
+        params.append(popup_data['image_url'])
+    if 'width' in popup_data:
+        updates.append('width = %s' if USE_POSTGRESQL else 'width = ?')
+        params.append(popup_data['width'])
+    if 'height' in popup_data:
+        updates.append('height = %s' if USE_POSTGRESQL else 'height = ?')
+        params.append(popup_data['height'])
     if 'is_active' in popup_data:
         if USE_POSTGRESQL:
             updates.append('is_active = %s')

@@ -66,6 +66,9 @@ def create():
         content = data.get('content', '').strip()
         start_date = data.get('start_date', '').strip()
         end_date = data.get('end_date', '').strip()
+        image_url = data.get('image_url', '').strip()
+        width = data.get('width', 600)
+        height = data.get('height', 400)
         is_active = data.get('is_active', True)
         
         if not title or not content or not start_date or not end_date:
@@ -77,6 +80,9 @@ def create():
         popup_id = create_popup({
             'title': title,
             'content': content,
+            'image_url': image_url if image_url else None,
+            'width': int(width) if width else 600,
+            'height': int(height) if height else 400,
             'start_date': start_date,
             'end_date': end_date,
             'is_active': is_active

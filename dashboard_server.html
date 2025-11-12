@@ -2067,7 +2067,29 @@
               </div>
               <div style="margin-bottom: 15px;">
                 <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">내용 *</label>
-                <textarea id="popupContent" class="request-input" style="min-height: 200px;" placeholder="팝업 내용을 입력하세요" required></textarea>
+                <textarea id="popupContentText" class="request-input" style="min-height: 200px;" placeholder="팝업 내용을 입력하세요" required></textarea>
+              </div>
+              <div style="margin-bottom: 15px;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">이미지 업로드</label>
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                  <input type="file" id="popupImageInput" accept="image/*" style="display: none;" onchange="handlePopupImageSelect(event)">
+                  <button type="button" class="save-btn" onclick="document.getElementById('popupImageInput').click()" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);">📷 이미지 선택</button>
+                  <button type="button" class="save-btn" onclick="removePopupImage()" id="removePopupImageBtn" style="display: none; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">🗑️ 이미지 제거</button>
+                  <div id="popupImagePreview" style="display: none; max-width: 200px; max-height: 200px; margin-top: 10px;">
+                    <img id="popupImagePreviewImg" src="" alt="미리보기" style="max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                  </div>
+                </div>
+                <input type="hidden" id="popupImageUrl">
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                <div>
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">팝업 너비 (px)</label>
+                  <input type="number" id="popupWidth" class="request-input" style="min-height: auto;" placeholder="600" value="600" min="300" max="1200">
+                </div>
+                <div>
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">팝업 높이 (px)</label>
+                  <input type="number" id="popupHeight" class="request-input" style="min-height: auto;" placeholder="400" value="400" min="200" max="800">
+                </div>
               </div>
               <div style="display: flex; gap: 12px;">
                 <button class="save-btn" onclick="savePopup()">저장</button>
@@ -5355,7 +5377,7 @@
     function resetPopupForm() {
       document.getElementById('popupId').value = '';
       document.getElementById('popupTitle').value = '';
-      document.getElementById('popupContent').value = '';
+      document.getElementById('popupContentText').value = '';
       document.getElementById('popupStartDate').value = '';
       document.getElementById('popupEndDate').value = '';
       document.getElementById('popupIsActive').checked = true;
@@ -5371,9 +5393,12 @@
     async function savePopup() {
       const popupId = document.getElementById('popupId').value;
       const title = document.getElementById('popupTitle').value.trim();
-      const content = document.getElementById('popupContent').value.trim();
+      const content = document.getElementById('popupContentText').value.trim();
       const startDate = document.getElementById('popupStartDate').value;
       const endDate = document.getElementById('popupEndDate').value;
+      const imageUrl = document.getElementById('popupImageUrl').value.trim();
+      const width = parseInt(document.getElementById('popupWidth').value) || 600;
+      const height = parseInt(document.getElementById('popupHeight').value) || 400;
       const isActive = document.getElementById('popupIsActive').checked;
       const message = document.getElementById('popupMessage');
       
@@ -5398,6 +5423,9 @@
         content,
         start_date: startDate,
         end_date: endDate,
+        image_url: imageUrl || null,
+        width: width,
+        height: height,
         is_active: isActive
       };
       
@@ -5455,12 +5483,24 @@
           const popup = result.data;
           document.getElementById('popupId').value = popup.id;
           document.getElementById('popupTitle').value = popup.title || '';
-          document.getElementById('popupContent').value = popup.content || '';
+          document.getElementById('popupContentText').value = popup.content || '';
           document.getElementById('popupStartDate').value = popup.start_date ? popup.start_date.split('T')[0] : '';
           document.getElementById('popupEndDate').value = popup.end_date ? popup.end_date.split('T')[0] : '';
+          document.getElementById('popupWidth').value = popup.width || 600;
+          document.getElementById('popupHeight').value = popup.height || 400;
           // PostgreSQL은 boolean, SQLite는 1/0
           const isActive = typeof popup.is_active === 'boolean' ? popup.is_active : popup.is_active === 1;
           document.getElementById('popupIsActive').checked = isActive;
+          
+          // 이미지 설정
+          if (popup.image_url) {
+            document.getElementById('popupImageUrl').value = popup.image_url;
+            document.getElementById('popupImagePreviewImg').src = popup.image_url;
+            document.getElementById('popupImagePreview').style.display = 'block';
+            document.getElementById('removePopupImageBtn').style.display = 'inline-block';
+          } else {
+            removePopupImage();
+          }
           
           // 폼 열기
           const form = document.getElementById('popupForm');
@@ -5535,12 +5575,29 @@
     // 팝업 표시
     function showPopup(popup) {
       const layer = document.getElementById('popupLayer');
+      const popupContentDiv = document.getElementById('popupContent');
       const title = document.getElementById('popupTitle');
       const body = document.getElementById('popupBody');
       
-      if (layer && title && body) {
+      if (layer && popupContentDiv && title && body) {
         title.textContent = popup.title || '';
-        body.textContent = popup.content || '';
+        
+        // 이미지 표시
+        const imageUrl = popup.image_url;
+        let bodyContent = '';
+        if (imageUrl) {
+          bodyContent = `<img src="${escapeHtml(imageUrl)}" alt="팝업 이미지" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 15px; display: block;">`;
+        }
+        bodyContent += `<div style="white-space: pre-wrap;">${escapeHtml(popup.content || '')}</div>`;
+        body.innerHTML = bodyContent;
+        
+        // 사이즈 설정
+        const width = popup.width || 600;
+        const height = popup.height || 400;
+        popupContentDiv.style.width = width + 'px';
+        popupContentDiv.style.maxWidth = width + 'px';
+        popupContentDiv.style.maxHeight = height + 'px';
+        
         layer.style.display = 'flex';
         
         // 팝업 ID를 data 속성에 저장 (닫을 때 사용)
