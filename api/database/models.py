@@ -21,6 +21,7 @@ if USE_POSTGRESQL:
 else:
     # SQLite 사용 (로컬 개발용)
     import sqlite3
+    from sqlite3 import OperationalError, IntegrityError
     # 데이터베이스 파일 경로
     if os.environ.get('VERCEL'):
         DB_PATH = os.path.join('/tmp', 'data.db')
@@ -256,7 +257,40 @@ def get_company_by_username(username: str) -> Optional[Dict]:
         try:
             cursor.execute('SELECT * FROM companies WHERE username = ?', (username,))
             row = cursor.fetchone()
-            return dict(row) if row else None
+            if row:
+                # SQLite Row 객체를 dict로 변환 (row_factory가 Row로 설정되어 있음)
+                try:
+                    # Row 객체는 dict처럼 사용 가능하지만, 명시적으로 변환
+                    if hasattr(row, 'keys'):
+                        return dict(row)
+                    else:
+                        # 튜플인 경우 수동 변환
+                        return {
+                            'id': row[0],
+                            'company_name': row[1],
+                            'username': row[2],
+                            'password': row[3],
+                            'role': row[4] if len(row) > 4 else '화주사',
+                            'business_number': row[5] if len(row) > 5 else None,
+                            'business_name': row[6] if len(row) > 6 else None,
+                            'business_address': row[7] if len(row) > 7 else None,
+                            'business_tel': row[8] if len(row) > 8 else None,
+                            'business_email': row[9] if len(row) > 9 else None,
+                            'business_certificate_url': row[10] if len(row) > 10 else None,
+                            'last_login': row[11] if len(row) > 11 else None,
+                            'created_at': row[12] if len(row) > 12 else None,
+                            'updated_at': row[13] if len(row) > 13 else None
+                        }
+                except Exception as e:
+                    print(f"❌ SQLite row 변환 오류: {e}")
+                    print(f"   Row 타입: {type(row)}, Row 내용: {row}")
+                    raise
+            return None
+        except Exception as e:
+            print(f"❌ get_company_by_username 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
         finally:
             conn.close()
 
@@ -1192,21 +1226,42 @@ def delete_return(return_id: int) -> bool:
             conn.close()
 
 
-def find_return_by_tracking_number(tracking_number: str, month: str) -> Optional[Dict]:
-    """송장번호로 반품 데이터 찾기 (QR 코드 검색용)"""
+def find_return_by_tracking_number(tracking_number: str, month: str = None) -> Optional[Dict]:
+    """송장번호로 반품 데이터 찾기 (QR 코드 검색용)
+    
+    Args:
+        tracking_number: 송장번호
+        month: 월 (예: "2025년11월"). None이면 모든 월에서 검색
+    """
     conn = get_db_connection()
     
     if USE_POSTGRESQL:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         try:
             tracking_normalized = tracking_number.replace(' ', '').replace('-', '').strip()
-            cursor.execute('''
-                SELECT * FROM returns 
-                WHERE month = %s AND (
-                    tracking_number = %s OR
-                    REPLACE(REPLACE(tracking_number, ' ', ''), '-', '') = %s
-                )
-            ''', (month, tracking_number.strip(), tracking_normalized))
+            
+            # month가 지정된 경우 해당 월에서만 검색, 없으면 모든 월에서 검색
+            if month:
+                cursor.execute('''
+                    SELECT * FROM returns 
+                    WHERE month = %s AND (
+                        tracking_number = %s OR
+                        REPLACE(REPLACE(tracking_number, ' ', ''), '-', '') = %s
+                    )
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ''', (month, tracking_number.strip(), tracking_normalized))
+            else:
+                cursor.execute('''
+                    SELECT * FROM returns 
+                    WHERE (
+                        tracking_number = %s OR
+                        REPLACE(REPLACE(tracking_number, ' ', ''), '-', '') = %s
+                    )
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ''', (tracking_number.strip(), tracking_normalized))
+            
             row = cursor.fetchone()
             return dict(row) if row else None
         except Exception as e:
@@ -1219,13 +1274,29 @@ def find_return_by_tracking_number(tracking_number: str, month: str) -> Optional
         cursor = conn.cursor()
         try:
             tracking_normalized = tracking_number.replace(' ', '').replace('-', '').strip()
-            cursor.execute('''
-                SELECT * FROM returns 
-                WHERE month = ? AND (
-                    tracking_number = ? OR
-                    REPLACE(REPLACE(tracking_number, ' ', ''), '-', '') = ?
-                )
-            ''', (month, tracking_number.strip(), tracking_normalized))
+            
+            # month가 지정된 경우 해당 월에서만 검색, 없으면 모든 월에서 검색
+            if month:
+                cursor.execute('''
+                    SELECT * FROM returns 
+                    WHERE month = ? AND (
+                        tracking_number = ? OR
+                        REPLACE(REPLACE(tracking_number, ' ', ''), '-', '') = ?
+                    )
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ''', (month, tracking_number.strip(), tracking_normalized))
+            else:
+                cursor.execute('''
+                    SELECT * FROM returns 
+                    WHERE (
+                        tracking_number = ? OR
+                        REPLACE(REPLACE(tracking_number, ' ', ''), '-', '') = ?
+                    )
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ''', (tracking_number.strip(), tracking_normalized))
+            
             row = cursor.fetchone()
             return dict(row) if row else None
         except Exception as e:

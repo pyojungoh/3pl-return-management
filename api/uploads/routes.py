@@ -116,13 +116,20 @@ def find_by_tracking():
                 'message': '송장번호가 없습니다.'
             }), 400
         
-        # 월이 없으면 현재 월 사용
-        if not month:
-            today = datetime.now()
-            month = f"{today.year}년{today.month}월"
-        
         # 데이터베이스에서 검색
-        return_data = find_return_by_tracking_number(tracking_number, month)
+        # month가 있으면 해당 월에서만 검색, 없으면 모든 월에서 검색
+        return_data = None
+        if month:
+            # 지정된 월에서 먼저 검색
+            return_data = find_return_by_tracking_number(tracking_number, month)
+        
+        # 월이 없거나 지정된 월에서 찾지 못한 경우 모든 월에서 검색
+        if not return_data:
+            print(f"🔍 모든 월에서 송장번호 검색: {tracking_number}")
+            return_data = find_return_by_tracking_number(tracking_number, None)
+            if return_data:
+                found_month = return_data.get('month', '알 수 없음')
+                print(f"   ✅ 데이터 발견: {found_month}월")
         
         if return_data:
             return jsonify({
