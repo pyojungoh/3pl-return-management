@@ -118,10 +118,20 @@ def find_by_tracking():
         
         # 데이터베이스에서 검색
         # month가 있으면 해당 월에서만 검색, 없으면 모든 월에서 검색
+        print(f"🔍 송장번호 검색 요청:")
+        print(f"   송장번호: {tracking_number}")
+        print(f"   요청된 월: '{month}' (길이: {len(month) if month else 0})")
+        
         return_data = None
         if month:
             # 지정된 월에서 먼저 검색
+            print(f"   📅 지정된 월에서 검색 시도: '{month}'")
             return_data = find_return_by_tracking_number(tracking_number, month)
+            if return_data:
+                found_month = return_data.get('month', '알 수 없음')
+                print(f"   ✅ 지정된 월에서 데이터 발견: {found_month}")
+            else:
+                print(f"   ❌ 지정된 월에서 데이터를 찾지 못함")
         
         # 월이 없거나 지정된 월에서 찾지 못한 경우 모든 월에서 검색
         if not return_data:
@@ -129,7 +139,10 @@ def find_by_tracking():
             return_data = find_return_by_tracking_number(tracking_number, None)
             if return_data:
                 found_month = return_data.get('month', '알 수 없음')
-                print(f"   ✅ 데이터 발견: {found_month}월")
+                print(f"   ✅ 모든 월에서 데이터 발견: {found_month}월")
+                print(f"   ⚠️ 요청된 월 '{month}'와 저장된 월 '{found_month}'가 일치하지 않음!")
+            else:
+                print(f"   ❌ 모든 월에서도 데이터를 찾지 못함")
         
         if return_data:
             return jsonify({

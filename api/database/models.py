@@ -976,6 +976,12 @@ def mark_as_completed(return_id: int, manager_name: str) -> bool:
 
 def create_return(return_data: Dict) -> int:
     """반품 데이터 생성"""
+    print(f"💾 create_return 함수 호출:")
+    print(f"   고객명: {return_data.get('customer_name')}")
+    print(f"   송장번호: {return_data.get('tracking_number')}")
+    print(f"   월: {return_data.get('month')}")
+    print(f"   화주명: {return_data.get('company_name')}")
+    
     conn = get_db_connection()
     
     if USE_POSTGRESQL:
@@ -1226,6 +1232,22 @@ def delete_return(return_id: int) -> bool:
             conn.close()
 
 
+def normalize_month(month: str) -> str:
+    """월 형식을 정규화 (예: "2025년11월", "2025년 11월" -> "2025년11월")"""
+    if not month:
+        return month
+    # 공백 제거
+    month = month.replace(' ', '').replace('-', '').strip()
+    # "년"과 "월" 사이의 공백 제거
+    if '년' in month and '월' in month:
+        parts = month.split('년')
+        if len(parts) == 2:
+            year = parts[0]
+            month_part = parts[1].replace('월', '').strip()
+            return f"{year}년{month_part}월"
+    return month
+
+
 def find_return_by_tracking_number(tracking_number: str, month: str = None) -> Optional[Dict]:
     """송장번호로 반품 데이터 찾기 (QR 코드 검색용)
     
@@ -1233,6 +1255,11 @@ def find_return_by_tracking_number(tracking_number: str, month: str = None) -> O
         tracking_number: 송장번호
         month: 월 (예: "2025년11월"). None이면 모든 월에서 검색
     """
+    # month 형식 정규화
+    if month:
+        month = normalize_month(month)
+        print(f"   📅 정규화된 월: '{month}'")
+    
     conn = get_db_connection()
     
     if USE_POSTGRESQL:
@@ -1242,6 +1269,8 @@ def find_return_by_tracking_number(tracking_number: str, month: str = None) -> O
             
             # month가 지정된 경우 해당 월에서만 검색, 없으면 모든 월에서 검색
             if month:
+                print(f"   🔎 PostgreSQL 검색: month='{month}', tracking_number='{tracking_number}'")
+                # 먼저 정확한 매칭 시도
                 cursor.execute('''
                     SELECT * FROM returns 
                     WHERE month = %s AND (
@@ -1251,6 +1280,35 @@ def find_return_by_tracking_number(tracking_number: str, month: str = None) -> O
                     ORDER BY created_at DESC
                     LIMIT 1
                 ''', (month, tracking_number.strip(), tracking_normalized))
+                row = cursor.fetchone()
+                if row:
+                    print(f"   ✅ 정확한 매칭으로 데이터 발견")
+                    return dict(row)
+                
+                # 정확한 매칭이 실패하면 해당 월의 모든 데이터를 확인
+                cursor.execute('SELECT DISTINCT month FROM returns WHERE month LIKE %s', (f'%{month[-2:]}%',))
+                months_in_db = [r[0] for r in cursor.fetchall()]
+                print(f"   📋 데이터베이스의 유사한 월 형식: {months_in_db}")
+                
+                # 유사한 월 형식으로 재검색 시도
+                for db_month in months_in_db:
+                    if month in db_month or db_month in month:
+                        print(f"   🔄 유사한 월 형식으로 재검색: '{db_month}'")
+                        cursor.execute('''
+                            SELECT * FROM returns 
+                            WHERE month = %s AND (
+                                tracking_number = %s OR
+                                REPLACE(REPLACE(tracking_number, ' ', ''), '-', '') = %s
+                            )
+                            ORDER BY created_at DESC
+                            LIMIT 1
+                        ''', (db_month, tracking_number.strip(), tracking_normalized))
+                        row = cursor.fetchone()
+                        if row:
+                            print(f"   ✅ 유사한 월 형식으로 데이터 발견: '{db_month}'")
+                            return dict(row)
+                
+                return None
             else:
                 cursor.execute('''
                     SELECT * FROM returns 
@@ -1277,6 +1335,8 @@ def find_return_by_tracking_number(tracking_number: str, month: str = None) -> O
             
             # month가 지정된 경우 해당 월에서만 검색, 없으면 모든 월에서 검색
             if month:
+                print(f"   🔎 SQLite 검색: month='{month}', tracking_number='{tracking_number}'")
+                # 먼저 정확한 매칭 시도
                 cursor.execute('''
                     SELECT * FROM returns 
                     WHERE month = ? AND (
@@ -1286,6 +1346,35 @@ def find_return_by_tracking_number(tracking_number: str, month: str = None) -> O
                     ORDER BY created_at DESC
                     LIMIT 1
                 ''', (month, tracking_number.strip(), tracking_normalized))
+                row = cursor.fetchone()
+                if row:
+                    print(f"   ✅ 정확한 매칭으로 데이터 발견")
+                    return dict(row)
+                
+                # 정확한 매칭이 실패하면 해당 월의 모든 데이터를 확인
+                cursor.execute('SELECT DISTINCT month FROM returns WHERE month LIKE ?', (f'%{month[-2:]}%',))
+                months_in_db = [r[0] for r in cursor.fetchall()]
+                print(f"   📋 데이터베이스의 유사한 월 형식: {months_in_db}")
+                
+                # 유사한 월 형식으로 재검색 시도
+                for db_month in months_in_db:
+                    if month in db_month or db_month in month:
+                        print(f"   🔄 유사한 월 형식으로 재검색: '{db_month}'")
+                        cursor.execute('''
+                            SELECT * FROM returns 
+                            WHERE month = ? AND (
+                                tracking_number = ? OR
+                                REPLACE(REPLACE(tracking_number, ' ', ''), '-', '') = ?
+                            )
+                            ORDER BY created_at DESC
+                            LIMIT 1
+                        ''', (db_month, tracking_number.strip(), tracking_normalized))
+                        row = cursor.fetchone()
+                        if row:
+                            print(f"   ✅ 유사한 월 형식으로 데이터 발견: '{db_month}'")
+                            return dict(row)
+                
+                return None
             else:
                 cursor.execute('''
                     SELECT * FROM returns 

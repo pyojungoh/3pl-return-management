@@ -427,6 +427,14 @@ def create_return_route():
     try:
         data = request.get_json()
         
+        # 디버깅: 입력 데이터 확인
+        print(f"📝 반품등록 요청 데이터:")
+        print(f"   고객명: {data.get('customer_name')}")
+        print(f"   송장번호: {data.get('tracking_number')}")
+        print(f"   화주명: {data.get('company_name')}")
+        print(f"   월: {data.get('month')}")
+        print(f"   제품: {data.get('product')}")
+        
         # 필수 필드 확인
         if not data.get('customer_name') or not data.get('tracking_number') or not data.get('month'):
             return jsonify({
@@ -435,6 +443,7 @@ def create_return_route():
             }), 400
         
         return_id = create_return(data)
+        print(f"   ✅ create_return 결과: return_id = {return_id}")
         if return_id:
             return jsonify({
                 'success': True,
