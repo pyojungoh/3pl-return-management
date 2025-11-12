@@ -748,6 +748,9 @@
 
       // 이미지가 있으면 먼저 업로드
       if (selectedImages.length > 0){
+        console.log('📤 이미지 업로드 시작:', selectedImages.length, '장');
+        updateOverlay('이미지 업로드 중…', `총 ${selectedImages.length}장 업로드를 시작합니다.`);
+        
         fetch('/api/uploads/upload-images', {
           method: 'POST',
           headers: {
@@ -758,21 +761,52 @@
             trackingNumber: trackingNumber
           })
         })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            updateOverlay('사진 링크 저장 중…', '데이터베이스에 링크를 기록하고 있습니다.');
-            document.getElementById('overlayBar').style.width = '96%';
-            formData.photoLinks = data.photoLinks;
-            saveData(formData);
-          } else {
-            throw new Error(data.message || '이미지 업로드 실패');
+        .then(response => {
+          console.log('📥 이미지 업로드 응답 상태:', response.status, response.statusText);
+          
+          // 응답이 JSON인지 확인
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            return response.text().then(text => {
+              console.error('❌ JSON이 아닌 응답:', text);
+              throw new Error(`서버 오류 (${response.status}): ${text.substring(0, 200)}`);
+            });
           }
+          
+          return response.json().then(data => {
+            console.log('📦 이미지 업로드 응답 데이터:', data);
+            
+            if (!response.ok) {
+              // HTTP 에러 상태 코드
+              throw new Error(data.message || `서버 오류 (${response.status})`);
+            }
+            
+            if (data.success) {
+              console.log('✅ 이미지 업로드 성공:', data.photoLinks);
+              updateOverlay('사진 링크 저장 중…', '데이터베이스에 링크를 기록하고 있습니다.');
+              document.getElementById('overlayBar').style.width = '96%';
+              formData.photoLinks = data.photoLinks;
+              saveData(formData);
+            } else {
+              throw new Error(data.message || '이미지 업로드 실패');
+            }
+          });
         })
         .catch(error => {
-          console.error('이미지 업로드 오류:', error);
+          console.error('❌ 이미지 업로드 오류:', error);
           hideOverlay();
-          showStatus('이미지 업로드 실패: ' + error.message, 'error');
+          
+          // 에러 메시지 개선
+          let errorMessage = '이미지 업로드 실패: ';
+          if (error.message) {
+            errorMessage += error.message;
+          } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            errorMessage += '서버에 연결할 수 없습니다. 인터넷 연결을 확인해주세요.';
+          } else {
+            errorMessage += '알 수 없는 오류가 발생했습니다.';
+          }
+          
+          showStatus(errorMessage, 'error');
           btn.disabled = false;
           btn.textContent = '등록하기';
         });
@@ -810,6 +844,9 @@
         month: formData.selectedMonth
       };
 
+      console.log('💾 반품 데이터 저장 시작:', returnData);
+      updateOverlay('저장 중…', '데이터베이스에 기록하고 있습니다.');
+      
       fetch('/api/returns/create', {
         method: 'POST',
         headers: {
@@ -817,33 +854,64 @@
         },
         body: JSON.stringify(returnData)
       })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          fillOverlayBar();
-          setTimeout(hideOverlay, 240);
-
-          showStatus(data.message || '반품 내역이 등록되었습니다.', 'success');
-          document.getElementById('returnForm').reset();
-          document.getElementById('photoPreview').style.display = 'none';
-          selectedImages = [];
-
-          const btn = document.getElementById('submitBtn');
-          btn.disabled = false;
-          btn.textContent = '등록하기';
-
-          if (formData.selectedMonth){
-            document.getElementById('monthSelector').value = formData.selectedMonth;
-          }
-          document.getElementById('statusMessage').scrollIntoView({behavior:'smooth', block:'center'});
-        } else {
-          throw new Error(data.message || '저장 실패');
+      .then(response => {
+        console.log('📥 반품 데이터 저장 응답 상태:', response.status, response.statusText);
+        
+        // 응답이 JSON인지 확인
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          return response.text().then(text => {
+            console.error('❌ JSON이 아닌 응답:', text);
+            throw new Error(`서버 오류 (${response.status}): ${text.substring(0, 200)}`);
+          });
         }
+        
+        return response.json().then(data => {
+          console.log('📦 반품 데이터 저장 응답 데이터:', data);
+          
+          if (!response.ok) {
+            // HTTP 에러 상태 코드
+            throw new Error(data.message || `서버 오류 (${response.status})`);
+          }
+          
+          if (data.success) {
+            console.log('✅ 반품 데이터 저장 성공:', data.id);
+            fillOverlayBar();
+            setTimeout(hideOverlay, 240);
+
+            showStatus(data.message || '반품 내역이 등록되었습니다.', 'success');
+            document.getElementById('returnForm').reset();
+            document.getElementById('photoPreview').style.display = 'none';
+            selectedImages = [];
+
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = false;
+            btn.textContent = '등록하기';
+
+            if (formData.selectedMonth){
+              document.getElementById('monthSelector').value = formData.selectedMonth;
+            }
+            document.getElementById('statusMessage').scrollIntoView({behavior:'smooth', block:'center'});
+          } else {
+            throw new Error(data.message || '저장 실패');
+          }
+        });
       })
       .catch(error => {
-        console.error('저장 오류:', error);
+        console.error('❌ 저장 오류:', error);
         hideOverlay();
-        showStatus('저장 실패: ' + error.message, 'error');
+        
+        // 에러 메시지 개선
+        let errorMessage = '저장 실패: ';
+        if (error.message) {
+          errorMessage += error.message;
+        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          errorMessage += '서버에 연결할 수 없습니다. 인터넷 연결을 확인해주세요.';
+        } else {
+          errorMessage += '알 수 없는 오류가 발생했습니다.';
+        }
+        
+        showStatus(errorMessage, 'error');
         const btn = document.getElementById('submitBtn');
         btn.disabled = false;
         btn.textContent = '등록하기';

@@ -48,33 +48,86 @@ def upload_images():
         }
     """
     try:
+        print(f"📤 이미지 업로드 API 호출됨")
+        print(f"   요청 URL: {request.url}")
+        print(f"   요청 메서드: {request.method}")
+        print(f"   Content-Type: {request.content_type}")
+        
+        # JSON 데이터 확인
+        if not request.is_json:
+            print(f"❌ JSON이 아닌 요청")
+            return jsonify({
+                'success': False,
+                'message': 'JSON 형식의 데이터가 필요합니다.'
+            }), 400
+        
         data = request.get_json()
+        if not data:
+            print(f"❌ 요청 데이터가 없음")
+            return jsonify({
+                'success': False,
+                'message': '요청 데이터가 없습니다.'
+            }), 400
+        
         images = data.get('images', [])
         tracking_number = data.get('trackingNumber', '').strip()
         
+        print(f"   이미지 개수: {len(images) if images else 0}")
+        print(f"   송장번호: '{tracking_number}'")
+        
         if not images or len(images) == 0:
+            print(f"❌ 이미지 데이터가 없음")
             return jsonify({
                 'success': False,
                 'message': '이미지 데이터가 없습니다.'
             }), 400
         
         if not tracking_number:
+            print(f"❌ 송장번호가 없음")
             return jsonify({
                 'success': False,
                 'message': '송장번호가 없습니다.'
             }), 400
         
         # Cloudinary에 이미지 업로드
-        photo_links = upload_images_to_drive(images, tracking_number)
-        
-        return jsonify({
-            'success': True,
-            'photoLinks': photo_links,
-            'message': f'{len(images)}장의 이미지가 업로드되었습니다.'
-        })
+        print(f"📸 Cloudinary 업로드 시작: {len(images)}장")
+        try:
+            photo_links = upload_images_to_drive(images, tracking_number)
+            print(f"✅ Cloudinary 업로드 완료: {len(photo_links.split(chr(10))) if photo_links else 0}개 링크")
+            
+            if not photo_links:
+                print(f"⚠️ 업로드된 링크가 없음")
+                return jsonify({
+                    'success': False,
+                    'message': '이미지 업로드는 완료되었지만 링크를 가져올 수 없습니다.'
+                }), 500
+            
+            return jsonify({
+                'success': True,
+                'photoLinks': photo_links,
+                'message': f'{len(images)}장의 이미지가 업로드되었습니다.'
+            })
+        except Exception as upload_error:
+            print(f"❌ Cloudinary 업로드 오류: {upload_error}")
+            import traceback
+            traceback.print_exc()
+            
+            # 에러 메시지 개선
+            error_message = str(upload_error)
+            if 'Cloudinary 설정' in error_message or '인증' in error_message:
+                error_message = 'Cloudinary 설정 오류: 환경 변수를 확인해주세요.'
+            elif 'unauthorized' in error_message.lower() or '401' in error_message:
+                error_message = 'Cloudinary 인증 오류: API 키를 확인해주세요.'
+            elif '403' in error_message:
+                error_message = 'Cloudinary 권한 오류: API 키 권한을 확인해주세요.'
+            
+            return jsonify({
+                'success': False,
+                'message': f'이미지 업로드 실패: {error_message}'
+            }), 500
         
     except Exception as e:
-        print(f'❌ 이미지 업로드 오류: {e}')
+        print(f'❌ 이미지 업로드 API 오류: {e}')
         import traceback
         traceback.print_exc()
         return jsonify({
