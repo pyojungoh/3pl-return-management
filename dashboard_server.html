@@ -1423,8 +1423,9 @@
           <button id="popupCloseBtn" onclick="closePopup()" style="position: absolute; top: 15px; right: 15px; background: #e74c3c; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;">×</button>
           <h2 id="popupTitle" style="margin: 0 0 20px 0; color: #ff6b35; font-size: 24px; font-weight: 700;"></h2>
           <div id="popupBody" style="color: #2d3436; font-size: 16px; line-height: 1.6; white-space: pre-wrap;"></div>
-          <div style="margin-top: 20px; text-align: center;">
+          <div style="margin-top: 20px; text-align: center; display: flex; gap: 10px; justify-content: center;">
             <button onclick="closePopup()" class="save-btn" style="background: linear-gradient(135deg, #636e72 0%, #2d3436 100%);">닫기</button>
+            <button onclick="closePopupForToday()" class="save-btn" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);">하루 동안 보지 않기</button>
           </div>
         </div>
       </div>
@@ -5505,17 +5506,21 @@
         is_active: isActive
       };
       
+      console.log('팝업 저장 데이터:', data);
+      
       try {
         let response;
-        if (popupId) {
+        if (popupIdValue) {
           // 수정
-          response = await fetch(`/api/popups/${popupId}`, {
+          console.log('팝업 수정 요청:', popupIdValue);
+          response = await fetch(`/api/popups/${popupIdValue}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
           });
         } else {
           // 생성
+          console.log('팝업 생성 요청');
           response = await fetch('/api/popups/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -5523,16 +5528,20 @@
           });
         }
         
+        console.log('팝업 저장 응답 상태:', response.status);
         const result = await response.json();
+        console.log('팝업 저장 응답 데이터:', result);
         
         if (result.success) {
           if (message) {
             message.textContent = '✅ ' + result.message;
             message.className = 'success';
           }
-          resetPopupForm();
-          togglePopupForm();
-          loadPopups();
+          setTimeout(() => {
+            resetPopupForm();
+            togglePopupForm();
+            loadPopups();
+          }, 500);
         } else {
           if (message) {
             message.textContent = '❌ ' + (result.message || '저장 실패');
@@ -5542,7 +5551,7 @@
       } catch (error) {
         console.error('팝업 저장 오류:', error);
         if (message) {
-          message.textContent = '❌ 팝업 저장 중 오류가 발생했습니다.';
+          message.textContent = '❌ 팝업 저장 중 오류가 발생했습니다: ' + error.message;
           message.className = 'error';
         }
       }
