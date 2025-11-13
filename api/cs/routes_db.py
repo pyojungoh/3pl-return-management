@@ -11,6 +11,13 @@ import csv
 import io
 from urllib.parse import quote
 
+# 한국 시간대 (KST = UTC+9)
+KST = timezone(timedelta(hours=9))
+
+def get_kst_now():
+    """현재 한국 시간 반환"""
+    return datetime.now(KST)
+
 # 텔레그램 알림 모듈 (선택적 import - 없어도 작동)
 try:
     from api.notifications.telegram import send_telegram_notification
@@ -30,14 +37,17 @@ def create_cs_request(company_name: str, username: str, date: str, month: str, i
     """C/S 접수 생성"""
     conn = get_db_connection()
     
+    # 한국 시간으로 현재 시간 저장
+    kst_now = get_kst_now()
+    
     if USE_POSTGRESQL:
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                INSERT INTO customer_service (company_name, username, date, month, issue_type, content, management_number, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, '접수')
+                INSERT INTO customer_service (company_name, username, date, month, issue_type, content, management_number, status, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, '접수', %s, %s)
                 RETURNING id
-            ''', (company_name, username, date, month, issue_type, content, management_number))
+            ''', (company_name, username, date, month, issue_type, content, management_number, kst_now, kst_now))
             cs_id = cursor.fetchone()[0]
             conn.commit()
             print(f"✅ C/S 접수 생성 성공: ID {cs_id}, 화주사: {company_name}, 유형: {issue_type}")
@@ -53,9 +63,9 @@ def create_cs_request(company_name: str, username: str, date: str, month: str, i
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                INSERT INTO customer_service (company_name, username, date, month, issue_type, content, management_number, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, '접수')
-            ''', (company_name, username, date, month, issue_type, content, management_number))
+                INSERT INTO customer_service (company_name, username, date, month, issue_type, content, management_number, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, '접수', ?, ?)
+            ''', (company_name, username, date, month, issue_type, content, management_number, kst_now, kst_now))
             cs_id = cursor.lastrowid
             conn.commit()
             print(f"✅ C/S 접수 생성 성공: ID {cs_id}, 화주사: {company_name}, 유형: {issue_type}")
@@ -177,7 +187,9 @@ def update_cs_status(cs_id: int, status: str, admin_message: str = None, process
     """C/S 접수 상태 업데이트 (관리자용)"""
     conn = get_db_connection()
     
-    processed_at = datetime.now() if status in ['처리완료', '처리불가'] else None
+    # 한국 시간으로 처리 시간 저장
+    processed_at = get_kst_now() if status in ['처리완료', '처리불가'] else None
+    updated_at = get_kst_now()
     
     if USE_POSTGRESQL:
         cursor = conn.cursor()
@@ -185,27 +197,27 @@ def update_cs_status(cs_id: int, status: str, admin_message: str = None, process
             if admin_message and processor:
                 cursor.execute('''
                     UPDATE customer_service
-                    SET status = %s, admin_message = %s, processor = %s, processed_at = %s, updated_at = CURRENT_TIMESTAMP
+                    SET status = %s, admin_message = %s, processor = %s, processed_at = %s, updated_at = %s
                     WHERE id = %s
-                ''', (status, admin_message, processor, processed_at, cs_id))
+                ''', (status, admin_message, processor, processed_at, updated_at, cs_id))
             elif admin_message:
                 cursor.execute('''
                     UPDATE customer_service
-                    SET status = %s, admin_message = %s, processed_at = %s, updated_at = CURRENT_TIMESTAMP
+                    SET status = %s, admin_message = %s, processed_at = %s, updated_at = %s
                     WHERE id = %s
-                ''', (status, admin_message, processed_at, cs_id))
+                ''', (status, admin_message, processed_at, updated_at, cs_id))
             elif processor:
                 cursor.execute('''
                     UPDATE customer_service
-                    SET status = %s, processor = %s, processed_at = %s, updated_at = CURRENT_TIMESTAMP
+                    SET status = %s, processor = %s, processed_at = %s, updated_at = %s
                     WHERE id = %s
-                ''', (status, processor, processed_at, cs_id))
+                ''', (status, processor, processed_at, updated_at, cs_id))
             else:
                 cursor.execute('''
                     UPDATE customer_service
-                    SET status = %s, processed_at = %s, updated_at = CURRENT_TIMESTAMP
+                    SET status = %s, processed_at = %s, updated_at = %s
                     WHERE id = %s
-                ''', (status, processed_at, cs_id))
+                ''', (status, processed_at, updated_at, cs_id))
             conn.commit()
             return cursor.rowcount > 0
         except Exception as e:
@@ -221,27 +233,27 @@ def update_cs_status(cs_id: int, status: str, admin_message: str = None, process
             if admin_message and processor:
                 cursor.execute('''
                     UPDATE customer_service
-                    SET status = ?, admin_message = ?, processor = ?, processed_at = ?, updated_at = CURRENT_TIMESTAMP
+                    SET status = ?, admin_message = ?, processor = ?, processed_at = ?, updated_at = ?
                     WHERE id = ?
-                ''', (status, admin_message, processor, processed_at, cs_id))
+                ''', (status, admin_message, processor, processed_at, updated_at, cs_id))
             elif admin_message:
                 cursor.execute('''
                     UPDATE customer_service
-                    SET status = ?, admin_message = ?, processed_at = ?, updated_at = CURRENT_TIMESTAMP
+                    SET status = ?, admin_message = ?, processed_at = ?, updated_at = ?
                     WHERE id = ?
-                ''', (status, admin_message, processed_at, cs_id))
+                ''', (status, admin_message, processed_at, updated_at, cs_id))
             elif processor:
                 cursor.execute('''
                     UPDATE customer_service
-                    SET status = ?, processor = ?, processed_at = ?, updated_at = CURRENT_TIMESTAMP
+                    SET status = ?, processor = ?, processed_at = ?, updated_at = ?
                     WHERE id = ?
-                ''', (status, processor, processed_at, cs_id))
+                ''', (status, processor, processed_at, updated_at, cs_id))
             else:
                 cursor.execute('''
                     UPDATE customer_service
-                    SET status = ?, processed_at = ?, updated_at = CURRENT_TIMESTAMP
+                    SET status = ?, processed_at = ?, updated_at = ?
                     WHERE id = ?
-                ''', (status, processed_at, cs_id))
+                ''', (status, processed_at, updated_at, cs_id))
             conn.commit()
             return cursor.rowcount > 0
         except Exception as e:
@@ -255,14 +267,17 @@ def update_generated_management_number(cs_id: int, generated_management_number: 
     """C/S 접수 생성된 관리번호 업데이트 (관리자용)"""
     conn = get_db_connection()
     
+    # 한국 시간으로 업데이트 시간 저장
+    updated_at = get_kst_now()
+    
     if USE_POSTGRESQL:
         cursor = conn.cursor()
         try:
             cursor.execute('''
                 UPDATE customer_service
-                SET generated_management_number = %s, updated_at = CURRENT_TIMESTAMP
+                SET generated_management_number = %s, updated_at = %s
                 WHERE id = %s
-            ''', (generated_management_number, cs_id))
+            ''', (generated_management_number, updated_at, cs_id))
             conn.commit()
             return cursor.rowcount > 0
         except Exception as e:
@@ -277,9 +292,9 @@ def update_generated_management_number(cs_id: int, generated_management_number: 
         try:
             cursor.execute('''
                 UPDATE customer_service
-                SET generated_management_number = ?, updated_at = CURRENT_TIMESTAMP
+                SET generated_management_number = ?, updated_at = ?
                 WHERE id = ?
-            ''', (generated_management_number, cs_id))
+            ''', (generated_management_number, updated_at, cs_id))
             conn.commit()
             return cursor.rowcount > 0
         except Exception as e:
@@ -452,6 +467,7 @@ def create_cs():
             current_time_kst = datetime.now(kst).strftime('%Y-%m-%d %H:%M:%S')
             
             message = f"📝 <b>새로운 C/S 접수</b>\n\n"
+            message += f"📋 C/S 번호: #{cs_id}\n"
             message += f"화주사: {company_name}\n"
             message += f"유형: {issue_type}\n"
             message += f"내용: {content[:200]}{'...' if len(content) > 200 else ''}\n"

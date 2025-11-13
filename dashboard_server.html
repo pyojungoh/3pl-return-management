@@ -1841,6 +1841,7 @@
             <table id="csTable" style="width: 100%; border-collapse: collapse; min-width: 1200px;">
               <thead>
                 <tr style="background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white;">
+                  <th style="padding: 12px; text-align: center; font-weight: 600;">순번</th>
                   <th style="padding: 12px; text-align: center; font-weight: 600;">날짜</th>
                   <th style="padding: 12px; text-align: center; font-weight: 600;">관리번호</th>
                   <th style="padding: 12px; text-align: center; font-weight: 600;">생성된 관리번호</th>
@@ -1855,7 +1856,7 @@
               </thead>
               <tbody id="csTableBody">
                 <tr>
-                  <td colspan="10" class="no-data">로딩 중...</td>
+                  <td colspan="11" class="no-data">로딩 중...</td>
                 </tr>
               </tbody>
             </table>
@@ -5046,7 +5047,7 @@
       }
       
       if (!filteredList || filteredList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="no-data">등록된 C/S 접수가 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="no-data">등록된 C/S 접수가 없습니다.</td></tr>';
         // 관리자 열 표시/숨김
         const adminHeader = document.getElementById('csAdminActionsHeader');
         if (adminHeader) {
@@ -5061,45 +5062,42 @@
         adminHeader.style.display = isAdmin ? 'table-cell' : 'none';
       }
       
-      filteredList.forEach(cs => {
+      // 전체 리스트 개수 (순번 계산용)
+      const totalCount = csList.length;
+      
+      filteredList.forEach((cs, index) => {
         const tr = document.createElement('tr');
         
-        // 날짜와 시간 초까지 표시 (한국 표준시간 KST, UTC+9)
+        // 순번: 오래된 것부터 1, 2, 3... (전체 리스트 기준)
+        // 리스트는 최신순 정렬이므로, 전체 개수에서 현재 인덱스를 빼서 계산
+        // 전체 리스트에서 현재 항목의 위치 찾기
+        const originalIndex = csList.findIndex(item => item.id === cs.id);
+        const rowNumber = totalCount - originalIndex;
+        
+        // 날짜와 시간 초까지 표시 (서버에서 이미 한국 시간으로 저장됨)
         let date = '-';
         if (cs.created_at) {
           try {
-            // 서버에서 받은 시간 문자열을 Date 객체로 파싱
+            // 서버에서 받은 시간 문자열 (이미 한국 시간)
             const dateStr = String(cs.created_at);
-            let dateObj = new Date(dateStr);
             
-            // 유효한 날짜인지 확인
-            if (isNaN(dateObj.getTime())) {
-              // 파싱 실패 시 다른 형식 시도
-              if (dateStr.includes(' ')) {
-                dateObj = new Date(dateStr.replace(' ', 'T'));
-              } else if (!dateStr.includes('T') && !dateStr.includes('Z')) {
-                dateObj = new Date(dateStr + 'T00:00:00Z');
-              } else {
-                dateObj = new Date(dateStr);
-              }
-            }
-            
-            // 여전히 유효하지 않으면 원본 문자열 사용
-            if (isNaN(dateObj.getTime())) {
+            // 날짜 형식이 이미 YYYY-MM-DD HH:MM:SS 형식이면 그대로 사용
+            if (dateStr.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)) {
               date = dateStr;
             } else {
-              // UTC 시간에 9시간(32400000ms)을 더해서 한국 시간으로 변환
-              const kstTime = new Date(dateObj.getTime() + (9 * 60 * 60 * 1000));
-              
-              // 변환된 시간에서 년월일시분초 추출 (일반 메서드 사용)
-              const year = kstTime.getFullYear();
-              const month = String(kstTime.getMonth() + 1).padStart(2, '0');
-              const day = String(kstTime.getDate()).padStart(2, '0');
-              const hours = String(kstTime.getHours()).padStart(2, '0');
-              const minutes = String(kstTime.getMinutes()).padStart(2, '0');
-              const seconds = String(kstTime.getSeconds()).padStart(2, '0');
-              
-              date = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+              // 다른 형식이면 파싱 후 표시
+              const dateObj = new Date(dateStr);
+              if (!isNaN(dateObj.getTime())) {
+                const year = dateObj.getFullYear();
+                const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const day = String(dateObj.getDate()).padStart(2, '0');
+                const hours = String(dateObj.getHours()).padStart(2, '0');
+                const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+                const seconds = String(dateObj.getSeconds()).padStart(2, '0');
+                date = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+              } else {
+                date = dateStr;
+              }
             }
           } catch (e) {
             console.error('날짜 파싱 오류:', e, cs.created_at);
@@ -5163,6 +5161,7 @@
         }
         
         tr.innerHTML = `
+          <td style="white-space: nowrap; text-align: center; font-weight: 600;">${rowNumber}</td>
           <td style="white-space: nowrap; text-align: center;">${date}</td>
           <td style="white-space: nowrap; text-align: center;">${managementNumber || '-'}</td>
           <td style="white-space: nowrap; text-align: center;">${generatedManagementNumber || '-'}</td>

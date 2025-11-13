@@ -83,8 +83,10 @@ def send_cs_notifications():
             content = cs.get('content', '')
             content_preview = content[:100] + ('...' if len(content) > 100 else '')
             
+            cs_id = cs.get('id', '')
             created_at_kst = convert_to_kst(cs.get('created_at', ''))
             message = f"🚨 <b>미처리 취소건 알림 (1분)</b>\n\n"
+            message += f"📋 C/S 번호: #{cs_id}\n"
             message += f"화주사: {company_name}\n"
             message += f"유형: {issue_type}\n"
             message += f"내용: {content_preview}\n"
@@ -146,8 +148,10 @@ def send_cs_notifications():
             content = cs.get('content', '')
             content_preview = content[:100] + ('...' if len(content) > 100 else '')
             
+            cs_id = cs.get('id', '')
             created_at_kst = convert_to_kst(cs.get('created_at', ''))
             message = f"🚨 <b>미처리 C/S 알림 (5분)</b>\n\n"
+            message += f"📋 C/S 번호: #{cs_id}\n"
             message += f"화주사: {company_name}\n"
             message += f"유형: {issue_type}\n"
             message += f"내용: {content_preview}\n"
