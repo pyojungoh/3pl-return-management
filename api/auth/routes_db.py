@@ -311,7 +311,7 @@ def change_password():
 @auth_bp.route('/update-info', methods=['POST'])
 def update_info():
     """
-    화주사 정보 업데이트 API (사업자 정보)
+    화주사 정보 업데이트 API (사업자 정보 + 검색 키워드)
     
     Request Body:
         {
@@ -320,7 +320,8 @@ def update_info():
             "business_name": "사업자명" (선택),
             "business_address": "주소" (선택),
             "business_tel": "전화번호" (선택),
-            "business_email": "이메일" (선택)
+            "business_email": "이메일" (선택),
+            "search_keywords": "검색 키워드 (쉼표로 구분, 예: tks,TKS컴퍼니)" (선택)
         }
     
     Returns:
@@ -345,20 +346,34 @@ def update_info():
                 'message': '아이디를 입력해주세요.'
             }), 400
         
-        business_number = data.get('business_number', '').strip() or None
-        business_name = data.get('business_name', '').strip() or None
-        business_address = data.get('business_address', '').strip() or None
-        business_tel = data.get('business_tel', '').strip() or None
-        business_email = data.get('business_email', '').strip() or None
+        # None 체크 후 strip 처리
+        business_number_val = data.get('business_number')
+        business_number = business_number_val.strip() if business_number_val else None
+        
+        business_name_val = data.get('business_name')
+        business_name = business_name_val.strip() if business_name_val else None
+        
+        business_address_val = data.get('business_address')
+        business_address = business_address_val.strip() if business_address_val else None
+        
+        business_tel_val = data.get('business_tel')
+        business_tel = business_tel_val.strip() if business_tel_val else None
+        
+        business_email_val = data.get('business_email')
+        business_email = business_email_val.strip() if business_email_val else None
         
         # 화주사 정보 업데이트
+        search_keywords_val = data.get('search_keywords')
+        search_keywords = search_keywords_val.strip() if search_keywords_val else None
+        
         success = update_company_info(
             username=username,
             business_number=business_number,
             business_name=business_name,
             business_address=business_address,
             business_tel=business_tel,
-            business_email=business_email
+            business_email=business_email,
+            search_keywords=search_keywords
         )
         
         if success:

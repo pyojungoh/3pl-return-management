@@ -80,11 +80,18 @@ def init_db():
                     business_tel TEXT,
                     business_email TEXT,
                     business_certificate_url TEXT,
+                    search_keywords TEXT,
                     last_login TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+            
+            # companies 테이블에 search_keywords 필드 추가 (마이그레이션)
+            try:
+                cursor.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS search_keywords TEXT')
+            except Exception:
+                pass
             
             # 반품 내역 테이블
             cursor.execute('''
@@ -261,6 +268,7 @@ def init_db():
                     business_address TEXT,
                     business_tel TEXT,
                     business_email TEXT,
+                    search_keywords TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -294,6 +302,12 @@ def init_db():
             
             try:
                 cursor.execute('ALTER TABLE companies ADD COLUMN business_certificate_url TEXT')
+            except OperationalError:
+                pass
+            
+            # companies 테이블에 search_keywords 필드 추가 (화주사명 별칭 저장용)
+            try:
+                cursor.execute('ALTER TABLE companies ADD COLUMN search_keywords TEXT')
             except OperationalError:
                 pass
             
@@ -457,6 +471,12 @@ def init_db():
             except OperationalError:
                 pass
             
+            # companies 테이블에 search_keywords 필드 추가 (화주사명 별칭 저장용)
+            try:
+                cursor.execute('ALTER TABLE companies ADD COLUMN search_keywords TEXT')
+            except OperationalError:
+                pass
+            
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_popups_dates 
                 ON popups(start_date, end_date, is_active)
@@ -542,7 +562,7 @@ def get_all_companies() -> List[Dict]:
                 SELECT id, company_name, username, role, 
                        business_number, business_name, business_address, 
                        business_tel, business_email, business_certificate_url,
-                       last_login, created_at, updated_at
+                       search_keywords, last_login, created_at, updated_at
                 FROM companies
                 ORDER BY created_at DESC
             ''')
@@ -554,16 +574,50 @@ def get_all_companies() -> List[Dict]:
     else:
         cursor = conn.cursor()
         try:
-            cursor.execute('''
-                SELECT id, company_name, username, role, 
-                       business_number, business_name, business_address, 
-                       business_tel, business_email, business_certificate_url,
-                       last_login, created_at, updated_at
-                FROM companies
-                ORDER BY created_at DESC
-            ''')
+            # SQLite에서 존재하는 컬럼 확인
+            cursor.execute("PRAGMA table_info(companies)")
+            columns_info = cursor.fetchall()
+            available_columns = [col[1] for col in columns_info]  # col[1]은 컬럼명
+            
+            # 기본 컬럼 목록
+            desired_columns = [
+                'id', 'company_name', 'username', 'role',
+                'business_number', 'business_name', 'business_address',
+                'business_tel', 'business_email', 'business_certificate_url',
+                'search_keywords', 'last_login', 'created_at', 'updated_at'
+            ]
+            
+            # 존재하는 컬럼만 선택
+            select_columns = [col for col in desired_columns if col in available_columns]
+            
+            if not select_columns:
+                print('⚠️ companies 테이블에 컬럼이 없습니다.')
+                return []
+            
+            # 모든 컬럼 조회 (존재하지 않는 컬럼은 NULL로 처리)
+            cursor.execute('SELECT * FROM companies ORDER BY created_at DESC')
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            
+            # Row 객체를 dict로 변환 (존재하지 않는 컬럼은 None으로 설정)
+            # conn.row_factory가 sqlite3.Row로 설정되어 있으므로 row.keys() 사용 가능
+            result = []
+            for row in rows:
+                row_dict = {}
+                # 실제 존재하는 컬럼만 추가
+                for key in row.keys():
+                    row_dict[key] = row[key]
+                # 존재하지 않는 컬럼은 None으로 설정
+                for col in desired_columns:
+                    if col not in row_dict:
+                        row_dict[col] = None
+                result.append(row_dict)
+            
+            return result
+        except Exception as e:
+            print(f"❌ get_all_companies SQLite 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
         finally:
             conn.close()
 
@@ -883,8 +937,9 @@ def get_companies_statistics() -> Dict:
 
 def update_company_info(username: str, business_number: str = None,
                        business_name: str = None, business_address: str = None,
-                       business_tel: str = None, business_email: str = None) -> bool:
-    """화주사 정보 업데이트 (사업자 정보)"""
+                       business_tel: str = None, business_email: str = None,
+                       search_keywords: str = None) -> bool:
+    """화주사 정보 업데이트 (사업자 정보 + 검색 키워드)"""
     conn = get_db_connection()
     
     if USE_POSTGRESQL:
@@ -908,6 +963,9 @@ def update_company_info(username: str, business_number: str = None,
             if business_email is not None:
                 updates.append('business_email = %s')
                 values.append(business_email)
+            if search_keywords is not None:
+                updates.append('search_keywords = %s')
+                values.append(search_keywords)
             
             if not updates:
                 return False
@@ -996,8 +1054,74 @@ def extract_day_number(date_str):
     return 0
 
 
+def normalize_company_name(name: str) -> str:
+    """화주사명 정규화 (대소문자 무시, 공백 제거)"""
+    if not name:
+        return ''
+    return ''.join(name.split()).lower()
+
+
+def get_company_search_keywords(company_name: str) -> List[str]:
+    """화주사명으로 검색 가능한 키워드 목록 가져오기 (본인 이름 + 별칭)"""
+    if not company_name:
+        return []
+    
+    # 화주사 정보 조회
+    conn = get_db_connection()
+    try:
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            # company_name 또는 username으로 검색
+            cursor.execute('''
+                SELECT company_name, search_keywords 
+                FROM companies 
+                WHERE company_name = %s OR username = %s
+                LIMIT 1
+            ''', (company_name, company_name))
+        else:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT company_name, search_keywords 
+                FROM companies 
+                WHERE company_name = ? OR username = ?
+                LIMIT 1
+            ''', (company_name, company_name))
+        
+        row = cursor.fetchone()
+        if row:
+            if USE_POSTGRESQL:
+                company_data = dict(row)
+            else:
+                company_data = dict(row) if hasattr(row, 'keys') else {
+                    'company_name': row[0],
+                    'search_keywords': row[1] if len(row) > 1 else None
+                }
+            
+            keywords = [normalize_company_name(company_data.get('company_name', ''))]
+            
+            # search_keywords 필드에서 별칭 추가
+            search_keywords = company_data.get('search_keywords', '')
+            if search_keywords:
+                # 쉼표나 줄바꿈으로 구분된 별칭들
+                aliases = [alias.strip() for alias in search_keywords.replace('\n', ',').split(',') if alias.strip()]
+                keywords.extend([normalize_company_name(alias) for alias in aliases])
+            
+            return list(set(keywords))  # 중복 제거
+        return [normalize_company_name(company_name)]
+    except Exception as e:
+        print(f"⚠️ get_company_search_keywords 오류: {e}")
+        return [normalize_company_name(company_name)]
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        conn.close()
+
+
 def get_returns_by_company(company: str, month: str, role: str = '화주사') -> List[Dict]:
-    """화주사별 반품 데이터 조회 (최신 날짜부터 정렬)"""
+    """화주사별 반품 데이터 조회 (최신 날짜부터 정렬)
+    
+    대소문자 무시, 공백 무시, 별칭(search_keywords) 지원
+    """
     conn = get_db_connection()
     
     # 디버깅: 파라미터 확인
@@ -1010,33 +1134,49 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
                 # 관리자는 모든 데이터 조회
                 cursor.execute('SELECT * FROM returns WHERE month = %s', (month,))
                 print(f"   관리자 모드: 모든 데이터 조회 (month: {month})")
+                rows = [dict(row) for row in cursor.fetchall()]
             else:
                 # 화주사는 자신의 데이터만 조회
                 if not company or not company.strip():
                     print(f"   ⚠️ 화주사인데 company가 비어있음! 빈 리스트 반환")
                     return []
-                cursor.execute('SELECT * FROM returns WHERE company_name = %s AND month = %s', (company.strip(), month))
-                print(f"   화주사 모드: '{company.strip()}' 데이터만 조회 (month: {month})")
-            rows = cursor.fetchall()
-            result = [dict(row) for row in rows]
+                
+                # 검색 가능한 키워드 목록 가져오기
+                search_keywords = get_company_search_keywords(company.strip())
+                print(f"   검색 키워드: {search_keywords}")
+                
+                # 모든 반품 데이터를 가져온 후 필터링 (대소문자 무시, 공백 무시)
+                cursor.execute('SELECT * FROM returns WHERE month = %s', (month,))
+                all_rows = cursor.fetchall()
+                all_returns = [dict(row) for row in all_rows]
+                
+                # 정규화된 키워드로 필터링
+                result = []
+                for ret in all_returns:
+                    ret_company_name = normalize_company_name(ret.get('company_name', ''))
+                    if ret_company_name in search_keywords:
+                        result.append(ret)
+                
+                print(f"   화주사 모드: '{company.strip()}' 데이터만 조회 (month: {month}, {len(result)}건)")
+                rows = result
             
-            print(f"   조회된 데이터: {len(result)}건")
-            if result and len(result) > 0:
+            print(f"   조회된 데이터: {len(rows)}건")
+            if rows and len(rows) > 0:
                 # 화주사별로 몇 건인지 확인 (디버깅용)
                 company_counts = {}
-                for item in result:
+                for item in rows:
                     comp_name = item.get('company_name', '')
                     company_counts[comp_name] = company_counts.get(comp_name, 0) + 1
                 print(f"   화주사별 데이터 개수: {company_counts}")
                 if role != '관리자' and len(company_counts) > 1:
                     print(f"   ⚠️ 경고: 화주사 모드인데 여러 화주사 데이터가 조회됨!")
             
-            result.sort(key=lambda x: (
+            rows.sort(key=lambda x: (
                 not x.get('return_date') or x.get('return_date') == '',
                 -extract_day_number(x.get('return_date', '')),
                 -x.get('id', 0)
             ))
-            return result
+            return rows
         finally:
             cursor.close()
             conn.close()
@@ -1046,14 +1186,30 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
             if role == '관리자':
                 cursor.execute('SELECT * FROM returns WHERE month = ?', (month,))
                 print(f"   관리자 모드: 모든 데이터 조회 (month: {month})")
+                rows = cursor.fetchall()
+                result = [dict(row) for row in rows]
             else:
                 if not company or not company.strip():
                     print(f"   ⚠️ 화주사인데 company가 비어있음! 빈 리스트 반환")
                     return []
-                cursor.execute('SELECT * FROM returns WHERE company_name = ? AND month = ?', (company.strip(), month))
-                print(f"   화주사 모드: '{company.strip()}' 데이터만 조회 (month: {month})")
-            rows = cursor.fetchall()
-            result = [dict(row) for row in rows]
+                
+                # 검색 가능한 키워드 목록 가져오기
+                search_keywords = get_company_search_keywords(company.strip())
+                print(f"   검색 키워드: {search_keywords}")
+                
+                # 모든 반품 데이터를 가져온 후 필터링 (대소문자 무시, 공백 무시)
+                cursor.execute('SELECT * FROM returns WHERE month = ?', (month,))
+                all_rows = cursor.fetchall()
+                all_returns = [dict(row) for row in all_rows]
+                
+                # 정규화된 키워드로 필터링
+                result = []
+                for ret in all_returns:
+                    ret_company_name = normalize_company_name(ret.get('company_name', ''))
+                    if ret_company_name in search_keywords:
+                        result.append(ret)
+                
+                print(f"   화주사 모드: '{company.strip()}' 데이터만 조회 (month: {month}, {len(result)}건)")
             
             print(f"   조회된 데이터: {len(result)}건")
             if result and len(result) > 0:

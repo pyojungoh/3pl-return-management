@@ -789,8 +789,80 @@
       border-radius: 16px;
       box-shadow: 0 4px 20px rgba(255, 152, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
       border: none;
-      overflow-x: auto;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      padding: 20px 20px 60px 20px;
+      margin-bottom: 40px;
+      min-height: 200px;
+    }
+    
+    /* 테이블 스크롤 영역 */
+    .table-container > table,
+    .table-container > div:last-child > table {
+      width: 100%;
+      min-width: 800px;
+      border-collapse: collapse;
+      border-spacing: 0;
+      display: table;
+    }
+    
+    /* 스크롤 가능한 테이블 래퍼 */
+    .table-scroll-wrapper {
+      overflow-x: scroll;
       overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      margin: 0 -20px;
+      padding: 0 20px 100px 20px;
+      margin-top: 15px;
+      margin-bottom: 20px;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+    
+    /* 테이블에 하단 여백 추가 */
+    .table-scroll-wrapper > table {
+      margin-bottom: 30px;
+    }
+    
+    /* 스크롤바 스타일 개선 */
+    .table-scroll-wrapper::-webkit-scrollbar,
+    .table-container::-webkit-scrollbar {
+      height: 12px;
+    }
+    
+    .table-scroll-wrapper::-webkit-scrollbar-track,
+    .table-container::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+      margin: 0 4px;
+    }
+    
+    .table-scroll-wrapper::-webkit-scrollbar-thumb,
+    .table-container::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, #ff9500 0%, #ffa502 100%);
+      border-radius: 10px;
+      border: 2px solid #f1f1f1;
+    }
+    
+    .table-scroll-wrapper::-webkit-scrollbar-thumb:hover,
+    .table-container::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(135deg, #ff6b35 0%, #ff9500 100%);
+    }
+    
+    .table-container > table {
+      width: 100%;
+      min-width: 800px;
+      border-collapse: collapse;
+      border-spacing: 0;
+      display: table;
+    }
+    
+    /* 화주사 목록 테이블은 컬럼이 많아서 더 큰 최소 너비 필요 */
+    .table-container:has(#companiesTableBody) > table,
+    .table-container table:has(#companiesTableBody) {
+      min-width: 1200px;
     }
     
     table {
@@ -1544,14 +1616,15 @@
       
       <!-- 테이블 -->
       <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>접수일</th>
-              <th class="admin-only" style="display: none;">화주사</th>
-              <th>제품</th>
-              <th>고객명</th>
-              <th>송장번호</th>
+        <div class="table-scroll-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>접수일</th>
+                <th class="admin-only" style="display: none;">화주사</th>
+                <th>제품</th>
+                <th>고객명</th>
+                <th>송장번호</th>
               <th>반품/교환</th>
               <th>재고상태</th>
               <th>처리완료</th>
@@ -1568,6 +1641,7 @@
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
       </div>
       <!-- 반품 내역 탭 끝 -->
@@ -2208,12 +2282,14 @@
             </div>
             <button class="refresh-btn" onclick="refreshCompaniesData()" id="refreshCompaniesBtn" style="padding: 8px 15px; font-size: 14px;">🔄 새로고침</button>
           </div>
-          <table>
+          <div class="table-scroll-wrapper">
+            <table style="min-width: 1200px;">
             <thead>
               <tr>
                 <th>화주사명</th>
                 <th>아이디</th>
                 <th>권한</th>
+                <th>태그</th>
                 <th>사업자번호</th>
                 <th>사업자명</th>
                 <th>주소</th>
@@ -2227,10 +2303,11 @@
             </thead>
             <tbody id="companiesTableBody">
               <tr>
-                <td colspan="12" class="no-data">데이터를 불러오는 중...</td>
+                <td colspan="13" class="no-data">데이터를 불러오는 중...</td>
               </tr>
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -2821,13 +2898,25 @@
       
       console.log('데이터 로드 - company:', companyFilter, 'month:', selectedMonth, 'role:', currentRole);
       
-      const url = `${API_BASE_URL}/api/returns/data?company=${encodeURIComponent(companyFilter)}&month=${encodeURIComponent(selectedMonth)}&role=${encodeURIComponent(currentRole)}`;
+      // username 파라미터 추가 (화주사인 경우)
+      const usernameParam = currentUsername ? `&username=${encodeURIComponent(currentUsername)}` : '';
+      const url = `${API_BASE_URL}/api/returns/data?company=${encodeURIComponent(companyFilter)}&month=${encodeURIComponent(selectedMonth)}&role=${encodeURIComponent(currentRole)}${usernameParam}`;
       
       console.log('API URL:', url);
       
       fetch(url)
         .then(response => response.json())
         .then(result => {
+          // 사업자 정보가 필요한 경우 큰 팝업 표시
+          if (result.requires_business_info) {
+            showBusinessInfoRequiredModal();
+            const isAdmin = ((currentRole || '').toString().trim() === '관리자');
+            const colspan = isAdmin ? 13 : 9;
+            document.getElementById('tableBody').innerHTML = 
+              `<tr><td colspan="${colspan}" class="no-data">사업자 정보를 입력해주세요.</td></tr>`;
+            return;
+          }
+          
           if (result.success) {
             currentData = result.data || [];
             // 통계 업데이트 (전체 데이터 기준)
@@ -4361,6 +4450,257 @@
     window.closeScheduleModal = closeScheduleModal;
     
     // ========== 화주사 정보 관련 함수 ==========
+    
+    // 사업자 정보 필수 팝업 모달 표시
+    function showBusinessInfoRequiredModal() {
+      // 기존 모달이 있으면 제거
+      const existingModal = document.getElementById('businessInfoRequiredModal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+      
+      const modalHtml = `
+        <div id="businessInfoRequiredModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 20000; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;">
+          <div style="background: linear-gradient(135deg, #ffffff 0%, #fff9e6 100%); border-radius: 20px; padding: 40px; max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3); position: relative;">
+            <!-- 닫기 버튼 -->
+            <button onclick="closeBusinessInfoRequiredModal()" style="position: absolute; top: 20px; right: 20px; background: #e74c3c; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(231, 76, 60, 0.3); transition: all 0.3s ease;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">×</button>
+            
+            <!-- 제목 -->
+            <div style="text-align: center; margin-bottom: 30px;">
+              <div style="font-size: 64px; margin-bottom: 20px;">⚠️</div>
+              <h2 style="margin: 0; color: #e74c3c; font-weight: 700; font-size: 32px; line-height: 1.3;">사업자 정보 입력 필요</h2>
+              <p style="margin: 15px 0 0 0; color: #2d3436; font-size: 18px; line-height: 1.6;">반품 내역을 조회하려면 사업자 정보를 입력해주세요.</p>
+            </div>
+            
+            <!-- 안내 메시지 -->
+            <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); padding: 20px; border-radius: 12px; margin-bottom: 30px; border: 2px solid #ffc107;">
+              <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <div style="font-size: 24px;">ℹ️</div>
+                <div style="flex: 1;">
+                  <h4 style="margin: 0 0 10px 0; color: #856404; font-weight: 600; font-size: 16px;">사업자 정보 입력 안내</h4>
+                  <ul style="margin: 0; padding-left: 20px; color: #856404; font-size: 14px; line-height: 1.8;">
+                    <li>반품 내역 조회를 위해 사업자 정보가 필요합니다.</li>
+                    <li>아래 폼에 모든 필수 항목을 입력해주세요.</li>
+                    <li>정보 입력 후 저장하면 반품 내역을 조회할 수 있습니다.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 사업자 정보 입력 폼 -->
+            <form id="businessInfoRequiredForm" onsubmit="saveBusinessInfoFromModal(event); return false;" style="margin-bottom: 20px;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                <div>
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">사업자번호 *</label>
+                  <input type="text" id="modalBusinessNumber" class="request-input" style="min-height: auto;" placeholder="사업자번호를 입력하세요" required>
+                </div>
+                
+                <div>
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">대표명 *</label>
+                  <input type="text" id="modalBusinessName" class="request-input" style="min-height: auto;" placeholder="대표명을 입력하세요" required>
+                </div>
+                
+                <div style="grid-column: 1 / -1;">
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">주소 *</label>
+                  <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <input type="text" id="modalPostcode" class="request-input" style="min-height: auto; width: 120px;" placeholder="우편번호" readonly>
+                    <button type="button" onclick="openPostcodeSearchForModal()" class="save-btn" style="padding: 10px 20px; font-size: 14px; white-space: nowrap;">🔍 주소 검색</button>
+                  </div>
+                  <input type="text" id="modalBusinessAddress" class="request-input" style="min-height: auto; margin-bottom: 8px;" placeholder="기본주소" readonly required>
+                  <input type="text" id="modalBusinessAddressDetail" class="request-input" style="min-height: auto;" placeholder="상세주소를 입력하세요">
+                </div>
+                
+                <div>
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">전화번호 *</label>
+                  <input type="tel" id="modalBusinessTel" class="request-input" style="min-height: auto;" placeholder="전화번호를 입력하세요" required>
+                </div>
+                
+                <div>
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">전자세금계산서 이메일 *</label>
+                  <input type="email" id="modalBusinessEmail" class="request-input" style="min-height: auto;" placeholder="전자세금계산서 이메일을 입력하세요" required>
+                </div>
+              </div>
+              
+              <div style="margin-top: 30px; display: flex; gap: 12px; justify-content: center;">
+                <button type="submit" class="save-btn" style="padding: 14px 40px; font-size: 18px; font-weight: 600;">💾 정보 저장</button>
+                <button type="button" onclick="closeBusinessInfoRequiredModal()" class="save-btn" style="background: linear-gradient(135deg, #636e72 0%, #2d3436 100%); padding: 14px 40px; font-size: 18px; font-weight: 600;">취소</button>
+              </div>
+              <div id="businessInfoRequiredMessage" style="margin-top: 20px; text-align: center;"></div>
+            </form>
+          </div>
+        </div>
+      `;
+      
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      
+      // 기존 화주사 정보가 있으면 폼에 채우기
+      loadCompanyInfoToModal();
+    }
+    window.showBusinessInfoRequiredModal = showBusinessInfoRequiredModal;
+    
+    // 모달 닫기
+    function closeBusinessInfoRequiredModal() {
+      const modal = document.getElementById('businessInfoRequiredModal');
+      if (modal) {
+        modal.remove();
+      }
+    }
+    window.closeBusinessInfoRequiredModal = closeBusinessInfoRequiredModal;
+    
+    // 모달에 화주사 정보 로드
+    async function loadCompanyInfoToModal() {
+      try {
+        const response = await fetch(`/api/auth/my-info?username=${encodeURIComponent(currentUsername)}`);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const data = result.data;
+          document.getElementById('modalBusinessNumber').value = data.business_number || '';
+          document.getElementById('modalBusinessName').value = data.business_name || '';
+          
+          // 주소 파싱 (우편번호|기본주소|상세주소 형식)
+          const fullAddress = data.business_address || '';
+          const addressParts = fullAddress.split('|');
+          if (addressParts.length >= 3) {
+            document.getElementById('modalPostcode').value = addressParts[0] || '';
+            document.getElementById('modalBusinessAddress').value = addressParts[1] || '';
+            document.getElementById('modalBusinessAddressDetail').value = addressParts[2] || '';
+          } else if (fullAddress) {
+            // 기존 형식 (구분자 없이 저장된 경우)
+            document.getElementById('modalPostcode').value = '';
+            document.getElementById('modalBusinessAddress').value = fullAddress;
+            document.getElementById('modalBusinessAddressDetail').value = '';
+          } else {
+            document.getElementById('modalPostcode').value = '';
+            document.getElementById('modalBusinessAddress').value = '';
+            document.getElementById('modalBusinessAddressDetail').value = '';
+          }
+          
+          document.getElementById('modalBusinessTel').value = data.business_tel || '';
+          document.getElementById('modalBusinessEmail').value = data.business_email || '';
+        }
+      } catch (error) {
+        console.error('화주사 정보 로드 오류:', error);
+      }
+    }
+    
+    // 모달에서 사업자 정보 저장
+    async function saveBusinessInfoFromModal(event) {
+      event.preventDefault();
+      
+      const messageDiv = document.getElementById('businessInfoRequiredMessage');
+      if (messageDiv) {
+        messageDiv.innerHTML = '<span style="color: #636e72;">저장 중...</span>';
+      }
+      
+      const businessNumber = document.getElementById('modalBusinessNumber').value.trim();
+      const businessName = document.getElementById('modalBusinessName').value.trim();
+      const postcode = document.getElementById('modalPostcode').value.trim();
+      const businessAddress = document.getElementById('modalBusinessAddress').value.trim();
+      const businessAddressDetail = document.getElementById('modalBusinessAddressDetail').value.trim();
+      const businessTel = document.getElementById('modalBusinessTel').value.trim();
+      const businessEmail = document.getElementById('modalBusinessEmail').value.trim();
+      
+      // 주소 형식: postcode|address|addressDetail
+      const fullAddress = postcode || businessAddress || businessAddressDetail 
+        ? `${postcode}|${businessAddress}|${businessAddressDetail}` 
+        : '';
+      
+      if (!businessNumber || !businessName || !businessAddress || !businessTel || !businessEmail) {
+        if (messageDiv) {
+          messageDiv.innerHTML = '<span style="color: #e74c3c;">❌ 모든 필수 항목을 입력해주세요.</span>';
+        }
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/auth/update-info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: currentUsername,
+            business_number: businessNumber,
+            business_name: businessName,
+            business_address: fullAddress,
+            business_tel: businessTel,
+            business_email: businessEmail
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          if (messageDiv) {
+            messageDiv.innerHTML = '<span style="color: #00b894;">✅ 사업자 정보가 저장되었습니다. 반품 내역을 다시 불러오는 중...</span>';
+          }
+          
+          // 모달 닫기
+          setTimeout(() => {
+            closeBusinessInfoRequiredModal();
+            // 반품 내역 다시 로드
+            loadData();
+          }, 1500);
+        } else {
+          if (messageDiv) {
+            messageDiv.innerHTML = '<span style="color: #e74c3c;">❌ ' + (result.message || '저장에 실패했습니다.') + '</span>';
+          }
+        }
+      } catch (error) {
+        console.error('사업자 정보 저장 오류:', error);
+        if (messageDiv) {
+          messageDiv.innerHTML = '<span style="color: #e74c3c;">❌ 저장 중 오류가 발생했습니다: ' + error.message + '</span>';
+        }
+      }
+    }
+    window.saveBusinessInfoFromModal = saveBusinessInfoFromModal;
+    
+    // 모달용 주소 검색
+    function openPostcodeSearchForModal() {
+      new daum.Postcode({
+        oncomplete: function(data) {
+          // 팝업에서 검색결과 항목을 클릭했을때 실행할 코드를 작성하는 부분.
+          // 각 주소의 노출 규칙에 따라 주소를 조합한다.
+          let addr = ''; // 주소 변수
+          let extraAddr = ''; // 참고항목 변수
+          
+          // 사용자가 선택한 주소 타입에 따라 해당 주소 값을 가져온다.
+          if (data.userSelectedType === 'R') { // 사용자가 도로명 주소를 선택했을 경우
+            addr = data.roadAddress;
+          } else { // 사용자가 지번 주소를 선택했을 경우(J)
+            addr = data.jibunAddress;
+          }
+          
+          // 사용자가 선택한 주소가 도로명 타입일때 참고항목을 조합한다.
+          if(data.userSelectedType === 'R'){
+            // 법정동명이 있을 경우 추가한다. (법정리는 제외)
+            // 법정동의 경우 마지막 문자가 "동/로/가"로 끝난다.
+            if(data.bname !== '' && /[동|로|가]$/g.test(data.bname)){
+              extraAddr += data.bname;
+            }
+            // 건물명이 있고, 공동주택일 경우 추가한다.
+            if(data.buildingName !== '' && data.apartment === 'Y'){
+              extraAddr += (extraAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+            }
+            // 표시할 참고항목이 있을 경우, 괄호까지 추가한 최종 문자열을 만든다.
+            if(extraAddr !== ''){
+              extraAddr = ' (' + extraAddr + ')';
+            }
+            // 조합된 참고항목을 해당 필드에 넣는다.
+            addr += extraAddr;
+          }
+          
+          // 모달의 input 필드에 값 입력
+          document.getElementById('modalPostcode').value = data.zonecode;
+          document.getElementById('modalBusinessAddress').value = addr;
+          // 커서를 상세주소 필드로 이동한다.
+          document.getElementById('modalBusinessAddressDetail').focus();
+        },
+        width: '100%',
+        height: '100%',
+        maxSuggestItems: 5
+      }).open();
+    }
+    window.openPostcodeSearchForModal = openPostcodeSearchForModal;
     
     // 사업자 정보 완성도 확인
     function checkBusinessInfoComplete(data) {
@@ -6469,7 +6809,7 @@
       tbody.innerHTML = '';
       
       if (!companies || companies.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" class="no-data">등록된 화주사가 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="no-data">등록된 화주사가 없습니다.</td></tr>';
         return;
       }
       
@@ -6512,16 +6852,29 @@
         const certificateUrl = company.business_certificate_url || '';
         let certificateHtml = '';
         if (certificateUrl) {
-          certificateHtml = `<button class="save-btn" onclick="viewCertificate(${company.id}, '${escapeHtml(certificateUrl)}')" style="background: linear-gradient(135deg, #ffeaa7 0%, #fff9e6 100%); color: #ff6b35; border: 2px solid #ffa502; padding: 6px 12px; font-size: 12px; border-radius: 8px; box-shadow: 0 2px 6px rgba(255, 165, 2, 0.2); transition: all 0.3s ease;">📄 보기</button>`;
+          certificateHtml = `<button class="save-btn" onclick="viewCertificate(${company.id}, '${escapeHtml(certificateUrl)}')" style="background: linear-gradient(135deg, #ffeaa7 0%, #fff9e6 100%); color: #ff6b35; border: 2px solid #ffa502; padding: 5px 10px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(255, 165, 2, 0.2); transition: all 0.3s ease; white-space: nowrap;">📄 보기</button>`;
         } else {
-          certificateHtml = `<button class="save-btn" onclick="uploadCertificate(${company.id})" style="background: linear-gradient(135deg, #fff9e6 0%, #ffeaa7 100%); color: #ff6b35; border: 2px solid #ffeaa7; padding: 6px 12px; font-size: 12px; border-radius: 8px; box-shadow: 0 2px 6px rgba(255, 152, 0, 0.15); transition: all 0.3s ease;">📤 업로드</button>`;
+          certificateHtml = `<button class="save-btn" onclick="uploadCertificate(${company.id})" style="background: linear-gradient(135deg, #fff9e6 0%, #ffeaa7 100%); color: #ff6b35; border: 2px solid #ffeaa7; padding: 5px 10px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(255, 152, 0, 0.15); transition: all 0.3s ease; white-space: nowrap;">📤 업로드</button>`;
         }
         
-        // 관리 버튼
+        // 태그 표시
+        const searchKeywords = company.search_keywords || '';
+        const tags = searchKeywords ? searchKeywords.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
+        let tagsHtml = '';
+        if (tags.length > 0) {
+          tagsHtml = tags.map(tag => 
+            `<span style="display: inline-block; background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; margin: 2px; box-shadow: 0 2px 4px rgba(116, 185, 255, 0.3);">${escapeHtml(tag)}</span>`
+          ).join('');
+        } else {
+          tagsHtml = '<span style="color: #999; font-size: 12px;">태그 없음</span>';
+        }
+        
+        // 관리 버튼 (반응형 - 1열 유지)
         const manageHtml = `
-          <div style="display: flex; gap: 6px; justify-content: center;">
-            <button class="save-btn" onclick="changeCompanyPassword(${company.id}, '${escapeHtml(company.username || '')}')" style="background: linear-gradient(135deg, #ffeaa7 0%, #fff9e6 100%); color: #ff6b35; border: 2px solid #ffa502; padding: 6px 12px; font-size: 12px; border-radius: 8px; box-shadow: 0 2px 6px rgba(255, 165, 2, 0.2); transition: all 0.3s ease;">🔒 비밀번호</button>
-            <button class="save-btn" onclick="deleteCompany(${company.id}, '${escapeHtml(company.company_name || '')}')" style="background: linear-gradient(135deg, #ee5a6f 0%, #ff6b35 100%); color: white; border: none; padding: 6px 12px; font-size: 12px; border-radius: 8px; box-shadow: 0 2px 6px rgba(238, 90, 111, 0.25); transition: all 0.3s ease;">🗑️ 삭제</button>
+          <div style="display: flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: nowrap; min-width: 200px;">
+            <button class="save-btn" onclick="openTagModal(${company.id}, '${escapeHtml(company.username || '')}', '${escapeHtml(company.company_name || '')}', '${escapeHtml(searchKeywords)}')" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(116, 185, 255, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">🏷️ 태그</button>
+            <button class="save-btn" onclick="changeCompanyPassword(${company.id}, '${escapeHtml(company.username || '')}')" style="background: linear-gradient(135deg, #ffeaa7 0%, #fff9e6 100%); color: #ff6b35; border: 2px solid #ffa502; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(255, 165, 2, 0.2); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">🔒 비밀번호</button>
+            <button class="save-btn" onclick="deleteCompany(${company.id}, '${escapeHtml(company.company_name || '')}')" style="background: linear-gradient(135deg, #ee5a6f 0%, #ff6b35 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(238, 90, 111, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">🗑️ 삭제</button>
           </div>
         `;
         
@@ -6529,15 +6882,16 @@
           <td>${escapeHtml(company.company_name || '-')}</td>
           <td>${escapeHtml(company.username || '-')}</td>
           <td>${roleHtml}</td>
+          <td style="max-width: 200px; word-wrap: break-word;">${tagsHtml}</td>
           <td>${escapeHtml(company.business_number || '-')}</td>
           <td>${escapeHtml(company.business_name || '-')}</td>
           <td>${escapeHtml(company.business_address || '-')}</td>
           <td>${escapeHtml(company.business_tel || '-')}</td>
           <td>${escapeHtml(company.business_email || '-')}</td>
-          <td style="text-align: center;">${certificateHtml}</td>
+          <td style="text-align: center; white-space: nowrap;">${certificateHtml}</td>
           <td>${lastLogin}</td>
           <td>${createdAt}</td>
-          <td style="text-align: center;">${manageHtml}</td>
+          <td style="text-align: center; white-space: nowrap; min-width: 200px;">${manageHtml}</td>
         `;
         
         tbody.appendChild(tr);
@@ -6572,6 +6926,105 @@
       });
     }
     window.deleteCompany = deleteCompany;
+    
+    /* ========== 화주사 태그 관리 ========== */
+    function openTagModal(companyId, username, companyName, currentTags) {
+      // 기존 모달 제거
+      const existingModal = document.getElementById('tagModal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+      
+      // 모달 HTML 생성
+      const modalHtml = `
+        <div id="tagModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;" onclick="closeTagModal(event)">
+          <div style="background: white; border-radius: 16px; padding: 30px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);" onclick="event.stopPropagation()">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <h3 style="margin: 0; color: #ff6b35; font-size: 22px; font-weight: 700;">🏷️ 태그 관리</h3>
+              <button onclick="closeTagModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #636e72; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.2s;" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='none'">×</button>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+              <p style="margin: 0 0 10px 0; color: #333; font-size: 14px; font-weight: 600;">화주사: <span style="color: #ff6b35;">${escapeHtml(companyName)}</span></p>
+              <p style="margin: 0; color: #666; font-size: 12px;">쉼표(,)로 구분하여 여러 태그를 입력하세요.</p>
+              <p style="margin: 5px 0 0 0; color: #999; font-size: 11px;">예: tks, TKS컴퍼니, 티케이에스</p>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+              <label style="display: block; margin-bottom: 8px; color: #333; font-size: 14px; font-weight: 600;">태그 입력</label>
+              <textarea id="tagInput" placeholder="태그를 쉼표로 구분하여 입력하세요 (예: tks, TKS컴퍼니)" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; min-height: 80px; box-sizing: border-box;" onfocus="this.style.borderColor='#74b9ff'" onblur="this.style.borderColor='#e0e0e0'">${escapeHtml(currentTags || '')}</textarea>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+              <button onclick="closeTagModal()" style="background: #e0e0e0; color: #333; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;" onmouseover="this.style.background='#d0d0d0'" onmouseout="this.style.background='#e0e0e0'">취소</button>
+              <button onclick="saveCompanyTags(${companyId}, '${escapeHtml(username)}')" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 6px rgba(116, 185, 255, 0.25);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(116, 185, 255, 0.35)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 6px rgba(116, 185, 255, 0.25)'">저장</button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      
+      // 입력 필드에 포커스
+      setTimeout(() => {
+        const tagInput = document.getElementById('tagInput');
+        if (tagInput) {
+          tagInput.focus();
+          tagInput.setSelectionRange(tagInput.value.length, tagInput.value.length);
+        }
+      }, 100);
+    }
+    window.openTagModal = openTagModal;
+    
+    // 태그 모달 닫기
+    function closeTagModal(event) {
+      if (event && event.target.id !== 'tagModal' && !event.target.closest('#tagModal > div')) {
+        return;
+      }
+      const modal = document.getElementById('tagModal');
+      if (modal) {
+        modal.remove();
+      }
+    }
+    window.closeTagModal = closeTagModal;
+    
+    // 태그 저장
+    async function saveCompanyTags(companyId, username) {
+      const tagInput = document.getElementById('tagInput');
+      if (!tagInput) {
+        showMessage('❌ 태그 입력 필드를 찾을 수 없습니다.', 'error');
+        return;
+      }
+      
+      const tags = tagInput.value.trim();
+      
+      try {
+        const response = await fetch('/api/auth/update-info', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            username: username,
+            search_keywords: tags
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          showMessage('✅ 태그가 저장되었습니다.', 'success');
+          closeTagModal();
+          loadCompanies(); // 화주사 목록 새로고침
+        } else {
+          showMessage('❌ ' + (data.message || '태그 저장에 실패했습니다.'), 'error');
+        }
+      } catch (error) {
+        console.error('태그 저장 오류:', error);
+        showMessage('❌ 태그 저장 중 오류가 발생했습니다: ' + error.message, 'error');
+      }
+    }
+    window.saveCompanyTags = saveCompanyTags;
     
     /* ========== 화주사 비밀번호 변경 ========== */
     function changeCompanyPassword(companyId, username) {

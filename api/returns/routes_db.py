@@ -87,8 +87,38 @@ def get_returns_data():
                 'message': '화주사명이 필요합니다.'
             }), 400
         
+        # 화주사인 경우 사업자 정보 확인
+        requires_business_info = False
+        if role != '관리자':
+            from api.database.models import get_company_by_username
+            username = request.args.get('username', '').strip()
+            if username:
+                company_info = get_company_by_username(username)
+                if company_info:
+                    # 사업자 정보 필수 필드 확인
+                    business_number = company_info.get('business_number', '').strip() if company_info.get('business_number') else ''
+                    business_name = company_info.get('business_name', '').strip() if company_info.get('business_name') else ''
+                    business_address = company_info.get('business_address', '').strip() if company_info.get('business_address') else ''
+                    business_tel = company_info.get('business_tel', '').strip() if company_info.get('business_tel') else ''
+                    business_email = company_info.get('business_email', '').strip() if company_info.get('business_email') else ''
+                    
+                    # 필수 필드 중 하나라도 없으면 사업자 정보 입력 필요
+                    if not business_number or not business_name or not business_address or not business_tel or not business_email:
+                        requires_business_info = True
+                        print(f"⚠️ 화주사 '{username}'의 사업자 정보가 불완전합니다.")
+        
         # 디버깅: 파라미터 확인
         print(f"📊 반품 데이터 조회 - company: '{company}', month: '{month}', role: '{role}'")
+        
+        # 사업자 정보가 필요한 경우 데이터 조회 전에 플래그 반환
+        if requires_business_info:
+            return jsonify({
+                'success': False,
+                'data': [],
+                'count': 0,
+                'requires_business_info': True,
+                'message': '사업자 정보를 입력해주세요.'
+            }), 200  # 200으로 반환하여 프론트엔드에서 정상 처리 가능하도록
         
         # 데이터베이스에서 조회
         returns = get_returns_by_company(company, month, role)
