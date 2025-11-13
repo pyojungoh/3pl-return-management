@@ -498,7 +498,6 @@
       display: flex;
       gap: 6px;
     }
-    
     .tab-btn {
       flex: 1;
       padding: 12px 20px;
@@ -988,7 +987,6 @@
       background-color: #ff9500 !important;
       color: white !important;
     }
-    
     /* 테이블 헤더의 모든 상태에서 동일한 스타일 유지 - 모든 조합 */
     table thead,
     table thead:hover,
@@ -1506,6 +1504,7 @@
       <div class="menu-bar" id="menuBar" style="display: none;">
         <button type="button" class="menu-item" id="companyInfoMenuBtn" onclick="switchMenu('companyInfo')">👤 화주사 정보</button>
         <button type="button" class="menu-item" id="returnsMenuBtn" onclick="switchMenu('returns')">📦 반품관리</button>
+        <button type="button" class="menu-item" id="csMenuBtn" onclick="switchMenu('cs')">📞 C/S</button>
         <button type="button" class="menu-item" id="scheduleMenuBtn" onclick="switchMenu('schedule')">📅 판매스케쥴</button>
         <button type="button" class="menu-item" id="boardMenuBtn" onclick="switchMenu('board')">📋 게시판</button>
       </div>
@@ -1514,6 +1513,7 @@
       <div id="adminTabs" style="display: none;">
         <div class="tabs">
           <button type="button" class="tab-btn active" id="returnsTabBtn" onclick="switchAdminTab('returns')">📦 반품 내역</button>
+          <button type="button" class="tab-btn" id="csTabBtn" onclick="switchAdminTab('cs')">📞 C/S 관리</button>
           <button type="button" class="tab-btn" id="scheduleCalendarTabBtn" onclick="switchAdminTab('scheduleCalendar')">📅 스케쥴 관리</button>
           <button type="button" class="tab-btn" id="boardTabBtn" onclick="switchAdminTab('board')">📋 게시판 관리</button>
           <button type="button" class="tab-btn" id="popupTabBtn" onclick="switchAdminTab('popup')">🔔 팝업 관리</button>
@@ -1531,7 +1531,7 @@
         </select>
         <button class="refresh-btn" onclick="refreshReturnsData()" id="refreshReturnsBtn">🔄 새로고침</button>
         <button class="refresh-btn admin-only-btn" id="downloadTemplateBtn" onclick="downloadCsvTemplate()" onmouseenter="showDownloadTooltip(event)" onmouseleave="hideDownloadTooltip()" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); position: relative; display: none;">📥 서식 다운로드</button>
-        <label for="csvUploadInput" class="admin-only-btn" style="cursor: pointer; display: none; margin: 0;">
+        <label for="csvUploadInput" class="admin-only-btn" style="cursor: pointer; display: none;">
           <span class="refresh-btn" style="display: inline-block; margin: 0;">📤 CSV 업로드</span>
           <input type="file" id="csvUploadInput" accept=".csv" style="display: none;" onchange="handleCsvUpload(event)">
         </label>
@@ -1749,6 +1749,120 @@
       </div>
       <!-- 화주사 정보 탭 끝 -->
       
+      <!-- C/S 탭 (화주사 모드 및 관리자 모드) -->
+      <div id="csTab" class="tab-content hidden">
+        <!-- 필터 -->
+        <div class="filters">
+          <label for="csMonthSelect">📅 조회 월:</label>
+          <select id="csMonthSelect">
+            <option value="">로딩 중...</option>
+          </select>
+          <button class="refresh-btn" onclick="refreshCsData()" id="refreshCsBtn">🔄 새로고침</button>
+          <button class="refresh-btn" onclick="exportCsData()" id="exportCsBtn" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);">📥 엑셀 다운로드</button>
+          <button class="refresh-btn" onclick="testTelegram()" id="testTelegramBtn" style="display:none; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">📱 텔레그램 테스트</button>
+        </div>
+        
+        <!-- 통계 -->
+        <div class="stats">
+          <div class="stat-item active" id="csFilterAll" onclick="filterCsByStatus('all')">
+            <div class="stat-number" id="csTotalCount">0</div>
+            <div class="stat-label">총 C/S 건</div>
+          </div>
+          <div class="stat-item" id="csFilterCompleted" onclick="filterCsByStatus('completed')">
+            <div class="stat-number" id="csCompletedCount">0</div>
+            <div class="stat-label">처리완료</div>
+          </div>
+          <div class="stat-item" id="csFilterPending" onclick="filterCsByStatus('pending')">
+            <div class="stat-number" id="csPendingCount">0</div>
+            <div class="stat-label">미처리</div>
+          </div>
+        </div>
+        
+        <!-- C/S 등록 접이식 버튼 (화주사 모드에서만 표시) -->
+        <div id="csRegisterSection" style="margin-bottom: 20px;">
+          <button id="addCsBtn" class="refresh-btn" onclick="toggleCsForm()" style="background: linear-gradient(135deg, #ffffff 0%, #fffef9 100%); width: 100%; text-align: left; padding: 16px 24px; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; border-radius: 14px; border: 2px solid #ffeaa7; color: #ff6b35; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(255, 152, 0, 0.1);">
+            <span>➕ C/S 등록</span>
+            <span id="addCsIcon" style="font-size: 14px; transition: transform 0.3s ease;">▼</span>
+          </button>
+          
+          <!-- C/S 등록 폼 (접이식) -->
+          <div id="addCsForm" style="display: none; background: #ffffff; padding: 24px; border-radius: 0 0 14px 14px; border: 2px solid #ffeaa7; border-top: none; animation: slideDown 0.3s ease; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1);">
+            <h3 style="margin-bottom: 20px; color: #ff6b35; font-weight: 700;">C/S 접수 등록</h3>
+            <form id="csForm" onsubmit="saveCs(event); return false;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div id="csCompanyNameField" style="display: none;">
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">화주사명 *</label>
+                  <select id="csCompanyName" class="request-input" style="min-height: auto;">
+                    <option value="">선택하세요</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">날짜 *</label>
+                  <input type="date" id="csDate" class="request-input" style="min-height: auto;" required>
+                </div>
+                
+                <div>
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">관리번호 *</label>
+                  <input type="text" id="csManagementNumber" class="request-input" style="min-height: auto;" placeholder="관리번호를 입력하세요" required>
+                </div>
+                
+                <div>
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">C/S 종류 *</label>
+                  <select id="csIssueType" class="request-input" style="min-height: auto;" required>
+                    <option value="">선택하세요</option>
+                    <option value="오배송">오배송</option>
+                    <option value="누락">누락</option>
+                    <option value="교환">교환</option>
+                    <option value="반품">반품</option>
+                    <option value="취소">취소</option>
+                    <option value="기타">기타</option>
+                  </select>
+                </div>
+                
+                <div style="grid-column: 1 / -1;">
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">C/S 내용 *</label>
+                  <textarea id="csContent" class="request-input" style="min-height: 100px;" placeholder="C/S 내용을 입력하세요" required></textarea>
+                </div>
+              </div>
+              
+              <div style="margin-top: 20px; display: flex; gap: 12px;">
+                <button type="submit" class="save-btn">💾 등록</button>
+                <button type="button" class="save-btn" onclick="resetCsForm()" style="background: linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%); box-shadow: 0 3px 10px rgba(178, 190, 195, 0.25);">🔄 초기화</button>
+              </div>
+              <div id="csFormMessage" style="margin-top: 15px;"></div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- C/S 목록 테이블 -->
+        <div class="table-container">
+          <div class="table-scroll-wrapper">
+            <table id="csTable" style="width: 100%; border-collapse: collapse; min-width: 1200px;">
+              <thead>
+                <tr style="background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white;">
+                  <th style="padding: 12px; text-align: center; font-weight: 600;">날짜</th>
+                  <th style="padding: 12px; text-align: center; font-weight: 600;">관리번호</th>
+                  <th style="padding: 12px; text-align: center; font-weight: 600;">생성된 관리번호</th>
+                  <th style="padding: 12px; text-align: center; font-weight: 600;">화주사명</th>
+                  <th style="padding: 12px; text-align: center; font-weight: 600;">C/S 종류</th>
+                  <th style="padding: 12px; text-align: center; font-weight: 600;">C/S 내용</th>
+                  <th style="padding: 12px; text-align: center; font-weight: 600;">처리여부</th>
+                  <th style="padding: 12px; text-align: center; font-weight: 600;">처리자</th>
+                  <th style="padding: 12px; text-align: center; font-weight: 600;">관리자 메시지</th>
+                  <th id="csAdminActionsHeader" style="padding: 12px; text-align: center; font-weight: 600; display: none;">관리</th>
+                </tr>
+              </thead>
+              <tbody id="csTableBody">
+                <tr>
+                  <td colspan="10" class="no-data">로딩 중...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <!-- C/S 탭 끝 -->
       <!-- 판매스케쥴 탭 (화주사 모드) -->
       <div id="scheduleTab" class="tab-content hidden">
         <!-- 스케쥴 등록 접이식 버튼 -->
@@ -2199,7 +2313,6 @@
         </div>
       </div>
       <!-- 팝업 관리 탭 끝 -->
-      
       <!-- 화주사 등록 탭 -->
       <div id="registerTab" class="tab-content hidden">
         <!-- 화주사 등록 접이식 버튼 -->
@@ -2326,6 +2439,8 @@
     let currentRole = '';
     let currentData = [];
     let currentFilter = 'all'; // 'all', 'completed', 'pending'
+    let currentCsData = [];
+    let currentCsFilter = 'all'; // 'all', 'completed', 'pending'
     
     // 로그인 메시지 표시
     function showLoginMessage(text, type) {
@@ -2507,7 +2622,7 @@
       } else {
         // 관리자면 저장된 탭 정보 확인 (F5 새로고침 시 현재 탭 유지)
         const savedTab = localStorage.getItem('activeAdminTab');
-        const validTabs = ['returns', 'scheduleCalendar', 'board', 'register'];
+        const validTabs = ['returns', 'cs', 'scheduleCalendar', 'board', 'register'];
         const activeTab = savedTab && validTabs.includes(savedTab) ? savedTab : 'returns';
         console.log('저장된 탭:', savedTab, '활성화할 탭:', activeTab);
         // 약간의 지연을 두고 탭 전환 (DOM이 완전히 로드된 후)
@@ -2536,6 +2651,13 @@
             console.log('반품 등록 섹션 표시:', isAdmin, '섹션 요소:', addReturnSection); // 디버깅용
           }
           
+          // C/S 등록 섹션 표시/숨기기 (화주사 및 관리자 모두 표시)
+          const csRegisterSection = document.getElementById('csRegisterSection');
+          if (csRegisterSection) {
+            csRegisterSection.style.display = 'block';
+            console.log('C/S 등록 섹션 표시: true, 섹션 요소:', csRegisterSection); // 디버깅용
+          }
+          
           // 관리자 전용 버튼 표시/숨김 (서식 다운로드, CSV 업로드)
           const downloadTemplateBtn = document.getElementById('downloadTemplateBtn');
           const csvUploadLabel = document.querySelector('label[for="csvUploadInput"]');
@@ -2544,6 +2666,10 @@
           }
           if (csvUploadLabel) {
             csvUploadLabel.style.display = isAdmin ? 'inline-block' : 'none';
+          }
+          const testTelegramBtn = document.getElementById('testTelegramBtn');
+          if (testTelegramBtn) {
+            testTelegramBtn.style.display = isAdmin ? 'inline-flex' : 'none';
           }
           
           const addReturnForm = document.getElementById('addReturnForm');
@@ -2691,7 +2817,6 @@
       }
     }
     window.refreshReturnsData = refreshReturnsData;
-    
     /* ========== CSV 파일 업로드 ========== */
     function handleCsvUpload(event) {
       const file = event.target.files[0];
@@ -3193,7 +3318,6 @@
       // 필터링된 데이터로 테이블 다시 렌더링
       applyFilter();
     }
-    
     // 필터 적용 함수
     function applyFilter() {
       if (!currentData || currentData.length === 0) {
@@ -3671,7 +3795,6 @@
       });
     }
     window.addReturn = addReturn;
-    
     // 메뉴 전환 함수
     function switchMenu(menuName) {
       // 모든 메뉴 아이템에서 active 클래스 제거
@@ -3686,33 +3809,88 @@
         selectedMenu.classList.add('active');
       }
       
-      // 메뉴별 콘텐츠 표시/숨김 처리
+      // 메뉴별 콘텐츠 표시/숨김 처리 (화주사 모드 탭만 처리)
+      // 관리자 탭은 건드리지 않음
+      const consignorTabIds = ['companyInfoTab', 'returnsTab', 'csTab', 'scheduleTab', 'boardCategoryTab'];
+      
       if (menuName === 'companyInfo') {
         // 화주사 정보 메뉴
-        document.getElementById('returnsTab').classList.add('hidden');
-        document.getElementById('scheduleTab').classList.add('hidden');
-        document.getElementById('boardCategoryTab').classList.add('hidden');
-        document.getElementById('companyInfoTab').classList.remove('hidden');
+        consignorTabIds.forEach(tabId => {
+          const tab = document.getElementById(tabId);
+          if (tab) {
+            if (tabId === 'companyInfoTab') {
+              tab.classList.remove('hidden');
+              tab.style.display = 'block';
+            } else {
+              tab.classList.add('hidden');
+              tab.style.display = 'none';
+            }
+          }
+        });
         // 화주사 정보 로드
         loadCompanyInfo();
       } else if (menuName === 'returns') {
-        document.getElementById('companyInfoTab').classList.add('hidden');
-        document.getElementById('returnsTab').classList.remove('hidden');
-        document.getElementById('scheduleTab').classList.add('hidden');
-        document.getElementById('boardCategoryTab').classList.add('hidden');
+        consignorTabIds.forEach(tabId => {
+          const tab = document.getElementById(tabId);
+          if (tab) {
+            if (tabId === 'returnsTab') {
+              tab.classList.remove('hidden');
+              tab.style.display = 'block';
+            } else {
+              tab.classList.add('hidden');
+              tab.style.display = 'none';
+            }
+          }
+        });
+      } else if (menuName === 'cs') {
+        consignorTabIds.forEach(tabId => {
+          const tab = document.getElementById(tabId);
+          if (tab) {
+            if (tabId === 'csTab') {
+              tab.classList.remove('hidden');
+              tab.style.display = 'block';
+            } else {
+              tab.classList.add('hidden');
+              tab.style.display = 'none';
+            }
+          }
+        });
+        // C/S 등록 섹션 표시 (화주사 및 관리자 모두)
+        const csRegisterSection = document.getElementById('csRegisterSection');
+        if (csRegisterSection) {
+          csRegisterSection.style.display = 'block';
+        }
+        // C/S 월 목록 로드 및 데이터 로드
+        loadCsAvailableMonths();
       } else if (menuName === 'schedule') {
-        document.getElementById('companyInfoTab').classList.add('hidden');
-        document.getElementById('returnsTab').classList.add('hidden');
-        document.getElementById('scheduleTab').classList.remove('hidden');
-        document.getElementById('boardCategoryTab').classList.add('hidden');
+        consignorTabIds.forEach(tabId => {
+          const tab = document.getElementById(tabId);
+          if (tab) {
+            if (tabId === 'scheduleTab') {
+              tab.classList.remove('hidden');
+              tab.style.display = 'block';
+            } else {
+              tab.classList.add('hidden');
+              tab.style.display = 'none';
+            }
+          }
+        });
         // 스케쥴 목록 로드
         refreshSchedules();
       } else if (menuName === 'board') {
         // 게시판 메뉴
-        document.getElementById('companyInfoTab').classList.add('hidden');
-        document.getElementById('returnsTab').classList.add('hidden');
-        document.getElementById('scheduleTab').classList.add('hidden');
-        document.getElementById('boardCategoryTab').classList.remove('hidden');
+        consignorTabIds.forEach(tabId => {
+          const tab = document.getElementById(tabId);
+          if (tab) {
+            if (tabId === 'boardCategoryTab') {
+              tab.classList.remove('hidden');
+              tab.style.display = 'block';
+            } else {
+              tab.classList.add('hidden');
+              tab.style.display = 'none';
+            }
+          }
+        });
         // 게시판 카테고리 및 게시글 로드
         loadBoardCategoriesForSelect();
         // 전체 카테고리 선택 및 게시글 로드
@@ -3727,6 +3905,103 @@
       console.log('메뉴 전환:', menuName);
     }
     window.switchMenu = switchMenu;
+    
+    // 관리자 탭 전환 함수
+    function switchAdminTab(tabName) {
+      // 모든 탭 버튼에서 active 클래스 제거
+      const tabButtons = document.querySelectorAll('.tab-btn');
+      tabButtons.forEach(btn => {
+        btn.classList.remove('active');
+      });
+      
+      // 선택된 탭 버튼에 active 클래스 추가
+      const selectedTabBtn = document.getElementById(tabName + 'TabBtn');
+      if (selectedTabBtn) {
+        selectedTabBtn.classList.add('active');
+      }
+      
+      // 관리자 탭만 명시적으로 숨기기 (화주사 모드 탭에 영향 주지 않도록)
+      const adminTabIds = ['returnsTab', 'csTab', 'scheduleCalendarTab', 'boardCategoryTab', 'popupTab', 'registerTab'];
+      adminTabIds.forEach(tabId => {
+        const tab = document.getElementById(tabId);
+        if (tab) {
+          tab.classList.add('hidden');
+          tab.style.display = 'none';
+        }
+      });
+      
+      // 선택된 탭 콘텐츠 표시
+      if (tabName === 'returns') {
+        const returnsTab = document.getElementById('returnsTab');
+        if (returnsTab) {
+          returnsTab.classList.remove('hidden');
+          returnsTab.style.display = 'block';
+        }
+        // 반품 내역 데이터 로드
+        refreshReturnsData();
+      } else if (tabName === 'cs') {
+        const csTab = document.getElementById('csTab');
+        if (csTab) {
+          csTab.classList.remove('hidden');
+          csTab.style.display = 'block';
+        }
+        // C/S 등록 섹션 표시 (화주사 및 관리자 모두)
+        const csRegisterSection = document.getElementById('csRegisterSection');
+        if (csRegisterSection) {
+          csRegisterSection.style.display = 'block';
+        }
+        // C/S 월 목록 로드 및 데이터 로드
+        loadCsAvailableMonths();
+      } else if (tabName === 'scheduleCalendar') {
+        const scheduleCalendarTab = document.getElementById('scheduleCalendarTab');
+        if (scheduleCalendarTab) {
+          scheduleCalendarTab.classList.remove('hidden');
+          scheduleCalendarTab.style.display = 'block';
+        }
+        // 스케쥴 캘린더 로드 (관리자 모드)
+        if (typeof loadCalendarSchedules === 'function') {
+          loadCalendarSchedules();
+        }
+      } else if (tabName === 'board') {
+        const boardCategoryTab = document.getElementById('boardCategoryTab');
+        if (boardCategoryTab) {
+          boardCategoryTab.classList.remove('hidden');
+          boardCategoryTab.style.display = 'block';
+        }
+        // 게시판 카테고리 및 게시글 로드
+        loadBoardCategoriesForSelect();
+        // 전체 카테고리 선택 및 게시글 로드
+        setTimeout(() => {
+          selectBoardCategory('');
+        }, 100);
+      } else if (tabName === 'popup') {
+        const popupTab = document.getElementById('popupTab');
+        if (popupTab) {
+          popupTab.classList.remove('hidden');
+          popupTab.style.display = 'block';
+        }
+        // 팝업 목록 로드
+        if (typeof loadPopups === 'function') {
+          loadPopups();
+        }
+      } else if (tabName === 'register') {
+        const registerTab = document.getElementById('registerTab');
+        if (registerTab) {
+          registerTab.classList.remove('hidden');
+          registerTab.style.display = 'block';
+        }
+        // 화주사 목록 로드
+        if (typeof loadCompanies === 'function') {
+          loadCompanies();
+        }
+      }
+      
+      // 현재 활성 탭을 localStorage에 저장 (F5 새로고침 시 복원용)
+      localStorage.setItem('activeAdminTab', tabName);
+      
+      console.log('관리자 탭 전환:', tabName);
+    }
+    window.switchAdminTab = switchAdminTab;
     
     // ========== 판매 스케쥴 관련 함수 ==========
     
@@ -4153,7 +4428,6 @@
       }
     }
     window.loadCalendarSchedules = loadCalendarSchedules;
-    
     // 화주사별 색상 할당 함수
     function getCompanyColor(companyName) {
       // 다양한 색상 팔레트
@@ -4449,8 +4723,678 @@
     }
     window.closeScheduleModal = closeScheduleModal;
     
-    // ========== 화주사 정보 관련 함수 ==========
+    // ========== C/S 관련 함수 ==========
     
+    // C/S 등록 폼 접이식
+    function toggleCsForm() {
+      const form = document.getElementById('addCsForm');
+      const icon = document.getElementById('addCsIcon');
+      if (form && icon) {
+        const isHidden = form.style.display === 'none';
+        form.style.display = isHidden ? 'block' : 'none';
+        icon.textContent = isHidden ? '▲' : '▼';
+        
+        // 폼이 열릴 때 오늘 날짜를 기본값으로 설정
+        if (isHidden) {
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          document.getElementById('csDate').value = `${year}-${month}-${day}`;
+          
+          // 관리자 모드일 때 화주사 목록 로드
+          if (currentRole === '관리자') {
+            loadCsCompanyList();
+          }
+        }
+      }
+    }
+    window.toggleCsForm = toggleCsForm;
+    
+    // C/S 등록용 화주사 목록 로드 (관리자용)
+    function loadCsCompanyList() {
+      const companySelect = document.getElementById('csCompanyName');
+      const companyField = document.getElementById('csCompanyNameField');
+      
+      if (!companySelect || !companyField) return;
+      
+      // 관리자 모드에서만 화주사명 필드 표시
+      if (currentRole === '관리자') {
+        companyField.style.display = 'block';
+        companySelect.required = true;
+      } else {
+        companyField.style.display = 'none';
+        companySelect.required = false;
+      }
+      
+      // 화주사 목록 로드
+      fetch('/api/auth/companies')
+        .then(response => response.json())
+        .then(result => {
+          if (result.success && result.companies) {
+            companySelect.innerHTML = '<option value="">선택하세요</option>';
+            // 화주사만 필터링 (관리자 제외)
+            const companies = result.companies.filter(company => company.role !== '관리자');
+            companies.forEach(company => {
+              const option = document.createElement('option');
+              option.value = company.company_name || company.username;
+              option.textContent = company.company_name || company.username;
+              companySelect.appendChild(option);
+            });
+          }
+        })
+        .catch(error => {
+          console.error('화주사 목록 로드 오류:', error);
+        });
+    }
+    window.loadCsCompanyList = loadCsCompanyList;
+    
+    // C/S 폼 초기화
+    function resetCsForm() {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      document.getElementById('csDate').value = `${year}-${month}-${day}`;
+      document.getElementById('csManagementNumber').value = '';
+      document.getElementById('csIssueType').value = '';
+      document.getElementById('csContent').value = '';
+      document.getElementById('csFormMessage').innerHTML = '';
+      
+      // 관리자 모드일 때 화주사명 초기화
+      const companySelect = document.getElementById('csCompanyName');
+      if (companySelect) {
+        companySelect.value = '';
+      }
+    }
+    window.resetCsForm = resetCsForm;
+    
+    // C/S 등록
+    async function saveCs(event) {
+      event.preventDefault();
+      const messageDiv = document.getElementById('csFormMessage');
+      
+      if (messageDiv) {
+        messageDiv.innerHTML = '<span style="color: #636e72;">등록 중...</span>';
+      }
+      
+      const date = document.getElementById('csDate').value;
+      const managementNumber = document.getElementById('csManagementNumber').value.trim();
+      const issueType = document.getElementById('csIssueType').value.trim();
+      const content = document.getElementById('csContent').value.trim();
+      
+      // 관리자 모드일 때 화주사명 가져오기
+      let companyName = currentCompany;
+      let username = currentUsername;
+      if (currentRole === '관리자') {
+        const selectedCompany = document.getElementById('csCompanyName').value.trim();
+        if (!selectedCompany) {
+          if (messageDiv) {
+            messageDiv.innerHTML = '<span style="color: #e74c3c;">❌ 화주사명을 선택해주세요.</span>';
+          }
+          return;
+        }
+        companyName = selectedCompany;
+        // 화주사명으로 username 찾기 (선택사항, 없으면 화주사명 사용)
+        username = selectedCompany;
+      }
+      
+      if (!date || !managementNumber || !issueType || !content) {
+        if (messageDiv) {
+          messageDiv.innerHTML = '<span style="color: #e74c3c;">❌ 모든 필드를 입력해주세요.</span>';
+        }
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/cs/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company_name: companyName,
+            username: username,
+            date: date,
+            management_number: managementNumber,
+            issue_type: issueType,
+            content: content
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          if (messageDiv) {
+            messageDiv.innerHTML = '<span style="color: #00b894;">✅ C/S 접수가 등록되었습니다.</span>';
+          }
+          resetCsForm();
+          toggleCsForm();
+          refreshCsData();
+        } else {
+          if (messageDiv) {
+            messageDiv.innerHTML = '<span style="color: #e74c3c;">❌ ' + (result.message || '등록 실패') + '</span>';
+          }
+        }
+      } catch (error) {
+        console.error('C/S 등록 오류:', error);
+        if (messageDiv) {
+          messageDiv.innerHTML = '<span style="color: #e74c3c;">❌ 등록 중 오류가 발생했습니다: ' + error.message + '</span>';
+        }
+      }
+    }
+    window.saveCs = saveCs;
+    // C/S 월 목록 로드
+    function loadCsAvailableMonths() {
+      const companyFilter = (currentRole === '관리자') ? '' : currentCompany;
+      const url = `${API_BASE_URL}/api/cs/available-months?company=${encodeURIComponent(companyFilter)}&role=${encodeURIComponent(currentRole)}`;
+      
+      fetch(url)
+        .then(response => response.json())
+        .then(result => {
+          const monthSelect = document.getElementById('csMonthSelect');
+          if (!monthSelect) return;
+          
+          monthSelect.innerHTML = '';
+          
+          if (result.success && result.months && result.months.length > 0) {
+            // 년도별로 그룹화
+            const monthsByYear = {};
+            result.months.forEach(monthStr => {
+              const yearMatch = monthStr.match(/(\d{4})년/);
+              if (yearMatch) {
+                const year = yearMatch[1];
+                if (!monthsByYear[year]) {
+                  monthsByYear[year] = [];
+                }
+                monthsByYear[year].push(monthStr);
+              }
+            });
+            
+            // 년도 정렬 (내림차순)
+            const years = Object.keys(monthsByYear).sort((a, b) => {
+              if (b === '기타') return -1;
+              return parseInt(b) - parseInt(a);
+            });
+            
+            // 옵션 그룹으로 년도별 표시
+            years.forEach(year => {
+              const optgroup = document.createElement('optgroup');
+              optgroup.label = `${year}년`;
+              monthsByYear[year].forEach(monthStr => {
+                const option = document.createElement('option');
+                option.value = monthStr;
+                option.textContent = monthStr;
+                optgroup.appendChild(option);
+              });
+              monthSelect.appendChild(optgroup);
+            });
+            
+            // 현재 월 선택 (기본값)
+            const today = new Date();
+            const currentMonth = `${today.getFullYear()}년${today.getMonth() + 1}월`;
+            if (result.months.includes(currentMonth)) {
+              monthSelect.value = currentMonth;
+            } else if (result.months.length > 0) {
+              monthSelect.value = result.months[0];
+            }
+            
+            // C/S 탭이 활성화되어 있을 때만 데이터 로드
+            const csTab = document.getElementById('csTab');
+            if (csTab && !csTab.classList.contains('hidden') && csTab.style.display !== 'none') {
+              loadCsData();
+            }
+          } else {
+            // 현재 월 추가 (데이터가 없을 때)
+            const today = new Date();
+            const currentMonth = `${today.getFullYear()}년${today.getMonth() + 1}월`;
+            const option = document.createElement('option');
+            option.value = currentMonth;
+            option.textContent = currentMonth;
+            monthSelect.appendChild(option);
+            monthSelect.value = currentMonth;
+            // 데이터가 없어도 C/S 탭이 활성화되어 있으면 데이터 로드
+            const csTab = document.getElementById('csTab');
+            if (csTab && !csTab.classList.contains('hidden') && csTab.style.display !== 'none') {
+              loadCsData();
+            }
+          }
+          
+          // C/S 등록 섹션 표시 (화주사 및 관리자 모두, 월 목록 로드 후)
+          const csRegisterSection = document.getElementById('csRegisterSection');
+          if (csRegisterSection) {
+            csRegisterSection.style.display = 'block';
+          }
+          
+          // 월 변경 이벤트
+          monthSelect.onchange = function() {
+            loadCsData();
+          };
+        })
+        .catch(error => {
+          console.error('C/S 월 목록 로드 오류:', error);
+          const monthSelect = document.getElementById('csMonthSelect');
+          if (monthSelect) {
+            const today = new Date();
+            const currentMonth = `${today.getFullYear()}년${today.getMonth() + 1}월`;
+            monthSelect.innerHTML = `<option value="${currentMonth}">${currentMonth}</option>`;
+            monthSelect.value = currentMonth;
+          }
+        });
+    }
+    window.loadCsAvailableMonths = loadCsAvailableMonths;
+    
+    // C/S 데이터 새로고침
+    function refreshCsData() {
+      const csTab = document.getElementById('csTab');
+      if (csTab && !csTab.classList.contains('hidden') && csTab.style.display !== 'none') {
+        loadCsData();
+      }
+    }
+    window.refreshCsData = refreshCsData;
+    
+    // C/S 데이터 로드
+    function loadCsData() {
+      const csTab = document.getElementById('csTab');
+      if (csTab && (csTab.classList.contains('hidden') || csTab.style.display === 'none')) {
+        return;
+      }
+      
+      const selectedMonth = document.getElementById('csMonthSelect')?.value || '';
+      const companyFilter = (currentRole === '관리자') ? '' : currentCompany;
+      
+      const url = `${API_BASE_URL}/api/cs/?company=${encodeURIComponent(companyFilter)}&month=${encodeURIComponent(selectedMonth)}&role=${encodeURIComponent(currentRole)}`;
+      
+      fetch(url)
+        .then(response => response.json())
+        .then(result => {
+          if (result.success) {
+            currentCsData = result.data || [];
+            renderCsTable(currentCsData);
+            updateCsStats(currentCsData);
+            filterCsByStatus(currentCsFilter);
+          } else {
+            showMessage('❌ ' + (result.message || 'C/S 목록 로드 실패'), 'error');
+            document.getElementById('csTableBody').innerHTML = 
+              `<tr><td colspan="9" class="no-data">데이터를 불러올 수 없습니다.</td></tr>`;
+            currentCsData = [];
+            updateCsStats([]);
+          }
+        })
+        .catch(error => {
+          console.error('C/S 데이터 로드 오류:', error);
+          showMessage('❌ C/S 데이터 로드 중 오류: ' + error.message, 'error');
+          currentCsData = [];
+          updateCsStats([]);
+        });
+    }
+    window.loadCsData = loadCsData;
+    
+    // C/S 테이블 렌더링
+    function renderCsTable(csList) {
+      const tbody = document.getElementById('csTableBody');
+      if (!tbody) return;
+      
+      tbody.innerHTML = '';
+      
+      const isAdmin = (currentRole === '관리자');
+      
+      // 필터링 적용
+      let filteredList = csList;
+      if (currentCsFilter === 'completed') {
+        filteredList = csList.filter(cs => cs.status === '처리완료' || cs.status === '처리불가');
+      } else if (currentCsFilter === 'pending') {
+        filteredList = csList.filter(cs => cs.status === '접수');
+      }
+      
+      if (!filteredList || filteredList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="no-data">등록된 C/S 접수가 없습니다.</td></tr>';
+        // 관리자 열 표시/숨김
+        const adminHeader = document.getElementById('csAdminActionsHeader');
+        if (adminHeader) {
+          adminHeader.style.display = isAdmin ? 'table-cell' : 'none';
+        }
+        return;
+      }
+      
+      // 관리자 열 표시/숨김
+      const adminHeader = document.getElementById('csAdminActionsHeader');
+      if (adminHeader) {
+        adminHeader.style.display = isAdmin ? 'table-cell' : 'none';
+      }
+      
+      filteredList.forEach(cs => {
+        const tr = document.createElement('tr');
+        
+        // 날짜와 시간 초까지 표시 (한국 표준시간 KST, UTC+9)
+        let date = '-';
+        if (cs.created_at) {
+          try {
+            // 서버에서 받은 시간 문자열을 Date 객체로 파싱
+            const dateStr = String(cs.created_at);
+            let dateObj = new Date(dateStr);
+            
+            // 유효한 날짜인지 확인
+            if (isNaN(dateObj.getTime())) {
+              // 파싱 실패 시 다른 형식 시도
+              if (dateStr.includes(' ')) {
+                dateObj = new Date(dateStr.replace(' ', 'T'));
+              } else if (!dateStr.includes('T') && !dateStr.includes('Z')) {
+                dateObj = new Date(dateStr + 'T00:00:00Z');
+              } else {
+                dateObj = new Date(dateStr);
+              }
+            }
+            
+            // 여전히 유효하지 않으면 원본 문자열 사용
+            if (isNaN(dateObj.getTime())) {
+              date = dateStr;
+            } else {
+              // UTC 시간에 9시간(32400000ms)을 더해서 한국 시간으로 변환
+              const kstTime = new Date(dateObj.getTime() + (9 * 60 * 60 * 1000));
+              
+              // 변환된 시간에서 년월일시분초 추출 (일반 메서드 사용)
+              const year = kstTime.getFullYear();
+              const month = String(kstTime.getMonth() + 1).padStart(2, '0');
+              const day = String(kstTime.getDate()).padStart(2, '0');
+              const hours = String(kstTime.getHours()).padStart(2, '0');
+              const minutes = String(kstTime.getMinutes()).padStart(2, '0');
+              const seconds = String(kstTime.getSeconds()).padStart(2, '0');
+              
+              date = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+            }
+          } catch (e) {
+            console.error('날짜 파싱 오류:', e, cs.created_at);
+            date = cs.created_at || '-';
+          }
+        } else if (cs.date) {
+          date = cs.date;
+        }
+        const managementNumber = cs.management_number || '';
+        const generatedManagementNumber = cs.generated_management_number || '';
+        const companyName = escapeHtml(cs.company_name || '');
+        const issueType = escapeHtml(cs.issue_type || '');
+        const content = escapeHtml(cs.content || '');
+        const status = cs.status || '접수';
+        const processor = escapeHtml(cs.processor || '');
+        const adminMessage = escapeHtml(cs.admin_message || '');
+        
+        // C/S 종류별 색상
+        let issueTypeColor = '#636e72';
+        let issueTypeBg = '#ecf0f1';
+        if (issueType === '오배송') {
+          issueTypeColor = '#e74c3c';
+          issueTypeBg = '#ffe5e5';
+        } else if (issueType === '누락') {
+          issueTypeColor = '#f39c12';
+          issueTypeBg = '#fff5e5';
+        } else if (issueType === '교환') {
+          issueTypeColor = '#3498db';
+          issueTypeBg = '#e5f3ff';
+        } else if (issueType === '반품') {
+          issueTypeColor = '#9b59b6';
+          issueTypeBg = '#f0e5ff';
+        } else if (issueType === '취소') {
+          issueTypeColor = '#e74c3c';
+          issueTypeBg = '#ffe5e5';
+        } else if (issueType === '기타') {
+          issueTypeColor = '#95a5a6';
+          issueTypeBg = '#f5f5f5';
+        }
+        
+        // 상태별 색상
+        let statusColor = '#636e72';
+        if (status === '처리완료') {
+          statusColor = '#00b894';
+        } else if (status === '처리불가') {
+          statusColor = '#e74c3c';
+        } else {
+          statusColor = '#f39c12';
+        }
+        
+        // 관리자용 관리 버튼
+        let manageHtml = '';
+        if (isAdmin) {
+          manageHtml = `
+            <div style="display: flex; gap: 5px; flex-wrap: nowrap; align-items: center;">
+              <button class="save-btn" onclick="updateCsGeneratedManagementNumber(${cs.id}, '${escapeHtml(generatedManagementNumber)}')" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(116, 185, 255, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">생성된 관리번호</button>
+              <button class="save-btn" onclick="processCsComplete(${cs.id})" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 184, 148, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">처리완료</button>
+              <button class="save-btn" onclick="processCsImpossible(${cs.id})" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(231, 76, 60, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">처리불가</button>
+            </div>
+          `;
+        }
+        
+        tr.innerHTML = `
+          <td style="white-space: nowrap; text-align: center;">${date}</td>
+          <td style="white-space: nowrap; text-align: center;">${managementNumber || '-'}</td>
+          <td style="white-space: nowrap; text-align: center;">${generatedManagementNumber || '-'}</td>
+          <td style="white-space: nowrap; text-align: center;">${companyName}</td>
+          <td style="white-space: nowrap; text-align: center;">
+            ${issueType ? `<span style="display: inline-block; padding: 4px 10px; border-radius: 6px; background: ${issueTypeBg}; color: ${issueTypeColor}; font-weight: 600; font-size: 11px; border: 1px solid ${issueTypeColor};">${issueType}</span>` : '-'}
+          </td>
+          <td style="max-width: 300px; word-wrap: break-word; text-align: center;">${content}</td>
+          <td style="white-space: nowrap; color: ${statusColor}; font-weight: 600; text-align: center;">${status}</td>
+          <td style="white-space: nowrap; text-align: center;">
+            ${processor ? `<span style="display: inline-block; padding: 3px 8px; border-radius: 4px; background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; font-weight: 600; font-size: 11px;">${processor}</span>` : '-'}
+          </td>
+          <td style="max-width: 200px; word-wrap: break-word; text-align: center;">${adminMessage || '-'}</td>
+          ${isAdmin ? `<td style="text-align: center; white-space: nowrap; min-width: 200px;">${manageHtml}</td>` : ''}
+        `;
+        
+        tbody.appendChild(tr);
+      });
+    }
+    window.renderCsTable = renderCsTable;
+    
+    // C/S 통계 업데이트
+    function updateCsStats(csList) {
+      const total = csList.length;
+      const completed = csList.filter(cs => cs.status === '처리완료' || cs.status === '처리불가').length;
+      const pending = csList.filter(cs => cs.status === '접수').length;
+      
+      const totalCountEl = document.getElementById('csTotalCount');
+      const completedCountEl = document.getElementById('csCompletedCount');
+      const pendingCountEl = document.getElementById('csPendingCount');
+      
+      if (totalCountEl) totalCountEl.textContent = total;
+      if (completedCountEl) completedCountEl.textContent = completed;
+      if (pendingCountEl) pendingCountEl.textContent = pending;
+    }
+    window.updateCsStats = updateCsStats;
+    
+    // C/S 상태별 필터링
+    function filterCsByStatus(filter) {
+      currentCsFilter = filter;
+      
+      // 통계 박스 활성화 상태 업데이트
+      document.querySelectorAll('#csFilterAll, #csFilterCompleted, #csFilterPending').forEach(item => {
+        item.classList.remove('active');
+      });
+      
+      if (filter === 'all') {
+        document.getElementById('csFilterAll')?.classList.add('active');
+      } else if (filter === 'completed') {
+        document.getElementById('csFilterCompleted')?.classList.add('active');
+      } else if (filter === 'pending') {
+        document.getElementById('csFilterPending')?.classList.add('active');
+      }
+      
+      // 테이블 다시 렌더링
+      if (currentCsData && currentCsData.length > 0) {
+        renderCsTable(currentCsData);
+      }
+    }
+    window.filterCsByStatus = filterCsByStatus;
+    
+    // C/S 엑셀 다운로드
+    function exportCsData() {
+      const selectedMonth = document.getElementById('csMonthSelect')?.value || '';
+      const companyFilter = (currentRole === '관리자') ? '' : currentCompany;
+      
+      const url = `${API_BASE_URL}/api/cs/export?company=${encodeURIComponent(companyFilter)}&month=${encodeURIComponent(selectedMonth)}&role=${encodeURIComponent(currentRole)}`;
+      
+      window.open(url, '_blank');
+    }
+    window.exportCsData = exportCsData;
+    
+    // 텔레그램 알림 테스트
+    async function testTelegram() {
+      if (!confirm('텔레그램 알림을 테스트하시겠습니까?')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/cs/test-telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showMessage('✅ ' + result.message, 'success');
+        } else {
+          showMessage('❌ ' + (result.message || '텔레그램 테스트 실패'), 'error');
+        }
+      } catch (error) {
+        console.error('텔레그램 테스트 오류:', error);
+        showMessage('❌ 텔레그램 테스트 중 오류: ' + error.message, 'error');
+      }
+    }
+    window.testTelegram = testTelegram;
+    
+    // 생성된 관리번호 업데이트 (관리자용 - 반품내역 비고 입력 방식과 동일)
+    function updateCsGeneratedManagementNumber(csId, currentNumber) {
+      // 기존 모달 제거
+      const existingModal = document.getElementById('csGeneratedManagementNumberModal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+      
+      const modalHtml = `
+        <div id="csGeneratedManagementNumberModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;" onclick="closeCsGeneratedManagementNumberModal(event)">
+          <div style="background: white; border-radius: 16px; padding: 30px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);" onclick="event.stopPropagation()">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <h3 style="margin: 0; color: #ff6b35; font-size: 22px; font-weight: 700;">생성된 관리번호 입력</h3>
+              <button onclick="closeCsGeneratedManagementNumberModal()" style="background: #e74c3c; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;">×</button>
+            </div>
+            <div style="margin-bottom: 20px;">
+              <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">생성된 관리번호</label>
+              <input type="text" id="csGeneratedManagementNumberInput" class="request-input" style="min-height: auto;" value="${escapeHtml(currentNumber || '')}" placeholder="생성된 관리번호를 입력하세요">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+              <button onclick="closeCsGeneratedManagementNumberModal()" class="save-btn" style="background: linear-gradient(135deg, #636e72 0%, #2d3436 100%);">취소</button>
+              <button onclick="saveCsGeneratedManagementNumber(${csId})" class="save-btn">💾 저장</button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      document.getElementById('csGeneratedManagementNumberInput').focus();
+    }
+    window.updateCsGeneratedManagementNumber = updateCsGeneratedManagementNumber;
+    
+    // 생성된 관리번호 모달 닫기
+    function closeCsGeneratedManagementNumberModal(event) {
+      if (event && event.target.id !== 'csGeneratedManagementNumberModal' && !event.target.closest('#csGeneratedManagementNumberModal > div')) {
+        return;
+      }
+      const modal = document.getElementById('csGeneratedManagementNumberModal');
+      if (modal) {
+        modal.remove();
+      }
+    }
+    window.closeCsGeneratedManagementNumberModal = closeCsGeneratedManagementNumberModal;
+    
+    // 생성된 관리번호 저장
+    function saveCsGeneratedManagementNumber(csId) {
+      const newNumber = document.getElementById('csGeneratedManagementNumberInput').value.trim();
+      
+      fetch(`/api/cs/${csId}/generated-management-number`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generated_management_number: newNumber || null })
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          showMessage('✅ 생성된 관리번호가 업데이트되었습니다.', 'success');
+          closeCsGeneratedManagementNumberModal();
+          refreshCsData();
+        } else {
+          showMessage('❌ ' + (result.message || '업데이트 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('생성된 관리번호 업데이트 오류:', error);
+        showMessage('❌ 생성된 관리번호 업데이트 중 오류: ' + error.message, 'error');
+      });
+    }
+    window.saveCsGeneratedManagementNumber = saveCsGeneratedManagementNumber;
+    
+    // 처리완료 (관리자용)
+    function processCsComplete(csId) {
+      const message = prompt('처리 메시지를 입력하세요 (선택사항):', '');
+      if (message === null) return; // 취소 버튼 클릭 시
+      
+      fetch(`/api/cs/${csId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: '처리완료',
+          admin_message: message ? message.trim() : null,
+          processor: currentCompany
+        })
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          showMessage('✅ 처리완료로 변경되었습니다.', 'success');
+          refreshCsData();
+          // 통계 업데이트를 위해 데이터 다시 로드
+          loadCsData();
+        } else {
+          showMessage('❌ ' + (result.message || '처리 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('처리완료 오류:', error);
+        showMessage('❌ 처리 중 오류: ' + error.message, 'error');
+      });
+    }
+    window.processCsComplete = processCsComplete;
+    
+    // 처리불가 (관리자용)
+    function processCsImpossible(csId) {
+      const message = prompt('처리 메시지를 입력하세요 (선택사항):', '');
+      if (message === null) return; // 취소 버튼 클릭 시
+      
+      fetch(`/api/cs/${csId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: '처리불가',
+          admin_message: message ? message.trim() : null,
+          processor: currentCompany
+        })
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          showMessage('✅ 처리불가로 변경되었습니다.', 'success');
+          refreshCsData();
+          // 통계 업데이트를 위해 데이터 다시 로드
+          loadCsData();
+        } else {
+          showMessage('❌ ' + (result.message || '처리 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('처리불가 오류:', error);
+        showMessage('❌ 처리 중 오류: ' + error.message, 'error');
+      });
+    }
+    window.processCsImpossible = processCsImpossible;
+    // ========== 화주사 정보 관련 함수 ==========
     // 사업자 정보 필수 팝업 모달 표시
     function showBusinessInfoRequiredModal() {
       // 기존 모달이 있으면 제거
@@ -4941,7 +5885,6 @@
       }
     }
     window.changePassword = changePassword;
-    
     // 비밀번호 변경 폼 초기화
     function resetPasswordForm() {
       document.getElementById('currentPassword').value = '';
@@ -5399,7 +6342,6 @@
       });
     }
     window.removeBoardFile = removeBoardFile;
-    
     // 게시글 저장
     async function saveBoard() {
       const categoryId = document.getElementById('boardCategoryId').value;
@@ -5446,7 +6388,6 @@
       }
     }
     window.saveBoard = saveBoard;
-    
     // 게시글 수정
     async function editBoard(boardId) {
       try {
@@ -5897,7 +6838,6 @@
       }
     }
     window.savePopup = savePopup;
-    
     // 팝업 수정
     async function editPopup(popupId) {
       try {
@@ -5943,7 +6883,6 @@
       }
     }
     window.editPopup = editPopup;
-    
     // 팝업 삭제
     async function deletePopup(popupId) {
       if (!confirm('정말로 이 팝업을 삭제하시겠습니까?')) {
@@ -6378,527 +7317,8 @@
         checkAndForceStyle();
       });
     }
-    
     // 전역으로 노출하여 언제든지 호출 가능하도록
     window.disableHeaderHover = disableHeaderHover;
-    
-    /* ========== 관리자 탭 전환 ========== */
-    function switchAdminTab(tabName) {
-      console.log('=== switchAdminTab 호출 ===', tabName);
-      
-      // 모든 탭 요소 가져오기
-      const returnsTab = document.getElementById('returnsTab');
-      const registerTab = document.getElementById('registerTab');
-      const scheduleCalendarTab = document.getElementById('scheduleCalendarTab');
-      const boardTab = document.getElementById('boardTab');
-      const popupTab = document.getElementById('popupTab');
-      const passwordTab = document.getElementById('passwordTab');
-      
-      console.log('탭 요소 확인:', {
-        returnsTab: returnsTab ? '존재' : '없음',
-        registerTab: registerTab ? '존재' : '없음',
-        scheduleCalendarTab: scheduleCalendarTab ? '존재' : '없음',
-        passwordTab: passwordTab ? '존재' : '없음'
-      });
-      
-      // 모든 탭 버튼 가져오기
-      const tabButtons = document.querySelectorAll('#adminTabs .tab-btn');
-      console.log('탭 버튼 개수:', tabButtons.length);
-      
-      // 1. 모든 탭 버튼 비활성화
-      tabButtons.forEach((btn, index) => {
-        btn.classList.remove('active');
-      });
-      
-      // 2. 모든 탭 콘텐츠 숨기기 (강제로)
-      const allTabs = [
-        {tab: returnsTab, name: 'returnsTab'},
-        {tab: registerTab, name: 'registerTab'},
-        {tab: scheduleCalendarTab, name: 'scheduleCalendarTab'},
-        {tab: boardTab, name: 'boardTab'},
-        {tab: popupTab, name: 'popupTab'}
-      ];
-      
-      // passwordTab도 숨기기 (존재하는 경우)
-      if (passwordTab) {
-        passwordTab.classList.add('hidden');
-        passwordTab.style.setProperty('display', 'none', 'important');
-        passwordTab.style.setProperty('visibility', 'hidden', 'important');
-        passwordTab.style.setProperty('opacity', '0', 'important');
-      }
-      
-      allTabs.forEach((item) => {
-        if (item.tab) {
-          item.tab.classList.add('hidden');
-          item.tab.style.setProperty('display', 'none', 'important');
-          item.tab.style.setProperty('visibility', 'hidden', 'important');
-          item.tab.style.setProperty('opacity', '0', 'important');
-          console.log(`${item.name} 숨김`);
-        }
-      });
-      
-      // 3. 선택된 탭 표시
-      let selectedTab = null;
-      let selectedButtonIndex = -1;
-      
-      if (tabName === 'returns' && returnsTab) {
-        selectedTab = returnsTab;
-        selectedButtonIndex = 0;
-      } else if (tabName === 'scheduleCalendar' && scheduleCalendarTab) {
-        selectedTab = scheduleCalendarTab;
-        selectedButtonIndex = 1;
-        // 화주사 목록 로드 및 달력 로드
-        loadCompaniesForSchedule();
-        loadCalendarSchedules();
-      } else if (tabName === 'board' && boardTab) {
-        selectedTab = boardTab;
-        selectedButtonIndex = 2;
-        // 카테고리 및 게시글 로드
-        loadCategories();
-        loadBoards();
-      } else if (tabName === 'popup' && popupTab) {
-        selectedTab = popupTab;
-        selectedButtonIndex = 3;
-        // 팝업 목록 로드
-        loadPopups();
-      } else if (tabName === 'register' && registerTab) {
-        selectedTab = registerTab;
-        selectedButtonIndex = 4;
-      }
-      
-      // 현재 활성 탭을 localStorage에 저장 (F5 새로고침 시 복원용)
-      localStorage.setItem('activeAdminTab', tabName);
-      // password 탭 제거됨
-      
-      if (selectedTab) {
-        // 선택된 탭 표시 (강제로)
-        selectedTab.classList.remove('hidden');
-        selectedTab.style.removeProperty('display');
-        selectedTab.style.removeProperty('visibility');
-        selectedTab.style.removeProperty('opacity');
-        selectedTab.style.setProperty('display', 'block', 'important');
-        selectedTab.style.setProperty('visibility', 'visible', 'important');
-        selectedTab.style.setProperty('opacity', '1', 'important');
-        
-        console.log('선택된 탭 표시:', selectedTab.id);
-        console.log('인라인 스타일:', {
-          display: selectedTab.style.display,
-          visibility: selectedTab.style.visibility,
-          opacity: selectedTab.style.opacity,
-          hasHidden: selectedTab.classList.contains('hidden')
-        });
-        
-        // 선택된 탭의 실제 표시 상태 확인
-        setTimeout(() => {
-          const computedStyle = window.getComputedStyle(selectedTab);
-          console.log('계산된 스타일:', {
-            display: computedStyle.display,
-            visibility: computedStyle.visibility,
-            opacity: computedStyle.opacity
-          });
-        }, 50);
-      } else {
-        console.error('선택된 탭을 찾을 수 없습니다:', tabName);
-      }
-      
-      // 4. 선택된 탭 버튼 활성화
-      if (selectedButtonIndex >= 0 && tabButtons[selectedButtonIndex]) {
-        tabButtons[selectedButtonIndex].classList.add('active');
-        console.log('탭 버튼 활성화:', selectedButtonIndex);
-      }
-      
-      // 5. 현재 활성화된 탭을 localStorage에 저장 (페이지 새로고침 시 유지)
-      localStorage.setItem('activeAdminTab', tabName);
-      
-      // 6. 화주사 등록 탭이 선택되면 화주사 목록 로드
-      if (tabName === 'register') {
-        setTimeout(() => {
-          try {
-            if (typeof loadCompanies === 'function') {
-              console.log('loadCompanies 함수 호출');
-              loadCompanies();
-            } else {
-              console.error('loadCompanies 함수를 찾을 수 없습니다.');
-            }
-          } catch (error) {
-            console.error('화주사 목록 로드 중 오류:', error);
-            console.error(error.stack);
-          }
-        }, 300);
-      }
-      
-      // 7. 반품 내역 탭이 선택되면 반품 내역 데이터 로드 (월이 선택되어 있을 때만)
-      if (tabName === 'returns') {
-        setTimeout(() => {
-          const monthSelect = document.getElementById('monthSelect');
-          if (monthSelect) {
-            // 월이 선택되어 있지 않으면 현재 월로 설정
-            if (!monthSelect.value) {
-              const today = new Date();
-              const currentMonth = `${today.getFullYear()}년${today.getMonth() + 1}월`;
-              monthSelect.value = currentMonth;
-            }
-            // 데이터 로드
-            if (monthSelect.value) {
-              try {
-                if (typeof refreshReturnsData === 'function') {
-                  console.log('반품 내역 데이터 로드');
-                  refreshReturnsData();
-                }
-              } catch (error) {
-                console.error('반품 내역 데이터 로드 중 오류:', error);
-              }
-            }
-          }
-        }, 300);
-      }
-      
-      console.log('=== switchAdminTab 완료 ===');
-    }
-    window.switchAdminTab = switchAdminTab;
-    
-    /* ========== 화주사 등록 폼 접이식 ========== */
-    function toggleAddCompanyForm() {
-      const form = document.getElementById('addCompanyForm');
-      const icon = document.getElementById('addCompanyIcon');
-      
-      if (form.style.display === 'none') {
-        form.style.display = 'block';
-        icon.textContent = '▲';
-        icon.style.transform = 'rotate(0deg)';
-      } else {
-        form.style.display = 'none';
-        icon.textContent = '▼';
-        icon.style.transform = 'rotate(0deg)';
-        const form = document.getElementById('adminRegisterForm');
-        if (form) {
-          form.reset();
-        }
-        const statusEl = document.getElementById('adminRegisterStatus');
-        if (statusEl) {
-          statusEl.className = 'admin-status';
-          statusEl.textContent = '';
-          statusEl.style.display = 'none';
-        }
-      }
-    }
-    window.toggleAddCompanyForm = toggleAddCompanyForm;
-    
-    /* ========== 화주사 등록 ========== */
-    function registerCompany() {
-      console.log('=== registerCompany 함수 호출 ===');
-      
-      const btn = document.getElementById('adminRegisterBtn');
-      const status = document.getElementById('adminRegisterStatus');
-      
-      if (!btn || !status) {
-        console.error('❌ 버튼 또는 상태 요소를 찾을 수 없습니다.');
-        alert('화주사 등록 폼을 찾을 수 없습니다. 페이지를 새로고침해주세요.');
-        return;
-      }
-      
-      // 필드 값 가져오기
-      const companyNameEl = document.getElementById('adminRegCompanyName');
-      const usernameEl = document.getElementById('adminRegUsername');
-      const passwordEl = document.getElementById('adminRegPassword');
-      const roleEl = document.getElementById('adminRegRole');
-      const businessNumberEl = document.getElementById('adminRegBusinessNumber');
-      const businessNameEl = document.getElementById('adminRegBusinessName');
-      const businessAddressEl = document.getElementById('adminRegBusinessAddress');
-      const businessTelEl = document.getElementById('adminRegBusinessTel');
-      const businessEmailEl = document.getElementById('adminRegBusinessEmail');
-      
-      if (!companyNameEl || !usernameEl || !passwordEl || !roleEl) {
-        console.error('❌ 필수 입력 필드를 찾을 수 없습니다.');
-        alert('화주사 등록 폼 필드를 찾을 수 없습니다. 페이지를 새로고침해주세요.');
-        return;
-      }
-      
-      const companyName = companyNameEl.value.trim();
-      const username = usernameEl.value.trim();
-      const password = passwordEl.value.trim();
-      const role = roleEl.value.trim();
-      const businessNumber = businessNumberEl ? businessNumberEl.value.trim() : '';
-      const businessName = businessNameEl ? businessNameEl.value.trim() : '';
-      const businessAddress = businessAddressEl ? businessAddressEl.value.trim() : '';
-      const businessTel = businessTelEl ? businessTelEl.value.trim() : '';
-      const businessEmail = businessEmailEl ? businessEmailEl.value.trim() : '';
-
-      console.log('입력된 데이터:', { companyName, username, password: '***', role });
-
-      if (!companyName || !username || !password || !role) {
-        status.className = 'admin-status error';
-        status.textContent = '화주사명, 아이디, 비밀번호, 권한은 필수 입력 항목입니다.';
-        console.error('❌ 필수 입력 항목 누락');
-        return;
-      }
-      
-      if (role !== '화주사' && role !== '관리자') {
-        status.className = 'admin-status error';
-        status.textContent = '권한은 화주사 또는 관리자 중 하나를 선택해야 합니다.';
-        console.error('❌ 잘못된 권한:', role);
-        return;
-      }
-
-      btn.disabled = true;
-      btn.textContent = '등록 중...';
-      status.className = 'admin-status loading';
-      status.textContent = '화주사 등록 중...';
-      
-      const data = {
-        company_name: companyName,
-        username: username,
-        password: password,
-        role: role,
-        business_number: businessNumber || undefined,
-        business_name: businessName || undefined,
-        business_address: businessAddress || undefined,
-        business_tel: businessTel || undefined,
-        business_email: businessEmail || undefined
-      };
-
-      console.log('화주사 등록 요청 데이터:', { ...data, password: '***' });
-      console.log('API_BASE_URL:', API_BASE_URL);
-      console.log('API URL:', `${API_BASE_URL}/api/auth/register`);
-      
-      // 버튼 비활성화
-      btn.disabled = true;
-      btn.textContent = '등록 중...';
-      status.className = 'admin-status loading';
-      status.textContent = '화주사 등록 중...';
-      status.style.display = 'block';
-      
-      fetch(`${API_BASE_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      })
-      .then(response => {
-        console.log('화주사 등록 응답 상태:', response.status, response.statusText);
-        console.log('응답 헤더:', response.headers);
-        
-        // 응답 본문 읽기
-        return response.text().then(text => {
-          console.log('응답 본문 (원본):', text);
-          try {
-            const json = JSON.parse(text);
-            return { status: response.status, ok: response.ok, data: json };
-          } catch (e) {
-            console.error('JSON 파싱 오류:', e);
-            return { status: response.status, ok: response.ok, data: { success: false, message: '서버 응답을 파싱할 수 없습니다.' } };
-          }
-        });
-      })
-      .then(result => {
-        console.log('화주사 등록 응답 데이터:', result);
-        
-        if (result.ok && result.data.success) {
-          status.className = 'admin-status success';
-          status.textContent = result.data.message || '화주사 계정이 생성되었습니다.';
-          status.style.display = 'block';
-          
-          // 폼 초기화
-          const form = document.getElementById('adminRegisterForm');
-          if (form) {
-            form.reset();
-          }
-          
-          // 화주사 목록 새로고침
-          if (typeof loadCompanies === 'function') {
-            console.log('화주사 목록 새로고침 호출');
-            loadCompanies();
-          } else {
-            console.warn('⚠️ loadCompanies 함수를 찾을 수 없습니다.');
-          }
-          
-          // 폼 닫기 (1.5초 후)
-          setTimeout(() => {
-            if (typeof toggleAddCompanyForm === 'function') {
-              toggleAddCompanyForm();
-            }
-          }, 1500);
-        } else {
-          status.className = 'admin-status error';
-          status.textContent = result.data.message || '화주사 등록에 실패했습니다.';
-          status.style.display = 'block';
-          console.error('화주사 등록 실패:', result.data);
-        }
-        
-        btn.disabled = false;
-        btn.textContent = '등록하기';
-      })
-      .catch(error => {
-        console.error('화주사 등록 오류:', error);
-        console.error('오류 스택:', error.stack);
-        status.className = 'admin-status error';
-        status.textContent = '화주사 등록 중 오류가 발생했습니다: ' + (error.message || error);
-        status.style.display = 'block';
-        btn.disabled = false;
-        btn.textContent = '등록하기';
-      });
-    }
-    window.registerCompany = registerCompany;
-    
-    /* ========== 화주사 목록 새로고침 ========== */
-    function refreshCompaniesData() {
-      console.log('화주사 목록 새로고침');
-      // 화주사 등록 탭이 활성화되어 있는지 확인
-      const registerTab = document.getElementById('registerTab');
-      if (registerTab && !registerTab.classList.contains('hidden') && registerTab.style.display !== 'none') {
-        loadCompanies();
-      } else {
-        console.log('화주사 등록 탭이 활성화되지 않아 새로고침을 건너뜁니다.');
-      }
-    }
-    window.refreshCompaniesData = refreshCompaniesData;
-    
-    /* ========== 화주사 목록 로드 ========== */
-    function loadCompanies() {
-      try {
-        const tbody = document.getElementById('companiesTableBody');
-        if (!tbody) {
-          console.error('companiesTableBody 요소를 찾을 수 없습니다.');
-          return;
-        }
-        
-        tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터를 불러오는 중...</td></tr>';
-        
-        fetch('/api/auth/companies', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          return response.json();
-        })
-        .then(data => {
-          if (data.success && data.companies) {
-            // 통계 표시
-            if (data.statistics) {
-              const statsEl = document.getElementById('companiesStatistics');
-              if (statsEl) {
-                statsEl.textContent = `(관리자: ${data.statistics.admin_count}, 화주사: ${data.statistics.company_count})`;
-              }
-            }
-            renderCompaniesTable(data.companies);
-          } else {
-            tbody.innerHTML = '<tr><td colspan="12" class="no-data">화주사 목록을 불러올 수 없습니다.</td></tr>';
-          }
-        })
-        .catch(error => {
-          console.error('화주사 목록 로드 오류:', error);
-          if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="12" class="no-data">화주사 목록을 불러오는 중 오류가 발생했습니다: ' + error.message + '</td></tr>';
-          }
-        });
-      } catch (error) {
-        console.error('loadCompanies 함수 오류:', error);
-      }
-    }
-    window.loadCompanies = loadCompanies;
-    
-    /* ========== 화주사 목록 테이블 렌더링 ========== */
-    function renderCompaniesTable(companies) {
-      const tbody = document.getElementById('companiesTableBody');
-      tbody.innerHTML = '';
-      
-      if (!companies || companies.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="13" class="no-data">등록된 화주사가 없습니다.</td></tr>';
-        return;
-      }
-      
-      companies.forEach(company => {
-        const tr = document.createElement('tr');
-        
-        // 날짜 포맷팅
-        const createdAt = company.created_at ? new Date(company.created_at).toLocaleDateString('ko-KR') : '-';
-        
-        // 최근 로그인 날짜 포맷팅
-        let lastLogin = '-';
-        if (company.last_login) {
-          const lastLoginDate = new Date(company.last_login);
-          const now = new Date();
-          const diffMs = now - lastLoginDate;
-          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-          const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-          const diffMinutes = Math.floor(diffMs / (1000 * 60));
-          
-          if (diffMinutes < 1) {
-            lastLogin = '방금 전';
-          } else if (diffMinutes < 60) {
-            lastLogin = `${diffMinutes}분 전`;
-          } else if (diffHours < 24) {
-            lastLogin = `${diffHours}시간 전`;
-          } else if (diffDays < 7) {
-            lastLogin = `${diffDays}일 전`;
-          } else {
-            lastLogin = lastLoginDate.toLocaleDateString('ko-KR');
-          }
-        }
-        
-        // 권한 표시 (색상으로 구분)
-        const role = company.role || '화주사';
-        const roleColor = role === '관리자' ? '#ff6b35' : '#feca57';
-        const roleBg = role === '관리자' ? 'linear-gradient(135deg, #ff6b35 0%, #ff5722 100%)' : 'linear-gradient(135deg, #feca57 0%, #ffa502 100%)';
-        const roleHtml = `<span style="background: ${roleBg}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 700; font-size: 13px;">${escapeHtml(role)}</span>`;
-        
-        // 사업자 등록증 버튼
-        const certificateUrl = company.business_certificate_url || '';
-        let certificateHtml = '';
-        if (certificateUrl) {
-          certificateHtml = `<button class="save-btn" onclick="viewCertificate(${company.id}, '${escapeHtml(certificateUrl)}')" style="background: linear-gradient(135deg, #ffeaa7 0%, #fff9e6 100%); color: #ff6b35; border: 2px solid #ffa502; padding: 5px 10px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(255, 165, 2, 0.2); transition: all 0.3s ease; white-space: nowrap;">📄 보기</button>`;
-        } else {
-          certificateHtml = `<button class="save-btn" onclick="uploadCertificate(${company.id})" style="background: linear-gradient(135deg, #fff9e6 0%, #ffeaa7 100%); color: #ff6b35; border: 2px solid #ffeaa7; padding: 5px 10px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(255, 152, 0, 0.15); transition: all 0.3s ease; white-space: nowrap;">📤 업로드</button>`;
-        }
-        
-        // 태그 표시
-        const searchKeywords = company.search_keywords || '';
-        const tags = searchKeywords ? searchKeywords.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
-        let tagsHtml = '';
-        if (tags.length > 0) {
-          tagsHtml = tags.map(tag => 
-            `<span style="display: inline-block; background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; margin: 2px; box-shadow: 0 2px 4px rgba(116, 185, 255, 0.3);">${escapeHtml(tag)}</span>`
-          ).join('');
-        } else {
-          tagsHtml = '<span style="color: #999; font-size: 12px;">태그 없음</span>';
-        }
-        
-        // 관리 버튼 (반응형 - 1열 유지)
-        const manageHtml = `
-          <div style="display: flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: nowrap; min-width: 200px;">
-            <button class="save-btn" onclick="openTagModal(${company.id}, '${escapeHtml(company.username || '')}', '${escapeHtml(company.company_name || '')}', '${escapeHtml(searchKeywords)}')" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(116, 185, 255, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">🏷️ 태그</button>
-            <button class="save-btn" onclick="changeCompanyPassword(${company.id}, '${escapeHtml(company.username || '')}')" style="background: linear-gradient(135deg, #ffeaa7 0%, #fff9e6 100%); color: #ff6b35; border: 2px solid #ffa502; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(255, 165, 2, 0.2); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">🔒 비밀번호</button>
-            <button class="save-btn" onclick="deleteCompany(${company.id}, '${escapeHtml(company.company_name || '')}')" style="background: linear-gradient(135deg, #ee5a6f 0%, #ff6b35 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(238, 90, 111, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">🗑️ 삭제</button>
-          </div>
-        `;
-        
-        tr.innerHTML = `
-          <td>${escapeHtml(company.company_name || '-')}</td>
-          <td>${escapeHtml(company.username || '-')}</td>
-          <td>${roleHtml}</td>
-          <td style="max-width: 200px; word-wrap: break-word;">${tagsHtml}</td>
-          <td>${escapeHtml(company.business_number || '-')}</td>
-          <td>${escapeHtml(company.business_name || '-')}</td>
-          <td>${escapeHtml(company.business_address || '-')}</td>
-          <td>${escapeHtml(company.business_tel || '-')}</td>
-          <td>${escapeHtml(company.business_email || '-')}</td>
-          <td style="text-align: center; white-space: nowrap;">${certificateHtml}</td>
-          <td>${lastLogin}</td>
-          <td>${createdAt}</td>
-          <td style="text-align: center; white-space: nowrap; min-width: 200px;">${manageHtml}</td>
-        `;
-        
-        tbody.appendChild(tr);
-      });
-    }
-    window.renderCompaniesTable = renderCompaniesTable;
-    
     /* ========== 화주사 삭제 ========== */
     function deleteCompany(companyId, companyName) {
       if (!confirm(`정말로 "${companyName}" 화주사를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) {
@@ -6926,7 +7346,6 @@
       });
     }
     window.deleteCompany = deleteCompany;
-    
     /* ========== 화주사 태그 관리 ========== */
     function openTagModal(companyId, username, companyName, currentTags) {
       // 기존 모달 제거
@@ -7264,4 +7683,3 @@
   </script>
 </body>
 </html>
-

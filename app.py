@@ -21,9 +21,19 @@ flask.cli.load_dotenv = _noop_load_dotenv
 
 try:
     load_dotenv()
+    # .env 파일에서 로드되지 않은 경우 기본값 설정
+    if not os.environ.get('TELEGRAM_BOT_TOKEN'):
+        os.environ['TELEGRAM_BOT_TOKEN'] = '8212387279:AAFc4-KLvLZ-8Zt-hOgTPMfUz3f2NnJbSDw'
+    if not os.environ.get('TELEGRAM_CHAT_ID'):
+        os.environ['TELEGRAM_CHAT_ID'] = '-4993829776'
 except Exception as e:
     print(f"⚠️ .env 파일 로드 중 오류 발생 (무시하고 계속 진행): {e}")
     print("   코드에 직접 설정된 환경 변수 값을 사용합니다.")
+    # 기본값 설정
+    if not os.environ.get('TELEGRAM_BOT_TOKEN'):
+        os.environ['TELEGRAM_BOT_TOKEN'] = '8212387279:AAFc4-KLvLZ-8Zt-hOgTPMfUz3f2NnJbSDw'
+    if not os.environ.get('TELEGRAM_CHAT_ID'):
+        os.environ['TELEGRAM_CHAT_ID'] = '-4993829776'
 
 # Flask 앱 생성
 app = Flask(__name__, 
@@ -68,6 +78,8 @@ from api.admin.routes import admin_bp
 from api.schedules.routes_db import schedules_bp
 from api.board.routes_db import board_bp
 from api.popups.routes_db import popups_bp
+from api.cs.routes_db import cs_bp
+from api.cs.scheduler import start_cs_notification_scheduler
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(returns_bp)
@@ -77,6 +89,13 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(schedules_bp)
 app.register_blueprint(board_bp)
 app.register_blueprint(popups_bp)
+app.register_blueprint(cs_bp)
+
+# C/S 알림 스케줄러 시작
+try:
+    start_cs_notification_scheduler()
+except Exception as e:
+    print(f"⚠️ C/S 알림 스케줄러 시작 중 오류 (무시 가능): {e}")
 
 
 # 메인 페이지 라우트 (화주사 대시보드)

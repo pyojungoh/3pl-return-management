@@ -1,0 +1,184 @@
+"""
+C/S 알림 스케줄러
+- 일반 미처리 항목: 5분마다 알림
+- 취소건: 1분마다 알림
+"""
+import threading
+import time
+from datetime import datetime, timezone, timedelta
+from api.cs.routes_db import get_pending_cs_requests, get_pending_cs_requests_by_issue_type
+from api.notifications.telegram import send_telegram_notification
+
+
+def convert_to_kst(datetime_str: str) -> str:
+    """
+    UTC 시간 문자열을 한국시간(KST)으로 변환
+    """
+    if not datetime_str:
+        return ''
+    
+    try:
+        # 다양한 날짜 형식 파싱 시도
+        formats = [
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d %H:%M:%S.%f',
+            '%Y-%m-%dT%H:%M:%S',
+            '%Y-%m-%dT%H:%M:%S.%f',
+            '%Y-%m-%dT%H:%M:%S%z',
+            '%Y-%m-%dT%H:%M:%S.%f%z',
+        ]
+        
+        dt = None
+        for fmt in formats:
+            try:
+                dt = datetime.strptime(datetime_str, fmt)
+                break
+            except ValueError:
+                continue
+        
+        if dt is None:
+            return datetime_str
+        
+        # timezone 정보가 없으면 UTC로 가정
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        
+        # KST로 변환 (UTC+9)
+        kst = timezone(timedelta(hours=9))
+        kst_time = dt.astimezone(kst)
+        
+        # YYYY-MM-DD HH:MM:SS 형식으로 반환
+        return kst_time.strftime('%Y-%m-%d %H:%M:%S')
+    except Exception as e:
+        print(f"⚠️ 시간 변환 오류: {e}, 원본: {datetime_str}")
+        return datetime_str
+
+# 마지막 알림 시간 추적 (중복 알림 방지)
+last_notification_times = {}
+
+def send_cs_notifications():
+    """C/S 알림 전송 (스케줄러에서 호출)"""
+    try:
+        # 취소건: 1분마다 알림
+        cancellation_requests = get_pending_cs_requests_by_issue_type('취소')
+        current_time = datetime.now()
+        
+        for cs in cancellation_requests:
+            cs_id = cs.get('id')
+            if not cs_id:
+                continue
+                
+            # 마지막 알림 시간 확인 (1분 이내면 스킵)
+            last_time_key = f"cancellation_{cs_id}"
+            last_time = last_notification_times.get(last_time_key)
+            
+            if last_time:
+                time_diff = (current_time - last_time).total_seconds()
+                if time_diff < 60:  # 1분 미만이면 스킵
+                    continue
+            
+            # 알림 전송
+            company_name = cs.get('company_name', '알 수 없음')
+            issue_type = cs.get('issue_type', '취소')
+            content = cs.get('content', '')
+            content_preview = content[:100] + ('...' if len(content) > 100 else '')
+            
+            created_at_kst = convert_to_kst(cs.get('created_at', ''))
+            message = f"🚨 <b>미처리 취소건 알림 (1분)</b>\n\n"
+            message += f"화주사: {company_name}\n"
+            message += f"유형: {issue_type}\n"
+            message += f"내용: {content_preview}\n"
+            message += f"접수일: {created_at_kst}"
+            
+            send_telegram_notification(message)
+            
+            # 마지막 알림 시간 업데이트
+            last_notification_times[last_time_key] = current_time
+        
+        # 일반 미처리 항목: 5분마다 알림 (취소건 제외)
+        all_pending = get_pending_cs_requests()
+        non_cancellation_requests = [cs for cs in all_pending if cs.get('issue_type') != '취소']
+        
+        for cs in non_cancellation_requests:
+            cs_id = cs.get('id')
+            if not cs_id:
+                continue
+                
+            # 마지막 알림 시간 확인 (5분 이내면 스킵)
+            last_time_key = f"general_{cs_id}"
+            last_time = last_notification_times.get(last_time_key)
+            
+            if last_time:
+                time_diff = (current_time - last_time).total_seconds()
+                if time_diff < 300:  # 5분 미만이면 스킵
+                    continue
+            else:
+                # 첫 알림인 경우, 접수일로부터 5분 이상 지났는지 확인
+                created_at_str = cs.get('created_at', '')
+                if created_at_str:
+                    try:
+                        # created_at을 datetime으로 파싱
+                        created_at = None
+                        formats = [
+                            '%Y-%m-%d %H:%M:%S',
+                            '%Y-%m-%d %H:%M:%S.%f',
+                            '%Y-%m-%dT%H:%M:%S',
+                            '%Y-%m-%dT%H:%M:%S.%f',
+                        ]
+                        for fmt in formats:
+                            try:
+                                created_at = datetime.strptime(created_at_str, fmt)
+                                break
+                            except ValueError:
+                                continue
+                        
+                        if created_at:
+                            # 접수일로부터 5분 미만이면 스킵
+                            time_since_creation = (current_time - created_at).total_seconds()
+                            if time_since_creation < 300:  # 5분 미만이면 스킵
+                                continue
+                    except Exception as e:
+                        print(f"⚠️ 접수일 파싱 오류: {e}")
+            
+            # 알림 전송
+            company_name = cs.get('company_name', '알 수 없음')
+            issue_type = cs.get('issue_type', '알 수 없음')
+            content = cs.get('content', '')
+            content_preview = content[:100] + ('...' if len(content) > 100 else '')
+            
+            created_at_kst = convert_to_kst(cs.get('created_at', ''))
+            message = f"🚨 <b>미처리 C/S 알림 (5분)</b>\n\n"
+            message += f"화주사: {company_name}\n"
+            message += f"유형: {issue_type}\n"
+            message += f"내용: {content_preview}\n"
+            message += f"접수일: {created_at_kst}"
+            
+            send_telegram_notification(message)
+            
+            # 마지막 알림 시간 업데이트
+            last_notification_times[last_time_key] = current_time
+            
+    except Exception as e:
+        print(f"❌ C/S 알림 전송 오류: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def start_cs_notification_scheduler():
+    """C/S 알림 스케줄러 시작 (백그라운드 스레드)"""
+    def scheduler_loop():
+        while True:
+            try:
+                send_cs_notifications()
+            except Exception as e:
+                print(f"❌ 스케줄러 루프 오류: {e}")
+            
+            # 1분마다 실행 (취소건 체크)
+            time.sleep(60)
+    
+    scheduler_thread = threading.Thread(target=scheduler_loop, daemon=True)
+    scheduler_thread.start()
+    print("✅ C/S 알림 스케줄러가 시작되었습니다.")
+    print("   - 취소건: 1분마다 알림")
+    print("   - 일반 항목: 5분마다 알림")
+

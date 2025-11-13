@@ -11,6 +11,8 @@ google-auth-oauthlib==1.2.0
 google-auth-httplib2==0.2.0
 # Cloudinary (이미지 업로드)
 cloudinary==1.38.0
+# Telegram notifications
+requests==2.31.0
 
 
 

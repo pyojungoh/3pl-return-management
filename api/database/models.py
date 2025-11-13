@@ -253,6 +253,84 @@ def init_db():
                 ON popups(start_date, end_date, is_active)
             ''')
             
+            # PostgreSQL - C/S 접수 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS customer_service (
+                    id SERIAL PRIMARY KEY,
+                    company_name TEXT NOT NULL,
+                    username TEXT NOT NULL,
+                    date DATE NOT NULL,
+                    month TEXT NOT NULL,
+                    issue_type TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    management_number TEXT,
+                    generated_management_number TEXT,
+                    status TEXT DEFAULT '접수',
+                    admin_message TEXT,
+                    processor TEXT,
+                    processed_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # C/S 테이블에 새 필드 추가 (마이그레이션)
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN IF NOT EXISTS date DATE')
+            except Exception:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN IF NOT EXISTS month TEXT')
+            except Exception:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN IF NOT EXISTS management_number TEXT')
+            except Exception:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN IF NOT EXISTS generated_management_number TEXT')
+            except Exception:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN IF NOT EXISTS admin_message TEXT')
+            except Exception:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN IF NOT EXISTS processor TEXT')
+            except Exception:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN IF NOT EXISTS processed_at TIMESTAMP')
+            except Exception:
+                pass
+            # admin_response를 admin_message로 변경 (기존 데이터 호환)
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN IF NOT EXISTS admin_response TEXT')
+                # admin_response가 있고 admin_message가 없으면 복사
+                cursor.execute('''
+                    UPDATE customer_service 
+                    SET admin_message = admin_response 
+                    WHERE admin_message IS NULL AND admin_response IS NOT NULL
+                ''')
+            except Exception:
+                pass
+            
+            # C/S 인덱스 생성
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_cs_company 
+                ON customer_service(company_name, created_at)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_cs_status 
+                ON customer_service(status, created_at)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_cs_month 
+                ON customer_service(month, created_at)
+            ''')
+            
         else:
             # SQLite 테이블 생성 (기존 코드)
             # 화주사 계정 테이블
@@ -480,6 +558,84 @@ def init_db():
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_popups_dates 
                 ON popups(start_date, end_date, is_active)
+            ''')
+            
+            # SQLite - C/S 접수 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS customer_service (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    company_name TEXT NOT NULL,
+                    username TEXT NOT NULL,
+                    date DATE NOT NULL,
+                    month TEXT NOT NULL,
+                    issue_type TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    management_number TEXT,
+                    generated_management_number TEXT,
+                    status TEXT DEFAULT '접수',
+                    admin_message TEXT,
+                    processor TEXT,
+                    processed_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # C/S 테이블에 새 필드 추가 (마이그레이션)
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN date DATE')
+            except OperationalError:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN month TEXT')
+            except OperationalError:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN management_number TEXT')
+            except OperationalError:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN generated_management_number TEXT')
+            except OperationalError:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN admin_message TEXT')
+            except OperationalError:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN processor TEXT')
+            except OperationalError:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN processed_at TIMESTAMP')
+            except OperationalError:
+                pass
+            # admin_response를 admin_message로 변경 (기존 데이터 호환)
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN admin_response TEXT')
+                # admin_response가 있고 admin_message가 없으면 복사
+                cursor.execute('''
+                    UPDATE customer_service 
+                    SET admin_message = admin_response 
+                    WHERE admin_message IS NULL AND admin_response IS NOT NULL
+                ''')
+            except OperationalError:
+                pass
+            
+            # C/S 인덱스 생성
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_cs_company 
+                ON customer_service(company_name, created_at)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_cs_status 
+                ON customer_service(status, created_at)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_cs_month 
+                ON customer_service(month, created_at)
             ''')
         
         conn.commit()
