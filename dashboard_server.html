@@ -1871,11 +1871,12 @@
                   <th style="padding: 12px; text-align: center; font-weight: 600;">처리자</th>
                   <th style="padding: 12px; text-align: center; font-weight: 600;">관리자 메시지</th>
                   <th id="csAdminActionsHeader" style="padding: 12px; text-align: center; font-weight: 600; display: none;">관리</th>
+                  <th id="csResendHeader" style="padding: 12px; text-align: center; font-weight: 600; display: none;">재요청</th>
                 </tr>
               </thead>
               <tbody id="csTableBody">
                 <tr>
-                  <td colspan="11" class="no-data">로딩 중...</td>
+                  <td colspan="12" class="no-data">로딩 중...</td>
                 </tr>
               </tbody>
             </table>
@@ -5131,11 +5132,16 @@
       }
       
       if (!filteredList || filteredList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="no-data">등록된 C/S 접수가 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="no-data">등록된 C/S 접수가 없습니다.</td></tr>';
         // 관리자 열 표시/숨김
         const adminHeader = document.getElementById('csAdminActionsHeader');
         if (adminHeader) {
           adminHeader.style.display = isAdmin ? 'table-cell' : 'none';
+        }
+        // 재요청 열 표시/숨김 (화주사 모드에서만)
+        const resendHeader = document.getElementById('csResendHeader');
+        if (resendHeader) {
+          resendHeader.style.display = !isAdmin ? 'table-cell' : 'none';
         }
         return;
       }
@@ -5144,6 +5150,11 @@
       const adminHeader = document.getElementById('csAdminActionsHeader');
       if (adminHeader) {
         adminHeader.style.display = isAdmin ? 'table-cell' : 'none';
+      }
+      // 재요청 열 표시/숨김 (화주사 모드에서만)
+      const resendHeader = document.getElementById('csResendHeader');
+      if (resendHeader) {
+        resendHeader.style.display = !isAdmin ? 'table-cell' : 'none';
       }
       
       // 전체 리스트 개수 (순번 계산용)
@@ -5260,6 +5271,11 @@
           </td>
           <td style="max-width: 200px; word-wrap: break-word; text-align: center;">${adminMessage || '-'}</td>
           ${isAdmin ? `<td style="text-align: center; white-space: nowrap; min-width: 200px;">${manageHtml}</td>` : ''}
+          ${!isAdmin && status !== '처리완료' && status !== '처리불가' ? `<td style="text-align: center; white-space: nowrap;">
+            <button class="save-btn" onclick="resendCsNotification(${cs.id})" style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: white; border: none; padding: 6px 12px; font-size: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(243, 156, 18, 0.25); transition: all 0.3s ease; white-space: nowrap; cursor: pointer;">
+              🔔 재요청
+            </button>
+          </td>` : !isAdmin ? `<td style="text-align: center; white-space: nowrap;">-</td>` : ''}
         `;
         
         tbody.appendChild(tr);
@@ -5607,6 +5623,33 @@
       });
     }
     window.processCsImpossible = processCsImpossible;
+    
+    // C/S 재요청 알림 전송 (화주사용)
+    async function resendCsNotification(csId) {
+      if (!confirm('재요청 알림을 전송하시겠습니까?')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/cs/${csId}/resend-notification`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showMessage('✅ 재요청 알림이 전송되었습니다.', 'success');
+        } else {
+          showMessage('❌ ' + (result.message || '재요청 알림 전송 실패'), 'error');
+        }
+      } catch (error) {
+        console.error('재요청 알림 오류:', error);
+        showMessage('❌ 재요청 알림 전송 중 오류: ' + error.message, 'error');
+      }
+    }
+    window.resendCsNotification = resendCsNotification;
+    
     // ========== 화주사 정보 관련 함수 ==========
     // 사업자 정보 필수 팝업 모달 표시
     function showBusinessInfoRequiredModal() {

@@ -735,6 +735,114 @@ def test_telegram():
         }), 500
 
 
+@cs_bp.route('/<int:cs_id>/resend-notification', methods=['POST'])
+def resend_cs_notification(cs_id):
+    """C/S 재요청 알림 전송 (화주사용)"""
+    try:
+        conn = get_db_connection()
+        
+        if USE_POSTGRESQL:
+            cursor = conn.cursor()
+            try:
+                # C/S 정보 조회
+                cursor.execute('''
+                    SELECT id, company_name, username, date, month, issue_type, content, 
+                           management_number, generated_management_number, status, created_at
+                    FROM customer_service
+                    WHERE id = %s
+                ''', (cs_id,))
+                row = cursor.fetchone()
+                
+                if not row:
+                    return jsonify({
+                        'success': False,
+                        'message': 'C/S 접수를 찾을 수 없습니다.'
+                    }), 404
+                
+                cs_data = {
+                    'id': row[0],
+                    'company_name': row[1],
+                    'username': row[2],
+                    'date': row[3],
+                    'month': row[4],
+                    'issue_type': row[5],
+                    'content': row[6],
+                    'management_number': row[7],
+                    'generated_management_number': row[8],
+                    'status': row[9],
+                    'created_at': row[10]
+                }
+            finally:
+                cursor.close()
+                conn.close()
+        else:
+            import sqlite3
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            try:
+                cursor.execute('''
+                    SELECT id, company_name, username, date, month, issue_type, content, 
+                           management_number, generated_management_number, status, created_at
+                    FROM customer_service
+                    WHERE id = ?
+                ''', (cs_id,))
+                row = cursor.fetchone()
+                
+                if not row:
+                    return jsonify({
+                        'success': False,
+                        'message': 'C/S 접수를 찾을 수 없습니다.'
+                    }), 404
+                
+                cs_data = dict(row)
+            finally:
+                conn.close()
+        
+        # 처리완료 상태면 알림 전송하지 않음
+        if cs_data.get('status') == '처리완료' or cs_data.get('status') == '처리불가':
+            return jsonify({
+                'success': False,
+                'message': '처리완료된 C/S는 재요청할 수 없습니다.'
+            }), 400
+        
+        # 텔레그램 알림 메시지 생성
+        kst_now = get_kst_now()
+        message = "🔔 <b>C/S 재요청 알림</b>\n\n"
+        message += f"📋 <b>C/S ID:</b> {cs_data.get('id', 'N/A')}\n"
+        if cs_data.get('generated_management_number'):
+            message += f"🔢 <b>관리번호:</b> {cs_data.get('generated_management_number')}\n"
+        elif cs_data.get('management_number'):
+            message += f"🔢 <b>관리번호:</b> {cs_data.get('management_number')}\n"
+        message += f"🏢 <b>화주사:</b> {cs_data.get('company_name', 'N/A')}\n"
+        message += f"📅 <b>날짜:</b> {cs_data.get('date', 'N/A')}\n"
+        message += f"📦 <b>종류:</b> {cs_data.get('issue_type', 'N/A')}\n"
+        message += f"📝 <b>내용:</b> {cs_data.get('content', 'N/A')}\n"
+        message += f"⏰ <b>재요청 시간:</b> {kst_now.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        message += "⚠️ 화주사가 재요청을 요청했습니다. 빠른 처리 부탁드립니다."
+        
+        success = send_telegram_notification(message)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '재요청 알림이 전송되었습니다.'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '재요청 알림 전송에 실패했습니다.'
+            }), 500
+            
+    except Exception as e:
+        print(f'❌ C/S 재요청 알림 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'재요청 알림 전송 중 오류: {str(e)}'
+        }), 500
+
+
 @cs_bp.route('/export', methods=['GET'])
 def export_cs():
     """C/S 접수 엑셀 다운로드"""
