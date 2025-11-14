@@ -2046,7 +2046,52 @@ def get_all_board_categories() -> List[Dict]:
             ''')
             rows = cursor.fetchall()
             # SQLite Row 객체를 딕셔너리로 변환
-            return [{key: row[key] for key in row.keys()} for row in rows]
+            result = []
+            for idx, row in enumerate(rows):
+                if hasattr(row, 'keys'):
+                    # 먼저 dict(row)로 변환
+                    row_dict = dict(row)
+                    
+                    # Row 객체의 키 확인
+                    row_keys = list(row_dict.keys())
+                    
+                    # id 필드를 찾아서 설정
+                    # 1. 먼저 'id' 키가 있는지 확인
+                    if 'id' in row_dict:
+                        # id가 있지만 None이면 row[0] 사용
+                        if row_dict['id'] is None and len(row) > 0:
+                            row_dict['id'] = row[0]
+                    else:
+                        # id 키가 없으면 row[0] 사용 (SELECT b.id as id가 첫 번째 컬럼)
+                        if len(row) > 0:
+                            row_dict['id'] = row[0]
+                        else:
+                            # row[0]도 없으면 None
+                            row_dict['id'] = None
+                    
+                    # 디버깅: 첫 번째 게시글만 로그 출력
+                    if idx == 0:
+                        print(f"🔍 게시글 Row 변환 - Row 키: {row_keys}")
+                        print(f"🔍 게시글 Row 변환 - row[0] 값: {row[0] if len(row) > 0 else 'N/A'}")
+                        print(f"🔍 게시글 Row 변환 - Dict 키: {list(row_dict.keys())}")
+                        print(f"🔍 게시글 Row 변환 - 최종 id: {row_dict.get('id')}, 타입: {type(row_dict.get('id'))}")
+                    result.append(row_dict)
+                else:
+                    # 튜플인 경우 (row_factory가 설정되지 않은 경우)
+                    result.append({
+                        'id': row[0] if len(row) > 0 else None,
+                        'category_id': row[1] if len(row) > 1 else None,
+                        'title': row[2] if len(row) > 2 else None,
+                        'content': row[3] if len(row) > 3 else None,
+                        'author_name': row[4] if len(row) > 4 else None,
+                        'author_role': row[5] if len(row) > 5 else None,
+                        'is_pinned': row[6] if len(row) > 6 else None,
+                        'view_count': row[7] if len(row) > 7 else None,
+                        'created_at': row[8] if len(row) > 8 else None,
+                        'updated_at': row[9] if len(row) > 9 else None,
+                        'category_name': row[10] if len(row) > 10 else None
+                    })
+            return result
         finally:
             conn.close()
 
@@ -2167,22 +2212,51 @@ def create_board(board_data: Dict) -> int:
     else:
         cursor = conn.cursor()
         try:
+            # 기존 최대 ID 확인
+            cursor.execute('SELECT MAX(id) FROM boards')
+            max_id_row = cursor.fetchone()
+            max_id = max_id_row[0] if max_id_row and max_id_row[0] is not None else 0
+            
+            # 새로운 ID 생성 (최대 ID + 1 또는 랜덤)
+            import random
+            import time
+            # 최대 ID + 1을 기본으로 사용하되, 랜덤 요소 추가
+            new_id = max_id + 1
+            # 타임스탬프 기반 랜덤 값 추가 (중복 방지)
+            random_component = int(time.time()) % 10000 + random.randint(1, 999)
+            new_id = new_id + random_component
+            
+            # ID가 너무 크면 최대 ID + 1 사용
+            if new_id > max_id + 100000:
+                new_id = max_id + 1
+            
+            # 현재 시간을 KST로 가져오기
+            from datetime import datetime, timezone, timedelta
+            kst = timezone(timedelta(hours=9))
+            created_at = datetime.now(kst).strftime('%Y-%m-%d %H:%M:%S')
+            
             cursor.execute('''
                 INSERT INTO boards (
-                    category_id, title, content, author_name, author_role, is_pinned
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    id, category_id, title, content, author_name, author_role, is_pinned, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
+                new_id,
                 board_data.get('category_id'),
                 board_data.get('title'),
                 board_data.get('content'),
                 board_data.get('author_name'),
                 board_data.get('author_role'),
-                1 if board_data.get('is_pinned', False) else 0
+                1 if board_data.get('is_pinned', False) else 0,
+                created_at,
+                created_at
             ))
             conn.commit()
-            return cursor.lastrowid
+            print(f"✅ 게시글 생성 성공 - 생성된 ID: {new_id} (최대 ID: {max_id})")
+            return new_id
         except Exception as e:
-            print(f"게시글 생성 오류: {e}")
+            print(f"❌ 게시글 생성 오류: {e}")
+            import traceback
+            traceback.print_exc()
             return 0
         finally:
             conn.close()
@@ -2211,7 +2285,8 @@ def get_boards_by_category(category_id: int) -> List[Dict]:
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                SELECT b.*, bc.name as category_name
+                SELECT b.id as id, b.category_id, b.title, b.content, b.author_name, b.author_role, 
+                       b.is_pinned, b.view_count, b.created_at, b.updated_at, bc.name as category_name
                 FROM boards b
                 JOIN board_categories bc ON b.category_id = bc.id
                 WHERE b.category_id = ?
@@ -2219,7 +2294,52 @@ def get_boards_by_category(category_id: int) -> List[Dict]:
             ''', (category_id,))
             rows = cursor.fetchall()
             # SQLite Row 객체를 딕셔너리로 변환
-            return [{key: row[key] for key in row.keys()} for row in rows]
+            result = []
+            for idx, row in enumerate(rows):
+                if hasattr(row, 'keys'):
+                    # 먼저 dict(row)로 변환
+                    row_dict = dict(row)
+                    
+                    # Row 객체의 키 확인
+                    row_keys = list(row_dict.keys())
+                    
+                    # id 필드를 찾아서 설정
+                    # 1. 먼저 'id' 키가 있는지 확인
+                    if 'id' in row_dict:
+                        # id가 있지만 None이면 row[0] 사용
+                        if row_dict['id'] is None and len(row) > 0:
+                            row_dict['id'] = row[0]
+                    else:
+                        # id 키가 없으면 row[0] 사용 (SELECT b.id as id가 첫 번째 컬럼)
+                        if len(row) > 0:
+                            row_dict['id'] = row[0]
+                        else:
+                            # row[0]도 없으면 None
+                            row_dict['id'] = None
+                    
+                    # 디버깅: 첫 번째 게시글만 로그 출력
+                    if idx == 0:
+                        print(f"🔍 게시글 Row 변환 - Row 키: {row_keys}")
+                        print(f"🔍 게시글 Row 변환 - row[0] 값: {row[0] if len(row) > 0 else 'N/A'}")
+                        print(f"🔍 게시글 Row 변환 - Dict 키: {list(row_dict.keys())}")
+                        print(f"🔍 게시글 Row 변환 - 최종 id: {row_dict.get('id')}, 타입: {type(row_dict.get('id'))}")
+                    result.append(row_dict)
+                else:
+                    # 튜플인 경우 (row_factory가 설정되지 않은 경우)
+                    result.append({
+                        'id': row[0] if len(row) > 0 else None,
+                        'category_id': row[1] if len(row) > 1 else None,
+                        'title': row[2] if len(row) > 2 else None,
+                        'content': row[3] if len(row) > 3 else None,
+                        'author_name': row[4] if len(row) > 4 else None,
+                        'author_role': row[5] if len(row) > 5 else None,
+                        'is_pinned': row[6] if len(row) > 6 else None,
+                        'view_count': row[7] if len(row) > 7 else None,
+                        'created_at': row[8] if len(row) > 8 else None,
+                        'updated_at': row[9] if len(row) > 9 else None,
+                        'category_name': row[10] if len(row) > 10 else None
+                    })
+            return result
         finally:
             conn.close()
 
@@ -2246,14 +2366,60 @@ def get_all_boards() -> List[Dict]:
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                SELECT b.*, bc.name as category_name
+                SELECT b.id as id, b.category_id, b.title, b.content, b.author_name, b.author_role, 
+                       b.is_pinned, b.view_count, b.created_at, b.updated_at, bc.name as category_name
                 FROM boards b
                 JOIN board_categories bc ON b.category_id = bc.id
                 ORDER BY b.is_pinned DESC, b.created_at DESC
             ''')
             rows = cursor.fetchall()
             # SQLite Row 객체를 딕셔너리로 변환
-            return [{key: row[key] for key in row.keys()} for row in rows]
+            result = []
+            for idx, row in enumerate(rows):
+                if hasattr(row, 'keys'):
+                    # 먼저 dict(row)로 변환
+                    row_dict = dict(row)
+                    
+                    # Row 객체의 키 확인
+                    row_keys = list(row_dict.keys())
+                    
+                    # id 필드를 찾아서 설정
+                    # 1. 먼저 'id' 키가 있는지 확인
+                    if 'id' in row_dict:
+                        # id가 있지만 None이면 row[0] 사용
+                        if row_dict['id'] is None and len(row) > 0:
+                            row_dict['id'] = row[0]
+                    else:
+                        # id 키가 없으면 row[0] 사용 (SELECT b.id as id가 첫 번째 컬럼)
+                        if len(row) > 0:
+                            row_dict['id'] = row[0]
+                        else:
+                            # row[0]도 없으면 None
+                            row_dict['id'] = None
+                    
+                    # 디버깅: 첫 번째 게시글만 로그 출력
+                    if idx == 0:
+                        print(f"🔍 게시글 Row 변환 - Row 키: {row_keys}")
+                        print(f"🔍 게시글 Row 변환 - row[0] 값: {row[0] if len(row) > 0 else 'N/A'}")
+                        print(f"🔍 게시글 Row 변환 - Dict 키: {list(row_dict.keys())}")
+                        print(f"🔍 게시글 Row 변환 - 최종 id: {row_dict.get('id')}, 타입: {type(row_dict.get('id'))}")
+                    result.append(row_dict)
+                else:
+                    # 튜플인 경우 (row_factory가 설정되지 않은 경우)
+                    result.append({
+                        'id': row[0] if len(row) > 0 else None,
+                        'category_id': row[1] if len(row) > 1 else None,
+                        'title': row[2] if len(row) > 2 else None,
+                        'content': row[3] if len(row) > 3 else None,
+                        'author_name': row[4] if len(row) > 4 else None,
+                        'author_role': row[5] if len(row) > 5 else None,
+                        'is_pinned': row[6] if len(row) > 6 else None,
+                        'view_count': row[7] if len(row) > 7 else None,
+                        'created_at': row[8] if len(row) > 8 else None,
+                        'updated_at': row[9] if len(row) > 9 else None,
+                        'category_name': row[10] if len(row) > 10 else None
+                    })
+            return result
         finally:
             conn.close()
 
@@ -2280,14 +2446,15 @@ def get_board_by_id(board_id: int) -> Optional[Dict]:
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                SELECT b.*, bc.name as category_name
+                SELECT b.id as id, b.category_id, b.title, b.content, b.author_name, b.author_role, 
+                       b.is_pinned, b.view_count, b.created_at, b.updated_at, bc.name as category_name
                 FROM boards b
                 JOIN board_categories bc ON b.category_id = bc.id
                 WHERE b.id = ?
             ''', (board_id,))
             row = cursor.fetchone()
             # SQLite Row 객체를 딕셔너리로 변환
-            return {key: row[key] for key in row.keys()} if row else None
+            return dict(row) if row else None
         finally:
             conn.close()
 
@@ -2493,7 +2660,52 @@ def get_board_files(board_id: int) -> List[Dict]:
             ''', (board_id,))
             rows = cursor.fetchall()
             # SQLite Row 객체를 딕셔너리로 변환
-            return [{key: row[key] for key in row.keys()} for row in rows]
+            result = []
+            for idx, row in enumerate(rows):
+                if hasattr(row, 'keys'):
+                    # 먼저 dict(row)로 변환
+                    row_dict = dict(row)
+                    
+                    # Row 객체의 키 확인
+                    row_keys = list(row_dict.keys())
+                    
+                    # id 필드를 찾아서 설정
+                    # 1. 먼저 'id' 키가 있는지 확인
+                    if 'id' in row_dict:
+                        # id가 있지만 None이면 row[0] 사용
+                        if row_dict['id'] is None and len(row) > 0:
+                            row_dict['id'] = row[0]
+                    else:
+                        # id 키가 없으면 row[0] 사용 (SELECT b.id as id가 첫 번째 컬럼)
+                        if len(row) > 0:
+                            row_dict['id'] = row[0]
+                        else:
+                            # row[0]도 없으면 None
+                            row_dict['id'] = None
+                    
+                    # 디버깅: 첫 번째 게시글만 로그 출력
+                    if idx == 0:
+                        print(f"🔍 게시글 Row 변환 - Row 키: {row_keys}")
+                        print(f"🔍 게시글 Row 변환 - row[0] 값: {row[0] if len(row) > 0 else 'N/A'}")
+                        print(f"🔍 게시글 Row 변환 - Dict 키: {list(row_dict.keys())}")
+                        print(f"🔍 게시글 Row 변환 - 최종 id: {row_dict.get('id')}, 타입: {type(row_dict.get('id'))}")
+                    result.append(row_dict)
+                else:
+                    # 튜플인 경우 (row_factory가 설정되지 않은 경우)
+                    result.append({
+                        'id': row[0] if len(row) > 0 else None,
+                        'category_id': row[1] if len(row) > 1 else None,
+                        'title': row[2] if len(row) > 2 else None,
+                        'content': row[3] if len(row) > 3 else None,
+                        'author_name': row[4] if len(row) > 4 else None,
+                        'author_role': row[5] if len(row) > 5 else None,
+                        'is_pinned': row[6] if len(row) > 6 else None,
+                        'view_count': row[7] if len(row) > 7 else None,
+                        'created_at': row[8] if len(row) > 8 else None,
+                        'updated_at': row[9] if len(row) > 9 else None,
+                        'category_name': row[10] if len(row) > 10 else None
+                    })
+            return result
         finally:
             conn.close()
 
@@ -2879,7 +3091,52 @@ def get_all_popups() -> List[Dict]:
             ''')
             rows = cursor.fetchall()
             # SQLite Row 객체를 딕셔너리로 변환
-            return [{key: row[key] for key in row.keys()} for row in rows]
+            result = []
+            for idx, row in enumerate(rows):
+                if hasattr(row, 'keys'):
+                    # 먼저 dict(row)로 변환
+                    row_dict = dict(row)
+                    
+                    # Row 객체의 키 확인
+                    row_keys = list(row_dict.keys())
+                    
+                    # id 필드를 찾아서 설정
+                    # 1. 먼저 'id' 키가 있는지 확인
+                    if 'id' in row_dict:
+                        # id가 있지만 None이면 row[0] 사용
+                        if row_dict['id'] is None and len(row) > 0:
+                            row_dict['id'] = row[0]
+                    else:
+                        # id 키가 없으면 row[0] 사용 (SELECT b.id as id가 첫 번째 컬럼)
+                        if len(row) > 0:
+                            row_dict['id'] = row[0]
+                        else:
+                            # row[0]도 없으면 None
+                            row_dict['id'] = None
+                    
+                    # 디버깅: 첫 번째 게시글만 로그 출력
+                    if idx == 0:
+                        print(f"🔍 게시글 Row 변환 - Row 키: {row_keys}")
+                        print(f"🔍 게시글 Row 변환 - row[0] 값: {row[0] if len(row) > 0 else 'N/A'}")
+                        print(f"🔍 게시글 Row 변환 - Dict 키: {list(row_dict.keys())}")
+                        print(f"🔍 게시글 Row 변환 - 최종 id: {row_dict.get('id')}, 타입: {type(row_dict.get('id'))}")
+                    result.append(row_dict)
+                else:
+                    # 튜플인 경우 (row_factory가 설정되지 않은 경우)
+                    result.append({
+                        'id': row[0] if len(row) > 0 else None,
+                        'category_id': row[1] if len(row) > 1 else None,
+                        'title': row[2] if len(row) > 2 else None,
+                        'content': row[3] if len(row) > 3 else None,
+                        'author_name': row[4] if len(row) > 4 else None,
+                        'author_role': row[5] if len(row) > 5 else None,
+                        'is_pinned': row[6] if len(row) > 6 else None,
+                        'view_count': row[7] if len(row) > 7 else None,
+                        'created_at': row[8] if len(row) > 8 else None,
+                        'updated_at': row[9] if len(row) > 9 else None,
+                        'category_name': row[10] if len(row) > 10 else None
+                    })
+            return result
         finally:
             conn.close()
 

@@ -156,6 +156,12 @@ def get_posts():
         else:
             posts = get_all_boards()
         
+        # 디버깅: 첫 번째 게시글의 키 확인
+        if posts and len(posts) > 0:
+            first_post = posts[0]
+            print(f"🔍 API 응답 - 첫 번째 게시글 키: {list(first_post.keys()) if isinstance(first_post, dict) else 'not dict'}")
+            print(f"🔍 API 응답 - 첫 번째 게시글 id: {first_post.get('id') if isinstance(first_post, dict) else 'N/A'}")
+        
         return jsonify({
             'success': True,
             'data': posts,
@@ -219,6 +225,7 @@ def create_post():
             }), 400
         
         board_id = create_board(data)
+        print(f"🔍 create_board 반환값: {board_id}, 타입: {type(board_id)}")
         if board_id:
             # 첨부파일이 있으면 저장
             files = data.get('files', [])
@@ -229,6 +236,11 @@ def create_post():
                     'file_url': file_data.get('file_url'),
                     'file_size': file_data.get('file_size')
                 })
+            
+            # 생성된 게시글 확인
+            from api.database.models import get_board_by_id
+            created_post = get_board_by_id(board_id)
+            print(f"🔍 생성된 게시글 확인 - ID: {board_id}, 실제 데이터: {created_post.get('id') if created_post else 'None'}")
             
             return jsonify({
                 'success': True,

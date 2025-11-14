@@ -6,6 +6,11 @@
   <title>JJAY 3PL 종합 물류 - 통합 관리 시스템</title>
   <!-- 다음 우편번호 서비스 -->
   <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  <!-- jQuery (Summernote 의존성) -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <!-- Summernote 리치 텍스트 에디터 -->
+  <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -2193,7 +2198,7 @@
             </div>
             <div style="margin-bottom: 15px;">
               <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">내용 *</label>
-              <textarea id="boardContent" class="request-input" style="min-height: 200px;" placeholder="게시글 내용을 입력하세요" required></textarea>
+              <textarea id="boardContent" class="request-input" style="min-height: 300px;" placeholder="게시글 내용을 입력하세요" required></textarea>
             </div>
             <div style="margin-bottom: 15px;">
               <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">첨부파일</label>
@@ -2488,6 +2493,92 @@
     }
     
     // HTML 이스케이프 함수
+    // 동영상 링크를 iframe으로 변환하는 함수
+    function convertVideoLinks(html) {
+      if (!html) return '';
+      
+      console.log('🔍 동영상 링크 변환 시작 - 원본 HTML:', html.substring(0, 200));
+      
+      // 이미 iframe이 있으면 src 확인 및 수정
+      if (html.includes('<iframe')) {
+        console.log('🔍 iframe 태그 발견');
+        // iframe의 src 속성 확인 및 수정
+        html = html.replace(/<iframe([^>]*?)>/gi, (match, attrs) => {
+          console.log('🔍 iframe 속성:', attrs);
+          // src가 없거나 잘못된 경우 처리
+          if (!attrs.includes('src=') || attrs.includes('src=""') || attrs.includes("src=''")) {
+            // HTML에서 YouTube 링크 찾기
+            const youtubeMatch = html.match(/https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/);
+            if (youtubeMatch) {
+              console.log('🔍 YouTube 링크 발견:', youtubeMatch[1]);
+              return `<iframe src="https://www.youtube.com/embed/${youtubeMatch[1]}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; max-width: 100%; height: 400px; border: none;">`;
+            }
+          }
+          // src가 있지만 YouTube embed 형식이 아닌 경우 변환
+          const srcMatch = attrs.match(/src=["']([^"']+)["']/);
+          if (srcMatch) {
+            const src = srcMatch[1];
+            const youtubeMatch = src.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/);
+            if (youtubeMatch && !src.includes('youtube.com/embed')) {
+              console.log('🔍 YouTube 링크를 embed 형식으로 변환:', youtubeMatch[1]);
+              return `<iframe src="https://www.youtube.com/embed/${youtubeMatch[1]}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; max-width: 100%; height: 400px; border: none;">`;
+            }
+          }
+          return match;
+        });
+        console.log('🔍 iframe 처리 후 HTML:', html.substring(0, 200));
+        return html;
+      }
+      
+      // YouTube 링크 변환 (다양한 형식 지원)
+      // https://www.youtube.com/watch?v=VIDEO_ID
+      // https://youtu.be/VIDEO_ID
+      // https://www.youtube.com/embed/VIDEO_ID
+      const youtubeRegex = /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/g;
+      if (youtubeRegex.test(html)) {
+        console.log('🔍 YouTube 링크 패턴 발견');
+        html = html.replace(youtubeRegex, (match, videoId) => {
+          console.log('🔍 YouTube 링크 변환:', videoId);
+          return `<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; margin: 20px 0; border-radius: 8px; overflow: hidden;">
+          <iframe style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;" 
+                  src="https://www.youtube.com/embed/${videoId}" 
+                  frameborder="0" 
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                  allowfullscreen>
+          </iframe>
+        </div>`;
+        });
+      }
+      
+      // Vimeo 링크 변환
+      // https://vimeo.com/VIDEO_ID
+      // https://player.vimeo.com/video/VIDEO_ID
+      html = html.replace(/https?:\/\/(?:www\.)?(?:vimeo\.com\/(?:video\/)?|player\.vimeo\.com\/video\/)(\d+)/g, (match, videoId) => {
+        return `<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; margin: 20px 0; border-radius: 8px; overflow: hidden;">
+          <iframe style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;" 
+                  src="https://player.vimeo.com/video/${videoId}" 
+                  frameborder="0" 
+                  allow="autoplay; fullscreen; picture-in-picture" 
+                  allowfullscreen>
+          </iframe>
+        </div>`;
+      });
+      
+      // 일반 동영상 링크가 iframe이 아닌 경우 변환 시도
+      if (!html.includes('<video')) {
+        // 일반 동영상 URL 패턴 (mp4, webm 등)
+        html = html.replace(/(https?:\/\/[^\s<>"]+\.(?:mp4|webm|ogg|mov|avi|wmv|flv|mkv))/gi, (match, url) => {
+          return `<video controls style="max-width: 100%; height: auto; margin: 20px 0; border-radius: 8px;">
+            <source src="${url}" type="video/${url.split('.').pop().toLowerCase()}">
+            브라우저가 동영상 태그를 지원하지 않습니다.
+          </video>`;
+        });
+      }
+      
+      return html;
+    }
+    window.convertVideoLinks = convertVideoLinks;
+    
     function escapeHtml(text) {
       if (!text) return '';
       const div = document.createElement('div');
@@ -3989,17 +4080,23 @@
           loadCalendarSchedules();
         }
       } else if (tabName === 'board') {
-        const boardCategoryTab = document.getElementById('boardCategoryTab');
-        if (boardCategoryTab) {
-          boardCategoryTab.classList.remove('hidden');
-          boardCategoryTab.style.display = 'block';
+        const boardTab = document.getElementById('boardTab');
+        if (boardTab) {
+          boardTab.classList.remove('hidden');
+          boardTab.style.display = 'block';
         }
-        // 게시판 카테고리 및 게시글 로드
-        loadBoardCategoriesForSelect();
-        // 전체 카테고리 선택 및 게시글 로드
-        setTimeout(() => {
-          selectBoardCategory('');
-        }, 100);
+        // 게시판 카테고리 로드
+        if (typeof loadBoardCategoriesForSelect === 'function') {
+          loadBoardCategoriesForSelect();
+        }
+        // 관리자 모드 게시글 목록 로드
+        if (typeof loadBoards === 'function') {
+          loadBoards();
+        }
+        // 카테고리 필터 드롭다운 로드
+        if (typeof loadCategoriesForBoard === 'function') {
+          loadCategoriesForBoard();
+        }
       } else if (tabName === 'popup') {
         const popupTab = document.getElementById('popupTab');
         if (popupTab) {
@@ -6413,7 +6510,10 @@
     // 게시글 목록 로드 (관리자용)
     async function loadBoards() {
       const tbody = document.getElementById('boardTableBody');
-      if (!tbody) return;
+      if (!tbody) {
+        console.error('boardTableBody를 찾을 수 없습니다.');
+        return;
+      }
       
       tbody.innerHTML = '<tr><td colspan="6" class="no-data">로딩 중...</td></tr>';
       
@@ -6426,8 +6526,20 @@
           url += `?category_id=${categoryId}`;
         }
         
+        console.log('게시글 목록 요청 URL:', url);
+        
         const response = await fetch(url);
+        console.log('게시글 목록 응답 상태:', response.status, response.statusText);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('게시글 목록 응답 오류:', response.status, errorText);
+          tbody.innerHTML = `<tr><td colspan="6" class="no-data">게시글을 불러오는 중 오류가 발생했습니다. (${response.status})</td></tr>`;
+          return;
+        }
+        
         const result = await response.json();
+        console.log('게시글 목록 응답 데이터:', result);
         
         if (result.success && result.data) {
           if (result.data.length === 0) {
@@ -6435,16 +6547,65 @@
             return;
           }
           
+          // 디버깅: 첫 번째 게시글의 키 확인
+          if (result.data.length > 0) {
+            const firstPost = result.data[0];
+            console.log('🔍 첫 번째 게시글 키:', Object.keys(firstPost));
+            console.log('🔍 첫 번째 게시글 id:', firstPost.id, '타입:', typeof firstPost.id);
+            console.log('🔍 첫 번째 게시글 전체:', firstPost);
+          }
+          
           tbody.innerHTML = '';
-          result.data.forEach(post => {
+          result.data.forEach((post, index) => {
+            // post.id가 없거나 undefined이면 건너뛰기
+            if (post.id === undefined || post.id === null) {
+              console.warn(`게시글 ID가 없습니다 (인덱스 ${index}):`, post);
+              console.warn('게시글의 모든 키:', Object.keys(post));
+              return;
+            }
+            
             const tr = document.createElement('tr');
             const createdAt = post.created_at ? new Date(post.created_at).toLocaleDateString('ko-KR') : '-';
-            const isPinned = post.is_pinned || (post.is_pinned === 1);
+            // is_pinned 체크 (엄격하게 - 문자열 '1', 숫자 1, boolean true만 true로 인식)
+            const isPinned = post.is_pinned === true || post.is_pinned === 1 || String(post.is_pinned) === '1';
+            const categoryName = (post.category_name || '').trim();
+            const isNoticeCategory = categoryName === '공지사항';
+            
+            // 디버깅: 첫 번째 게시글만 로그
+            if (index === 0) {
+              console.log('🔍 게시글 스타일 체크:', {
+                id: post.id,
+                title: post.title,
+                is_pinned: post.is_pinned,
+                isPinned: isPinned,
+                category_name: categoryName,
+                isNoticeCategory: isNoticeCategory
+              });
+            }
+            
+            // 우선순위에 따른 제목 스타일 결정
+            // 1순위: 공지사항 체크(is_pinned) - 빨간색 굵은 글씨
+            // 2순위: 공지사항 카테고리 - 굵은 글씨
+            // 3순위: 나머지 - 일반 스타일
+            let titleStyle = 'cursor: pointer;';
+            let titlePrefix = '';
+            
+            if (isPinned) {
+              // 공지사항 체크: 빨간색 굵은 글씨
+              titlePrefix = '📌 ';
+              titleStyle += ' font-weight: 700; color: #e74c3c;';
+            } else if (isNoticeCategory) {
+              // 공지사항 카테고리: 굵은 글씨
+              titleStyle += ' font-weight: 700; color: #2d3436;';
+            } else {
+              // 나머지: 일반 스타일
+              titleStyle += ' font-weight: normal; color: #2d3436;';
+            }
             
             tr.innerHTML = `
               <td>${escapeHtml(post.category_name || '')}</td>
-              <td style="${isPinned ? 'font-weight: 700; color: #ff6b35;' : ''}; cursor: pointer;" onclick="showBoardDetail(${post.id})" title="클릭하여 상세 보기">
-                ${isPinned ? '📌 ' : ''}${escapeHtml(post.title || '')}
+              <td style="${titleStyle}" onclick="showBoardDetail(${post.id})" title="클릭하여 상세 보기">
+                ${titlePrefix}${escapeHtml(post.title || '')}
               </td>
               <td>${escapeHtml(post.author_name || '')}</td>
               <td>${post.view_count || 0}</td>
@@ -6457,11 +6618,12 @@
             tbody.appendChild(tr);
           });
         } else {
-          tbody.innerHTML = '<tr><td colspan="6" class="no-data">게시글을 불러오는 중 오류가 발생했습니다.</td></tr>';
+          console.error('게시글 목록 응답 실패:', result);
+          tbody.innerHTML = `<tr><td colspan="6" class="no-data">게시글을 불러오는 중 오류가 발생했습니다. ${result.message || ''}</td></tr>`;
         }
       } catch (error) {
         console.error('게시글 조회 오류:', error);
-        tbody.innerHTML = '<tr><td colspan="6" class="no-data">게시글을 불러오는 중 오류가 발생했습니다.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="6" class="no-data">게시글을 불러오는 중 오류가 발생했습니다: ${error.message}</td></tr>`;
       }
     }
     window.loadBoards = loadBoards;
@@ -6470,10 +6632,59 @@
     function toggleBoardForm() {
       const form = document.getElementById('boardForm');
       if (form) {
-        form.style.display = form.style.display === 'none' ? 'block' : 'none';
-        if (form.style.display === 'block') {
+        const isHidden = form.style.display === 'none' || !form.style.display;
+        form.style.display = isHidden ? 'block' : 'none';
+        
+        if (isHidden) {
+          // 폼을 열 때 초기화
           resetBoardForm();
           loadCategoriesForBoard();
+          
+          // Summernote 에디터 초기화
+          setTimeout(() => {
+            const contentElement = $('#boardContent');
+            if (contentElement.length) {
+              // 이미 초기화되어 있으면 제거 후 재초기화
+              if (contentElement.hasClass('note-editable')) {
+                try {
+                  contentElement.summernote('destroy');
+                } catch (e) {
+                  console.log('Summernote destroy 오류 (무시):', e);
+                }
+              }
+              
+              // 원본 textarea 초기화
+              const textarea = document.getElementById('boardContent');
+              if (textarea) {
+                textarea.value = '';
+              }
+              
+              // 새로 초기화
+              contentElement.summernote({
+                height: 300,
+                lang: 'ko-KR',
+                toolbar: [
+                  ['style', ['style']],
+                  ['font', ['bold', 'italic', 'underline', 'clear']],
+                  ['fontname', ['fontname']],
+                  ['fontsize', ['fontsize']],
+                  ['color', ['color']],
+                  ['para', ['ul', 'ol', 'paragraph']],
+                  ['table', ['table']],
+                  ['insert', ['link', 'picture', 'video']],
+                  ['view', ['fullscreen', 'codeview', 'help']]
+                ],
+                fontNames: ['맑은 고딕', 'Arial', 'Arial Black', 'Comic Sans MS', 'Courier New', 'Helvetica', 'Times New Roman', 'Verdana'],
+                fontSizes: ['8', '9', '10', '11', '12', '14', '16', '18', '20', '24', '36', '48'],
+                placeholder: '게시글 내용을 입력하세요'
+              });
+              
+              // 초기화 후 빈 내용 설정
+              setTimeout(() => {
+                contentElement.summernote('code', '');
+              }, 50);
+            }
+          }, 100);
         }
       }
     }
@@ -6481,13 +6692,62 @@
     
     // 게시글 폼 초기화
     function resetBoardForm() {
-      document.getElementById('boardCategoryId').value = '';
-      document.getElementById('boardTitle').value = '';
-      document.getElementById('boardContent').value = '';
-      document.getElementById('boardIsPinned').checked = false;
-      document.getElementById('boardFileList').innerHTML = '';
-      document.getElementById('boardMessage').innerHTML = '';
-      boardFiles = [];
+      // 카테고리 초기화
+      const categorySelect = document.getElementById('boardCategoryId');
+      if (categorySelect) {
+        categorySelect.value = '';
+      }
+      
+      // 제목 초기화
+      const titleInput = document.getElementById('boardTitle');
+      if (titleInput) {
+        titleInput.value = '';
+      }
+      
+      // 내용 초기화 (Summernote 에디터)
+      const contentElement = document.getElementById('boardContent');
+      if (contentElement) {
+        // Summernote 에디터가 초기화되어 있으면 코드로 초기화
+        if ($('#boardContent').length && $('#boardContent').hasClass('note-editable')) {
+          try {
+            $('#boardContent').summernote('code', '');
+            $('#boardContent').summernote('reset');
+            // 추가로 빈 HTML 설정
+            $('#boardContent').summernote('code', '<p><br></p>');
+          } catch (e) {
+            console.error('Summernote 초기화 오류:', e);
+            // 에러 발생 시 에디터 제거 후 재초기화
+            $('#boardContent').summernote('destroy');
+            contentElement.value = '';
+          }
+        } else {
+          // 일반 textarea인 경우
+          contentElement.value = '';
+        }
+      }
+      
+      // 고정 여부 초기화
+      const isPinnedCheckbox = document.getElementById('boardIsPinned');
+      if (isPinnedCheckbox) {
+        isPinnedCheckbox.checked = false;
+      }
+      
+      // 파일 목록 초기화
+      const fileList = document.getElementById('boardFileList');
+      if (fileList) {
+        fileList.innerHTML = '';
+      }
+      
+      // 메시지 초기화
+      const messageDiv = document.getElementById('boardMessage');
+      if (messageDiv) {
+        messageDiv.innerHTML = '';
+      }
+      
+      // 파일 배열 초기화
+      if (typeof boardFiles !== 'undefined') {
+        boardFiles = [];
+      }
     }
     window.resetBoardForm = resetBoardForm;
     
@@ -6602,11 +6862,17 @@
     async function saveBoard() {
       const categoryId = document.getElementById('boardCategoryId').value;
       const title = document.getElementById('boardTitle').value.trim();
-      const content = document.getElementById('boardContent').value.trim();
+      // Summernote 에디터가 초기화되어 있으면 코드로 가져오기, 아니면 일반 value
+      let content = '';
+      if ($('#boardContent').length && $('#boardContent').hasClass('note-editable')) {
+        content = $('#boardContent').summernote('code');
+      } else {
+        content = document.getElementById('boardContent').value.trim();
+      }
       const isPinned = document.getElementById('boardIsPinned').checked;
       const messageDiv = document.getElementById('boardMessage');
       
-      if (!categoryId || !title || !content) {
+      if (!categoryId || !title || !content || content === '<p><br></p>') {
         messageDiv.innerHTML = '<span style="color: #e74c3c;">카테고리, 제목, 내용을 모두 입력해주세요.</span>';
         return;
       }
@@ -6632,9 +6898,28 @@
         
         if (result.success) {
           messageDiv.innerHTML = '<span style="color: #00b894;">게시글이 등록되었습니다.</span>';
+          
+          // Summernote 에디터 강제 초기화
+          if ($('#boardContent').length && $('#boardContent').hasClass('note-editable')) {
+            $('#boardContent').summernote('code', '');
+            $('#boardContent').summernote('reset');
+          }
+          
+          // 폼 초기화
           resetBoardForm();
+          
+          // 폼 닫기
           toggleBoardForm();
+          
+          // 게시글 목록 새로고침
           loadBoards();
+          
+          // 성공 메시지 2초 후 자동 제거
+          setTimeout(() => {
+            if (messageDiv) {
+              messageDiv.innerHTML = '';
+            }
+          }, 2000);
         } else {
           messageDiv.innerHTML = `<span style="color: #e74c3c;">${result.message || '게시글 등록에 실패했습니다.'}</span>`;
         }
@@ -6652,10 +6937,35 @@
         
         if (result.success && result.data) {
           const post = result.data;
-          document.getElementById('boardCategoryId').value = post.category_id;
+          
+          // 폼 표시
+          document.getElementById('boardForm').style.display = 'block';
+          
+          // 카테고리 먼저 로드
+          await loadCategoriesForBoard();
+          
+          // 카테고리 값 설정 (카테고리 로드 후)
+          setTimeout(() => {
+            const categorySelect = document.getElementById('boardCategoryId');
+            if (categorySelect && post.category_id) {
+              categorySelect.value = post.category_id;
+              console.log('🔍 카테고리 설정:', post.category_id, '선택된 값:', categorySelect.value);
+            }
+          }, 100);
+          
           document.getElementById('boardTitle').value = post.title || '';
-          document.getElementById('boardContent').value = post.content || '';
-          document.getElementById('boardIsPinned').checked = post.is_pinned || (post.is_pinned === 1);
+          
+          // 공지사항 체크박스 설정 (엄격하게 - 1, true, '1'만 체크)
+          const isPinnedCheckbox = document.getElementById('boardIsPinned');
+          if (isPinnedCheckbox) {
+            const isPinned = post.is_pinned === true || post.is_pinned === 1 || String(post.is_pinned) === '1';
+            isPinnedCheckbox.checked = isPinned;
+            console.log('🔍 공지사항 체크박스 설정:', {
+              post_is_pinned: post.is_pinned,
+              isPinned: isPinned,
+              checked: isPinnedCheckbox.checked
+            });
+          }
           
           // 첨부파일 표시
           boardFiles = post.files || [];
@@ -6671,9 +6981,36 @@
             fileList.appendChild(fileItem);
           });
           
-          // 폼 표시
-          document.getElementById('boardForm').style.display = 'block';
-          loadCategoriesForBoard();
+          // Summernote 에디터 초기화 (수정 모드)
+          setTimeout(() => {
+            if ($('#boardContent').length && !$('#boardContent').hasClass('note-editable')) {
+              $('#boardContent').summernote({
+                height: 300,
+                lang: 'ko-KR',
+                toolbar: [
+                  ['style', ['style']],
+                  ['font', ['bold', 'italic', 'underline', 'clear']],
+                  ['fontname', ['fontname']],
+                  ['fontsize', ['fontsize']],
+                  ['color', ['color']],
+                  ['para', ['ul', 'ol', 'paragraph']],
+                  ['table', ['table']],
+                  ['insert', ['link', 'picture', 'video']],
+                  ['view', ['fullscreen', 'codeview', 'help']]
+                ],
+                fontNames: ['맑은 고딕', 'Arial', 'Arial Black', 'Comic Sans MS', 'Courier New', 'Helvetica', 'Times New Roman', 'Verdana'],
+                fontSizes: ['8', '9', '10', '11', '12', '14', '16', '18', '20', '24', '36', '48'],
+                placeholder: '게시글 내용을 입력하세요'
+              });
+              // 에디터 초기화 후 내용 설정
+              setTimeout(() => {
+                $('#boardContent').summernote('code', post.content || '');
+              }, 100);
+            } else if ($('#boardContent').hasClass('note-editable')) {
+              // 이미 초기화되어 있으면 바로 내용 설정
+              $('#boardContent').summernote('code', post.content || '');
+            }
+          }, 200);
           
           // 저장 함수를 수정 모드로 변경
           const saveBtn = document.querySelector('#boardForm .save-btn');
@@ -6698,11 +7035,17 @@
     async function updateBoard(boardId) {
       const categoryId = document.getElementById('boardCategoryId').value;
       const title = document.getElementById('boardTitle').value.trim();
-      const content = document.getElementById('boardContent').value.trim();
+      // Summernote 에디터가 초기화되어 있으면 코드로 가져오기, 아니면 일반 value
+      let content = '';
+      if ($('#boardContent').length && $('#boardContent').hasClass('note-editable')) {
+        content = $('#boardContent').summernote('code');
+      } else {
+        content = document.getElementById('boardContent').value.trim();
+      }
       const isPinned = document.getElementById('boardIsPinned').checked;
       const messageDiv = document.getElementById('boardMessage');
       
-      if (!categoryId || !title || !content) {
+      if (!categoryId || !title || !content || content === '<p><br></p>') {
         messageDiv.innerHTML = '<span style="color: #e74c3c;">카테고리, 제목, 내용을 모두 입력해주세요.</span>';
         return;
       }
@@ -7302,8 +7645,43 @@
           
           tbody.innerHTML = '';
           result.data.forEach((post, index) => {
-            const isPinned = post.is_pinned || (post.is_pinned === 1);
+            // is_pinned 체크 (엄격하게 - 문자열 '1', 숫자 1, boolean true만 true로 인식)
+            const isPinned = post.is_pinned === true || post.is_pinned === 1 || String(post.is_pinned) === '1';
+            const categoryName = (post.category_name || '').trim();
+            const isNoticeCategory = categoryName === '공지사항';
+            
+            // 디버깅: 첫 번째 게시글만 로그
+            if (index === 0) {
+              console.log('🔍 게시글 스타일 체크:', {
+                id: post.id,
+                title: post.title,
+                is_pinned: post.is_pinned,
+                isPinned: isPinned,
+                category_name: categoryName,
+                isNoticeCategory: isNoticeCategory
+              });
+            }
             const createdAt = post.created_at ? new Date(post.created_at).toLocaleDateString('ko-KR') : '-';
+            
+            // 우선순위에 따른 제목 스타일 결정
+            // 1순위: 공지사항 체크(is_pinned) - 빨간색 굵은 글씨
+            // 2순위: 공지사항 카테고리 - 굵은 글씨
+            // 3순위: 나머지 - 일반 스타일
+            let titleStyle = '';
+            let titlePrefix = '';
+            
+            if (isPinned) {
+              // 공지사항 체크: 빨간색 굵은 글씨
+              titlePrefix = '📌 ';
+              titleStyle = 'font-weight: 700; color: #e74c3c;';
+            } else if (isNoticeCategory) {
+              // 공지사항 카테고리: 굵은 글씨
+              titleStyle = 'font-weight: 700; color: #2d3436;';
+            } else {
+              // 나머지: 일반 스타일
+              titleStyle = 'font-weight: normal; color: #2d3436;';
+            }
+            
             const tr = document.createElement('tr');
             tr.style.cursor = 'pointer';
             tr.onclick = () => showBoardDetail(post.id);
@@ -7315,8 +7693,8 @@
               <td style="text-align: center;">
                 <span style="font-size: 12px; color: #636e72; background: #fff9e6; padding: 4px 8px; border-radius: 4px;">${escapeHtml(post.category_name || '')}</span>
               </td>
-              <td style="${isPinned ? 'font-weight: 700; color: #ff6b35;' : ''}">
-                ${isPinned ? '📌 ' : ''}${escapeHtml(post.title || '')}
+              <td style="${titleStyle}">
+                ${titlePrefix}${escapeHtml(post.title || '')}
               </td>
               <td style="text-align: center;">${escapeHtml(post.author_name || '')}</td>
               <td style="text-align: center;">${createdAt}</td>
@@ -7365,20 +7743,58 @@
           }
           
           container.innerHTML = '';
-          result.data.forEach(post => {
-            const isPinned = post.is_pinned || (post.is_pinned === 1);
+          result.data.forEach((post, idx) => {
+            // is_pinned 체크 (엄격하게 - 문자열 '1', 숫자 1, boolean true만 true로 인식)
+            const isPinned = post.is_pinned === true || post.is_pinned === 1 || String(post.is_pinned) === '1';
+            const categoryName = (post.category_name || '').trim();
+            const isNoticeCategory = categoryName === '공지사항';
+            
+            // 디버깅: 첫 번째 게시글만 로그
+            if (idx === 0) {
+              console.log('🔍 게시글 스타일 체크 (카드):', {
+                id: post.id,
+                title: post.title,
+                is_pinned: post.is_pinned,
+                isPinned: isPinned,
+                category_name: categoryName,
+                isNoticeCategory: isNoticeCategory
+              });
+            }
             const createdAt = post.created_at ? new Date(post.created_at).toLocaleDateString('ko-KR') : '-';
             
+            // 우선순위에 따른 제목 스타일 결정
+            // 1순위: 공지사항 체크(is_pinned) - 빨간색 굵은 글씨
+            // 2순위: 공지사항 카테고리 - 굵은 글씨
+            // 3순위: 나머지 - 일반 스타일
+            let titleFontWeight = 'normal';
+            let titleColor = '#2d3436';
+            let titlePrefix = '';
+            
+            if (isPinned) {
+              // 공지사항 체크: 빨간색 굵은 글씨
+              titlePrefix = '📌 ';
+              titleFontWeight = '700';
+              titleColor = '#e74c3c';
+            } else if (isNoticeCategory) {
+              // 공지사항 카테고리: 굵은 글씨
+              titleFontWeight = '700';
+              titleColor = '#2d3436';
+            } else {
+              // 나머지: 일반 스타일
+              titleFontWeight = 'normal';
+              titleColor = '#2d3436';
+            }
+            
             const postCard = document.createElement('div');
-            postCard.style.cssText = 'background: ' + (isPinned ? '#fff9e6' : '#ffffff') + '; border: 2px solid ' + (isPinned ? '#ff6b35' : '#ffeaa7') + '; border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;';
+            postCard.style.cssText = 'background: #ffffff; border: 2px solid #ffeaa7; border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;';
             postCard.onclick = () => showBoardDetail(post.id);
             postCard.onmouseover = function() { this.style.transform = 'translateY(-2px)'; this.style.boxShadow = '0 4px 12px rgba(255, 107, 53, 0.2)'; };
             postCard.onmouseout = function() { this.style.transform = 'translateY(0)'; this.style.boxShadow = 'none'; };
             
             postCard.innerHTML = `
               <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
-                <h4 style="margin: 0; color: #ff6b35; font-size: 18px; font-weight: ${isPinned ? '700' : '600'};">
-                  ${isPinned ? '📌 ' : ''}${escapeHtml(post.title || '')}
+                <h4 style="margin: 0; color: ${titleColor}; font-size: 18px; font-weight: ${titleFontWeight};">
+                  ${titlePrefix}${escapeHtml(post.title || '')}
                 </h4>
                 <span style="font-size: 12px; color: #636e72;">조회수: ${post.view_count || 0}</span>
               </div>
@@ -7404,6 +7820,13 @@
     
     // 게시글 상세 보기
     async function showBoardDetail(boardId) {
+      // boardId 유효성 검사
+      if (!boardId || boardId === 'null' || boardId === 'undefined') {
+        console.error('게시글 ID가 유효하지 않습니다:', boardId);
+        alert('게시글을 불러올 수 없습니다.');
+        return;
+      }
+      
       try {
         const response = await fetch(`/api/board/posts/${boardId}`);
         const result = await response.json();
@@ -7411,12 +7834,55 @@
         if (result.success && result.data) {
           const post = result.data;
           const isPinned = post.is_pinned || (post.is_pinned === 1);
-          const createdAt = post.created_at ? new Date(post.created_at).toLocaleDateString('ko-KR') : '-';
-          const updatedAt = post.updated_at ? new Date(post.updated_at).toLocaleDateString('ko-KR') : '-';
+          // 작성일/수정일 포맷팅 (null 체크 강화)
+          let createdAt = '-';
+          if (post.created_at) {
+            try {
+              const date = new Date(post.created_at);
+              if (!isNaN(date.getTime())) {
+                createdAt = date.toLocaleDateString('ko-KR', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+              }
+            } catch (e) {
+              console.error('작성일 포맷팅 오류:', e);
+              createdAt = post.created_at;
+            }
+          }
+          
+          let updatedAt = '-';
+          if (post.updated_at) {
+            try {
+              const date = new Date(post.updated_at);
+              if (!isNaN(date.getTime())) {
+                updatedAt = date.toLocaleDateString('ko-KR', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+              }
+            } catch (e) {
+              console.error('수정일 포맷팅 오류:', e);
+              updatedAt = post.updated_at;
+            }
+          }
+          
+          // 조회수 증가 API 호출
+          try {
+            await fetch(`/api/board/posts/${boardId}/view`, { method: 'POST' });
+          } catch (e) {
+            console.error('조회수 증가 오류:', e);
+          }
           
           let modalHtml = `
             <div id="boardDetailModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;" onclick="closeBoardDetailModal(event)">
-              <div style="background: white; border-radius: 16px; padding: 30px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.3);" onclick="event.stopPropagation()">
+              <div style="background: white; border-radius: 16px; padding: 30px; max-width: 900px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.3);" onclick="event.stopPropagation()">
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
                   <div style="flex: 1;">
                     <h3 style="margin: 0 0 8px 0; color: #ff6b35; font-size: 22px; font-weight: ${isPinned ? '700' : '600'};">
@@ -7424,13 +7890,13 @@
                     </h3>
                     <div style="color: #636e72; font-size: 13px;">
                       작성자: ${escapeHtml(post.author_name || '')} | 작성일: ${createdAt}
-                      ${updatedAt !== createdAt ? ' | 수정일: ' + updatedAt : ''}
+                      ${updatedAt !== createdAt && updatedAt !== '-' ? ' | 수정일: ' + updatedAt : ''} | 조회수: ${post.view_count || 0}
                     </div>
                   </div>
                   <button onclick="closeBoardDetailModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #636e72; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.2s;" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='none'">×</button>
                 </div>
-                <div style="margin-bottom: 20px; padding: 20px; background: #f8f9fa; border-radius: 12px; white-space: pre-wrap; line-height: 1.8; color: #2d3436; font-size: 14px;">
-                  ${escapeHtml(post.content || '')}
+                <div style="margin-bottom: 20px; padding: 20px; background: #f8f9fa; border-radius: 12px; line-height: 1.8; color: #2d3436; font-size: 14px; min-height: 100px; word-wrap: break-word; overflow-wrap: break-word;">
+                  ${convertVideoLinks(post.content || '')}
                 </div>
           `;
           
