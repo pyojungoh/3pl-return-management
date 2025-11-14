@@ -10,7 +10,8 @@ from api.database.models import (
     get_schedules_by_date_range,
     get_schedule_by_id,
     update_schedule,
-    delete_schedule
+    delete_schedule,
+    get_all_companies
 )
 
 # Blueprint 생성
@@ -163,7 +164,8 @@ def create_schedule_route():
         data = request.get_json()
         
         # 필수 필드 확인
-        if not data.get('company_name') or not data.get('title') or not data.get('start_date') or not data.get('end_date'):
+        company_name = data.get('company_name', '').strip()
+        if not company_name or not data.get('title') or not data.get('start_date') or not data.get('end_date'):
             return jsonify({
                 'success': False,
                 'message': '화주사명, 제목, 시작일, 종료일은 필수입니다.'
@@ -184,18 +186,71 @@ def create_schedule_route():
                 'message': '날짜 형식이 올바르지 않습니다. (YYYY-MM-DD 형식)'
             }), 400
         
-        schedule_id = create_schedule(data)
-        if schedule_id:
-            return jsonify({
-                'success': True,
-                'message': '스케쥴이 등록되었습니다.',
-                'id': schedule_id
-            })
+        # "모든 화주사" 선택 시 모든 화주사에게 스케줄 생성 (company_name은 "제이제이"로 저장)
+        if company_name == '모든 화주사' or company_name == 'ALL':
+            companies = get_all_companies()
+            # 관리자 계정 제외
+            companies = [c for c in companies if c.get('role') != '관리자']
+            
+            if not companies:
+                return jsonify({
+                    'success': False,
+                    'message': '등록된 화주사가 없습니다.'
+                }), 400
+            
+            created_count = 0
+            failed_count = 0
+            schedule_ids = []
+            
+            # 사용자가 선택한 schedule_type을 유지
+            user_schedule_type = data.get('schedule_type', '').strip()
+            if not user_schedule_type:
+                user_schedule_type = '모든화주사'
+            
+            # 모든 화주사에게 스케줄 생성 (각 화주사의 실제 company_name으로 저장)
+            for company in companies:
+                company_data = data.copy()
+                company_data['company_name'] = company.get('company_name')  # 각 화주사의 실제 이름으로 저장
+                # schedule_type 앞에 "모든화주사-" 접두사 추가하여 "모든화주사" 타입임을 표시
+                # 예: "모든화주사-입고", "모든화주사-출고" 등
+                if user_schedule_type != '모든화주사':
+                    company_data['schedule_type'] = f'모든화주사-{user_schedule_type}'
+                else:
+                    company_data['schedule_type'] = '모든화주사'
+                schedule_id = create_schedule(company_data)
+                if schedule_id:
+                    created_count += 1
+                    schedule_ids.append(schedule_id)
+                else:
+                    failed_count += 1
+            
+            if created_count > 0:
+                return jsonify({
+                    'success': True,
+                    'message': f'{created_count}개 화주사에게 스케쥴이 등록되었습니다.',
+                    'count': created_count,
+                    'failed': failed_count,
+                    'ids': schedule_ids
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '스케쥴 등록에 실패했습니다.'
+                }), 500
         else:
-            return jsonify({
-                'success': False,
-                'message': '스케쥴 등록에 실패했습니다.'
-            }), 500
+            # 단일 화주사 스케줄 생성
+            schedule_id = create_schedule(data)
+            if schedule_id:
+                return jsonify({
+                    'success': True,
+                    'message': '스케쥴이 등록되었습니다.',
+                    'id': schedule_id
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '스케쥴 등록에 실패했습니다.'
+                }), 500
         
     except Exception as e:
         print(f'❌ 스케쥴 등록 오류: {e}')
@@ -257,9 +312,26 @@ def update_schedule_route(schedule_id):
 def delete_schedule_route(schedule_id):
     """
     스케쥴 삭제 API
+    
+    Query Parameters:
+        - role: 권한 ("관리자" 또는 "화주사")
+        - company: 화주사명 (화주사 모드일 때 필수)
     """
     try:
-        success = delete_schedule(schedule_id)
+        # 권한과 화주사명 확인
+        role = request.args.get('role', '관리자').strip()
+        company_name = request.args.get('company', '').strip()
+        
+        print(f'🔍 삭제 요청: schedule_id={schedule_id}, role={role}, company={company_name}')
+        
+        # 화주사 모드인 경우 company_name 필수
+        if role != '관리자' and not company_name:
+            return jsonify({
+                'success': False,
+                'message': '화주사명이 필요합니다.'
+            }), 400
+        
+        success = delete_schedule(schedule_id, role=role, company_name=company_name)
         if success:
             return jsonify({
                 'success': True,

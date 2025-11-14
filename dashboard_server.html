@@ -2038,6 +2038,18 @@
                 <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">화주사 선택 *</label>
                 <select id="adminScheduleCompanyName" class="request-input" style="min-height: auto;" required>
                   <option value="">화주사를 선택하세요</option>
+                  <option value="모든 화주사">모든 화주사</option>
+                </select>
+              </div>
+              <div>
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">스케줄 타입 *</label>
+                <select id="adminScheduleType" class="request-input" style="min-height: auto;" required>
+                  <option value="">타입을 선택하세요</option>
+                  <option value="입고">입고</option>
+                  <option value="출고">출고</option>
+                  <option value="행사">행사</option>
+                  <option value="연휴">연휴</option>
+                  <option value="기타">기타</option>
                 </select>
               </div>
               <div>
@@ -4361,30 +4373,80 @@
     
     // 스케쥴 삭제
     async function deleteSchedule(scheduleId) {
+      // ID 유효성 검사 (더 완화된 검사)
+      if (scheduleId === null || scheduleId === undefined || scheduleId === '' || 
+          String(scheduleId).toLowerCase() === 'null' || String(scheduleId).toLowerCase() === 'undefined' ||
+          isNaN(Number(scheduleId))) {
+        console.error('스케쥴 ID가 유효하지 않습니다:', scheduleId, typeof scheduleId);
+        alert(`스케쥴 ID가 유효하지 않습니다. (ID: ${scheduleId})`);
+        return;
+      }
+      
+      // 숫자로 변환
+      const id = Number(scheduleId);
+      if (id <= 0) {
+        console.error('스케쥴 ID가 0 이하입니다:', id);
+        alert(`스케쥴 ID가 유효하지 않습니다. (ID: ${id})`);
+        return;
+      }
+      
       try {
-        const response = await fetch(`/api/schedules/delete/${scheduleId}`, {
+        // 현재 사용자 정보 가져오기 (전역 변수 사용)
+        const userRole = typeof currentRole !== 'undefined' ? currentRole : '관리자';
+        const userCompany = typeof currentCompany !== 'undefined' ? currentCompany : '';
+        
+        console.log('스케쥴 삭제 시도:', id, 'role:', userRole, 'company:', userCompany);
+        
+        // role과 company를 query parameter로 전달
+        let url = `/api/schedules/delete/${id}?role=${encodeURIComponent(userRole)}`;
+        if (userCompany) {
+          url += `&company=${encodeURIComponent(userCompany)}`;
+        }
+        
+        const response = await fetch(url, {
           method: 'DELETE'
         });
         
         const result = await response.json();
         
         if (result.success) {
-          alert('스케쥴이 삭제되었습니다.');
+          console.log('✅ 삭제 성공 응답 받음, 목록 새로고침 시작...');
           // 관리자 모드인지 화주사 모드인지 확인
           const scheduleCalendarTab = document.getElementById('scheduleCalendarTab');
           if (scheduleCalendarTab && !scheduleCalendarTab.classList.contains('hidden')) {
             // 관리자 모드: 달력과 목록 새로고침
-            loadCalendarSchedules();
+            console.log('관리자 모드: 달력과 목록 새로고침');
+            // 약간의 지연 후 새로고침 (서버에서 삭제가 완전히 완료되도록)
+            setTimeout(() => {
+              if (typeof loadCalendarSchedules === 'function') {
+                console.log('loadCalendarSchedules 함수 호출');
+                loadCalendarSchedules();
+              } else {
+                console.error('loadCalendarSchedules 함수를 찾을 수 없습니다. 페이지 새로고침');
+                location.reload();
+              }
+            }, 300);
           } else {
             // 화주사 모드: 스케쥴 목록 새로고침
-            refreshSchedules();
+            console.log('화주사 모드: 스케쥴 목록 새로고침');
+            setTimeout(() => {
+              if (typeof refreshSchedules === 'function') {
+                console.log('refreshSchedules 함수 호출');
+                refreshSchedules();
+              } else {
+                console.error('refreshSchedules 함수를 찾을 수 없습니다. 페이지 새로고침');
+                location.reload();
+              }
+            }, 300);
           }
+          alert('스케쥴이 삭제되었습니다.');
         } else {
+          console.error('❌ 삭제 실패:', result.message);
           alert(result.message || '스케쥴 삭제에 실패했습니다.');
         }
       } catch (error) {
         console.error('스케쥴 삭제 오류:', error);
-        alert('스케쥴 삭제 중 오류가 발생했습니다.');
+        alert('스케쥴 삭제 중 오류가 발생했습니다: ' + error.message);
       }
     }
     window.deleteSchedule = deleteSchedule;
@@ -4394,6 +4456,7 @@
     // 관리자 스케쥴 저장
     async function saveAdminSchedule() {
       const companyName = document.getElementById('adminScheduleCompanyName').value.trim();
+      const scheduleType = document.getElementById('adminScheduleType').value.trim();
       const title = document.getElementById('adminScheduleTitle').value.trim();
       const startDate = document.getElementById('adminScheduleStartDate').value;
       const endDate = document.getElementById('adminScheduleEndDate').value;
@@ -4401,7 +4464,7 @@
       const requestNote = document.getElementById('adminScheduleRequestNote').value.trim();
       const messageDiv = document.getElementById('adminScheduleMessage');
       
-      if (!companyName || !title || !startDate || !endDate || !eventDescription) {
+      if (!companyName || !scheduleType || !title || !startDate || !endDate || !eventDescription) {
         messageDiv.innerHTML = '<span style="color: #e74c3c;">필수 항목을 모두 입력해주세요.</span>';
         return;
       }
@@ -4419,6 +4482,7 @@
           },
           body: JSON.stringify({
             company_name: companyName,
+            schedule_type: scheduleType,
             title: title,
             start_date: startDate,
             end_date: endDate,
@@ -4430,7 +4494,11 @@
         const result = await response.json();
         
         if (result.success) {
-          messageDiv.innerHTML = '<span style="color: #00b894;">스케쥴이 등록되었습니다.</span>';
+          if (result.count) {
+            messageDiv.innerHTML = `<span style="color: #00b894;">${result.message || `${result.count}개 화주사에게 스케쥴이 등록되었습니다.`}</span>`;
+          } else {
+            messageDiv.innerHTML = '<span style="color: #00b894;">스케쥴이 등록되었습니다.</span>';
+          }
           resetAdminScheduleForm();
           toggleAdminScheduleForm(); // 폼 접기
           loadCalendarSchedules();
@@ -4447,6 +4515,7 @@
     // 관리자 스케쥴 폼 초기화
     function resetAdminScheduleForm() {
       document.getElementById('adminScheduleCompanyName').value = '';
+      document.getElementById('adminScheduleType').value = '';
       document.getElementById('adminScheduleTitle').value = '';
       document.getElementById('adminScheduleStartDate').value = '';
       document.getElementById('adminScheduleEndDate').value = '';
@@ -4466,9 +4535,9 @@
         const result = await response.json();
         
         if (result.success && result.companies) {
-          // 기존 옵션 제거 (첫 번째 옵션 제외)
-          while (select.options.length > 1) {
-            select.remove(1);
+          // 기존 옵션 제거 (첫 번째와 두 번째 옵션 제외 - "화주사를 선택하세요"와 "모든 화주사")
+          while (select.options.length > 2) {
+            select.remove(2);
           }
           
           // 화주사만 필터링 (관리자 제외)
@@ -4606,9 +4675,38 @@
       const daysInMonth = lastDay.getDate();
       const startingDayOfWeek = firstDay.getDay();
       
-      // 날짜별로 스케쥴 그룹화
+      // 날짜별로 스케쥴 그룹화 (schedule_type이 "모든화주사"인 경우 중복 제거)
       const schedulesByDate = {};
+      const allCompaniesScheduleKeys = new Set(); // 모든화주사 스케줄 추적용 (같은 제목, 같은 날짜 범위면 1개만 유지)
+      
+      // 먼저 "모든화주사" 스케줄을 필터링하여 중복 제거
+      const processedSchedules = [];
+      const allCompaniesSchedulesMap = new Map(); // key -> schedule 매핑
+      
       schedules.forEach(schedule => {
+        // schedule_type이 "모든화주사"로 시작하는 경우 (company_name이 무엇이든 상관없이)
+        const isAllCompaniesSchedule = schedule.schedule_type && 
+                                       (schedule.schedule_type.startsWith('모든화주사') || schedule.schedule_type === '모든화주사');
+        
+        if (isAllCompaniesSchedule) {
+          // 같은 제목, 같은 시작일, 같은 종료일인 경우 중복 제거
+          // 캘린더에는 "제이제이(타입)" 형식으로 1개만 표시
+          const key = `${schedule.title}_${schedule.start_date}_${schedule.end_date}`;
+          if (!allCompaniesSchedulesMap.has(key)) {
+            // 캘린더 표시용으로 company_name을 "제이제이"로 변경
+            const displaySchedule = {...schedule};
+            displaySchedule.company_name = '제이제이';
+            allCompaniesSchedulesMap.set(key, displaySchedule);
+            processedSchedules.push(displaySchedule);
+          }
+        } else {
+          // 일반 스케줄은 모두 추가
+          processedSchedules.push(schedule);
+        }
+      });
+      
+      // 중복 제거된 스케줄들을 날짜별로 그룹화
+      processedSchedules.forEach(schedule => {
         const start = new Date(schedule.start_date);
         const end = new Date(schedule.end_date);
         const current = new Date(start);
@@ -4668,12 +4766,21 @@
         // 스케쥴 표시 (최대 3개)
         daySchedules.slice(0, 3).forEach((schedule, idx) => {
           const companyName = escapeHtml(schedule.company_name || '');
+          let scheduleType = escapeHtml(schedule.schedule_type || '');
           const title = escapeHtml(schedule.title || '');
           const color = getCompanyColor(schedule.company_name);
+          
+          // schedule_type이 "모든화주사-"로 시작하면 접두사 제거 (예: "모든화주사-입고" → "입고")
+          if (scheduleType.startsWith('모든화주사-')) {
+            scheduleType = scheduleType.replace('모든화주사-', '');
+          }
+          
+          // "화주사이름(타입)" 형식으로 표시
+          const displayText = scheduleType ? `${companyName}(${scheduleType})` : companyName;
           html += `
             <div style="background: linear-gradient(135deg, ${color.start} 0%, ${color.end} 100%); color: white; padding: 4px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" 
-                 title="${companyName}: ${title}">
-              ${companyName.length > 6 ? companyName.substring(0, 6) + '...' : companyName}
+                 title="${displayText}: ${title}">
+              ${displayText.length > 12 ? displayText.substring(0, 12) + '...' : displayText}
             </div>
           `;
         });
@@ -4704,19 +4811,47 @@
       
       tbody.innerHTML = '';
       
-      // 통계 업데이트
-      const statisticsSpan = document.getElementById('schedulesStatistics');
-      if (statisticsSpan) {
-        statisticsSpan.textContent = `(총 ${schedules ? schedules.length : 0}개)`;
-      }
-      
       if (!schedules || schedules.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="no-data">등록된 스케쥴이 없습니다.</td></tr>';
+        // 통계 업데이트
+        const statisticsSpan = document.getElementById('schedulesStatistics');
+        if (statisticsSpan) {
+          statisticsSpan.textContent = '(총 0개)';
+        }
         return;
       }
       
+      // "모든화주사" 타입 스케줄 중복 제거 (같은 제목, 같은 날짜 범위면 1개만 표시)
+      const uniqueSchedules = [];
+      const allCompaniesScheduleKeys = new Set(); // 모든화주사 스케줄 추적용
+      
+      schedules.forEach(schedule => {
+        // schedule_type이 "모든화주사"로 시작하는 경우 중복 제거
+        if (schedule.schedule_type && (schedule.schedule_type.startsWith('모든화주사') || schedule.schedule_type === '모든화주사')) {
+          // 같은 제목, 같은 시작일, 같은 종료일인 경우 중복 제거
+          // 목록에는 "제이제이(타입)" 형식으로 1개만 표시
+          const key = `${schedule.title}_${schedule.start_date}_${schedule.end_date}`;
+          if (!allCompaniesScheduleKeys.has(key)) {
+            allCompaniesScheduleKeys.add(key);
+            // 캘린더 표시용으로 company_name을 "제이제이"로 변경
+            const displaySchedule = {...schedule};
+            displaySchedule.company_name = '제이제이';
+            uniqueSchedules.push(displaySchedule);
+          }
+        } else {
+          // 일반 스케줄은 모두 추가
+          uniqueSchedules.push(schedule);
+        }
+      });
+      
+      // 통계 업데이트 (중복 제거된 개수로 표시)
+      const statisticsSpan = document.getElementById('schedulesStatistics');
+      if (statisticsSpan) {
+        statisticsSpan.textContent = `(총 ${uniqueSchedules.length}개)`;
+      }
+      
       // 시작일 기준으로 정렬 (최신순)
-      const sortedSchedules = [...schedules].sort((a, b) => {
+      const sortedSchedules = [...uniqueSchedules].sort((a, b) => {
         const dateA = new Date(a.start_date);
         const dateB = new Date(b.start_date);
         return dateB - dateA;
@@ -4736,16 +4871,49 @@
         const eventDescriptionShort = eventDescription.length > 50 ? eventDescription.substring(0, 50) + '...' : eventDescription;
         const requestNoteShort = requestNote.length > 50 ? requestNote.substring(0, 50) + '...' : requestNote;
         
-        // 삭제 버튼
-        const deleteBtn = `
-          <button class="save-btn" onclick="if(confirm('정말 삭제하시겠습니까?\\n삭제된 스케쥴은 복구할 수 없습니다.')) deleteSchedule(${schedule.id})" 
-                  style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border: none; padding: 6px 12px; font-size: 12px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 6px rgba(231, 76, 60, 0.25);">
-            🗑️ 삭제
-          </button>
-        `;
+        // 삭제 버튼 (ID 확인 및 디버깅)
+        const scheduleId = schedule.id;
+        
+        // ID 디버깅 (모든 스케줄)
+        if (!scheduleId || scheduleId === null || scheduleId === undefined) {
+          console.error('❌ 스케줄 ID가 없습니다:', {
+            id: scheduleId,
+            type: typeof scheduleId,
+            schedule_keys: Object.keys(schedule),
+            full_schedule: schedule
+          });
+        }
+        
+        // ID가 없으면 삭제 버튼 비활성화
+        let deleteBtn = '';
+        if (scheduleId && scheduleId !== null && scheduleId !== undefined) {
+          deleteBtn = `
+            <button class="save-btn" onclick="if(confirm('정말 삭제하시겠습니까?\\n삭제된 스케쥴은 복구할 수 없습니다.')) deleteSchedule(${scheduleId})" 
+                    style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border: none; padding: 6px 12px; font-size: 12px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 6px rgba(231, 76, 60, 0.25);">
+              🗑️ 삭제
+            </button>
+          `;
+        } else {
+          deleteBtn = `
+            <button disabled style="background: #95a5a6; color: white; border: none; padding: 6px 12px; font-size: 12px; border-radius: 8px; cursor: not-allowed; opacity: 0.6;">
+              삭제 불가 (ID 없음)
+            </button>
+          `;
+        }
+        
+        // 화주사이름(타입) 형식으로 표시
+        const companyName = escapeHtml(schedule.company_name || '');
+        let scheduleType = escapeHtml(schedule.schedule_type || '');
+        
+        // schedule_type이 "모든화주사-"로 시작하면 접두사 제거 (예: "모든화주사-입고" → "입고")
+        if (scheduleType.startsWith('모든화주사-')) {
+          scheduleType = scheduleType.replace('모든화주사-', '');
+        }
+        
+        const companyDisplay = scheduleType ? `${companyName}(${scheduleType})` : companyName;
         
         tr.innerHTML = `
-          <td>${escapeHtml(schedule.company_name || '')}</td>
+          <td>${companyDisplay}</td>
           <td>${escapeHtml(schedule.title || '')}</td>
           <td>${startDate}</td>
           <td>${endDate}</td>
@@ -4795,11 +4963,22 @@
           const endDate = schedule.end_date ? new Date(schedule.end_date).toLocaleDateString('ko-KR') : '';
           const color = getCompanyColor(schedule.company_name);
           
+          // 화주사이름(타입) 형식으로 표시
+          const companyName = escapeHtml(schedule.company_name || '');
+          let scheduleType = escapeHtml(schedule.schedule_type || '');
+          
+          // schedule_type이 "모든화주사-"로 시작하면 접두사 제거 (예: "모든화주사-입고" → "입고")
+          if (scheduleType.startsWith('모든화주사-')) {
+            scheduleType = scheduleType.replace('모든화주사-', '');
+          }
+          
+          const companyDisplay = scheduleType ? `${companyName}(${scheduleType})` : companyName;
+          
           modalHtml += `
             <div style="background: #fff9e6; border: 2px solid #ffeaa7; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
               <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
                 <h4 style="margin: 0; color: #ff6b35; font-size: 18px; font-weight: 700;">${escapeHtml(schedule.title || '')}</h4>
-                <span style="background: linear-gradient(135deg, ${color.start} 0%, ${color.end} 100%); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">${escapeHtml(schedule.company_name || '')}</span>
+                <span style="background: linear-gradient(135deg, ${color.start} 0%, ${color.end} 100%); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">${companyDisplay}</span>
               </div>
               <div style="margin-bottom: 8px; color: #2d3436; font-size: 14px;">
                 <strong>기간:</strong> ${startDate} ~ ${endDate}

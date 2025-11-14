@@ -161,6 +161,15 @@ def init_db():
                 ON schedules(start_date, end_date)
             ''')
             
+            # schedule_type 컬럼 추가 (없는 경우에만)
+            try:
+                cursor.execute('ALTER TABLE schedules ADD COLUMN schedule_type TEXT')
+                print("✅ schedules 테이블에 schedule_type 컬럼이 추가되었습니다.")
+            except Exception as e:
+                # 컬럼이 이미 존재하는 경우 무시
+                if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
+                    print(f"⚠️ schedule_type 컬럼 추가 중 오류 (무시 가능): {e}")
+            
             # PostgreSQL - 게시판 카테고리 테이블
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS board_categories (
@@ -461,6 +470,15 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_schedules_dates 
                 ON schedules(start_date, end_date)
             ''')
+            
+            # schedule_type 컬럼 추가 (없는 경우에만)
+            try:
+                cursor.execute('ALTER TABLE schedules ADD COLUMN schedule_type TEXT')
+                print("✅ schedules 테이블에 schedule_type 컬럼이 추가되었습니다.")
+            except Exception as e:
+                # 컬럼이 이미 존재하는 경우 무시
+                if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
+                    print(f"⚠️ schedule_type 컬럼 추가 중 오류 (무시 가능): {e}")
             
             # SQLite - 게시판 카테고리 테이블
             cursor.execute('''
@@ -2752,8 +2770,8 @@ def create_schedule(schedule_data: Dict) -> int:
             cursor.execute('''
                 INSERT INTO schedules (
                     company_name, title, start_date, end_date, 
-                    event_description, request_note
-                ) VALUES (%s, %s, %s, %s, %s, %s)
+                    event_description, request_note, schedule_type
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             ''', (
                 schedule_data.get('company_name'),
@@ -2761,7 +2779,8 @@ def create_schedule(schedule_data: Dict) -> int:
                 schedule_data.get('start_date'),
                 schedule_data.get('end_date'),
                 schedule_data.get('event_description'),
-                schedule_data.get('request_note')
+                schedule_data.get('request_note'),
+                schedule_data.get('schedule_type')
             ))
             conn.commit()
             row = cursor.fetchone()
@@ -2774,25 +2793,63 @@ def create_schedule(schedule_data: Dict) -> int:
             cursor.close()
             conn.close()
     else:
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         try:
+            import random
+            import time
+            from datetime import datetime, timezone, timedelta
+            
+            # 랜덤 ID 생성 (중복 체크)
+            max_attempts = 10
+            new_id = None
+            for attempt in range(max_attempts):
+                # 타임스탬프 기반 + 랜덤 숫자
+                timestamp_part = int(time.time() * 1000) % 1000000  # 마지막 6자리
+                random_part = random.randint(1000, 9999)  # 4자리 랜덤
+                candidate_id = timestamp_part * 10000 + random_part
+                
+                # 중복 체크
+                cursor.execute('SELECT id FROM schedules WHERE id = ?', (candidate_id,))
+                if cursor.fetchone() is None:
+                    new_id = candidate_id
+                    break
+            
+            # 모든 시도 실패 시 순차적 ID 사용
+            if new_id is None:
+                cursor.execute('SELECT MAX(id) FROM schedules')
+                max_id_row = cursor.fetchone()
+                max_id = max_id_row[0] if max_id_row and max_id_row[0] is not None else 0
+                new_id = max_id + 1 + random.randint(1, 1000)
+            
+            # 현재 시간을 KST로 가져오기
+            kst = timezone(timedelta(hours=9))
+            created_at = datetime.now(kst).strftime('%Y-%m-%d %H:%M:%S')
+            
             cursor.execute('''
                 INSERT INTO schedules (
-                    company_name, title, start_date, end_date, 
-                    event_description, request_note
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    id, company_name, title, start_date, end_date, 
+                    event_description, request_note, schedule_type, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
+                new_id,
                 schedule_data.get('company_name'),
                 schedule_data.get('title'),
                 schedule_data.get('start_date'),
                 schedule_data.get('end_date'),
                 schedule_data.get('event_description'),
-                schedule_data.get('request_note')
+                schedule_data.get('request_note'),
+                schedule_data.get('schedule_type'),
+                created_at,
+                created_at
             ))
             conn.commit()
-            return cursor.lastrowid
+            print(f"✅ 스케줄 생성 성공 - 생성된 ID: {new_id}")
+            return new_id
         except Exception as e:
             print(f"스케쥴 생성 오류: {e}")
+            import traceback
+            traceback.print_exc()
             return 0
         finally:
             conn.close()
@@ -2816,15 +2873,48 @@ def get_schedules_by_company(company_name: str) -> List[Dict]:
             cursor.close()
             conn.close()
     else:
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                SELECT * FROM schedules 
+                SELECT id, company_name, title, start_date, end_date, 
+                       event_description, request_note, schedule_type, 
+                       created_at, updated_at
+                FROM schedules 
                 WHERE company_name = ?
                 ORDER BY start_date DESC, created_at DESC
             ''', (company_name,))
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            result = []
+            for row in rows:
+                # SQLite Row 객체를 명시적으로 딕셔너리로 변환
+                row_dict = {}
+                if hasattr(row, 'keys'):
+                    # Row 객체인 경우
+                    for key in row.keys():
+                        row_dict[key] = row[key]
+                    # ID가 없거나 None인 경우 row[0]에서 가져오기
+                    if 'id' not in row_dict or row_dict['id'] is None:
+                        row_dict['id'] = row[0] if len(row) > 0 else None
+                else:
+                    # 튜플인 경우
+                    row_dict = {
+                        'id': row[0] if len(row) > 0 else None,
+                        'company_name': row[1] if len(row) > 1 else None,
+                        'title': row[2] if len(row) > 2 else None,
+                        'start_date': row[3] if len(row) > 3 else None,
+                        'end_date': row[4] if len(row) > 4 else None,
+                        'event_description': row[5] if len(row) > 5 else None,
+                        'request_note': row[6] if len(row) > 6 else None,
+                        'schedule_type': row[7] if len(row) > 7 else None,
+                        'created_at': row[8] if len(row) > 8 else None,
+                        'updated_at': row[9] if len(row) > 9 else None
+                    }
+                # ID 디버깅
+                if row_dict.get('id') is None:
+                    print(f'⚠️ 스케줄 ID가 None입니다. Row: {row}, Dict: {row_dict}')
+                result.append(row_dict)
+            return result
         finally:
             conn.close()
 
@@ -2846,14 +2936,47 @@ def get_all_schedules() -> List[Dict]:
             cursor.close()
             conn.close()
     else:
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                SELECT * FROM schedules 
+                SELECT id, company_name, title, start_date, end_date, 
+                       event_description, request_note, schedule_type, 
+                       created_at, updated_at
+                FROM schedules 
                 ORDER BY start_date DESC, created_at DESC
             ''')
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            result = []
+            for row in rows:
+                # SQLite Row 객체를 명시적으로 딕셔너리로 변환
+                row_dict = {}
+                if hasattr(row, 'keys'):
+                    # Row 객체인 경우
+                    for key in row.keys():
+                        row_dict[key] = row[key]
+                    # ID가 없거나 None인 경우 row[0]에서 가져오기
+                    if 'id' not in row_dict or row_dict['id'] is None:
+                        row_dict['id'] = row[0] if len(row) > 0 else None
+                else:
+                    # 튜플인 경우
+                    row_dict = {
+                        'id': row[0] if len(row) > 0 else None,
+                        'company_name': row[1] if len(row) > 1 else None,
+                        'title': row[2] if len(row) > 2 else None,
+                        'start_date': row[3] if len(row) > 3 else None,
+                        'end_date': row[4] if len(row) > 4 else None,
+                        'event_description': row[5] if len(row) > 5 else None,
+                        'request_note': row[6] if len(row) > 6 else None,
+                        'schedule_type': row[7] if len(row) > 7 else None,
+                        'created_at': row[8] if len(row) > 8 else None,
+                        'updated_at': row[9] if len(row) > 9 else None
+                    }
+                # ID 디버깅
+                if row_dict.get('id') is None:
+                    print(f'⚠️ 스케줄 ID가 None입니다. Row: {row}, Dict: {row_dict}')
+                result.append(row_dict)
+            return result
         finally:
             conn.close()
 
@@ -2878,17 +3001,50 @@ def get_schedules_by_date_range(start_date: str, end_date: str) -> List[Dict]:
             cursor.close()
             conn.close()
     else:
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                SELECT * FROM schedules 
+                SELECT id, company_name, title, start_date, end_date, 
+                       event_description, request_note, schedule_type, 
+                       created_at, updated_at
+                FROM schedules 
                 WHERE (start_date <= ? AND end_date >= ?)
                    OR (start_date BETWEEN ? AND ?)
                    OR (end_date BETWEEN ? AND ?)
                 ORDER BY start_date ASC, company_name ASC
             ''', (end_date, start_date, start_date, end_date, start_date, end_date))
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            result = []
+            for row in rows:
+                # SQLite Row 객체를 명시적으로 딕셔너리로 변환
+                row_dict = {}
+                if hasattr(row, 'keys'):
+                    # Row 객체인 경우
+                    for key in row.keys():
+                        row_dict[key] = row[key]
+                    # ID가 없거나 None인 경우 row[0]에서 가져오기
+                    if 'id' not in row_dict or row_dict['id'] is None:
+                        row_dict['id'] = row[0] if len(row) > 0 else None
+                else:
+                    # 튜플인 경우
+                    row_dict = {
+                        'id': row[0] if len(row) > 0 else None,
+                        'company_name': row[1] if len(row) > 1 else None,
+                        'title': row[2] if len(row) > 2 else None,
+                        'start_date': row[3] if len(row) > 3 else None,
+                        'end_date': row[4] if len(row) > 4 else None,
+                        'event_description': row[5] if len(row) > 5 else None,
+                        'request_note': row[6] if len(row) > 6 else None,
+                        'schedule_type': row[7] if len(row) > 7 else None,
+                        'created_at': row[8] if len(row) > 8 else None,
+                        'updated_at': row[9] if len(row) > 9 else None
+                    }
+                # ID 디버깅
+                if row_dict.get('id') is None:
+                    print(f'⚠️ 스케줄 ID가 None입니다. Row: {row}, Dict: {row_dict}')
+                result.append(row_dict)
+            return result
         finally:
             conn.close()
 
@@ -2930,6 +3086,7 @@ def update_schedule(schedule_id: int, schedule_data: Dict) -> bool:
                     end_date = %s,
                     event_description = %s,
                     request_note = %s,
+                    schedule_type = %s,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
             ''', (
@@ -2938,6 +3095,7 @@ def update_schedule(schedule_id: int, schedule_data: Dict) -> bool:
                 schedule_data.get('end_date'),
                 schedule_data.get('event_description'),
                 schedule_data.get('request_note'),
+                schedule_data.get('schedule_type'),
                 schedule_id
             ))
             conn.commit()
@@ -2959,6 +3117,7 @@ def update_schedule(schedule_id: int, schedule_data: Dict) -> bool:
                     end_date = ?,
                     event_description = ?,
                     request_note = ?,
+                    schedule_type = ?,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ''', (
@@ -2967,6 +3126,7 @@ def update_schedule(schedule_id: int, schedule_data: Dict) -> bool:
                 schedule_data.get('end_date'),
                 schedule_data.get('event_description'),
                 schedule_data.get('request_note'),
+                schedule_data.get('schedule_type'),
                 schedule_id
             ))
             conn.commit()
@@ -2978,31 +3138,177 @@ def update_schedule(schedule_id: int, schedule_data: Dict) -> bool:
             conn.close()
 
 
-def delete_schedule(schedule_id: int) -> bool:
+def delete_schedule(schedule_id: int, role: str = '관리자', company_name: str = '') -> bool:
     """스케쥴 삭제"""
     conn = get_db_connection()
     
     if USE_POSTGRESQL:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         try:
-            cursor.execute('DELETE FROM schedules WHERE id = %s', (schedule_id,))
-            conn.commit()
-            return cursor.rowcount > 0
+            # 삭제 전 스케줄 정보 확인
+            cursor.execute('SELECT id, title, company_name, start_date, end_date, schedule_type FROM schedules WHERE id = %s', (schedule_id,))
+            before = cursor.fetchone()
+            
+            if not before:
+                print(f'⚠️ 삭제할 스케줄을 찾을 수 없습니다: id={schedule_id}')
+                return False
+            
+            schedule_type = before.get('schedule_type', '')
+            title = before.get('title', '')
+            start_date = before.get('start_date', '')
+            end_date = before.get('end_date', '')
+            
+            print(f'🔍 삭제 전 스케줄 확인: id={schedule_id}, title={title}, company={before.get("company_name")}, type={schedule_type}')
+            
+            # "모든화주사" 타입인지 확인
+            is_all_companies = schedule_type and (schedule_type.startswith('모든화주사') or schedule_type == '모든화주사')
+            
+            if is_all_companies:
+                if role == '관리자':
+                    # 관리자 모드: "모든화주사" 타입의 모든 스케줄 일괄 삭제
+                    print(f'🔍 관리자 모드 - "모든화주사" 타입 스케줄 일괄 삭제: title={title}, start={start_date}, end={end_date}')
+                    cursor.execute('''
+                        DELETE FROM schedules 
+                        WHERE title = %s 
+                        AND start_date = %s 
+                        AND end_date = %s
+                        AND (schedule_type LIKE '모든화주사%%' OR schedule_type = '모든화주사')
+                    ''', (title, start_date, end_date))
+                    conn.commit()
+                    deleted_count = cursor.rowcount
+                    print(f'✅ "모든화주사" 스케줄 일괄 삭제 성공: 삭제된 행 수={deleted_count}')
+                    return deleted_count > 0
+                else:
+                    # 화주사 모드: 본인의 스케줄만 삭제
+                    print(f'🔍 화주사 모드 - 본인 스케줄만 삭제: company={company_name}, title={title}, start={start_date}, end={end_date}')
+                    cursor.execute('''
+                        DELETE FROM schedules 
+                        WHERE company_name = %s
+                        AND title = %s 
+                        AND start_date = %s 
+                        AND end_date = %s
+                        AND (schedule_type LIKE '모든화주사%%' OR schedule_type = '모든화주사')
+                    ''', (company_name, title, start_date, end_date))
+                    conn.commit()
+                    deleted_count = cursor.rowcount
+                    print(f'✅ 화주사 스케줄 삭제 성공: company={company_name}, 삭제된 행 수={deleted_count}')
+                    return deleted_count > 0
+            else:
+                # 일반 스케줄: ID로 삭제
+                cursor.execute('DELETE FROM schedules WHERE id = %s', (schedule_id,))
+                conn.commit()
+                deleted_count = cursor.rowcount
+                print(f'✅ 스케줄 삭제 성공: id={schedule_id}, 삭제된 행 수={deleted_count}')
+                return deleted_count > 0
         except Exception as e:
             print(f"스케쥴 삭제 오류: {e}")
+            import traceback
+            traceback.print_exc()
             conn.rollback()
             return False
         finally:
             cursor.close()
             conn.close()
     else:
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         try:
-            cursor.execute('DELETE FROM schedules WHERE id = ?', (schedule_id,))
-            conn.commit()
-            return cursor.rowcount > 0
+            # ID 타입 확인 및 변환
+            schedule_id_int = int(schedule_id)
+            print(f'🔍 삭제 시도: schedule_id={schedule_id} (타입: {type(schedule_id)}, 변환: {schedule_id_int})')
+            
+            # 삭제 전 확인 - 모든 ID 타입으로 검색
+            cursor.execute('SELECT id, title, company_name, start_date, end_date, schedule_type, rowid FROM schedules WHERE id = ?', (schedule_id_int,))
+            before = cursor.fetchone()
+            
+            if not before:
+                # 문자열로도 시도
+                cursor.execute('SELECT id, title, company_name, start_date, end_date, schedule_type, rowid FROM schedules WHERE CAST(id AS TEXT) = ?', (str(schedule_id),))
+                before = cursor.fetchone()
+            
+            if before:
+                before_dict = dict(before) if hasattr(before, 'keys') else before
+                schedule_type = before_dict.get('schedule_type', '')
+                title = before_dict.get('title', '')
+                start_date = before_dict.get('start_date', '')
+                end_date = before_dict.get('end_date', '')
+                
+                print(f'🔍 삭제 전 스케줄 확인: id={before_dict.get("id")}, title={title}, company={before_dict.get("company_name")}, type={schedule_type}')
+                
+                # "모든화주사" 타입인지 확인
+                is_all_companies = schedule_type and (schedule_type.startswith('모든화주사') or schedule_type == '모든화주사')
+                
+                if is_all_companies:
+                    if role == '관리자':
+                        # 관리자 모드: "모든화주사" 타입의 모든 스케줄 일괄 삭제
+                        print(f'🔍 관리자 모드 - "모든화주사" 타입 스케줄 일괄 삭제: title={title}, start={start_date}, end={end_date}')
+                        cursor.execute('''
+                            DELETE FROM schedules 
+                            WHERE title = ? 
+                            AND start_date = ? 
+                            AND end_date = ?
+                            AND (schedule_type LIKE '모든화주사%' OR schedule_type = '모든화주사')
+                        ''', (title, start_date, end_date))
+                        conn.commit()
+                        deleted_count = cursor.rowcount
+                        print(f'✅ "모든화주사" 스케줄 일괄 삭제 성공: 삭제된 행 수={deleted_count}')
+                        return deleted_count > 0
+                    else:
+                        # 화주사 모드: 본인의 스케줄만 삭제
+                        print(f'🔍 화주사 모드 - 본인 스케줄만 삭제: company={company_name}, title={title}, start={start_date}, end={end_date}')
+                        cursor.execute('''
+                            DELETE FROM schedules 
+                            WHERE company_name = ?
+                            AND title = ? 
+                            AND start_date = ? 
+                            AND end_date = ?
+                            AND (schedule_type LIKE '모든화주사%' OR schedule_type = '모든화주사')
+                        ''', (company_name, title, start_date, end_date))
+                        conn.commit()
+                        deleted_count = cursor.rowcount
+                        print(f'✅ 화주사 스케줄 삭제 성공: company={company_name}, 삭제된 행 수={deleted_count}')
+                        return deleted_count > 0
+                else:
+                    # 일반 스케줄: rowid로 삭제 (더 확실함)
+                    rowid = before_dict.get('rowid')
+                    if rowid:
+                        cursor.execute('DELETE FROM schedules WHERE rowid = ?', (rowid,))
+                        conn.commit()
+                        deleted_count = cursor.rowcount
+                        print(f'🔍 rowid로 삭제 시도: rowid={rowid}, 삭제된 행 수={deleted_count}')
+                    else:
+                        # rowid가 없으면 ID로 삭제
+                        cursor.execute('DELETE FROM schedules WHERE id = ?', (schedule_id_int,))
+                        conn.commit()
+                        deleted_count = cursor.rowcount
+                        print(f'🔍 id로 삭제 시도: id={schedule_id_int}, 삭제된 행 수={deleted_count}')
+                    
+                    # 삭제 후 확인
+                    if rowid:
+                        cursor.execute('SELECT id FROM schedules WHERE rowid = ?', (rowid,))
+                    else:
+                        cursor.execute('SELECT id FROM schedules WHERE id = ?', (schedule_id_int,))
+                    after = cursor.fetchone()
+                    
+                    if deleted_count > 0:
+                        print(f'✅ 스케줄 삭제 성공: id={schedule_id_int}, 삭제된 행 수={deleted_count}')
+                        if after:
+                            print(f'⚠️ 경고: 삭제 후에도 스케줄이 존재합니다!')
+                        return True
+                    else:
+                        print(f'❌ 스케줄 삭제 실패: id={schedule_id_int}, 삭제된 행 수={deleted_count}')
+                        return False
+            else:
+                print(f'⚠️ 삭제할 스케줄을 찾을 수 없습니다: id={schedule_id} (int: {schedule_id_int})')
+                # 모든 스케줄 ID 확인 (디버깅용)
+                cursor.execute('SELECT id, title, company_name FROM schedules LIMIT 5')
+                all_schedules = cursor.fetchall()
+                print(f'🔍 현재 스케줄 샘플: {[dict(s) if hasattr(s, "keys") else s for s in all_schedules]}')
+                return False
         except Exception as e:
             print(f"스케쥴 삭제 오류: {e}")
+            import traceback
+            traceback.print_exc()
             return False
         finally:
             conn.close()
