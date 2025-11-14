@@ -85,17 +85,33 @@ def get_cs_requests(company_name: str = None, role: str = '화주사', month: st
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         try:
             if role == '관리자':
-                if month:
-                    cursor.execute('''
-                        SELECT * FROM customer_service
-                        WHERE month = %s
-                        ORDER BY created_at DESC
-                    ''', (month,))
+                if company_name:
+                    # 관리자 모드에서 특정 화주사 필터링
+                    if month:
+                        cursor.execute('''
+                            SELECT * FROM customer_service
+                            WHERE company_name = %s AND month = %s
+                            ORDER BY created_at DESC
+                        ''', (company_name, month))
+                    else:
+                        cursor.execute('''
+                            SELECT * FROM customer_service
+                            WHERE company_name = %s
+                            ORDER BY created_at DESC
+                        ''', (company_name,))
                 else:
-                    cursor.execute('''
-                        SELECT * FROM customer_service
-                        ORDER BY created_at DESC
-                    ''')
+                    # 관리자 모드에서 전체 조회
+                    if month:
+                        cursor.execute('''
+                            SELECT * FROM customer_service
+                            WHERE month = %s
+                            ORDER BY created_at DESC
+                        ''', (month,))
+                    else:
+                        cursor.execute('''
+                            SELECT * FROM customer_service
+                            ORDER BY created_at DESC
+                        ''')
             else:
                 if month:
                     cursor.execute('''
@@ -121,23 +137,45 @@ def get_cs_requests(company_name: str = None, role: str = '화주사', month: st
         cursor = conn.cursor()
         try:
             if role == '관리자':
-                if month:
-                    cursor.execute('''
-                        SELECT id, company_name, username, date, month, issue_type, content, 
-                               management_number, generated_management_number, status, 
-                               admin_message, processor, processed_at, created_at, updated_at
-                        FROM customer_service
-                        WHERE month = ?
-                        ORDER BY created_at DESC
-                    ''', (month,))
+                if company_name:
+                    # 관리자 모드에서 특정 화주사 필터링
+                    if month:
+                        cursor.execute('''
+                            SELECT id, company_name, username, date, month, issue_type, content, 
+                                   management_number, generated_management_number, status, 
+                                   admin_message, processor, processed_at, created_at, updated_at
+                            FROM customer_service
+                            WHERE company_name = ? AND month = ?
+                            ORDER BY created_at DESC
+                        ''', (company_name, month))
+                    else:
+                        cursor.execute('''
+                            SELECT id, company_name, username, date, month, issue_type, content, 
+                                   management_number, generated_management_number, status, 
+                                   admin_message, processor, processed_at, created_at, updated_at
+                            FROM customer_service
+                            WHERE company_name = ?
+                            ORDER BY created_at DESC
+                        ''', (company_name,))
                 else:
-                    cursor.execute('''
-                        SELECT id, company_name, username, date, month, issue_type, content, 
-                               management_number, generated_management_number, status, 
-                               admin_message, processor, processed_at, created_at, updated_at
-                        FROM customer_service
-                        ORDER BY created_at DESC
-                    ''')
+                    # 관리자 모드에서 전체 조회
+                    if month:
+                        cursor.execute('''
+                            SELECT id, company_name, username, date, month, issue_type, content, 
+                                   management_number, generated_management_number, status, 
+                                   admin_message, processor, processed_at, created_at, updated_at
+                            FROM customer_service
+                            WHERE month = ?
+                            ORDER BY created_at DESC
+                        ''', (month,))
+                    else:
+                        cursor.execute('''
+                            SELECT id, company_name, username, date, month, issue_type, content, 
+                                   management_number, generated_management_number, status, 
+                                   admin_message, processor, processed_at, created_at, updated_at
+                            FROM customer_service
+                            ORDER BY created_at DESC
+                        ''')
             else:
                 if month:
                     cursor.execute('''
@@ -504,8 +542,11 @@ def get_cs_list():
         role = request.args.get('role', '화주사').strip()
         month = request.args.get('month', '').strip()
         
+        # 관리자 모드에서도 company_name이 제공되면 필터링
+        filter_company = company_name if company_name else (None if role == '관리자' else company_name)
+        
         cs_list = get_cs_requests(
-            company_name if role != '관리자' else None, 
+            filter_company,
             role,
             month if month else None
         )
@@ -702,8 +743,11 @@ def export_cs():
         role = request.args.get('role', '화주사').strip()
         month = request.args.get('month', '').strip()
         
+        # 관리자 모드에서도 company_name이 제공되면 필터링
+        filter_company = company_name if company_name else (None if role == '관리자' else company_name)
+        
         cs_list = get_cs_requests(
-            company_name if role != '관리자' else None,
+            filter_company,
             role,
             month if month else None
         )

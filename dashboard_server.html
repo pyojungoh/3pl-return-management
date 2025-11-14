@@ -1757,25 +1757,44 @@
           <select id="csMonthSelect">
             <option value="">로딩 중...</option>
           </select>
+          <label for="csCompanySelect" id="csCompanyLabel" style="display: none;">🏢 화주사:</label>
+          <select id="csCompanySelect" style="display: none;" onchange="loadCsData()">
+            <option value="">전체</option>
+          </select>
           <button class="refresh-btn" onclick="refreshCsData()" id="refreshCsBtn">🔄 새로고침</button>
           <button class="refresh-btn" onclick="exportCsData()" id="exportCsBtn" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);">📥 엑셀 다운로드</button>
           <button class="refresh-btn" onclick="testTelegram()" id="testTelegramBtn" style="display:none; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">📱 텔레그램 테스트</button>
         </div>
         
         <!-- 통계 -->
-        <div class="stats">
-          <div class="stat-item active" id="csFilterAll" onclick="filterCsByStatus('all')">
-            <div class="stat-number" id="csTotalCount">0</div>
-            <div class="stat-label">총 C/S 건</div>
-          </div>
-          <div class="stat-item" id="csFilterCompleted" onclick="filterCsByStatus('completed')">
-            <div class="stat-number" id="csCompletedCount">0</div>
-            <div class="stat-label">처리완료</div>
-          </div>
-          <div class="stat-item" id="csFilterPending" onclick="filterCsByStatus('pending')">
-            <div class="stat-number" id="csPendingCount">0</div>
-            <div class="stat-label">미처리</div>
-          </div>
+        <div class="stats" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <span id="csFilterAll" onclick="filterCsByStatus('all')" onmouseover="if(!this.classList.contains('active')) this.style.transform='scale(1.05)'" onmouseout="if(!this.classList.contains('active')) this.style.transform='scale(1)'" style="padding: 8px 12px; border-radius: 8px; background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white; cursor: pointer; font-size: 13px; font-weight: 600; border: 2px solid #ff6b35; transition: all 0.3s ease; white-space: nowrap;">
+            총 C/S 건 <strong id="csTotalCount">0</strong>
+          </span>
+          <span id="csFilterCompleted" onclick="filterCsByStatus('completed')" onmouseover="if(this.style.background.includes('fffef9')) this.style.transform='scale(1.05)'; this.style.borderColor='#ffa502'" onmouseout="if(this.style.background.includes('fffef9')) this.style.transform='scale(1)'; this.style.borderColor='#ffeaa7'" style="padding: 8px 12px; border-radius: 8px; background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%); color: #636e72; cursor: pointer; font-size: 13px; font-weight: 600; border: 2px solid #ffeaa7; transition: all 0.3s ease; white-space: nowrap;">
+            처리완료 <strong id="csCompletedCount">0</strong>
+          </span>
+          <span id="csFilterPending" onclick="filterCsByStatus('pending')" onmouseover="if(this.style.background.includes('fffef9')) this.style.transform='scale(1.05)'; this.style.borderColor='#ffa502'" onmouseout="if(this.style.background.includes('fffef9')) this.style.transform='scale(1)'; this.style.borderColor='#ffeaa7'" style="padding: 8px 12px; border-radius: 8px; background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%); color: #636e72; cursor: pointer; font-size: 13px; font-weight: 600; border: 2px solid #ffeaa7; transition: all 0.3s ease; white-space: nowrap;">
+            미처리 <strong id="csPendingCount">0</strong>
+          </span>
+          <span id="csFilterMissing" onclick="filterCsByType('누락')" onmouseover="if(!this.classList.contains('active')) { this.style.transform='scale(1.05)'; this.style.opacity='0.9'; }" onmouseout="if(!this.classList.contains('active')) { this.style.transform='scale(1)'; this.style.opacity='1'; }" style="padding: 6px 10px; border-radius: 6px; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; cursor: pointer; font-size: 11px; font-weight: 600; border: 2px solid #e74c3c; transition: all 0.3s ease; white-space: nowrap;">
+            누락 <strong id="csMissingCount">0</strong>
+          </span>
+          <span id="csFilterWrongDelivery" onclick="filterCsByType('오배송')" onmouseover="if(!this.classList.contains('active')) { this.style.transform='scale(1.05)'; this.style.opacity='0.9'; }" onmouseout="if(!this.classList.contains('active')) { this.style.transform='scale(1)'; this.style.opacity='1'; }" style="padding: 6px 10px; border-radius: 6px; background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: white; cursor: pointer; font-size: 11px; font-weight: 600; border: 2px solid #f39c12; transition: all 0.3s ease; white-space: nowrap;">
+            오배송 <strong id="csWrongDeliveryCount">0</strong>
+          </span>
+          <span id="csFilterExchange" onclick="filterCsByType('교환')" onmouseover="if(!this.classList.contains('active')) { this.style.transform='scale(1.05)'; this.style.opacity='0.9'; }" onmouseout="if(!this.classList.contains('active')) { this.style.transform='scale(1)'; this.style.opacity='1'; }" style="padding: 6px 10px; border-radius: 6px; background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; cursor: pointer; font-size: 11px; font-weight: 600; border: 2px solid #3498db; transition: all 0.3s ease; white-space: nowrap;">
+            교환 <strong id="csExchangeCount">0</strong>
+          </span>
+          <span id="csFilterReturn" onclick="filterCsByType('반품')" onmouseover="if(!this.classList.contains('active')) { this.style.transform='scale(1.05)'; this.style.opacity='0.9'; }" onmouseout="if(!this.classList.contains('active')) { this.style.transform='scale(1)'; this.style.opacity='1'; }" style="padding: 6px 10px; border-radius: 6px; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%); color: white; cursor: pointer; font-size: 11px; font-weight: 600; border: 2px solid #9b59b6; transition: all 0.3s ease; white-space: nowrap;">
+            반품 <strong id="csReturnCount">0</strong>
+          </span>
+          <span id="csFilterCancel" onclick="filterCsByType('취소')" onmouseover="if(!this.classList.contains('active')) { this.style.transform='scale(1.05)'; this.style.opacity='0.9'; }" onmouseout="if(!this.classList.contains('active')) { this.style.transform='scale(1)'; this.style.opacity='1'; }" style="padding: 6px 10px; border-radius: 6px; background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%); color: white; cursor: pointer; font-size: 11px; font-weight: 600; border: 2px solid #95a5a6; transition: all 0.3s ease; white-space: nowrap;">
+            취소 <strong id="csCancelCount">0</strong>
+          </span>
+          <span id="csFilterOther" onclick="filterCsByType('기타')" onmouseover="if(!this.classList.contains('active')) { this.style.transform='scale(1.05)'; this.style.opacity='0.9'; }" onmouseout="if(!this.classList.contains('active')) { this.style.transform='scale(1)'; this.style.opacity='1'; }" style="padding: 6px 10px; border-radius: 6px; background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%); color: white; cursor: pointer; font-size: 11px; font-weight: 600; border: 2px solid #1abc9c; transition: all 0.3s ease; white-space: nowrap;">
+            기타 <strong id="csOtherCount">0</strong>
+          </span>
         </div>
         
         <!-- C/S 등록 접이식 버튼 (화주사 모드에서만 표시) -->
@@ -2442,6 +2461,7 @@
     let currentFilter = 'all'; // 'all', 'completed', 'pending'
     let currentCsData = [];
     let currentCsFilter = 'all'; // 'all', 'completed', 'pending'
+    let currentCsTypeFilter = null; // '누락', '오배송', '교환', '반품', '취소', '기타' 또는 null
     
     // 로그인 메시지 표시
     function showLoginMessage(text, type) {
@@ -3951,6 +3971,10 @@
         if (csRegisterSection) {
           csRegisterSection.style.display = 'block';
         }
+        // 화주사 목록 로드 (관리자 모드에서만)
+        if (typeof loadCompaniesForCs === 'function') {
+          loadCompaniesForCs();
+        }
         // C/S 월 목록 로드 및 데이터 로드
         loadCsAvailableMonths();
       } else if (tabName === 'scheduleCalendar') {
@@ -5000,7 +5024,16 @@
       }
       
       const selectedMonth = document.getElementById('csMonthSelect')?.value || '';
-      const companyFilter = (currentRole === '관리자') ? '' : currentCompany;
+      let companyFilter = '';
+      
+      // 관리자 모드: 선택한 화주사 필터 적용
+      if (currentRole === '관리자') {
+        const selectedCompany = document.getElementById('csCompanySelect')?.value || '';
+        companyFilter = selectedCompany;
+      } else {
+        // 화주사 모드: 자신의 데이터만
+        companyFilter = currentCompany;
+      }
       
       const url = `${API_BASE_URL}/api/cs/?company=${encodeURIComponent(companyFilter)}&month=${encodeURIComponent(selectedMonth)}&role=${encodeURIComponent(currentRole)}`;
       
@@ -5029,6 +5062,50 @@
     }
     window.loadCsData = loadCsData;
     
+    // C/S 관리용 화주사 목록 로드
+    async function loadCompaniesForCs() {
+      const select = document.getElementById('csCompanySelect');
+      const label = document.getElementById('csCompanyLabel');
+      
+      // 관리자 모드에서만 표시
+      if (currentRole !== '관리자') {
+        if (select) select.style.display = 'none';
+        if (label) label.style.display = 'none';
+        return;
+      }
+      
+      if (!select) return;
+      
+      // 관리자 모드에서만 표시
+      if (select) select.style.display = 'inline-block';
+      if (label) label.style.display = 'inline-block';
+      
+      try {
+        const response = await fetch('/api/auth/companies');
+        const result = await response.json();
+        
+        if (result.success && result.companies) {
+          // 기존 옵션 제거 (첫 번째 "전체" 옵션 제외)
+          while (select.options.length > 1) {
+            select.remove(1);
+          }
+          
+          // 화주사만 필터링 (관리자 제외)
+          const companies = result.companies.filter(company => company.role !== '관리자');
+          
+          companies.forEach(company => {
+            const option = document.createElement('option');
+            option.value = company.company_name;
+            option.textContent = company.company_name;
+            select.appendChild(option);
+          });
+        }
+      } catch (error) {
+        console.error('화주사 목록 로드 오류:', error);
+      }
+    }
+    window.loadCompaniesForCs = loadCompaniesForCs;
+    
     // C/S 테이블 렌더링
     function renderCsTable(csList) {
       const tbody = document.getElementById('csTableBody');
@@ -5040,10 +5117,17 @@
       
       // 필터링 적용
       let filteredList = csList;
+      
+      // 상태별 필터링
       if (currentCsFilter === 'completed') {
-        filteredList = csList.filter(cs => cs.status === '처리완료' || cs.status === '처리불가');
+        filteredList = filteredList.filter(cs => cs.status === '처리완료' || cs.status === '처리불가');
       } else if (currentCsFilter === 'pending') {
-        filteredList = csList.filter(cs => cs.status === '접수');
+        filteredList = filteredList.filter(cs => cs.status === '접수');
+      }
+      
+      // 종류별 필터링
+      if (currentCsTypeFilter) {
+        filteredList = filteredList.filter(cs => cs.issue_type === currentCsTypeFilter);
       }
       
       if (!filteredList || filteredList.length === 0) {
@@ -5189,6 +5273,15 @@
       const completed = csList.filter(cs => cs.status === '처리완료' || cs.status === '처리불가').length;
       const pending = csList.filter(cs => cs.status === '접수').length;
       
+      // 종류별 통계
+      const missing = csList.filter(cs => cs.issue_type === '누락').length;
+      const wrongDelivery = csList.filter(cs => cs.issue_type === '오배송').length;
+      const exchange = csList.filter(cs => cs.issue_type === '교환').length;
+      const returnType = csList.filter(cs => cs.issue_type === '반품').length;
+      const cancel = csList.filter(cs => cs.issue_type === '취소').length;
+      const other = csList.filter(cs => cs.issue_type === '기타').length;
+      
+      // 상태별 통계 업데이트
       const totalCountEl = document.getElementById('csTotalCount');
       const completedCountEl = document.getElementById('csCompletedCount');
       const pendingCountEl = document.getElementById('csPendingCount');
@@ -5196,24 +5289,87 @@
       if (totalCountEl) totalCountEl.textContent = total;
       if (completedCountEl) completedCountEl.textContent = completed;
       if (pendingCountEl) pendingCountEl.textContent = pending;
+      
+      // 종류별 통계 업데이트
+      const missingCountEl = document.getElementById('csMissingCount');
+      const wrongDeliveryCountEl = document.getElementById('csWrongDeliveryCount');
+      const exchangeCountEl = document.getElementById('csExchangeCount');
+      const returnCountEl = document.getElementById('csReturnCount');
+      const cancelCountEl = document.getElementById('csCancelCount');
+      const otherCountEl = document.getElementById('csOtherCount');
+      
+      if (missingCountEl) missingCountEl.textContent = missing;
+      if (wrongDeliveryCountEl) wrongDeliveryCountEl.textContent = wrongDelivery;
+      if (exchangeCountEl) exchangeCountEl.textContent = exchange;
+      if (returnCountEl) returnCountEl.textContent = returnType;
+      if (cancelCountEl) cancelCountEl.textContent = cancel;
+      if (otherCountEl) otherCountEl.textContent = other;
     }
     window.updateCsStats = updateCsStats;
     
     // C/S 상태별 필터링
     function filterCsByStatus(filter) {
       currentCsFilter = filter;
+      currentCsTypeFilter = null; // 상태 필터 변경 시 종류 필터 초기화
       
       // 통계 박스 활성화 상태 업데이트
-      document.querySelectorAll('#csFilterAll, #csFilterCompleted, #csFilterPending').forEach(item => {
-        item.classList.remove('active');
+      const allFilter = document.getElementById('csFilterAll');
+      const completedFilter = document.getElementById('csFilterCompleted');
+      const pendingFilter = document.getElementById('csFilterPending');
+      
+      // 모든 상태 필터 스타일 초기화
+      if (allFilter) {
+        allFilter.style.background = 'linear-gradient(135deg, #fffef9 0%, #ffffff 100%)';
+        allFilter.style.color = '#636e72';
+        allFilter.style.borderColor = '#ffeaa7';
+      }
+      if (completedFilter) {
+        completedFilter.style.background = 'linear-gradient(135deg, #fffef9 0%, #ffffff 100%)';
+        completedFilter.style.color = '#636e72';
+        completedFilter.style.borderColor = '#ffeaa7';
+      }
+      if (pendingFilter) {
+        pendingFilter.style.background = 'linear-gradient(135deg, #fffef9 0%, #ffffff 100%)';
+        pendingFilter.style.color = '#636e72';
+        pendingFilter.style.borderColor = '#ffeaa7';
+      }
+      
+      // 종류 필터 스타일 초기화 (원래 색상으로)
+      const typeFilterConfigs = {
+        'csFilterMissing': { color: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)', border: '#e74c3c' },
+        'csFilterWrongDelivery': { color: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)', border: '#f39c12' },
+        'csFilterExchange': { color: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)', border: '#3498db' },
+        'csFilterReturn': { color: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)', border: '#9b59b6' },
+        'csFilterCancel': { color: 'linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%)', border: '#95a5a6' },
+        'csFilterOther': { color: 'linear-gradient(135deg, #1abc9c 0%, #16a085 100%)', border: '#1abc9c' }
+      };
+      
+      Object.entries(typeFilterConfigs).forEach(([id, config]) => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.style.background = config.color;
+          el.style.color = 'white';
+          el.style.borderColor = config.border;
+          el.style.opacity = '1';
+          el.style.transform = 'scale(1)';
+          el.style.boxShadow = 'none';
+          el.classList.remove('active');
+        }
       });
       
-      if (filter === 'all') {
-        document.getElementById('csFilterAll')?.classList.add('active');
-      } else if (filter === 'completed') {
-        document.getElementById('csFilterCompleted')?.classList.add('active');
-      } else if (filter === 'pending') {
-        document.getElementById('csFilterPending')?.classList.add('active');
+      // 선택된 필터 활성화
+      if (filter === 'all' && allFilter) {
+        allFilter.style.background = 'linear-gradient(135deg, #ff6b35 0%, #feca57 100%)';
+        allFilter.style.color = 'white';
+        allFilter.style.borderColor = '#ff6b35';
+      } else if (filter === 'completed' && completedFilter) {
+        completedFilter.style.background = 'linear-gradient(135deg, #ff6b35 0%, #feca57 100%)';
+        completedFilter.style.color = 'white';
+        completedFilter.style.borderColor = '#ff6b35';
+      } else if (filter === 'pending' && pendingFilter) {
+        pendingFilter.style.background = 'linear-gradient(135deg, #ff6b35 0%, #feca57 100%)';
+        pendingFilter.style.color = 'white';
+        pendingFilter.style.borderColor = '#ff6b35';
       }
       
       // 테이블 다시 렌더링
@@ -5223,10 +5379,68 @@
     }
     window.filterCsByStatus = filterCsByStatus;
     
+    // C/S 종류별 필터링
+    function filterCsByType(type) {
+      if (currentCsTypeFilter === type) {
+        // 같은 종류를 다시 클릭하면 필터 해제
+        currentCsTypeFilter = null;
+      } else {
+        currentCsTypeFilter = type;
+      }
+      
+      // 종류 필터 스타일 업데이트
+      const typeFilterIds = {
+        '누락': { id: 'csFilterMissing', color: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)', border: '#e74c3c' },
+        '오배송': { id: 'csFilterWrongDelivery', color: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)', border: '#f39c12' },
+        '교환': { id: 'csFilterExchange', color: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)', border: '#3498db' },
+        '반품': { id: 'csFilterReturn', color: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)', border: '#9b59b6' },
+        '취소': { id: 'csFilterCancel', color: 'linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%)', border: '#95a5a6' },
+        '기타': { id: 'csFilterOther', color: 'linear-gradient(135deg, #1abc9c 0%, #16a085 100%)', border: '#1abc9c' }
+      };
+      
+      // 모든 종류 필터 스타일 초기화 (원래 색상으로)
+      Object.entries(typeFilterIds).forEach(([type, config]) => {
+        const el = document.getElementById(config.id);
+        if (el) {
+          el.style.background = config.color;
+          el.style.color = 'white';
+          el.style.borderColor = config.border;
+          el.style.opacity = '1';
+          el.classList.remove('active');
+        }
+      });
+      
+      // 선택된 종류 필터 활성화 (더 진하게)
+      if (currentCsTypeFilter && typeFilterIds[currentCsTypeFilter]) {
+        const activeEl = document.getElementById(typeFilterIds[currentCsTypeFilter].id);
+        if (activeEl) {
+          activeEl.style.opacity = '1';
+          activeEl.style.transform = 'scale(1.1)';
+          activeEl.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+          activeEl.classList.add('active');
+        }
+      }
+      
+      // 테이블 다시 렌더링
+      if (currentCsData && currentCsData.length > 0) {
+        renderCsTable(currentCsData);
+      }
+    }
+    window.filterCsByType = filterCsByType;
+    
     // C/S 엑셀 다운로드
     function exportCsData() {
       const selectedMonth = document.getElementById('csMonthSelect')?.value || '';
-      const companyFilter = (currentRole === '관리자') ? '' : currentCompany;
+      let companyFilter = '';
+      
+      // 관리자 모드: 선택한 화주사 필터 적용
+      if (currentRole === '관리자') {
+        const selectedCompany = document.getElementById('csCompanySelect')?.value || '';
+        companyFilter = selectedCompany;
+      } else {
+        // 화주사 모드: 자신의 데이터만
+        companyFilter = currentCompany;
+      }
       
       const url = `${API_BASE_URL}/api/cs/export?company=${encodeURIComponent(companyFilter)}&month=${encodeURIComponent(selectedMonth)}&role=${encodeURIComponent(currentRole)}`;
       
@@ -7318,6 +7532,173 @@
     }
     // 전역으로 노출하여 언제든지 호출 가능하도록
     window.disableHeaderHover = disableHeaderHover;
+    
+    /* ========== 화주사 목록 불러오기 ========== */
+    async function loadCompanies() {
+      const tbody = document.getElementById('companiesTableBody');
+      const statisticsSpan = document.getElementById('companiesStatistics');
+      
+      if (!tbody) return;
+      
+      tbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중...</td></tr>';
+      
+      try {
+        const response = await fetch('/api/auth/companies');
+        const result = await response.json();
+        
+        if (result.success && result.companies) {
+          // 통계 업데이트
+          if (statisticsSpan && result.statistics) {
+            const stats = result.statistics;
+            statisticsSpan.textContent = `(관리자: ${stats.admin_count || 0}, 화주사: ${stats.consignor_count || 0})`;
+          }
+          
+          // 테이블 렌더링
+          if (result.companies.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="13" class="no-data">등록된 화주사가 없습니다.</td></tr>';
+            return;
+          }
+          
+          tbody.innerHTML = '';
+          result.companies.forEach(company => {
+            const row = document.createElement('tr');
+            const createdDate = company.created_at ? new Date(company.created_at).toLocaleDateString('ko-KR') : '-';
+            const lastLogin = company.last_login ? new Date(company.last_login).toLocaleDateString('ko-KR') : '-';
+            const tags = company.search_keywords || '';
+            
+            row.innerHTML = `
+              <td style="text-align: center;">${escapeHtml(company.company_name || '')}</td>
+              <td style="text-align: center;">${escapeHtml(company.username || '')}</td>
+              <td style="text-align: center;">
+                <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; 
+                  ${company.role === '관리자' ? 'background: #e74c3c; color: white;' : 'background: #3498db; color: white;'}">
+                  ${escapeHtml(company.role || '화주사')}
+                </span>
+              </td>
+              <td style="text-align: center;">${escapeHtml(tags)}</td>
+              <td style="text-align: center;">${escapeHtml(company.business_number || '-')}</td>
+              <td style="text-align: center;">${escapeHtml(company.business_name || '-')}</td>
+              <td style="text-align: center;">${escapeHtml(company.business_address || '-')}</td>
+              <td style="text-align: center;">${escapeHtml(company.business_tel || '-')}</td>
+              <td style="text-align: center;">${escapeHtml(company.business_email || '-')}</td>
+              <td style="text-align: center;">
+                ${company.business_certificate_url ? 
+                  `<button onclick="viewCertificate(${company.id}, '${escapeHtml(company.business_certificate_url)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">보기</button>` : 
+                  `<button onclick="uploadCertificate(${company.id})" style="padding: 4px 8px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">업로드</button>`
+                }
+              </td>
+              <td style="text-align: center;">${lastLogin}</td>
+              <td style="text-align: center;">${createdDate}</td>
+              <td style="text-align: center; white-space: nowrap;">
+                <div style="display: inline-flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                  <button onclick="openTagModal(${company.id}, '${escapeHtml(company.username)}', '${escapeHtml(company.company_name)}', '${escapeHtml(tags)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">태그</button>
+                  <button onclick="changeCompanyPassword(${company.id}, '${escapeHtml(company.username)}')" style="padding: 4px 8px; background: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">비밀번호</button>
+                  <button onclick="deleteCompany(${company.id}, '${escapeHtml(company.company_name)}')" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">삭제</button>
+                </div>
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+        } else {
+          tbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러올 수 없습니다.</td></tr>';
+        }
+      } catch (error) {
+        console.error('화주사 목록 로드 오류:', error);
+        tbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중 오류가 발생했습니다.</td></tr>';
+      }
+    }
+    window.loadCompanies = loadCompanies;
+    
+    // 화주사 목록 새로고침
+    function refreshCompaniesData() {
+      loadCompanies();
+    }
+    window.refreshCompaniesData = refreshCompaniesData;
+    
+    // 화주사 등록 폼 접기/펼치기
+    function toggleAddCompanyForm() {
+      const form = document.getElementById('addCompanyForm');
+      const icon = document.getElementById('addCompanyIcon');
+      if (form && icon) {
+        const isHidden = form.style.display === 'none';
+        form.style.display = isHidden ? 'block' : 'none';
+        icon.textContent = isHidden ? '▼' : '▶';
+      }
+    }
+    window.toggleAddCompanyForm = toggleAddCompanyForm;
+    
+    // 화주사 등록
+    async function registerCompany() {
+      const companyName = document.getElementById('adminRegCompanyName').value.trim();
+      const username = document.getElementById('adminRegUsername').value.trim();
+      const password = document.getElementById('adminRegPassword').value.trim();
+      const role = document.getElementById('adminRegRole').value;
+      const businessNumber = document.getElementById('adminRegBusinessNumber').value.trim();
+      const businessName = document.getElementById('adminRegBusinessName').value.trim();
+      const businessAddress = document.getElementById('adminRegBusinessAddress').value.trim();
+      const businessTel = document.getElementById('adminRegBusinessTel').value.trim();
+      const businessEmail = document.getElementById('adminRegBusinessEmail').value.trim();
+      const statusDiv = document.getElementById('adminRegisterStatus');
+      
+      if (!companyName || !username || !password || !role) {
+        if (statusDiv) {
+          statusDiv.innerHTML = '<span style="color: #e74c3c;">필수 항목을 모두 입력해주세요.</span>';
+        }
+        return;
+      }
+      
+      if (statusDiv) {
+        statusDiv.innerHTML = '<span style="color: #3498db;">등록 중...</span>';
+      }
+      
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            company_name: companyName,
+            username: username,
+            password: password,
+            role: role,
+            business_number: businessNumber || null,
+            business_name: businessName || null,
+            business_address: businessAddress || null,
+            business_tel: businessTel || null,
+            business_email: businessEmail || null
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          if (statusDiv) {
+            statusDiv.innerHTML = '<span style="color: #00b894;">✅ 화주사가 등록되었습니다.</span>';
+          }
+          // 폼 초기화
+          document.getElementById('adminRegisterForm').reset();
+          toggleAddCompanyForm();
+          // 목록 새로고침
+          loadCompanies();
+          // C/S 화주사 드롭다운도 새로고침 (C/S 탭이 활성화되어 있을 때)
+          if (typeof loadCompaniesForCs === 'function') {
+            loadCompaniesForCs();
+          }
+        } else {
+          if (statusDiv) {
+            statusDiv.innerHTML = `<span style="color: #e74c3c;">❌ ${result.message || '등록 실패'}</span>`;
+          }
+        }
+      } catch (error) {
+        console.error('화주사 등록 오류:', error);
+        if (statusDiv) {
+          statusDiv.innerHTML = `<span style="color: #e74c3c;">❌ 등록 중 오류가 발생했습니다: ${error.message}</span>`;
+        }
+      }
+    }
+    window.registerCompany = registerCompany;
+    
     /* ========== 화주사 삭제 ========== */
     function deleteCompany(companyId, companyName) {
       if (!confirm(`정말로 "${companyName}" 화주사를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) {
