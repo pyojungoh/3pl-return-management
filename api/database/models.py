@@ -42,14 +42,19 @@ def get_db_connection():
             if 'sslmode' not in DATABASE_URL and 'sslmode=' not in DATABASE_URL:
                 # URL에 쿼리 파라미터가 있는지 확인
                 if '?' in DATABASE_URL:
-                    conn = psycopg2.connect(DATABASE_URL + '&sslmode=require')
+                    conn = psycopg2.connect(DATABASE_URL + '&sslmode=require', connect_timeout=10)
                 else:
-                    conn = psycopg2.connect(DATABASE_URL + '?sslmode=require')
+                    conn = psycopg2.connect(DATABASE_URL + '?sslmode=require', connect_timeout=10)
             else:
-                conn = psycopg2.connect(DATABASE_URL)
+                conn = psycopg2.connect(DATABASE_URL, connect_timeout=10)
+            
+            # PostgreSQL은 기본적으로 autocommit=True이므로 명시적으로 설정하지 않음
+            # 트랜잭션은 각 함수에서 명시적으로 commit/rollback 처리
             return conn
         except Exception as e:
             print(f"❌ PostgreSQL 연결 오류: {e}")
+            import traceback
+            traceback.print_exc()
             raise
     else:
         # SQLite 연결
