@@ -237,14 +237,23 @@ def send_cs_notifications():
 
 def start_cs_notification_scheduler():
     """C/S 알림 스케줄러 시작 (백그라운드 스레드)"""
+    import os
+    is_vercel = os.environ.get('VERCEL') == '1'
+    
+    if is_vercel:
+        print("⚠️ [스케줄러] Vercel 환경 감지 - 백그라운드 스레드는 제한적일 수 있습니다.")
+        print("   Vercel Cron Jobs를 사용하는 것을 권장합니다: /api/cs/check-notifications")
+    
     def scheduler_loop():
-        print("🔄 [스케줄러] 루프 시작")
+        print("🔄 [스케줄러] 루프 시작 (백그라운드 스레드)")
         loop_count = 0
         while True:
             try:
                 loop_count += 1
                 if loop_count % 5 == 0:  # 5분마다 한 번씩 로그 출력
                     print(f"🔄 [스케줄러] 루프 실행 중... (실행 횟수: {loop_count})")
+                elif loop_count == 1:
+                    print(f"🔄 [스케줄러] 첫 실행: {loop_count}")
                 send_cs_notifications()
             except Exception as e:
                 print(f"❌ [스케줄러] 루프 오류: {e}")
@@ -254,9 +263,21 @@ def start_cs_notification_scheduler():
             # 1분마다 실행 (취소건 체크)
             time.sleep(60)
     
-    scheduler_thread = threading.Thread(target=scheduler_loop, daemon=True)
-    scheduler_thread.start()
-    print("✅ C/S 알림 스케줄러가 시작되었습니다.")
-    print("   - 취소건: 1분마다 알림")
-    print("   - 일반 항목: 첫 알림은 접수 후 1분, 이후 5분마다 알림")
+    try:
+        scheduler_thread = threading.Thread(target=scheduler_loop, daemon=True)
+        scheduler_thread.start()
+        print("✅ [스케줄러] C/S 알림 스케줄러가 시작되었습니다.")
+        print("   - 취소건: 1분마다 알림")
+        print("   - 일반 항목: 첫 알림은 접수 후 1분, 이후 5분마다 알림")
+        print(f"   - 스레드 상태: {'활성' if scheduler_thread.is_alive() else '비활성'}")
+        
+        # 스레드가 살아있는지 확인
+        import time as time_module
+        time_module.sleep(0.1)  # 잠시 대기
+        if not scheduler_thread.is_alive():
+            print("⚠️ [스케줄러] 경고: 스레드가 즉시 종료되었습니다. Vercel 환경에서는 작동하지 않을 수 있습니다.")
+    except Exception as e:
+        print(f"❌ [스케줄러] 스레드 시작 오류: {e}")
+        import traceback
+        traceback.print_exc()
 

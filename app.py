@@ -82,10 +82,14 @@ app.register_blueprint(popups_bp)
 app.register_blueprint(cs_bp)
 
 # C/S 알림 스케줄러 시작
+print("🚀 [앱 시작] C/S 알림 스케줄러 시작 시도...")
 try:
     start_cs_notification_scheduler()
+    print("✅ [앱 시작] C/S 알림 스케줄러 시작 완료")
 except Exception as e:
-    print(f"⚠️ C/S 알림 스케줄러 시작 중 오류 (무시 가능): {e}")
+    print(f"❌ [앱 시작] C/S 알림 스케줄러 시작 중 오류: {e}")
+    import traceback
+    traceback.print_exc()
 
 
 # 메인 페이지 라우트 (화주사 대시보드)
