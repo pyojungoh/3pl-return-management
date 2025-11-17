@@ -15,8 +15,13 @@ def send_telegram_notification(message: str) -> bool:
     Returns:
         bool: 전송 성공 여부
     """
+    print("🔍 [텔레그램] 알림 전송 함수 호출됨")
     bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
     chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+    
+    print(f"🔑 [텔레그램] 환경변수 확인:")
+    print(f"   - TELEGRAM_BOT_TOKEN: {'설정됨' if bot_token else '없음'} ({bot_token[:10] + '...' if bot_token and len(bot_token) > 10 else 'N/A'})")
+    print(f"   - TELEGRAM_CHAT_ID: {'설정됨' if chat_id else '없음'} ({chat_id})")
     
     if not bot_token or not chat_id:
         print("⚠️ 텔레그램 설정이 없습니다. (TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID)")
