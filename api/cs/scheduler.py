@@ -10,54 +10,52 @@ from api.cs.routes_db import get_pending_cs_requests, get_pending_cs_requests_by
 from api.notifications.telegram import send_telegram_notification
 
 
-def convert_to_kst(datetime_str: str) -> str:
+def convert_to_kst(value) -> str:
     """
-    시간 문자열을 한국시간(KST)으로 변환
-    데이터베이스에 저장된 시간은 이미 KST이므로, timezone 정보가 없으면 KST로 가정
+    시간 값을 한국시간(KST) 문자열로 변환.
+    value는 문자열 또는 datetime 객체가 될 수 있음.
     """
-    if not datetime_str:
+    if not value:
         return ''
     
+    kst = timezone(timedelta(hours=9))
+    
     try:
-        # 다양한 날짜 형식 파싱 시도
-        formats = [
-            '%Y-%m-%d %H:%M:%S',
-            '%Y-%m-%d %H:%M:%S.%f',
-            '%Y-%m-%dT%H:%M:%S',
-            '%Y-%m-%dT%H:%M:%S.%f',
-            '%Y-%m-%dT%H:%M:%S%z',
-            '%Y-%m-%dT%H:%M:%S.%f%z',
-        ]
-        
         dt = None
-        for fmt in formats:
-            try:
-                dt = datetime.strptime(datetime_str, fmt)
-                break
-            except ValueError:
-                continue
-        
-        if dt is None:
-            return datetime_str
-        
-        # timezone 정보가 있으면 변환, 없으면 이미 KST로 가정
-        if dt.tzinfo is None:
-            # timezone 정보가 없으면 이미 KST로 저장된 것으로 가정하고 그대로 반환
-            # 또는 문자열에서 마이크로초 제거
-            if '.' in datetime_str:
-                return datetime_str.split('.')[0]
-            return datetime_str
+        if isinstance(value, datetime):
+            dt = value
         else:
-            # timezone 정보가 있으면 KST로 변환
-            kst = timezone(timedelta(hours=9))
-            kst_time = dt.astimezone(kst)
-            return kst_time.strftime('%Y-%m-%d %H:%M:%S')
+            datetime_str = str(value)
+            formats = [
+                '%Y-%m-%d %H:%M:%S',
+                '%Y-%m-%d %H:%M:%S.%f',
+                '%Y-%m-%dT%H:%M:%S',
+                '%Y-%m-%dT%H:%M:%S.%f',
+                '%Y-%m-%dT%H:%M:%S%z',
+                '%Y-%m-%dT%H:%M:%S.%f%z',
+            ]
+            
+            for fmt in formats:
+                try:
+                    dt = datetime.strptime(datetime_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            
+            if dt is None:
+                # 문자열 파싱 실패 시 그대로 반환 (마이크로초 제거)
+                return datetime_str.split('.')[0] if '.' in datetime_str else datetime_str
+        
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=kst)
+        else:
+            dt = dt.astimezone(kst)
+        
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
     except Exception as e:
-        print(f"⚠️ 시간 변환 오류: {e}, 원본: {datetime_str}")
-        # 오류 발생 시 원본 반환 (마이크로초 제거)
-        if '.' in datetime_str:
-            return datetime_str.split('.')[0]
-        return datetime_str
+        print(f"⚠️ 시간 변환 오류: {e}, 원본: {value}")
+        value_str = str(value)
+        return value_str.split('.')[0] if '.' in value_str else value_str
 
 # 마지막 알림 시간 추적 (중복 알림 방지)
 last_notification_times = {}
