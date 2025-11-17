@@ -71,6 +71,7 @@ def send_cs_notifications():
         
         # 취소건: 1분마다 알림
         cancellation_requests = get_pending_cs_requests_by_issue_type('취소')
+        print(f"📊 [스케줄러] 취소건 조회: {len(cancellation_requests)}건")
         
         for cs in cancellation_requests:
             cs_id = cs.get('id')
@@ -109,6 +110,7 @@ def send_cs_notifications():
             message += f"내용: {content_preview}\n"
             message += f"접수일: {created_at_kst}"
             
+            print(f"📤 [스케줄러] 취소건 알림 전송: C/S #{cs_id}")
             send_telegram_notification(message)
             
             # 마지막 알림 시간 업데이트
@@ -117,6 +119,7 @@ def send_cs_notifications():
         # 일반 미처리 항목: 5분마다 알림 (취소건 제외)
         all_pending = get_pending_cs_requests()
         non_cancellation_requests = [cs for cs in all_pending if cs.get('issue_type') != '취소' and cs.get('status') == '접수']
+        print(f"📊 [스케줄러] 일반 미처리 항목 조회: {len(non_cancellation_requests)}건")
         
         for cs in non_cancellation_requests:
             cs_id = cs.get('id')
@@ -132,10 +135,14 @@ def send_cs_notifications():
             last_time_key = f"general_{cs_id}"
             last_time = last_notification_times.get(last_time_key)
             
+            should_send = False
+            
             if last_time:
+                # 이전에 알림을 보낸 적이 있으면, 5분 이상 지났는지 확인
                 time_diff = (current_time - last_time).total_seconds()
-                if time_diff < 300:  # 5분 미만이면 스킵
-                    continue
+                if time_diff >= 300:  # 5분 이상 지났으면 알림 전송
+                    should_send = True
+                    print(f"⏰ [스케줄러] C/S #{cs_id}: 마지막 알림으로부터 {time_diff:.0f}초 경과 (5분 이상)")
             else:
                 # 첫 알림인 경우, 접수일로부터 5분 이상 지났는지 확인
                 created_at_str = cs.get('created_at', '')
@@ -159,12 +166,28 @@ def send_cs_notifications():
                                 continue
                         
                         if created_at:
-                            # 접수일로부터 5분 미만이면 스킵
+                            # 접수일로부터 5분 이상 지났는지 확인
                             time_since_creation = (current_time - created_at).total_seconds()
-                            if time_since_creation < 300:  # 5분 미만이면 스킵
-                                continue
+                            if time_since_creation >= 300:  # 5분 이상 지났으면 알림 전송
+                                should_send = True
+                                print(f"⏰ [스케줄러] C/S #{cs_id}: 접수일로부터 {time_since_creation:.0f}초 경과 (5분 이상)")
+                            else:
+                                print(f"⏸️ [스케줄러] C/S #{cs_id}: 접수일로부터 {time_since_creation:.0f}초 경과 (5분 미만, 스킵)")
+                        else:
+                            # 파싱 실패 시에도 알림 전송 (안전장치)
+                            should_send = True
+                            print(f"⚠️ [스케줄러] C/S #{cs_id}: 접수일 파싱 실패, 알림 전송")
                     except Exception as e:
-                        print(f"⚠️ 접수일 파싱 오류: {e}")
+                        print(f"⚠️ 접수일 파싱 오류: {e}, C/S #{cs_id}")
+                        # 오류 발생 시에도 알림 전송 (안전장치)
+                        should_send = True
+                else:
+                    # created_at이 없으면 알림 전송 (안전장치)
+                    should_send = True
+                    print(f"⚠️ [스케줄러] C/S #{cs_id}: 접수일 정보 없음, 알림 전송")
+            
+            if not should_send:
+                continue
             
             # 알림 전송
             company_name = cs.get('company_name', '알 수 없음')
@@ -184,6 +207,7 @@ def send_cs_notifications():
             message += f"내용: {content_preview}\n"
             message += f"접수일: {created_at_kst}"
             
+            print(f"📤 [스케줄러] 일반 미처리 항목 알림 전송: C/S #{cs_id}")
             send_telegram_notification(message)
             
             # 마지막 알림 시간 업데이트
