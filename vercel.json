@@ -19,9 +19,6 @@
   "env": {
     "VERCEL": "1"
   },
-  "github": {
-    "autoDeployOnPush": true
-  },
   "crons": [
     {
       "path": "/api/cs/check-notifications",
