@@ -2,6 +2,7 @@
 인증 API 라우트 (SQLite 데이터베이스 기반)
 """
 from flask import Blueprint, request, jsonify
+from datetime import datetime
 from api.database.models import (
     get_company_by_username,
     get_all_companies,
@@ -413,10 +414,17 @@ def get_companies():
         companies = get_all_companies()
         statistics = get_companies_statistics()
         
-        # 비밀번호 필드는 제외
+        # 비밀번호 필드는 제외하고 datetime 필드 처리
         for company in companies:
+            if not isinstance(company, dict):
+                print(f"⚠️ [get_companies] company가 dict가 아님: {type(company)}, 값: {company}")
+                continue
             if 'password' in company:
                 del company['password']
+            # datetime 필드를 문자열로 변환 (JSON 직렬화를 위해)
+            for key, value in company.items():
+                if isinstance(value, datetime):
+                    company[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
         
         return jsonify({
             'success': True,

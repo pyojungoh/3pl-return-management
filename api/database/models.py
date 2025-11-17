@@ -741,7 +741,15 @@ def get_all_companies() -> List[Dict]:
                 ORDER BY created_at DESC
             ''')
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            result = []
+            for row in rows:
+                row_dict = dict(row)
+                # datetime 객체를 문자열로 변환
+                for key, value in row_dict.items():
+                    if isinstance(value, datetime):
+                        row_dict[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+                result.append(row_dict)
+            return result
         finally:
             cursor.close()
             conn.close()
