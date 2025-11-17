@@ -121,6 +121,9 @@ def send_cs_notifications():
         all_pending = get_pending_cs_requests()
         non_cancellation_requests = [cs for cs in all_pending if cs.get('issue_type') != '취소' and cs.get('status') == '접수']
         print(f"📊 [스케줄러] 일반 미처리 항목 조회: {len(non_cancellation_requests)}건")
+        if len(non_cancellation_requests) > 0:
+            print(f"   - C/S ID 목록: {[cs.get('id') for cs in non_cancellation_requests]}")
+            print(f"   - 저장된 알림 시간 키: {list(last_notification_times.keys())}")
         
         for cs in non_cancellation_requests:
             cs_id = cs.get('id')
@@ -141,9 +144,16 @@ def send_cs_notifications():
             if last_time:
                 # 이전에 알림을 보낸 적이 있으면, 5분 이상 지났는지 확인
                 time_diff = (current_time - last_time).total_seconds()
+                print(f"🔍 [스케줄러] C/S #{cs_id}: 마지막 알림 시간 확인")
+                print(f"   - 마지막 알림: {last_time.strftime('%Y-%m-%d %H:%M:%S') if hasattr(last_time, 'strftime') else last_time}")
+                print(f"   - 현재 시간: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                print(f"   - 경과 시간: {time_diff:.0f}초 ({time_diff/60:.1f}분)")
+                
                 if time_diff >= 300:  # 5분 이상 지났으면 알림 전송
                     should_send = True
-                    print(f"⏰ [스케줄러] C/S #{cs_id}: 마지막 알림으로부터 {time_diff:.0f}초 경과 (5분 이상)")
+                    print(f"✅ [스케줄러] C/S #{cs_id}: 5분 이상 경과, 알림 전송")
+                else:
+                    print(f"⏸️ [스케줄러] C/S #{cs_id}: 5분 미만 ({time_diff/60:.1f}분), 스킵 (다음 체크 대기)")
             else:
                 # 첫 알림인 경우, 접수일로부터 1분 이상 지났는지 확인 (5분에서 1분으로 완화)
                 created_at_str = cs.get('created_at', '')
@@ -217,6 +227,7 @@ def send_cs_notifications():
             
             # 마지막 알림 시간 업데이트
             last_notification_times[last_time_key] = current_time
+            print(f"💾 [스케줄러] C/S #{cs_id}: 마지막 알림 시간 저장 완료: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
             
     except Exception as e:
         print(f"❌ C/S 알림 전송 오류: {e}")
