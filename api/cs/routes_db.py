@@ -506,6 +506,8 @@ def create_cs():
             
             message = f"📝 <b>새로운 C/S 접수</b>\n\n"
             message += f"📋 C/S 번호: #{cs_id}\n"
+            if management_number:
+                message += f"🔢 관리번호: {management_number}\n"
             message += f"화주사: {company_name}\n"
             message += f"유형: {issue_type}\n"
             message += f"내용: {content[:200]}{'...' if len(content) > 200 else ''}\n"

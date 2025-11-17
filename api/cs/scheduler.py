@@ -12,7 +12,8 @@ from api.notifications.telegram import send_telegram_notification
 
 def convert_to_kst(datetime_str: str) -> str:
     """
-    UTC 시간 문자열을 한국시간(KST)으로 변환
+    시간 문자열을 한국시간(KST)으로 변환
+    데이터베이스에 저장된 시간은 이미 KST이므로, timezone 정보가 없으면 KST로 가정
     """
     if not datetime_str:
         return ''
@@ -39,18 +40,23 @@ def convert_to_kst(datetime_str: str) -> str:
         if dt is None:
             return datetime_str
         
-        # timezone 정보가 없으면 UTC로 가정
+        # timezone 정보가 있으면 변환, 없으면 이미 KST로 가정
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        
-        # KST로 변환 (UTC+9)
-        kst = timezone(timedelta(hours=9))
-        kst_time = dt.astimezone(kst)
-        
-        # YYYY-MM-DD HH:MM:SS 형식으로 반환
-        return kst_time.strftime('%Y-%m-%d %H:%M:%S')
+            # timezone 정보가 없으면 이미 KST로 저장된 것으로 가정하고 그대로 반환
+            # 또는 문자열에서 마이크로초 제거
+            if '.' in datetime_str:
+                return datetime_str.split('.')[0]
+            return datetime_str
+        else:
+            # timezone 정보가 있으면 KST로 변환
+            kst = timezone(timedelta(hours=9))
+            kst_time = dt.astimezone(kst)
+            return kst_time.strftime('%Y-%m-%d %H:%M:%S')
     except Exception as e:
         print(f"⚠️ 시간 변환 오류: {e}, 원본: {datetime_str}")
+        # 오류 발생 시 원본 반환 (마이크로초 제거)
+        if '.' in datetime_str:
+            return datetime_str.split('.')[0]
         return datetime_str
 
 # 마지막 알림 시간 추적 (중복 알림 방지)
@@ -59,13 +65,21 @@ last_notification_times = {}
 def send_cs_notifications():
     """C/S 알림 전송 (스케줄러에서 호출)"""
     try:
+        # KST 시간대 사용
+        kst = timezone(timedelta(hours=9))
+        current_time = datetime.now(kst)
+        
         # 취소건: 1분마다 알림
         cancellation_requests = get_pending_cs_requests_by_issue_type('취소')
-        current_time = datetime.now()
         
         for cs in cancellation_requests:
             cs_id = cs.get('id')
             if not cs_id:
+                continue
+            
+            # 상태 확인 (처리완료/처리불가면 스킵)
+            status = cs.get('status', '접수')
+            if status not in ['접수']:
                 continue
                 
             # 마지막 알림 시간 확인 (1분 이내면 스킵)
@@ -84,9 +98,12 @@ def send_cs_notifications():
             content_preview = content[:100] + ('...' if len(content) > 100 else '')
             
             cs_id = cs.get('id', '')
+            management_number = cs.get('management_number', '') or cs.get('generated_management_number', '')
             created_at_kst = convert_to_kst(cs.get('created_at', ''))
             message = f"🚨 <b>미처리 취소건 알림 (1분)</b>\n\n"
             message += f"📋 C/S 번호: #{cs_id}\n"
+            if management_number:
+                message += f"🔢 관리번호: {management_number}\n"
             message += f"화주사: {company_name}\n"
             message += f"유형: {issue_type}\n"
             message += f"내용: {content_preview}\n"
@@ -99,11 +116,16 @@ def send_cs_notifications():
         
         # 일반 미처리 항목: 5분마다 알림 (취소건 제외)
         all_pending = get_pending_cs_requests()
-        non_cancellation_requests = [cs for cs in all_pending if cs.get('issue_type') != '취소']
+        non_cancellation_requests = [cs for cs in all_pending if cs.get('issue_type') != '취소' and cs.get('status') == '접수']
         
         for cs in non_cancellation_requests:
             cs_id = cs.get('id')
             if not cs_id:
+                continue
+            
+            # 상태 확인 (처리완료/처리불가면 스킵)
+            status = cs.get('status', '접수')
+            if status not in ['접수']:
                 continue
                 
             # 마지막 알림 시간 확인 (5분 이내면 스킵)
@@ -119,7 +141,7 @@ def send_cs_notifications():
                 created_at_str = cs.get('created_at', '')
                 if created_at_str:
                     try:
-                        # created_at을 datetime으로 파싱
+                        # created_at을 datetime으로 파싱 (KST로 가정)
                         created_at = None
                         formats = [
                             '%Y-%m-%d %H:%M:%S',
@@ -129,7 +151,9 @@ def send_cs_notifications():
                         ]
                         for fmt in formats:
                             try:
-                                created_at = datetime.strptime(created_at_str, fmt)
+                                created_at = datetime.strptime(created_at_str.split('.')[0] if '.' in created_at_str else created_at_str, fmt)
+                                # KST로 가정
+                                created_at = created_at.replace(tzinfo=kst)
                                 break
                             except ValueError:
                                 continue
@@ -149,9 +173,12 @@ def send_cs_notifications():
             content_preview = content[:100] + ('...' if len(content) > 100 else '')
             
             cs_id = cs.get('id', '')
+            management_number = cs.get('management_number', '') or cs.get('generated_management_number', '')
             created_at_kst = convert_to_kst(cs.get('created_at', ''))
             message = f"🚨 <b>미처리 C/S 알림 (5분)</b>\n\n"
             message += f"📋 C/S 번호: #{cs_id}\n"
+            if management_number:
+                message += f"🔢 관리번호: {management_number}\n"
             message += f"화주사: {company_name}\n"
             message += f"유형: {issue_type}\n"
             message += f"내용: {content_preview}\n"
