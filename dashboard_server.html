@@ -5527,6 +5527,7 @@
               <button class="save-btn" onclick="updateCsGeneratedManagementNumber(${cs.id}, '${escapeHtml(generatedManagementNumber)}')" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(116, 185, 255, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">생성된 관리번호</button>
               <button class="save-btn" onclick="processCsComplete(${cs.id})" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 184, 148, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">처리완료</button>
               <button class="save-btn" onclick="processCsImpossible(${cs.id})" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(231, 76, 60, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">처리불가</button>
+              <button class="save-btn" onclick="deleteCs(${cs.id})" style="background: linear-gradient(135deg, #b2bec3 0%, #636e72 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(99, 110, 114, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">삭제</button>
             </div>
           `;
         }
@@ -5899,6 +5900,33 @@
       });
     }
     window.processCsImpossible = processCsImpossible;
+    
+    // C/S 삭제 (관리자용)
+    function deleteCs(csId) {
+      if (!confirm('해당 C/S 접수를 삭제하시겠습니까? 삭제 후에는 복구할 수 없습니다.')) {
+        return;
+      }
+      
+      const roleParam = encodeURIComponent(currentRole || '');
+      
+      fetch(`/api/cs/${csId}?role=${roleParam}`, {
+        method: 'DELETE'
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          showMessage('✅ C/S 접수가 삭제되었습니다.', 'success');
+          refreshCsData();
+        } else {
+          showMessage('❌ ' + (result.message || '삭제에 실패했습니다.'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('C/S 삭제 오류:', error);
+        showMessage('❌ C/S 삭제 중 오류: ' + error.message, 'error');
+      });
+    }
+    window.deleteCs = deleteCs;
     
     // C/S 재요청 알림 전송 (화주사용)
     async function resendCsNotification(csId) {

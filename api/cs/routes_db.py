@@ -302,6 +302,35 @@ def update_cs_status(cs_id: int, status: str, admin_message: str = None, process
             conn.close()
 
 
+def delete_cs_request(cs_id: int) -> bool:
+    """C/S 접수 삭제 (관리자용)"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM customer_service WHERE id = %s', (cs_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ C/S 삭제 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM customer_service WHERE id = ?', (cs_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ C/S 삭제 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
 def update_generated_management_number(cs_id: int, generated_management_number: str) -> bool:
     """C/S 접수 생성된 관리번호 업데이트 (관리자용)"""
     conn = get_db_connection()
@@ -676,6 +705,40 @@ def update_cs_status_route(cs_id):
         return jsonify({
             'success': False,
             'message': f'C/S 상태 업데이트 중 오류: {str(e)}'
+        }), 500
+
+
+@cs_bp.route('/<int:cs_id>', methods=['DELETE'])
+def delete_cs_route(cs_id):
+    """C/S 접수 삭제 (관리자용)"""
+    try:
+        role = request.args.get('role', '').strip()
+        
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 C/S를 삭제할 수 있습니다.'
+            }), 403
+        
+        success = delete_cs_request(cs_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'C/S 접수가 삭제되었습니다.'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'C/S 접수를 찾을 수 없거나 삭제에 실패했습니다.'
+            }), 404
+    except Exception as e:
+        print(f'❌ C/S 삭제 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'C/S 삭제 중 오류: {str(e)}'
         }), 500
 
 
