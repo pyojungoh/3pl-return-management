@@ -1086,6 +1086,13 @@ def get_companies_statistics() -> Dict:
             }
         except Exception as e:
             print(f"통계 조회 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            # 오류 발생 시 트랜잭션 롤백
+            try:
+                conn.rollback()
+            except:
+                pass
             return {
                 'admin_count': 0,
                 'company_count': 0,
