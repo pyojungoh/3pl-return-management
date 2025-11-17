@@ -9,6 +9,7 @@ from api.database.models import (
 from datetime import datetime, timezone, timedelta
 import csv
 import io
+import os
 from urllib.parse import quote
 
 # 한국 시간대 (KST = UTC+9)
@@ -500,6 +501,7 @@ def create_cs():
         
         if cs_id:
             # 텔레그램 알림 전송
+            print(f"📤 [C/S 등록] 텔레그램 알림 전송 시작: C/S #{cs_id}")
             # 현재 시간을 KST로 변환
             kst = timezone(timedelta(hours=9))
             current_time_kst = datetime.now(kst).strftime('%Y-%m-%d %H:%M:%S')
@@ -513,7 +515,9 @@ def create_cs():
             message += f"내용: {content[:200]}{'...' if len(content) > 200 else ''}\n"
             message += f"접수일: {current_time_kst}"
             
-            send_telegram_notification(message)
+            print(f"📝 [C/S 등록] 텔레그램 메시지: {message[:100]}...")
+            result = send_telegram_notification(message)
+            print(f"📬 [C/S 등록] 텔레그램 알림 전송 결과: {'성공' if result else '실패'}")
             
             return jsonify({
                 'success': True,
@@ -842,6 +846,44 @@ def resend_cs_notification(cs_id):
         return jsonify({
             'success': False,
             'message': f'재요청 알림 전송 중 오류: {str(e)}'
+        }), 500
+
+
+@cs_bp.route('/check-notifications', methods=['GET', 'POST'])
+def check_notifications():
+    """C/S 알림 체크 (Vercel Cron Jobs용)"""
+    try:
+        # Vercel Cron Jobs에서 호출하는 엔드포인트
+        # 헤더에서 cron secret 확인 (선택사항, 보안 강화용)
+        cron_secret = request.headers.get('Authorization')
+        expected_secret = os.environ.get('CRON_SECRET')
+        
+        # CRON_SECRET이 설정되어 있으면 검증
+        if expected_secret and cron_secret != f'Bearer {expected_secret}':
+            print("⚠️ [Cron] 인증 실패: CRON_SECRET 불일치")
+            return jsonify({
+                'success': False,
+                'message': 'Unauthorized'
+            }), 401
+        
+        print("🔄 [Cron] C/S 알림 체크 시작 (Vercel Cron Jobs)")
+        
+        # 스케줄러 함수 직접 호출
+        from api.cs.scheduler import send_cs_notifications
+        send_cs_notifications()
+        
+        return jsonify({
+            'success': True,
+            'message': 'C/S 알림 체크 완료'
+        })
+        
+    except Exception as e:
+        print(f'❌ C/S 알림 체크 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'C/S 알림 체크 중 오류: {str(e)}'
         }), 500
 
 
