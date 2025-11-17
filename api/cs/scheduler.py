@@ -68,6 +68,7 @@ def send_cs_notifications():
         # KST 시간대 사용
         kst = timezone(timedelta(hours=9))
         current_time = datetime.now(kst)
+        print(f"🕐 [스케줄러] 실행 시작: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
         
         # 취소건: 1분마다 알림
         cancellation_requests = get_pending_cs_requests_by_issue_type('취소')
@@ -144,8 +145,10 @@ def send_cs_notifications():
                     should_send = True
                     print(f"⏰ [스케줄러] C/S #{cs_id}: 마지막 알림으로부터 {time_diff:.0f}초 경과 (5분 이상)")
             else:
-                # 첫 알림인 경우, 접수일로부터 5분 이상 지났는지 확인
+                # 첫 알림인 경우, 접수일로부터 1분 이상 지났는지 확인 (5분에서 1분으로 완화)
                 created_at_str = cs.get('created_at', '')
+                print(f"🔍 [스케줄러] C/S #{cs_id}: 첫 알림 체크, 접수일: {created_at_str}")
+                
                 if created_at_str:
                     try:
                         # created_at을 datetime으로 파싱 (KST로 가정)
@@ -166,25 +169,27 @@ def send_cs_notifications():
                                 continue
                         
                         if created_at:
-                            # 접수일로부터 5분 이상 지났는지 확인
+                            # 접수일로부터 1분 이상 지났는지 확인 (5분에서 1분으로 완화)
                             time_since_creation = (current_time - created_at).total_seconds()
-                            if time_since_creation >= 300:  # 5분 이상 지났으면 알림 전송
+                            print(f"⏱️ [스케줄러] C/S #{cs_id}: 접수일로부터 {time_since_creation:.0f}초 경과")
+                            
+                            if time_since_creation >= 60:  # 1분 이상 지났으면 알림 전송
                                 should_send = True
-                                print(f"⏰ [스케줄러] C/S #{cs_id}: 접수일로부터 {time_since_creation:.0f}초 경과 (5분 이상)")
+                                print(f"✅ [스케줄러] C/S #{cs_id}: 1분 이상 경과, 알림 전송")
                             else:
-                                print(f"⏸️ [스케줄러] C/S #{cs_id}: 접수일로부터 {time_since_creation:.0f}초 경과 (5분 미만, 스킵)")
+                                print(f"⏸️ [스케줄러] C/S #{cs_id}: 1분 미만, 스킵 (다음 체크 대기)")
                         else:
                             # 파싱 실패 시에도 알림 전송 (안전장치)
                             should_send = True
-                            print(f"⚠️ [스케줄러] C/S #{cs_id}: 접수일 파싱 실패, 알림 전송")
+                            print(f"⚠️ [스케줄러] C/S #{cs_id}: 접수일 파싱 실패, 알림 전송 (안전장치)")
                     except Exception as e:
-                        print(f"⚠️ 접수일 파싱 오류: {e}, C/S #{cs_id}")
+                        print(f"⚠️ [스케줄러] 접수일 파싱 오류: {e}, C/S #{cs_id}")
                         # 오류 발생 시에도 알림 전송 (안전장치)
                         should_send = True
                 else:
                     # created_at이 없으면 알림 전송 (안전장치)
                     should_send = True
-                    print(f"⚠️ [스케줄러] C/S #{cs_id}: 접수일 정보 없음, 알림 전송")
+                    print(f"⚠️ [스케줄러] C/S #{cs_id}: 접수일 정보 없음, 알림 전송 (안전장치)")
             
             if not should_send:
                 continue
@@ -222,11 +227,18 @@ def send_cs_notifications():
 def start_cs_notification_scheduler():
     """C/S 알림 스케줄러 시작 (백그라운드 스레드)"""
     def scheduler_loop():
+        print("🔄 [스케줄러] 루프 시작")
+        loop_count = 0
         while True:
             try:
+                loop_count += 1
+                if loop_count % 5 == 0:  # 5분마다 한 번씩 로그 출력
+                    print(f"🔄 [스케줄러] 루프 실행 중... (실행 횟수: {loop_count})")
                 send_cs_notifications()
             except Exception as e:
-                print(f"❌ 스케줄러 루프 오류: {e}")
+                print(f"❌ [스케줄러] 루프 오류: {e}")
+                import traceback
+                traceback.print_exc()
             
             # 1분마다 실행 (취소건 체크)
             time.sleep(60)
@@ -235,5 +247,5 @@ def start_cs_notification_scheduler():
     scheduler_thread.start()
     print("✅ C/S 알림 스케줄러가 시작되었습니다.")
     print("   - 취소건: 1분마다 알림")
-    print("   - 일반 항목: 5분마다 알림")
+    print("   - 일반 항목: 첫 알림은 접수 후 1분, 이후 5분마다 알림")
 
