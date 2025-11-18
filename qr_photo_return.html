@@ -1005,6 +1005,11 @@ async function uploadPhotos() {
             hideOverlay();
             showOverlay('업로드 완료', `${uploadedPhotos.length}장의 사진이 업로드되었습니다.`, 2000);
             
+            // 업로드 완료 후 QR 스캔 모드로 복귀
+            setTimeout(() => {
+                resetToQRScanMode();
+            }, 2000);
+            
         } else {
             throw new Error(data.message || '사진 업로드 실패');
         }
@@ -1106,6 +1111,60 @@ function stopQRScan() {
         qrVideo.srcObject = null;
         qrVideo.pause();
     }
+}
+
+// ========= 사진 촬영 카메라 정리 =========
+function stopPhotoCamera() {
+    console.log('⏹️ 사진 촬영 카메라 정리');
+    
+    if (photoStream) {
+        photoStream.getTracks().forEach(track => track.stop());
+        photoStream = null;
+    }
+    
+    const photoVideo = document.getElementById('photoVideo');
+    if (photoVideo) {
+        photoVideo.srcObject = null;
+        photoVideo.pause();
+    }
+}
+
+// ========= QR 스캔 모드로 복귀 =========
+async function resetToQRScanMode() {
+    console.log('🔄 QR 스캔 모드로 복귀');
+    
+    // 사진 촬영 모드 숨기기
+    const photoMode = document.querySelector('.photo-mode');
+    if (photoMode) {
+        photoMode.classList.remove('active');
+    }
+    
+    // 정보 패널 숨기기
+    const infoPanel = document.getElementById('infoPanel');
+    if (infoPanel) {
+        infoPanel.classList.remove('show');
+    }
+    
+    // 사진 촬영 카메라 정리
+    stopPhotoCamera();
+    
+    // 변수 초기화
+    selectedPhotos = [];
+    uploadedPhotos = [];
+    currentTrackingNumber = '';
+    currentReturnData = null;
+    updatePhotoThumbnails();
+    
+    // QR 스캔 모드 표시
+    const qrScanMode = document.querySelector('.qr-scan-mode');
+    if (qrScanMode) {
+        qrScanMode.classList.remove('hidden');
+    }
+    
+    // QR 스캔 다시 시작
+    setTimeout(() => {
+        startAutoQRScan();
+    }, 500);
 }
 
 // ========= 카메라 오류 처리 =========
