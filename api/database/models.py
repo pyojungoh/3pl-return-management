@@ -1630,6 +1630,35 @@ def create_return(return_data: Dict) -> int:
     print(f"   월: {return_data.get('month')}")
     print(f"   화주명: {return_data.get('company_name')}")
     
+    # 빈 문자열을 None으로 변환 (데이터베이스에 NULL로 저장)
+    def empty_to_none(value):
+        """빈 문자열이나 공백만 있는 문자열을 None으로 변환"""
+        if value is None:
+            return None
+        if isinstance(value, str) and value.strip() == '':
+            return None
+        return value
+    
+    # 반품 데이터의 빈 문자열 필드를 None으로 변환
+    return_data = {
+        'return_date': return_data.get('return_date'),
+        'company_name': return_data.get('company_name'),
+        'product': empty_to_none(return_data.get('product')),
+        'customer_name': return_data.get('customer_name'),
+        'tracking_number': return_data.get('tracking_number'),
+        'return_type': empty_to_none(return_data.get('return_type')),
+        'stock_status': empty_to_none(return_data.get('stock_status')),
+        'inspection': empty_to_none(return_data.get('inspection')),
+        'completed': empty_to_none(return_data.get('completed')),
+        'memo': empty_to_none(return_data.get('memo')),
+        'photo_links': empty_to_none(return_data.get('photo_links')),
+        'other_courier': empty_to_none(return_data.get('other_courier')),
+        'shipping_fee': empty_to_none(return_data.get('shipping_fee')),
+        'client_request': empty_to_none(return_data.get('client_request')),
+        'client_confirmed': empty_to_none(return_data.get('client_confirmed')),
+        'month': return_data.get('month')
+    }
+    
     conn = get_db_connection()
     
     if USE_POSTGRESQL:

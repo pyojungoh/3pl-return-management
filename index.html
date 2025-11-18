@@ -825,22 +825,23 @@
       const returnDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
 
       // 반품 데이터 생성
+      // 빈 문자열은 null로 변환하여 데이터베이스에 NULL로 저장 (대시보드에서 "클릭하여 선택" 표시 방지)
       const returnData = {
         return_date: returnDate,
         company_name: formData.company,
         product: formData.product,
         customer_name: formData.customer,
         tracking_number: formData.trackingNumber,
-        return_type: '', // 기본값
-        stock_status: '', // 기본값
-        inspection: '', // 기본값
-        completed: '', // 기본값
-        memo: '', // 기본값
-        photo_links: formData.photoLinks || '', // 사진 링크
-        other_courier: '', // 기본값
-        shipping_fee: '', // 기본값
-        client_request: '', // 기본값
-        client_confirmed: '', // 기본값
+        return_type: null, // NULL로 저장 (빈 문자열 대신)
+        stock_status: null, // NULL로 저장 (빈 문자열 대신)
+        inspection: null, // NULL로 저장
+        completed: null, // NULL로 저장
+        memo: null, // NULL로 저장
+        photo_links: formData.photoLinks || null, // 사진 링크 (없으면 NULL)
+        other_courier: null, // NULL로 저장
+        shipping_fee: null, // NULL로 저장
+        client_request: null, // NULL로 저장
+        client_confirmed: null, // NULL로 저장
         month: formData.selectedMonth
       };
 
