@@ -770,16 +770,16 @@ async function searchReturnData(trackingNumber) {
                 product: data.data.product || '',
                 customer_name: data.data.customer || '',
                 tracking_number: trackingNumber,
-                return_type: '',
-                stock_status: '',
-                inspection: '',
-                completed: '',
-                memo: '',
-                photo_links: '',
-                other_courier: '',
-                shipping_fee: '',
-                client_request: '',
-                client_confirmed: '',
+                return_type: null, // NULL로 저장 (빈 문자열 대신)
+                stock_status: null, // NULL로 저장 (빈 문자열 대신)
+                inspection: null,
+                completed: null,
+                memo: null,
+                photo_links: null,
+                other_courier: null,
+                shipping_fee: null,
+                client_request: null,
+                client_confirmed: null,
                 month: selectedMonth
             };
             

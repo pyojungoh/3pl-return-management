@@ -3771,10 +3771,25 @@
           <h3 style="margin-bottom: 20px;">📱 QR 코드</h3>
           <img src="${qrUrl}" alt="QR Code" style="margin: 20px 0; max-width: 100%; border: 2px solid #e0e0e0; padding: 10px; border-radius: 8px;">
           <p style="margin: 15px 0; font-size: 14px; color: #666;">송장번호: <strong>${trackingNumber}</strong></p>
-          <button onclick="document.getElementById('qrModal').remove()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">닫기</button>
+          <button onclick="closeQRModal()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">닫기</button>
         </div>
       `;
       document.body.appendChild(modal);
+    };
+    
+    // QR 모달 닫기 (새로고침 및 반품 메뉴 상태 유지)
+    window.closeQRModal = function closeQRModal() {
+      const modal = document.getElementById('qrModal');
+      if (modal) {
+        modal.remove();
+      }
+      
+      // 반품 메뉴 상태 저장
+      localStorage.setItem('activeAdminTab', 'returns');
+      localStorage.setItem('activeConsignorMenu', 'returns');
+      
+      // 페이지 새로고침
+      location.reload();
     };
     
     // 비고 수정
