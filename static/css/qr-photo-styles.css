@@ -1,0 +1,493 @@
+/* ========= QR 자동 스캔 및 사진 촬영 페이지 스타일 ========= */
+
+:root {
+  --fs-body: 16px;
+  --fs-label: 18px;
+  --fs-btn: 18px;
+  --fs-title: 24px;
+  --h-control: 48px;
+  --h-button: 48px;
+  --pad-v: 12px;
+  --pad-h: 16px;
+  --radius: 8px;
+  --gap: 20px;
+  --thumb: clamp(100px, 30vw, 150px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
+}
+
+body {
+  background: #000;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-size: var(--fs-body);
+  line-height: 1.4;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ========= QR 스캔 모드 ========= */
+.qr-scan-mode {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  z-index: 100;
+}
+
+.qr-scan-mode.hidden {
+  display: none;
+}
+
+.qr-video-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#qrVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.qr-scan-guide {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 250px;
+  height: 250px;
+  border: 3px solid #4CAF50;
+  border-radius: 12px;
+  pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+}
+
+.qr-scan-guide::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  width: 30px;
+  height: 30px;
+  border-top: 4px solid #4CAF50;
+  border-left: 4px solid #4CAF50;
+  border-radius: 12px 0 0 0;
+}
+
+.qr-scan-guide::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  width: 30px;
+  height: 30px;
+  border-bottom: 4px solid #4CAF50;
+  border-right: 4px solid #4CAF50;
+  border-radius: 0 0 12px 0;
+}
+
+.qr-status-message {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 24px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  max-width: 90%;
+  backdrop-filter: blur(10px);
+}
+
+.qr-status-message.error {
+  background: rgba(244, 67, 54, 0.9);
+}
+
+.qr-status-message.success {
+  background: rgba(76, 175, 80, 0.9);
+}
+
+/* ========= 사진 촬영 모드 ========= */
+.photo-mode {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  background: #000;
+  z-index: 200;
+}
+
+.photo-mode.active {
+  display: flex;
+}
+
+.photo-video-container {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+#photoVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.photo-thumbnails {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 8px 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.photo-thumbnails::-webkit-scrollbar {
+  display: none;
+}
+
+.photo-thumbnail {
+  position: relative;
+  flex-shrink: 0;
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #fff;
+}
+
+.photo-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-thumbnail .delete-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f44336;
+  color: #fff;
+  border: 2px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.photo-control-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.capture-btn {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 5px solid #fff;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s;
+}
+
+.capture-btn:active {
+  transform: scale(0.9);
+}
+
+.capture-btn-inner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.upload-btn {
+  flex: 1;
+  max-width: 200px;
+  height: 50px;
+  border: none;
+  border-radius: 25px;
+  background: #4CAF50;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+
+.upload-btn:disabled {
+  background: #666;
+  cursor: not-allowed;
+}
+
+.upload-btn:not(:disabled):active {
+  background: #45a049;
+}
+
+.upload-btn.hidden {
+  display: none;
+}
+
+/* ========= 정보 표시 영역 ========= */
+.info-panel {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  backdrop-filter: blur(10px);
+  display: none;
+}
+
+.info-panel.show {
+  display: block;
+}
+
+.info-panel-item {
+  margin: 4px 0;
+}
+
+.info-panel-label {
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+/* ========= 오버레이 ========= */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.overlay.show {
+  display: flex;
+}
+
+.overlay-card {
+  background: #fff;
+  width: min(86vw, 420px);
+  padding: 24px;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e0e0e0;
+  border-top-color: #4CAF50;
+  border-radius: 50%;
+  margin: 0 auto 16px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.overlay-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #222;
+  margin-bottom: 8px;
+}
+
+.overlay-desc {
+  font-size: 16px;
+  color: #555;
+  margin-bottom: 16px;
+}
+
+.progressbar {
+  width: 100%;
+  height: 6px;
+  background: #eee;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressbar > div {
+  width: 0%;
+  height: 100%;
+  background: #4CAF50;
+  transition: width 0.25s ease;
+}
+
+/* ========= 수동 입력 모드 ========= */
+.manual-input-mode {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  background: #f5f5f5;
+  z-index: 300;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.manual-input-mode.active {
+  display: flex;
+}
+
+.manual-input-container {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.manual-input-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.manual-input-group {
+  margin-bottom: 16px;
+}
+
+.manual-input-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #222;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.manual-input-field {
+  width: 100%;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 16px;
+  padding: 12px 16px;
+  min-height: 48px;
+}
+
+.manual-input-field:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+.manual-input-btn {
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  background: #4CAF50;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 14px;
+  margin-top: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.manual-input-btn:active {
+  background: #45a049;
+}
+
+.close-manual-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ========= 반응형 ========= */
+@media (max-width: 480px) {
+  .qr-scan-guide {
+    width: 200px;
+    height: 200px;
+  }
+  
+  .photo-thumbnail {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .capture-btn {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .capture-btn-inner {
+    width: 48px;
+    height: 48px;
+  }
+}
+

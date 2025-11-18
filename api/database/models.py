@@ -1368,7 +1368,7 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
             rows.sort(key=lambda x: (
                 not x.get('return_date') or x.get('return_date') == '',
                 -extract_day_number(x.get('return_date', '')),
-                -x.get('id', 0)
+                -(x.get('id') or 0)
             ))
             return rows
         finally:
@@ -1418,7 +1418,7 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
             result.sort(key=lambda x: (
                 not x.get('return_date') or x.get('return_date') == '',
                 -extract_day_number(x.get('return_date', '')),
-                -x.get('id', 0)
+                -(x.get('id') or 0)
             ))
             return result
         finally:

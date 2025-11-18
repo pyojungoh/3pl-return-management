@@ -232,8 +232,8 @@ def get_returns_data():
             not x.get('반품 접수일') or x.get('반품 접수일') == '',
             # 날짜를 숫자로 변환하여 정렬 (내림차순)
             -get_day_for_sort(x.get('반품 접수일', '')),
-            # ID로 정렬 (내림차순)
-            -x.get('id', 0)
+            # ID로 정렬 (내림차순) - None 값 처리
+            -(x.get('id') or 0)
         ))
         
         return jsonify({

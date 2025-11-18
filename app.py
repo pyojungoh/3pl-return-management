@@ -128,6 +128,17 @@ def admin():
     """관리자 페이지 (모바일 QR 코드 사진 입력 페이지) - 레거시 경로"""
     return qrmobile()
 
+@app.route('/qr-photo')
+def qr_photo():
+    """QR 자동 스캔 및 사진 촬영 페이지 (모듈화)"""
+    try:
+        # qr_photo_return.html 파일 직접 제공
+        return send_file('qr_photo_return.html')
+    except FileNotFoundError:
+        return '<h1>QR 사진 페이지 파일을 찾을 수 없습니다.</h1><p>qr_photo_return.html 파일이 필요합니다.</p>', 404
+    except Exception as e:
+        return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
+
 
 # 정적 파일 제공
 @app.route('/static/<path:filename>')

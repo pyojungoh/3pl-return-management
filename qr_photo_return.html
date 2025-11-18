@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="반품사진등록">
+  <meta name="theme-color" content="#4CAF50">
+  <title>반품 사진 등록</title>
+  
+  <!-- jsQR 라이브러리 (QR 코드 스캔용) -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  
+  <!-- 스타일 모듈 -->
+  <link rel="stylesheet" href="/static/css/qr-photo-styles.css">
+</head>
+<body>
+  <!-- QR 스캔 모드 -->
+  <div class="qr-scan-mode">
+    <div class="qr-video-container">
+      <video id="qrVideo" autoplay playsinline webkit-playsinline></video>
+      <div class="qr-scan-guide"></div>
+      <div id="qrStatusMessage" class="qr-status-message">QR 코드를 카메라에 비춰주세요.</div>
+    </div>
+  </div>
+
+  <!-- 사진 촬영 모드 -->
+  <div class="photo-mode">
+    <!-- 정보 패널 -->
+    <div id="infoPanel" class="info-panel"></div>
+    
+    <!-- 카메라 뷰 -->
+    <div class="photo-video-container">
+      <video id="photoVideo" autoplay playsinline webkit-playsinline></video>
+    </div>
+    
+    <!-- 컨트롤 영역 -->
+    <div class="photo-controls">
+      <!-- 썸네일 갤러리 -->
+      <div id="photoThumbnails" class="photo-thumbnails"></div>
+      
+      <!-- 컨트롤 버튼 -->
+      <div class="photo-control-buttons">
+        <button class="capture-btn" onclick="capturePhoto()" type="button">
+          <div class="capture-btn-inner"></div>
+        </button>
+        <button id="uploadBtn" class="upload-btn hidden" onclick="uploadPhotos()" type="button">
+          📤 업로드
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 수동 입력 모드 -->
+  <div class="manual-input-mode">
+    <button class="close-manual-btn" onclick="closeManualInput()" type="button">×</button>
+    <div class="manual-input-container">
+      <h2 class="manual-input-title">송장번호 직접 입력</h2>
+      <div class="manual-input-group">
+        <label class="manual-input-label">송장번호</label>
+        <input 
+          type="text" 
+          id="manualTrackingInput" 
+          class="manual-input-field" 
+          placeholder="송장번호를 입력하세요"
+          onkeypress="if(event.key==='Enter') handleManualInput()"
+        >
+      </div>
+      <button class="manual-input-btn" onclick="handleManualInput()" type="button">
+        검색 및 사진 촬영 시작
+      </button>
+    </div>
+  </div>
+
+  <!-- 오버레이 (업로드 진행 표시) -->
+  <div id="overlay" class="overlay">
+    <div class="overlay-card">
+      <div class="spinner"></div>
+      <div id="overlayTitle" class="overlay-title">처리 중...</div>
+      <div id="overlayDesc" class="overlay-desc">잠시만 기다려주세요.</div>
+      <div class="progressbar">
+        <div id="overlayBar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript 모듈 -->
+  <script src="/static/js/qr-photo-module.js"></script>
+</body>
+</html>
+
