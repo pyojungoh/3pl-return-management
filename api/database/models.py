@@ -1356,6 +1356,37 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
             
             print(f"   조회된 데이터: {len(rows)}건")
             if rows and len(rows) > 0:
+                # ID가 없는 데이터에 ID 생성
+                cursor_update = conn.cursor()
+                try:
+                    for item in rows:
+                        if not item.get('id') or item.get('id') is None:
+                            # 최대 ID 조회
+                            cursor_update.execute('SELECT COALESCE(MAX(id), 0) FROM returns')
+                            max_id = cursor_update.fetchone()[0]
+                            new_id = max_id + 1
+                            
+                            # ID 업데이트
+                            customer_name = item.get('customer_name')
+                            tracking_number = item.get('tracking_number')
+                            month = item.get('month')
+                            
+                            if customer_name and tracking_number and month:
+                                cursor_update.execute('''
+                                    UPDATE returns 
+                                    SET id = %s 
+                                    WHERE customer_name = %s 
+                                    AND tracking_number = %s 
+                                    AND month = %s 
+                                    AND (id IS NULL OR id = 0)
+                                ''', (new_id, customer_name, tracking_number, month))
+                                item['id'] = new_id
+                                print(f"   ✅ ID 생성: {new_id} - {customer_name}, {tracking_number}")
+                    
+                    conn.commit()
+                finally:
+                    cursor_update.close()
+                
                 # 화주사별로 몇 건인지 확인 (디버깅용)
                 company_counts = {}
                 for item in rows:
@@ -1407,6 +1438,37 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
             
             print(f"   조회된 데이터: {len(result)}건")
             if result and len(result) > 0:
+                # ID가 없는 데이터에 ID 생성
+                cursor_update = conn.cursor()
+                try:
+                    for item in result:
+                        if not item.get('id') or item.get('id') is None:
+                            # 최대 ID 조회
+                            cursor_update.execute('SELECT COALESCE(MAX(id), 0) FROM returns')
+                            max_id = cursor_update.fetchone()[0]
+                            new_id = max_id + 1
+                            
+                            # ID 업데이트
+                            customer_name = item.get('customer_name')
+                            tracking_number = item.get('tracking_number')
+                            month = item.get('month')
+                            
+                            if customer_name and tracking_number and month:
+                                cursor_update.execute('''
+                                    UPDATE returns 
+                                    SET id = ? 
+                                    WHERE customer_name = ? 
+                                    AND tracking_number = ? 
+                                    AND month = ? 
+                                    AND (id IS NULL OR id = 0)
+                                ''', (new_id, customer_name, tracking_number, month))
+                                item['id'] = new_id
+                                print(f"   ✅ ID 생성: {new_id} - {customer_name}, {tracking_number}")
+                    
+                    conn.commit()
+                finally:
+                    cursor_update.close()
+                
                 company_counts = {}
                 for item in result:
                     comp_name = item.get('company_name', '')
@@ -1676,7 +1738,25 @@ def create_return(return_data: Dict) -> int:
                 return_data.get('month')
             ))
             conn.commit()
-            return cursor.lastrowid
+            new_id = cursor.lastrowid
+            print(f"   ✅ 새 반품 데이터 생성 완료: ID = {new_id}")
+            if not new_id or new_id == 0:
+                # ID가 없으면 조회해서 가져오기
+                cursor.execute('''
+                    SELECT id FROM returns 
+                    WHERE customer_name = ? AND tracking_number = ? AND month = ?
+                ''', (
+                    return_data.get('customer_name'),
+                    return_data.get('tracking_number'),
+                    return_data.get('month')
+                ))
+                row = cursor.fetchone()
+                if row:
+                    if hasattr(row, 'keys'):
+                        new_id = row['id']
+                    else:
+                        new_id = row[0]
+            return new_id if new_id else 0
         except IntegrityError:
             cursor.execute('''
                 UPDATE returns SET
@@ -1719,10 +1799,133 @@ def create_return(return_data: Dict) -> int:
                 return_data.get('month')
             ))
             row = cursor.fetchone()
-            return row[0] if row else 0
+            if row:
+                if hasattr(row, 'keys'):
+                    existing_id = row['id']
+                else:
+                    existing_id = row[0]
+                print(f"   ✅ 기존 반품 데이터 업데이트 완료: ID = {existing_id}")
+                return existing_id if existing_id else 0
+            return 0
         except Exception as e:
             print(f"반품 데이터 생성 오류: {e}")
             return 0
+        finally:
+            conn.close()
+
+
+def fix_missing_return_ids():
+    """ID가 없는 모든 반품 데이터에 ID 생성 (일괄 처리)"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            # ID가 NULL이거나 0인 데이터 찾기
+            cursor.execute('SELECT * FROM returns WHERE id IS NULL OR id = 0')
+            rows = cursor.fetchall()
+            
+            if len(rows) == 0:
+                print("✅ ID가 없는 데이터가 없습니다.")
+                return
+            
+            print(f"📝 ID가 없는 데이터 {len(rows)}건 발견")
+            
+            # 각 행에 대해 ID 생성
+            for row in rows:
+                # 고유한 ID 생성 (현재 최대 ID + 1)
+                cursor.execute('SELECT COALESCE(MAX(id), 0) FROM returns')
+                max_id = cursor.fetchone()[0]
+                new_id = max_id + 1
+                
+                # Row 객체에서 데이터 추출
+                customer_name = row.get('customer_name') if hasattr(row, 'get') else row[3] if len(row) > 3 else None
+                tracking_number = row.get('tracking_number') if hasattr(row, 'get') else row[4] if len(row) > 4 else None
+                month = row.get('month') if hasattr(row, 'get') else row[15] if len(row) > 15 else None
+                
+                if customer_name and tracking_number and month:
+                    # 해당 데이터에 ID 업데이트
+                    cursor.execute('''
+                        UPDATE returns 
+                        SET id = %s 
+                        WHERE customer_name = %s 
+                        AND tracking_number = %s 
+                        AND month = %s 
+                        AND (id IS NULL OR id = 0)
+                    ''', (new_id, customer_name, tracking_number, month))
+                    print(f"   ✅ ID 생성: {new_id} - {customer_name}, {tracking_number}")
+            
+            conn.commit()
+            print(f"✅ 총 {len(rows)}건의 데이터에 ID를 생성했습니다.")
+            
+        except Exception as e:
+            conn.rollback()
+            print(f"❌ 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        # SQLite
+        cursor = conn.cursor()
+        try:
+            # ID가 NULL이거나 0인 데이터 찾기
+            cursor.execute('SELECT * FROM returns WHERE id IS NULL OR id = 0')
+            rows = cursor.fetchall()
+            
+            if len(rows) == 0:
+                print("✅ ID가 없는 데이터가 없습니다.")
+                return
+            
+            print(f"📝 ID가 없는 데이터 {len(rows)}건 발견")
+            
+            # 각 행에 대해 ID 생성
+            for row in rows:
+                # 고유한 ID 생성 (현재 최대 ID + 1)
+                cursor.execute('SELECT COALESCE(MAX(id), 0) FROM returns')
+                max_id = cursor.fetchone()[0]
+                new_id = max_id + 1
+                
+                # SQLite Row 객체는 dict처럼 접근 가능
+                try:
+                    if hasattr(row, 'keys'):
+                        # Row 객체 (dict-like)
+                        customer_name = row['customer_name']
+                        tracking_number = row['tracking_number']
+                        month = row['month']
+                    elif isinstance(row, dict):
+                        customer_name = row.get('customer_name')
+                        tracking_number = row.get('tracking_number')
+                        month = row.get('month')
+                    else:
+                        # tuple인 경우 인덱스로 접근
+                        customer_name = row[3] if len(row) > 3 else None
+                        tracking_number = row[4] if len(row) > 4 else None
+                        month = row[15] if len(row) > 15 else None
+                except (KeyError, IndexError, TypeError) as e:
+                    print(f"   ⚠️ 행 데이터 파싱 오류: {e}, row: {row}")
+                    continue
+                
+                if customer_name and tracking_number and month:
+                    # 해당 데이터에 ID 업데이트
+                    cursor.execute('''
+                        UPDATE returns 
+                        SET id = ? 
+                        WHERE customer_name = ? 
+                        AND tracking_number = ? 
+                        AND month = ? 
+                        AND (id IS NULL OR id = 0)
+                    ''', (new_id, customer_name, tracking_number, month))
+                    print(f"   ✅ ID 생성: {new_id} - {customer_name}, {tracking_number}")
+            
+            conn.commit()
+            print(f"✅ 총 {len(rows)}건의 데이터에 ID를 생성했습니다.")
+            
+        except Exception as e:
+            print(f"❌ 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
         finally:
             conn.close()
 
@@ -1783,6 +1986,90 @@ def update_memo(return_id: int, memo: str) -> bool:
             return True
         except Exception as e:
             print(f"비고 업데이트 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+def update_return(return_id: int, return_data: Dict) -> bool:
+    """반품 데이터 업데이트"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            updates = []
+            values = []
+            
+            # 업데이트할 필드들
+            if 'company_name' in return_data:
+                updates.append('company_name = %s')
+                values.append(return_data.get('company_name'))
+            if 'product' in return_data:
+                updates.append('product = %s')
+                values.append(return_data.get('product'))
+            if 'return_type' in return_data:
+                updates.append('return_type = %s')
+                values.append(return_data.get('return_type'))
+            if 'stock_status' in return_data:
+                updates.append('stock_status = %s')
+                values.append(return_data.get('stock_status'))
+            
+            if not updates:
+                return False
+            
+            updates.append('updated_at = CURRENT_TIMESTAMP')
+            values.append(return_id)
+            
+            cursor.execute(f'''
+                UPDATE returns 
+                SET {', '.join(updates)}
+                WHERE id = %s
+            ''', values)
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"반품 데이터 업데이트 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            updates = []
+            values = []
+            
+            # 업데이트할 필드들
+            if 'company_name' in return_data:
+                updates.append('company_name = ?')
+                values.append(return_data.get('company_name'))
+            if 'product' in return_data:
+                updates.append('product = ?')
+                values.append(return_data.get('product'))
+            if 'return_type' in return_data:
+                updates.append('return_type = ?')
+                values.append(return_data.get('return_type'))
+            if 'stock_status' in return_data:
+                updates.append('stock_status = ?')
+                values.append(return_data.get('stock_status'))
+            
+            if not updates:
+                return False
+            
+            updates.append('updated_at = CURRENT_TIMESTAMP')
+            values.append(return_id)
+            
+            cursor.execute(f'''
+                UPDATE returns 
+                SET {', '.join(updates)}
+                WHERE id = ?
+            ''', values)
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"반품 데이터 업데이트 오류: {e}")
             return False
         finally:
             conn.close()

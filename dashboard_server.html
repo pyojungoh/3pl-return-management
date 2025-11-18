@@ -3218,6 +3218,24 @@
       data.forEach((row, index) => {
         const tr = document.createElement('tr');
         
+        // 반품 ID 확인 및 생성
+        let returnId = row.id || row.rowIndex;
+        if (!returnId || returnId === null || returnId === undefined || returnId === 'null' || returnId === 'undefined') {
+          console.warn(`⚠️ 반품 ID가 없습니다. row:`, row);
+          // ID가 없으면 임시 ID 생성 (인덱스 기반, 나중에 실제 ID로 교체 필요)
+          returnId = `temp_${Date.now()}_${index}`;
+          console.warn(`   임시 ID 생성: ${returnId}`);
+          // row 객체에 ID 추가
+          row.id = returnId;
+          row.rowIndex = returnId;
+        }
+        
+        // ID를 숫자로 변환 시도
+        const numericId = parseInt(returnId);
+        if (isNaN(numericId)) {
+          console.warn(`⚠️ 반품 ID가 숫자가 아닙니다: ${returnId}`);
+        }
+        
         const isCompleted = row['처리완료'] && row['처리완료'].toString().trim();
         const isConfirmed = row['화주사확인완료'] && row['화주사확인완료'].toString().trim();
         const memoText = row['비고'] || '';
@@ -3267,7 +3285,7 @@
           const buttonClass = requestValue ? 'save-btn edit-btn' : 'save-btn';
           requestHtml = `
             <textarea class="request-input" id="request_${index}" placeholder="요청사항을 입력하세요">${escapeHtml(requestValue)}</textarea>
-            <button class="${buttonClass}" onclick="saveRequest(${index}, ${row.rowIndex})">${buttonText}</button>
+            <button class="${buttonClass}" onclick="saveRequest(${index}, '${returnId}')">${buttonText}</button>
           `;
         }
         
@@ -3302,11 +3320,22 @@
         }
         
         // 관리자 전용 셀 (항상 생성, updateAdminColumns에서 표시/숨김 제어)
-        const companyCell = `<td class="admin-only">${row['화주명'] || ''}</td>`;
+        // 관리자 모드에서만 수정 가능하도록 설정
+        const companyNameRaw = row['화주명'] || ''; // 원본 값 (이스케이프 전)
+        const companyNameValue = escapeHtml(companyNameRaw); // 화면 표시용 (이스케이프 후)
+        const companyNameForAttr = companyNameRaw.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        const companyNameForJs = companyNameRaw.replace(/'/g, "\\'").replace(/"/g, '\\"');
+        const companyCell = isAdmin ? 
+          `<td class="admin-only editable-cell" data-field="company_name" data-id="${returnId}" data-original="${companyNameForAttr}" onclick="if(event.target.tagName !== 'INPUT') startEditCell(this, '${companyNameForJs}')" style="cursor: pointer; padding: 4px;">
+            <span class="cell-content">${companyNameValue || '<span style="color: #b2bec3;">클릭하여 수정</span>'}</span>
+            <input type="text" class="cell-input" value="${companyNameRaw.replace(/"/g, '&quot;')}" style="display: none; width: 100%; padding: 4px; border: 2px solid #ff6b35; border-radius: 4px;" onblur="finishEditCell(this)" onkeydown="if(event.key === 'Enter') { event.target.blur(); }">
+          </td>` :
+          `<td class="admin-only">${companyNameValue}</td>`;
+        
         const memoTextSafe = escapeHtml(memoText || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
         const memoCell = `
           <td class="admin-only" style="text-align: center; min-width: 80px;">
-            <button class="save-btn" onclick="editMemo(${index}, ${row.rowIndex}, '${memoTextSafe}')" style="background: linear-gradient(135deg, #ffeaa7 0%, #ffd93d 100%); color: #2d3436; border: none; padding: 3px 8px; font-size: 10px; border-radius: 4px; box-shadow: none;">
+            <button class="save-btn" onclick="editMemo(${index}, '${returnId}', '${memoTextSafe}')" style="background: linear-gradient(135deg, #ffeaa7 0%, #ffd93d 100%); color: #2d3436; border: none; padding: 3px 8px; font-size: 10px; border-radius: 4px; box-shadow: none;">
               ${memoText ? '📝 비고' : '📝 추가'}
             </button>
           </td>
@@ -3321,21 +3350,9 @@
           </td>
         `;
         
-        // 관리 셀 (삭제 버튼을 옆으로 배치하여 실수 클릭 방지)
-        const hasCompleted = isCompleted && completedName;
-        const manageCell = `
-          <td class="admin-only" style="text-align: center; min-width: 140px;">
-            <div style="display: flex; flex-direction: row; gap: 4px; align-items: center; justify-content: center;">
-              ${hasCompleted ? 
-                `<span style="color: #00b894; font-size: 11px; font-weight: 600; flex: 1; text-align: center;">완료</span>` : 
-                `<button class="save-btn" onclick="completeReturn(${index}, ${row.rowIndex})" style="background: linear-gradient(135deg, #ffa502 0%, #ff9500 100%); color: white; border: none; padding: 3px 8px; font-size: 10px; flex: 1; border-radius: 4px; box-shadow: none;">처리완료</button>`}
-              <button class="save-btn" onclick="if(confirm('정말 삭제하시겠습니까?\\n삭제된 데이터는 복구할 수 없습니다.')) deleteReturn(${index}, ${row.rowIndex})" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border: none; padding: 3px 6px; font-size: 9px; min-width: 28px; border-radius: 4px; box-shadow: none;" title="삭제">🗑️</button>
-            </div>
-          </td>
-        `;
-        
         // 상품명 셀에 비고 툴팁 추가 (비고가 있을 때만, 빨간색 두껍게)
-        const productName = escapeHtml(row['제품'] || '');
+        const productNameRaw = row['제품'] || ''; // 원본 값 (이스케이프 전)
+        const productName = escapeHtml(productNameRaw); // 화면 표시용 (이스케이프 후)
         const hasMemo = memoText && memoText.trim() !== '';
         const productCellClass = hasMemo ? 'product-cell has-memo' : 'product-cell';
         const productCellAttributes = hasMemo 
@@ -3345,9 +3362,70 @@
              onmouseenter="showMemoTooltip(event, '${memoTextSafe.replace(/'/g, "\\'")}')" 
              onmouseleave="hideMemoTooltip()"`
           : `class="${productCellClass}" style="text-align: center;"`;
-        const productCell = `
-          <td ${productCellAttributes}>
+        
+        // 관리자 모드에서 제품 셀 수정 가능
+        // data-original 속성에 원본 값을 넣되, HTML 특수 문자를 이스케이프
+        const productNameForAttr = productNameRaw.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        const productNameForJs = productNameRaw.replace(/'/g, "\\'").replace(/"/g, '\\"');
+        
+        // 제품 셀 스타일 조정 (비고가 있을 때와 없을 때 모두 처리)
+        let productCellStyle = 'text-align: center; cursor: pointer; padding: 4px;';
+        if (hasMemo) {
+          productCellStyle = 'text-align: center; position: relative; cursor: pointer; padding: 4px;';
+        }
+        
+        // input value는 HTML 속성에 넣을 때 브라우저가 자동으로 이스케이프하므로 원본 값 사용
+        // 하지만 템플릿 리터럴에서 특수 문자를 이스케이프해야 함
+        const productNameForInputAttr = productNameRaw.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        
+        const productCell = isAdmin ?
+          `<td class="${productCellClass} editable-cell" style="${productCellStyle}" data-field="product" data-id="${returnId}" data-original="${productNameForAttr}" ${hasMemo ? `data-memo="${escapeHtml(memoText || '')}" title="${escapeHtml(memoText || '')}" onmouseenter="showMemoTooltip(event, '${memoTextSafe.replace(/'/g, "\\'")}')" onmouseleave="hideMemoTooltip()"` : ''} onclick="if(event.target.tagName !== 'INPUT' && event.target.tagName !== 'SPAN') startEditCell(this, '${productNameForJs}')">
+            <span class="cell-content">${productName || '<span style="color: #b2bec3;">클릭하여 수정</span>'}</span>
+            <input type="text" class="cell-input" value="${productNameForInputAttr}" style="display: none; width: 100%; padding: 4px; border: 2px solid #ff6b35; border-radius: 4px;" onblur="finishEditCell(this)" onkeydown="if(event.key === 'Enter') { event.preventDefault(); event.target.blur(); }">
+          </td>` :
+          `<td ${productCellAttributes}>
             ${productName}
+          </td>`;
+        
+        // 반품/교환/오배송 셀 (관리자 모드에서 드롭다운)
+        const returnTypeValue = row['반품/교환/오배송'] || '';
+        const returnTypeCell = isAdmin ?
+          `<td class="admin-only editable-cell" data-field="return_type" data-id="${returnId}" data-original="${returnTypeValue}" onclick="if(event.target.tagName !== 'SELECT') startEditSelect(this, 'return_type', '${returnTypeValue}')" style="cursor: pointer; padding: 4px;">
+            <span class="cell-content">${returnTypeValue || '<span style="color: #b2bec3;">클릭하여 선택</span>'}</span>
+            <select class="cell-select" style="display: none; width: 100%; padding: 4px; border: 2px solid #ff6b35; border-radius: 4px;" onchange="saveSelectCell(this)">
+              <option value="">선택</option>
+              <option value="반품" ${returnTypeValue === '반품' ? 'selected' : ''}>반품</option>
+              <option value="교환" ${returnTypeValue === '교환' ? 'selected' : ''}>교환</option>
+              <option value="오배송" ${returnTypeValue === '오배송' ? 'selected' : ''}>오배송</option>
+              <option value="누락" ${returnTypeValue === '누락' ? 'selected' : ''}>누락</option>
+            </select>
+          </td>` :
+          `<td>${returnTypeValue}</td>`;
+        
+        // 재고상태 셀 (관리자 모드에서 드롭다운)
+        const stockStatusValue = row['재고상태'] || '';
+        const stockStatusCell = isAdmin ?
+          `<td class="editable-cell" data-field="stock_status" data-id="${returnId}" data-original="${stockStatusValue}" onclick="if(event.target.tagName !== 'SELECT') startEditSelect(this, 'stock_status', '${stockStatusValue}')" style="cursor: pointer; padding: 4px;">
+            <span class="cell-content">${stockStatusValue || '<span style="color: #b2bec3;">클릭하여 선택</span>'}</span>
+            <select class="cell-select" style="display: none; width: 100%; padding: 4px; border: 2px solid #ff6b35; border-radius: 4px;" onchange="saveSelectCell(this)">
+              <option value="">선택</option>
+              <option value="정상" ${stockStatusValue === '정상' ? 'selected' : ''}>정상</option>
+              <option value="불량" ${stockStatusValue === '불량' ? 'selected' : ''}>불량</option>
+            </select>
+          </td>` :
+          `<td>${stockStatusValue}</td>`;
+        
+        // 관리 셀 (삭제 버튼 옆에 수정 버튼 추가)
+        const hasCompleted = isCompleted && completedName;
+        const manageCell = `
+          <td class="admin-only" style="text-align: center; min-width: 180px;">
+            <div style="display: flex; flex-direction: row; gap: 4px; align-items: center; justify-content: center;">
+              ${hasCompleted ? 
+                `<span style="color: #00b894; font-size: 11px; font-weight: 600; flex: 1; text-align: center;">완료</span>` : 
+                `<button class="save-btn" onclick="completeReturn(${index}, '${returnId}')" style="background: linear-gradient(135deg, #ffa502 0%, #ff9500 100%); color: white; border: none; padding: 3px 8px; font-size: 10px; flex: 1; border-radius: 4px; box-shadow: none;">처리완료</button>`}
+              <button class="save-btn" onclick="saveRowChanges('${returnId}', ${index})" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); color: white; border: none; padding: 3px 6px; font-size: 9px; min-width: 28px; border-radius: 4px; box-shadow: none;" title="수정 저장">💾</button>
+              <button class="save-btn" onclick="if(confirm('정말 삭제하시겠습니까?\\n삭제된 데이터는 복구할 수 없습니다.')) deleteReturn(${index}, '${returnId}')" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border: none; padding: 3px 6px; font-size: 9px; min-width: 28px; border-radius: 4px; box-shadow: none;" title="삭제">🗑️</button>
+            </div>
           </td>
         `;
         
@@ -3357,8 +3435,8 @@
           ${productCell}
           <td>${row['고객명'] || ''}</td>
           <td>${row['송장번호'] || ''}</td>
-          <td>${row['반품/교환/오배송'] || ''}</td>
-          <td>${row['재고상태'] || ''}</td>
+          ${returnTypeCell}
+          ${stockStatusCell}
           <td>${statusHtml}</td>
           <td>${photoHtml}</td>
           ${memoCell}
@@ -3526,6 +3604,23 @@
     
     // 요청사항 저장
     function saveRequest(dataIndex, rowIndex) {
+      // rowIndex가 문자열인 경우 처리
+      let returnId = rowIndex;
+      if (typeof rowIndex === 'string' && rowIndex.startsWith('temp_')) {
+        console.warn('⚠️ 임시 ID를 사용 중입니다. 실제 ID가 필요합니다:', rowIndex);
+        showMessage('⚠️ 반품 ID가 없어 저장할 수 없습니다. 페이지를 새로고침해주세요.', 'error');
+        return;
+      }
+      
+      // 숫자로 변환 시도
+      const numericId = parseInt(rowIndex);
+      if (isNaN(numericId)) {
+        console.error('반품 ID가 유효하지 않습니다:', rowIndex);
+        showMessage('❌ 반품 ID가 유효하지 않습니다.', 'error');
+        return;
+      }
+      returnId = numericId;
+      
       const requestText = document.getElementById(`request_${dataIndex}`).value.trim();
       const selectedMonth = document.getElementById('monthSelect').value;
       
@@ -3548,7 +3643,7 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          rowIndex: rowIndex,
+          rowIndex: returnId,
           month: selectedMonth,
           requestText: requestText
         })
@@ -3611,6 +3706,23 @@
     
     // 처리완료 표시 (관리자)
     window.completeReturn = function completeReturn(dataIndex, rowIndex) {
+      // rowIndex가 문자열인 경우 처리
+      let returnId = rowIndex;
+      if (typeof rowIndex === 'string' && rowIndex.startsWith('temp_')) {
+        console.warn('⚠️ 임시 ID를 사용 중입니다. 실제 ID가 필요합니다:', rowIndex);
+        showMessage('⚠️ 반품 ID가 없어 처리할 수 없습니다. 페이지를 새로고침해주세요.', 'error');
+        return;
+      }
+      
+      // 숫자로 변환 시도
+      const numericId = parseInt(rowIndex);
+      if (isNaN(numericId)) {
+        console.error('반품 ID가 유효하지 않습니다:', rowIndex);
+        showMessage('❌ 반품 ID가 유효하지 않습니다.', 'error');
+        return;
+      }
+      returnId = numericId;
+      
       if (!confirm('이 반품 건을 처리완료로 표시하시겠습니까?')) {
         return;
       }
@@ -3624,7 +3736,7 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          rowIndex: rowIndex,
+          rowIndex: returnId,
           month: selectedMonth,
           managerName: managerName
         })
@@ -3667,6 +3779,22 @@
     
     // 비고 수정
     window.editMemo = function editMemo(dataIndex, returnId, currentMemo) {
+      // returnId가 문자열인 경우 처리
+      let numericId = returnId;
+      if (typeof returnId === 'string' && returnId.startsWith('temp_')) {
+        console.warn('⚠️ 임시 ID를 사용 중입니다. 실제 ID가 필요합니다:', returnId);
+        showMessage('⚠️ 반품 ID가 없어 수정할 수 없습니다. 페이지를 새로고침해주세요.', 'error');
+        return;
+      }
+      
+      // 숫자로 변환 시도
+      numericId = parseInt(returnId);
+      if (isNaN(numericId)) {
+        console.error('반품 ID가 유효하지 않습니다:', returnId);
+        showMessage('❌ 반품 ID가 유효하지 않습니다.', 'error');
+        return;
+      }
+      
       const memoText = prompt('비고를 입력하세요:', currentMemo || '');
       if (memoText === null) return; // 취소
       
@@ -3676,7 +3804,7 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          rowIndex: returnId,
+          rowIndex: numericId,
           memo: memoText
         })
       })
@@ -3695,8 +3823,469 @@
       });
     };
     
+    // ========== 셀 편집 기능 (관리자 전용) ==========
+    // 셀 편집 시작 (텍스트 입력)
+    window.startEditCell = function startEditCell(cell, originalValue) {
+      const content = cell.querySelector('.cell-content');
+      const input = cell.querySelector('.cell-input');
+      if (content && input) {
+        content.style.display = 'none';
+        input.style.display = 'block';
+        input.focus();
+        input.select();
+      }
+    };
+    
+    // 셀 편집 완료 (blur 시 호출, 값이 변경되었으면 content 업데이트)
+    window.finishEditCell = function finishEditCell(input) {
+      const cell = input.closest('.editable-cell');
+      if (!cell) {
+        console.error('finishEditCell: cell을 찾을 수 없습니다.');
+        return;
+      }
+      
+      const content = cell.querySelector('.cell-content');
+      if (!content) {
+        console.error('finishEditCell: content를 찾을 수 없습니다.');
+        return;
+      }
+      
+      // input의 실제 값을 가져옴 (input.value는 항상 디코딩된 값을 반환)
+      let newValue = input.value.trim();
+      
+      const field = cell.getAttribute('data-field');
+      console.log(`finishEditCell: ${field} - 새 값: "${newValue}"`);
+      
+      // content를 현재 input 값으로 업데이트 (data-original은 유지 - 저장 시 비교용)
+      if (newValue) {
+        // content가 HTML이 아닌 순수 텍스트로 업데이트
+        content.textContent = newValue;
+      } else {
+        content.innerHTML = '<span style="color: #b2bec3;">클릭하여 수정</span>';
+      }
+      
+      // 편집 모드 종료 (input의 값은 유지 - 저장 시 읽기 위해)
+      input.style.display = 'none';
+      content.style.display = 'block';
+      
+      console.log(`finishEditCell: ${field} - 편집 모드 종료 완료`);
+    };
+    
+    // 셀 편집 취소 (원래 값으로 복원)
+    window.cancelEditCell = function cancelEditCell(inputOrSelect) {
+      const cell = inputOrSelect.closest('.editable-cell');
+      if (cell) {
+        const content = cell.querySelector('.cell-content');
+        const originalValue = cell.getAttribute('data-original') || '';
+        if (content) {
+          if (inputOrSelect.tagName === 'INPUT') {
+            inputOrSelect.value = originalValue;
+            inputOrSelect.style.display = 'none';
+          } else if (inputOrSelect.tagName === 'SELECT') {
+            inputOrSelect.value = originalValue;
+            inputOrSelect.style.display = 'none';
+          }
+          content.style.display = 'block';
+        }
+      }
+    };
+    
+    // 다른 곳 클릭 시 편집 모드 취소 (다른 편집 가능한 셀 클릭 시에는 유지)
+    document.addEventListener('click', function(event) {
+      // 클릭한 요소가 편집 가능한 셀인지 확인
+      const clickedCell = event.target.closest('.editable-cell');
+      const clickedInput = event.target.closest('.cell-input');
+      const clickedSelect = event.target.closest('.cell-select');
+      
+      // 편집 가능한 셀 내부를 클릭한 경우는 제외
+      if (clickedCell || clickedInput || clickedSelect) {
+        return;
+      }
+      
+      // 버튼이나 다른 인터랙티브 요소 클릭 시에도 제외
+      if (event.target.tagName === 'BUTTON' || 
+          event.target.closest('button') ||
+          event.target.tagName === 'A' ||
+          event.target.closest('a')) {
+        return;
+      }
+      
+      // 모든 편집 중인 셀 종료 (값은 유지)
+      const editingCells = document.querySelectorAll('.editable-cell');
+      editingCells.forEach(cell => {
+        const input = cell.querySelector('.cell-input');
+        const select = cell.querySelector('.cell-select');
+        
+        if (input && input.style.display !== 'none') {
+          // finishEditCell로 편집 모드 종료 (값은 유지)
+          finishEditCell(input);
+        } else if (select && select.style.display !== 'none') {
+          // 셀렉트는 이미 saveSelectCell에서 처리되므로 여기서는 취소하지 않음
+          // finishEditCell(select);
+        }
+      });
+    });
+    
+    // 셀렉트 편집 시작
+    window.startEditSelect = function startEditSelect(cell, field, originalValue) {
+      const content = cell.querySelector('.cell-content');
+      const select = cell.querySelector('.cell-select');
+      if (content && select) {
+        content.style.display = 'none';
+        select.style.display = 'block';
+        select.focus();
+      }
+    };
+    
+    // 셀렉트 저장 (변경 시 즉시 저장하지 않고 값만 업데이트)
+    window.saveSelectCell = function saveSelectCell(select) {
+      const cell = select.closest('.editable-cell');
+      if (cell) {
+        const field = cell.getAttribute('data-field');
+        const returnIdStr = cell.getAttribute('data-id');
+        let returnId = returnIdStr;
+        const newValue = select.value;
+        const content = cell.querySelector('.cell-content');
+        
+        // 임시 ID인지 확인
+        if (returnIdStr && returnIdStr.startsWith('temp_')) {
+          console.warn('⚠️ 임시 ID를 사용 중입니다. 실제 ID가 필요합니다:', returnIdStr);
+          showMessage('⚠️ 반품 ID가 없어 수정할 수 없습니다. 페이지를 새로고침해주세요.', 'error');
+          // 원래 값으로 복원
+          const originalValue = cell.getAttribute('data-original') || '';
+          select.value = originalValue;
+          return;
+        }
+        
+        // 숫자로 변환 시도
+        const numericId = parseInt(returnIdStr);
+        if (isNaN(numericId)) {
+          console.error('반품 ID를 찾을 수 없습니다:', returnIdStr, cell);
+          showMessage('❌ 반품 ID를 찾을 수 없습니다.', 'error');
+          // 원래 값으로 복원
+          const originalValue = cell.getAttribute('data-original') || '';
+          select.value = originalValue;
+          return;
+        }
+        
+        returnId = numericId;
+        
+        // UI만 업데이트하고 즉시 저장하지 않음 (수정 버튼으로 저장)
+        // data-original은 업데이트하지 않음 (저장 시 변경사항 감지용)
+        if (content) {
+          if (newValue) {
+            content.textContent = newValue;
+          } else {
+            content.innerHTML = '<span style="color: #b2bec3;">클릭하여 선택</span>';
+          }
+        }
+        select.style.display = 'none';
+        if (content) content.style.display = 'block';
+        
+        // data-original은 업데이트하지 않음 (saveRowChanges에서 변경사항 감지용)
+      }
+    };
+    
+    // 셀 값 저장 (개별 필드)
+    function saveCellValue(returnId, field, value, cell, content, inputOrSelect) {
+      const updateData = {
+        id: returnId,
+        [field]: value
+      };
+      
+      fetch(`${API_BASE_URL}/api/returns/update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          // 성공 시 UI 업데이트
+          if (content) {
+            content.textContent = value || (field === 'company_name' ? '클릭하여 수정' : field === 'product' ? '클릭하여 수정' : '클릭하여 선택');
+            if (!value) {
+              content.innerHTML = '<span style="color: #b2bec3;">' + (field === 'company_name' ? '클릭하여 수정' : field === 'product' ? '클릭하여 수정' : '클릭하여 선택') + '</span>';
+            }
+          }
+          if (inputOrSelect) {
+            inputOrSelect.style.display = 'none';
+            if (content) content.style.display = 'block';
+          }
+          // 원본 값 업데이트
+          cell.setAttribute('data-original', value || '');
+          // currentData 업데이트
+          updateCurrentData(returnId, field, value);
+        } else {
+          showMessage('❌ ' + (result.message || '저장 실패'), 'error');
+          // 실패 시 원래 값으로 복원
+          if (inputOrSelect) {
+            const originalValue = cell.getAttribute('data-original') || '';
+            if (inputOrSelect.tagName === 'INPUT') {
+              inputOrSelect.value = originalValue;
+            } else {
+              inputOrSelect.value = originalValue;
+            }
+          }
+        }
+      })
+      .catch(error => {
+        console.error('셀 저장 오류:', error);
+        showMessage('❌ 저장 중 오류: ' + error.message, 'error');
+        // 실패 시 원래 값으로 복원
+        if (inputOrSelect) {
+          const originalValue = cell.getAttribute('data-original') || '';
+          if (inputOrSelect.tagName === 'INPUT') {
+            inputOrSelect.value = originalValue;
+          } else {
+            inputOrSelect.value = originalValue;
+          }
+        }
+      });
+    }
+    
+    // currentData 업데이트
+    function updateCurrentData(returnId, field, value) {
+      if (currentData && Array.isArray(currentData)) {
+        const row = currentData.find(r => (r.id || r.rowIndex) === returnId);
+        if (row) {
+          // 필드명 매핑
+          const fieldMap = {
+            'company_name': '화주명',
+            'product': '제품',
+            'return_type': '반품/교환/오배송',
+            'stock_status': '재고상태'
+          };
+          const displayField = fieldMap[field] || field;
+          row[displayField] = value;
+        }
+      }
+    }
+    
+    // 행 변경사항 저장 (수정 버튼 클릭 시)
+    window.saveRowChanges = function saveRowChanges(returnId, dataIndex) {
+      // 임시 ID인지 확인
+      if (returnId && returnId.toString().startsWith('temp_')) {
+        console.warn('⚠️ 임시 ID를 사용 중입니다. 실제 ID가 필요합니다:', returnId);
+        showMessage('⚠️ 반품 ID가 없어 수정할 수 없습니다. 페이지를 새로고침해주세요.', 'error');
+        return;
+      }
+      
+      // 숫자로 변환
+      const numericId = parseInt(returnId);
+      if (isNaN(numericId)) {
+        console.error('반품 ID가 유효하지 않습니다:', returnId);
+        showMessage('❌ 반품 ID가 유효하지 않습니다.', 'error');
+        return;
+      }
+      
+      // 해당 행의 모든 편집 가능한 셀에서 변경사항 수집
+      const row = document.querySelector(`tr:has([data-id="${returnId}"])`);
+      if (!row) {
+        showMessage('❌ 행을 찾을 수 없습니다.', 'error');
+        return;
+      }
+      
+      const editableCells = row.querySelectorAll('.editable-cell');
+      const updateData = { id: numericId };
+      let hasChanges = false;
+      
+      console.log('🔍 변경사항 확인 시작 - returnId:', returnId);
+      
+      editableCells.forEach(cell => {
+        const field = cell.getAttribute('data-field');
+        const originalValue = cell.getAttribute('data-original') || '';
+        let currentValue = '';
+        
+        // 입력 필드인지 셀렉트인지 확인
+        const input = cell.querySelector('.cell-input');
+        const select = cell.querySelector('.cell-select');
+        const content = cell.querySelector('.cell-content');
+        
+        // input이나 select가 있으면 항상 그 값을 사용 (편집 모드가 끝났어도 값은 유지됨)
+        if (input) {
+          // input.value는 항상 디코딩된 값을 반환하므로 그대로 사용
+          currentValue = input.value.trim();
+          
+          // data-original도 HTML 엔티티가 있을 수 있으므로 디코딩하여 비교
+          let decodedOriginal = originalValue;
+          if (originalValue.includes('&')) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = originalValue;
+            decodedOriginal = tempDiv.textContent || tempDiv.innerText || originalValue;
+          }
+          decodedOriginal = decodedOriginal.trim();
+          
+          console.log(`   ${field}: input.value = "${currentValue}", data-original = "${originalValue}" (디코딩: "${decodedOriginal}")`);
+          
+          // input이 숨겨져 있어도 값은 유지되므로, content와 비교하여 일관성 체크
+          if (content) {
+            const contentValue = content.textContent.trim();
+            if (contentValue.includes('클릭하여')) {
+              // content가 안내 문구면 무시
+            } else if (contentValue !== currentValue) {
+              console.log(`   ⚠️ ${field}: input과 content 값 불일치 - input: "${currentValue}", content: "${contentValue}"`);
+              // input 값을 우선 사용
+            }
+          }
+          
+          // 디코딩된 원본 값과 비교
+          if (currentValue !== decodedOriginal) {
+            updateData[field] = currentValue;
+            hasChanges = true;
+            console.log(`   ✅ 변경 감지: ${field} = "${currentValue}" (원본: "${decodedOriginal}")`);
+          } else {
+            console.log(`   ⏭️ 변경 없음: ${field} (현재: "${currentValue}", 원본: "${decodedOriginal}")`);
+          }
+        } else if (select) {
+          currentValue = select.value;
+          
+          // data-original도 HTML 엔티티가 있을 수 있으므로 디코딩하여 비교
+          let decodedOriginal = originalValue;
+          if (originalValue.includes('&')) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = originalValue;
+            decodedOriginal = tempDiv.textContent || tempDiv.innerText || originalValue;
+          }
+          decodedOriginal = decodedOriginal.trim();
+          
+          console.log(`   ${field}: select.value = "${currentValue}", data-original = "${originalValue}" (디코딩: "${decodedOriginal}")`);
+          
+          // select가 숨겨져 있어도 값은 유지되므로, content와 비교
+          if (content) {
+            const contentValue = content.textContent.trim();
+            if (contentValue.includes('클릭하여')) {
+              // content가 안내 문구면 무시
+            } else if (contentValue !== currentValue) {
+              console.log(`   ⚠️ ${field}: select와 content 값 불일치 - select: "${currentValue}", content: "${contentValue}"`);
+              // select 값을 우선 사용
+            }
+          }
+          
+          // 디코딩된 원본 값과 비교
+          if (currentValue !== decodedOriginal) {
+            updateData[field] = currentValue;
+            hasChanges = true;
+            console.log(`   ✅ 변경 감지: ${field} = "${currentValue}" (원본: "${decodedOriginal}")`);
+          } else {
+            console.log(`   ⏭️ 변경 없음: ${field} (현재: "${currentValue}", 원본: "${decodedOriginal}")`);
+          }
+        } else if (content) {
+          // input/select가 없으면 content의 텍스트 사용
+          currentValue = content.textContent.trim();
+          // "클릭하여 수정" 같은 안내 문구 제거
+          if (currentValue.includes('클릭하여')) {
+            currentValue = '';
+          }
+          
+          // data-original도 HTML 엔티티가 있을 수 있으므로 디코딩하여 비교
+          let decodedOriginal = originalValue;
+          if (originalValue.includes('&')) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = originalValue;
+            decodedOriginal = tempDiv.textContent || tempDiv.innerText || originalValue;
+          }
+          decodedOriginal = decodedOriginal.trim();
+          
+          console.log(`   ${field}: content 값 = "${currentValue}", data-original = "${originalValue}" (디코딩: "${decodedOriginal}")`);
+          
+          // 디코딩된 원본 값과 비교
+          if (currentValue !== decodedOriginal) {
+            updateData[field] = currentValue;
+            hasChanges = true;
+            console.log(`   ✅ 변경 감지: ${field} = "${currentValue}" (원본: "${decodedOriginal}")`);
+          } else {
+            console.log(`   ⏭️ 변경 없음: ${field} (현재: "${currentValue}", 원본: "${decodedOriginal}")`);
+          }
+        }
+      });
+      
+      console.log('📊 변경사항 요약:', { hasChanges, updateData });
+      
+      if (!hasChanges) {
+        showMessage('💡 변경된 내용이 없습니다.', 'info');
+        return;
+      }
+      
+      console.log('💾 저장할 데이터:', updateData);
+      
+      // API 호출
+      fetch(`${API_BASE_URL}/api/returns/update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(err => {
+            throw new Error(err.message || `서버 오류 (${response.status})`);
+          });
+        }
+        return response.json();
+      })
+      .then(result => {
+        if (result.success) {
+          showMessage('✅ 반품 데이터가 업데이트되었습니다.', 'success');
+          
+          // 저장 성공 후 data-original 업데이트 (다음 변경사항 감지를 위해)
+          editableCells.forEach(cell => {
+            const field = cell.getAttribute('data-field');
+            if (updateData[field] !== undefined) {
+              const input = cell.querySelector('.cell-input');
+              const select = cell.querySelector('.cell-select');
+              const content = cell.querySelector('.cell-content');
+              
+              let savedValue = '';
+              if (input) {
+                savedValue = input.value.trim();
+              } else if (select) {
+                savedValue = select.value;
+              } else if (content) {
+                savedValue = content.textContent.trim();
+                if (savedValue.includes('클릭하여')) {
+                  savedValue = '';
+                }
+              }
+              
+              // 저장된 값으로 원본 업데이트
+              cell.setAttribute('data-original', savedValue || '');
+            }
+          });
+          
+          // 데이터 새로고침
+          refreshReturnsData();
+        } else {
+          showMessage('❌ ' + (result.message || '저장 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('행 저장 오류:', error);
+        showMessage('❌ 저장 중 오류: ' + error.message, 'error');
+      });
+    };
+    
     // 반품 삭제
     window.deleteReturn = function deleteReturn(dataIndex, returnId) {
+      // returnId가 문자열인 경우 처리
+      let numericId = returnId;
+      if (typeof returnId === 'string' && returnId.startsWith('temp_')) {
+        console.warn('⚠️ 임시 ID를 사용 중입니다. 실제 ID가 필요합니다:', returnId);
+        showMessage('⚠️ 반품 ID가 없어 삭제할 수 없습니다. 페이지를 새로고침해주세요.', 'error');
+        return;
+      }
+      
+      // 숫자로 변환 시도
+      numericId = parseInt(returnId);
+      if (isNaN(numericId)) {
+        console.error('반품 ID가 유효하지 않습니다:', returnId);
+        showMessage('❌ 반품 ID가 유효하지 않습니다.', 'error');
+        return;
+      }
+      
       if (!confirm('이 반품 건을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.')) {
         return;
       }
@@ -3707,7 +4296,7 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          rowIndex: returnId
+          rowIndex: numericId
         })
       })
       .then(response => response.json())

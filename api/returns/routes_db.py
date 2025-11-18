@@ -13,7 +13,8 @@ from api.database.models import (
     get_return_by_id,
     update_memo,
     delete_return,
-    create_return
+    create_return,
+    update_return
 )
 
 # Blueprint 생성
@@ -426,6 +427,68 @@ def delete_return_route():
         return jsonify({
             'success': False,
             'message': f'삭제 중 오류: {str(e)}'
+        }), 500
+
+
+@returns_bp.route('/update', methods=['POST'])
+def update_return_route():
+    """
+    반품 데이터 업데이트 API (관리자 전용)
+    
+    Request Body:
+        {
+            "id": int,              # 반품 ID
+            "company_name": str,     # 화주명 (선택)
+            "product": str,          # 제품 (선택)
+            "return_type": str,      # 반품/교환/오배송 (선택)
+            "stock_status": str      # 재고상태 (선택)
+        }
+    """
+    try:
+        data = request.get_json()
+        return_id = data.get('id')
+        
+        if not return_id:
+            return jsonify({
+                'success': False,
+                'message': '반품 ID가 필요합니다.'
+            }), 400
+        
+        # 업데이트할 데이터만 추출
+        update_data = {}
+        if 'company_name' in data:
+            update_data['company_name'] = data.get('company_name', '').strip()
+        if 'product' in data:
+            update_data['product'] = data.get('product', '').strip()
+        if 'return_type' in data:
+            update_data['return_type'] = data.get('return_type', '').strip()
+        if 'stock_status' in data:
+            update_data['stock_status'] = data.get('stock_status', '').strip()
+        
+        if not update_data:
+            return jsonify({
+                'success': False,
+                'message': '업데이트할 데이터가 없습니다.'
+            }), 400
+        
+        if update_return(return_id, update_data):
+            return jsonify({
+                'success': True,
+                'message': '반품 데이터가 업데이트되었습니다.'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '반품 데이터 업데이트에 실패했습니다.'
+            }), 500
+        
+    except Exception as e:
+        print(f'❌ 반품 업데이트 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'반품 업데이트 중 오류: {str(e)}'
         }), 500
 
 

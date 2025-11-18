@@ -36,8 +36,14 @@ app.config['JSON_AS_ASCII'] = False  # 한글 지원
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # 데이터베이스 초기화
-from api.database.models import init_db, get_company_by_username, create_company
+from api.database.models import init_db, get_company_by_username, create_company, fix_missing_return_ids
 init_db()
+
+# 기존 반품 데이터에 ID가 없는 경우 ID 생성
+try:
+    fix_missing_return_ids()
+except Exception as e:
+    print(f"⚠️ 반품 ID 생성 중 오류 발생 (무시하고 계속 진행): {e}")
 
 # 초기 관리자 계정 자동 생성 (없는 경우에만)
 try:
