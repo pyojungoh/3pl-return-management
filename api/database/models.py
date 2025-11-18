@@ -1694,8 +1694,25 @@ def create_return(return_data: Dict) -> int:
             row = cursor.fetchone()
             return row[0] if row else 0
         except IntegrityError:
-            # 중복 데이터인 경우 업데이트
+            # 중복 데이터인 경우 업데이트 (기존 값 유지)
             conn.rollback()
+            # 기존 데이터 조회하여 return_type과 stock_status 확인
+            cursor.execute('''
+                SELECT return_type, stock_status FROM returns 
+                WHERE customer_name = %s AND tracking_number = %s AND month = %s
+            ''', (
+                return_data.get('customer_name'),
+                return_data.get('tracking_number'),
+                return_data.get('month')
+            ))
+            existing_row = cursor.fetchone()
+            existing_return_type = existing_row[0] if existing_row else None
+            existing_stock_status = existing_row[1] if existing_row else None
+            
+            # 새로운 값이 None이면 기존 값 유지, 아니면 새 값 사용
+            new_return_type = return_data.get('return_type') if return_data.get('return_type') is not None else existing_return_type
+            new_stock_status = return_data.get('stock_status') if return_data.get('stock_status') is not None else existing_stock_status
+            
             cursor.execute('''
                 UPDATE returns SET
                     return_date = %s,
@@ -1703,12 +1720,12 @@ def create_return(return_data: Dict) -> int:
                     product = %s,
                     return_type = %s,
                     stock_status = %s,
-                    inspection = %s,
-                    completed = %s,
-                    memo = %s,
-                    photo_links = %s,
-                    other_courier = %s,
-                    shipping_fee = %s,
+                    inspection = COALESCE(%s, inspection),
+                    completed = COALESCE(%s, completed),
+                    memo = COALESCE(%s, memo),
+                    photo_links = COALESCE(%s, photo_links),
+                    other_courier = COALESCE(%s, other_courier),
+                    shipping_fee = COALESCE(%s, shipping_fee),
                     updated_at = CURRENT_TIMESTAMP
                 WHERE customer_name = %s AND tracking_number = %s AND month = %s
                 RETURNING id
@@ -1716,8 +1733,8 @@ def create_return(return_data: Dict) -> int:
                 return_data.get('return_date'),
                 return_data.get('company_name'),
                 return_data.get('product'),
-                return_data.get('return_type'),
-                return_data.get('stock_status'),
+                new_return_type,
+                new_stock_status,
                 return_data.get('inspection'),
                 return_data.get('completed'),
                 return_data.get('memo'),
@@ -1787,6 +1804,23 @@ def create_return(return_data: Dict) -> int:
                         new_id = row[0]
             return new_id if new_id else 0
         except IntegrityError:
+            # 기존 데이터 조회하여 return_type과 stock_status 확인
+            cursor.execute('''
+                SELECT return_type, stock_status FROM returns 
+                WHERE customer_name = ? AND tracking_number = ? AND month = ?
+            ''', (
+                return_data.get('customer_name'),
+                return_data.get('tracking_number'),
+                return_data.get('month')
+            ))
+            existing_row = cursor.fetchone()
+            existing_return_type = existing_row[0] if existing_row and len(existing_row) > 0 else None
+            existing_stock_status = existing_row[1] if existing_row and len(existing_row) > 1 else None
+            
+            # 새로운 값이 None이면 기존 값 유지, 아니면 새 값 사용
+            new_return_type = return_data.get('return_type') if return_data.get('return_type') is not None else existing_return_type
+            new_stock_status = return_data.get('stock_status') if return_data.get('stock_status') is not None else existing_stock_status
+            
             cursor.execute('''
                 UPDATE returns SET
                     return_date = ?,
@@ -1794,20 +1828,20 @@ def create_return(return_data: Dict) -> int:
                     product = ?,
                     return_type = ?,
                     stock_status = ?,
-                    inspection = ?,
-                    completed = ?,
-                    memo = ?,
-                    photo_links = ?,
-                    other_courier = ?,
-                    shipping_fee = ?,
+                    inspection = COALESCE(?, inspection),
+                    completed = COALESCE(?, completed),
+                    memo = COALESCE(?, memo),
+                    photo_links = COALESCE(?, photo_links),
+                    other_courier = COALESCE(?, other_courier),
+                    shipping_fee = COALESCE(?, shipping_fee),
                     updated_at = CURRENT_TIMESTAMP
                 WHERE customer_name = ? AND tracking_number = ? AND month = ?
             ''', (
                 return_data.get('return_date'),
                 return_data.get('company_name'),
                 return_data.get('product'),
-                return_data.get('return_type'),
-                return_data.get('stock_status'),
+                new_return_type,
+                new_stock_status,
                 return_data.get('inspection'),
                 return_data.get('completed'),
                 return_data.get('memo'),
