@@ -10,6 +10,9 @@
   <meta name="apple-mobile-web-app-title" content="반품교환">
   <meta name="theme-color" content="#4CAF50">
   <title>반품교환 등록</title>
+  <!-- 파비콘 -->
+  <link rel="icon" type="image/svg+xml" href="/static/favicon-qr-photo.svg">
+  <link rel="alternate icon" href="/static/favicon-qr-photo.svg">
 
   <!-- jsQR 라이브러리 (QR 코드 스캔용) -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
@@ -174,11 +177,53 @@
     .cancel-btn{
       background:#9e9e9e;
       color:#fff;
+      min-height: calc(var(--h-button) * 1.1);
+      font-size: calc(var(--fs-btn) * 1.05);
+      font-weight: 800;
     }
     
     .cancel-btn:hover,
     .cancel-btn:active{
       background:#757575;
+    }
+
+    .company-selector{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .company-selector select{
+      border:2px solid #ddd;
+      border-radius:var(--radius);
+      background:#fff;
+      font-size:var(--fs-input);
+      padding:12px 16px;
+      min-height:var(--h-control);
+    }
+    .company-selector select:focus{
+      outline:none;
+      border-color:#4CAF50;
+      box-shadow:0 0 0 3px rgba(76,175,80,0.1);
+    }
+    .company-hint{
+      display:block;
+      margin-top:6px;
+      color:#777;
+      font-size:14px;
+    }
+    #submitBtn{
+      min-height:calc(var(--h-button) * 1.2);
+      font-size:calc(var(--fs-btn) * 1.15);
+      letter-spacing:-0.1px;
+    }
+    @media(min-width:520px){
+      .company-selector{
+        flex-direction:row;
+        align-items:center;
+      }
+      .company-selector select{
+        max-width:45%;
+      }
     }
 
     .status{
@@ -272,7 +317,14 @@
       <!-- 검색 결과 확인 -->
       <div class="form-group">
         <label>화주명</label>
-        <input type="text" id="company" placeholder="검색 후 자동 입력됩니다" readonly>
+        <div class="company-selector">
+          <input type="text" id="company" placeholder="화주명을 검색하거나 선택하세요" list="companySuggestionList" autocomplete="off">
+          <select id="companyDropdown">
+            <option value="">드롭다운에서 선택</option>
+          </select>
+        </div>
+        <datalist id="companySuggestionList"></datalist>
+        <span class="company-hint">검색 입력 또는 드롭다운으로 화주사를 빠르게 선택하세요.</span>
       </div>
       <div class="form-group">
         <label>제품</label>
@@ -391,6 +443,7 @@
     let availableSheets = [];
     let overlayTimer = null;
     let pseudoProgress = 0;
+    let companyOptions = [];
 
     document.addEventListener('DOMContentLoaded', function () {
       loadAvailableSheets();
@@ -423,7 +476,116 @@
           searchByTracking();
         }
       });
+
+      const companyInput = document.getElementById('company');
+      if (companyInput) {
+        companyInput.addEventListener('input', handleCompanyInput);
+        companyInput.addEventListener('keydown', function(e){
+          if (e.key === 'Enter') {
+            const match = findMatchingCompany(companyInput.value.trim());
+            if (match) {
+              e.preventDefault();
+              setCompanySelection(match);
+            }
+          }
+        });
+      }
+
+      const companyDropdown = document.getElementById('companyDropdown');
+      if (companyDropdown) {
+        companyDropdown.addEventListener('change', handleCompanyDropdownChange);
+      }
+
+      loadCompanyOptions();
     });
+
+    function loadCompanyOptions(){
+      fetch('/api/auth/companies')
+        .then(response => response.json())
+        .then(data => {
+          if (!data.success) {
+            throw new Error(data.message || '화주사 목록을 불러오지 못했습니다.');
+          }
+          const names = (data.companies || [])
+            .map(company => company.company_name || company.company || company.username || '')
+            .filter(name => !!name);
+          const unique = Array.from(new Set(names));
+          companyOptions = unique.sort((a, b) => a.localeCompare(b, 'ko'));
+          populateCompanyControls();
+        })
+        .catch(error => {
+          console.error('화주사 목록 로드 오류:', error);
+        });
+    }
+
+    function populateCompanyControls(){
+      const datalist = document.getElementById('companySuggestionList');
+      const dropdown = document.getElementById('companyDropdown');
+      if (datalist) {
+        datalist.innerHTML = '';
+        companyOptions.forEach(name => {
+          const option = document.createElement('option');
+          option.value = name;
+          datalist.appendChild(option);
+        });
+      }
+      if (dropdown) {
+        const currentValue = dropdown.value;
+        dropdown.innerHTML = '<option value=\"\">드롭다운에서 선택</option>';
+        companyOptions.forEach(name => {
+          const option = document.createElement('option');
+          option.value = name;
+          option.textContent = name;
+          dropdown.appendChild(option);
+        });
+        if (currentValue && companyOptions.includes(currentValue)) {
+          dropdown.value = currentValue;
+        } else if (document.getElementById('company').value) {
+          dropdown.value = document.getElementById('company').value;
+        }
+      }
+    }
+
+    function handleCompanyInput(event){
+      const value = event.target.value.trim();
+      syncDropdownWithInput(value);
+    }
+
+    function handleCompanyDropdownChange(event){
+      const value = event.target.value;
+      setCompanySelection(value);
+    }
+
+    function syncDropdownWithInput(value){
+      const dropdown = document.getElementById('companyDropdown');
+      if (!dropdown) return;
+      if (!value){
+        dropdown.value = '';
+        return;
+      }
+      const match = findMatchingCompany(value);
+      dropdown.value = match || '';
+    }
+
+    function setCompanySelection(value){
+      const companyInput = document.getElementById('company');
+      const dropdown = document.getElementById('companyDropdown');
+      const normalized = value || '';
+      if (companyInput) {
+        companyInput.value = normalized;
+      }
+      if (dropdown) {
+        dropdown.value = companyOptions.includes(normalized) ? normalized : '';
+      }
+    }
+
+    function findMatchingCompany(text){
+      if (!text) return '';
+      const lower = text.toLowerCase();
+      const exact = companyOptions.find(name => name.toLowerCase() === lower);
+      if (exact) return exact;
+      return companyOptions.find(name => name.toLowerCase().startsWith(lower)) || '';
+    }
 
     /* ========== 탭 전환 ========== */
     function switchTab(tabName){
@@ -510,6 +672,7 @@
           status.className = 'status success';
           status.textContent = data.message || '화주사 계정이 생성되었습니다.';
           document.getElementById('registerForm').reset();
+          loadCompanyOptions();
         } else {
           status.className = 'status error';
           status.textContent = data.message || '화주사 등록에 실패했습니다.';
@@ -1236,14 +1399,14 @@
     }
 
     function fillFormWithData(data){
-      document.getElementById('company').value        = data.company || '';
+      setCompanySelection(data.company || '');
       document.getElementById('product').value        = data.product || '';
       document.getElementById('customer').value       = data.customer || '';
       document.getElementById('trackingNumber').value = data.trackingNumber || '';
     }
 
     function clearFormData(trackingValue){
-      document.getElementById('company').value = '';
+      setCompanySelection('');
       document.getElementById('product').value = '';
       document.getElementById('customer').value = '';
       document.getElementById('trackingNumber').value = trackingValue || '';

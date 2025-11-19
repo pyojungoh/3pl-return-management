@@ -9,6 +9,9 @@
   <meta name="apple-mobile-web-app-title" content="반품사진등록">
   <meta name="theme-color" content="#4CAF50">
   <title>반품 사진 등록</title>
+  <!-- 파비콘 -->
+  <link rel="icon" type="image/svg+xml" href="/static/favicon-qr-photo.svg">
+  <link rel="alternate icon" href="/static/favicon-qr-photo.svg">
   
   <!-- jsQR 라이브러리 (QR 코드 스캔용) -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
@@ -596,6 +599,7 @@ let currentTrackingNumber = '';
 let currentReturnData = null;
 let availableMonths = [];
 let isUploading = false;
+let currentPhotoSessionId = '';
 
 // ========= 초기화 =========
 document.addEventListener('DOMContentLoaded', function() {
@@ -722,17 +726,37 @@ async function startAutoQRScan() {
 }
 
 // ========= QR 코드 감지 처리 =========
-async function handleQRDetected(trackingNumber) {
-    console.log('📦 QR 코드 인식 완료:', trackingNumber);
+async function handleQRDetected(rawValue) {
+    console.log('📦 QR 코드 인식 완료:', rawValue);
     
-    // QR 스캔 중단
     stopQRScan();
     
-    currentTrackingNumber = trackingNumber;
-    showQRStatus('✅ QR 코드 인식 완료! 데이터 검색 중...', 'success');
+    const parsed = parseScannedPayload(rawValue);
+    currentPhotoSessionId = parsed.sessionId || '';
+    currentTrackingNumber = parsed.trackingNumber || rawValue || '';
     
-    // 데이터 자동 검색
-    await searchReturnData(trackingNumber);
+    if (!currentTrackingNumber) {
+        showQRStatus('⚠️ 송장번호를 읽을 수 없습니다. 다시 시도해주세요.', 'error');
+        setTimeout(() => startAutoQRScan(), 1500);
+        return;
+    }
+    
+    if (currentPhotoSessionId) {
+        showQRStatus('✅ QR 코드 인식 완료! 사진 촬영 모드로 이동합니다.', 'success');
+        currentReturnData = {
+            company_name: '',
+            product: '',
+            customer_name: '',
+            tracking_number: currentTrackingNumber,
+            month: null
+        };
+        updateInfoPanel();
+        await switchToPhotoMode();
+        return;
+    }
+    
+    showQRStatus('✅ QR 코드 인식 완료! 데이터 검색 중...', 'success');
+    await searchReturnData(currentTrackingNumber);
 }
 
 // ========= 반품 데이터 검색 =========
@@ -984,32 +1008,36 @@ async function uploadPhotos() {
         
         if (data.success && data.photoLinks) {
             console.log('✅ 사진 업로드 완료:', data.photoLinks);
+            const batchCount = selectedPhotos.length;
             
-            // 반품 데이터에 사진 링크 추가
-            if (currentReturnData) {
+            if (currentPhotoSessionId) {
+                await submitPhotosToSession(data.photoLinks);
+            } else if (currentReturnData) {
                 const existingLinks = currentReturnData.photo_links || '';
-                const newLinks = existingLinks 
-                    ? existingLinks + '\n' + data.photoLinks 
+                const newLinks = existingLinks
+                    ? `${existingLinks}\n${data.photoLinks}`
                     : data.photoLinks;
                 currentReturnData.photo_links = newLinks;
             }
             
-            // 업로드된 사진들을 배열에서 제거
             uploadedPhotos.push(...selectedPhotos);
             selectedPhotos = [];
             updatePhotoThumbnails();
             
-            // 반품 데이터 저장
-            await saveReturnData();
-            
             hideOverlay();
-            showOverlay('업로드 완료', `${uploadedPhotos.length}장의 사진이 업로드되었습니다.`, 2000);
             
-            // 업로드 완료 후 QR 스캔 모드로 복귀
-            setTimeout(() => {
-                resetToQRScanMode();
-            }, 2000);
-            
+            if (currentPhotoSessionId) {
+                showOverlay('전송 완료', `${batchCount}장의 사진이 관리자 화면으로 전달되었습니다.`, 2000);
+                setTimeout(() => {
+                    resetToQRScanMode();
+                }, 2000);
+            } else {
+                await saveReturnData();
+                showOverlay('업로드 완료', `${batchCount}장의 사진이 업로드되었습니다.`, 2000);
+                setTimeout(() => {
+                    resetToQRScanMode();
+                }, 2000);
+            }
         } else {
             throw new Error(data.message || '사진 업로드 실패');
         }
@@ -1064,6 +1092,38 @@ async function saveReturnData() {
         console.error('❌ 반품 데이터 저장 오류:', error);
         // 저장 실패해도 사진은 업로드되었으므로 계속 진행
     }
+}
+
+async function submitPhotosToSession(photoLinks) {
+    if (!currentPhotoSessionId) {
+        console.warn('⚠️ 활성화된 사진 세션이 없습니다.');
+        return false;
+    }
+    
+    const response = await fetch('/api/uploads/photo-session/photos', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            sessionId: currentPhotoSessionId,
+            trackingNumber: currentTrackingNumber,
+            photoLinks
+        })
+    });
+    
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error(`세션 저장 오류 (${response.status}): ${text.substring(0, 200)}`);
+    }
+    
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+        throw new Error(data.message || '사진 세션 저장에 실패했습니다.');
+    }
+    console.log('✅ 사진 세션 업데이트 완료:', currentPhotoSessionId);
+    return true;
 }
 
 // ========= 정보 패널 업데이트 =========
@@ -1153,6 +1213,7 @@ async function resetToQRScanMode() {
     uploadedPhotos = [];
     currentTrackingNumber = '';
     currentReturnData = null;
+    currentPhotoSessionId = '';
     updatePhotoThumbnails();
     
     // QR 스캔 모드 표시
@@ -1200,6 +1261,76 @@ function showManualInputMode() {
     const manualInputMode = document.querySelector('.manual-input-mode');
     if (manualInputMode) {
         manualInputMode.classList.add('active');
+    }
+}
+
+function parseScannedPayload(rawValue) {
+    if (!rawValue || typeof rawValue !== 'string') {
+        return { trackingNumber: rawValue || '' };
+    }
+    
+    const value = rawValue.trim();
+    const fallback = { trackingNumber: value };
+    
+    if (!value) {
+        return fallback;
+    }
+    
+    // JSON 형태 ({ "sessionId": "...", "trackingNumber": "..." })
+    try {
+        const parsed = JSON.parse(value);
+        if (parsed && (parsed.sessionId || parsed.trackingNumber || parsed.tracking)) {
+            return {
+                sessionId: parsed.sessionId || '',
+                trackingNumber: parsed.trackingNumber || parsed.tracking || value
+            };
+        }
+    } catch (error) {
+        // JSON 파싱 실패 시 무시
+    }
+    
+    // URL 또는 해시 쿼리 형태
+    try {
+        const url = new URL(value);
+        const searchParams = extractSessionParams(url.search);
+        const hashParams = extractSessionParams(url.hash);
+        const sessionId = searchParams.sessionId || hashParams.sessionId || '';
+        const trackingNumber = searchParams.trackingNumber || hashParams.trackingNumber || value;
+        if (sessionId || searchParams.trackingNumber || hashParams.trackingNumber) {
+            return { sessionId, trackingNumber };
+        }
+    } catch (error) {
+        // URL 파싱 실패 시 무시
+    }
+    
+    // sessionId= 형태의 단순 문자열
+    if (value.includes('sessionId=')) {
+        const inlineParams = extractSessionParams(value);
+        if (inlineParams.sessionId || inlineParams.trackingNumber) {
+            return {
+                sessionId: inlineParams.sessionId || '',
+                trackingNumber: inlineParams.trackingNumber || value
+            };
+        }
+    }
+    
+    return fallback;
+}
+
+function extractSessionParams(fragment) {
+    if (!fragment) {
+        return { sessionId: '', trackingNumber: '' };
+    }
+    
+    const cleaned = fragment.replace(/^[#?]/, '');
+    try {
+        const params = new URLSearchParams(cleaned);
+        return {
+            sessionId: params.get('sessionId') || '',
+            trackingNumber: params.get('trackingNumber') || params.get('tracking') || ''
+        };
+    } catch (error) {
+        return { sessionId: '', trackingNumber: '' };
     }
 }
 

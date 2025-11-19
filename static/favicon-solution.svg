@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- 배경 원 -->
+  <circle cx="50" cy="50" r="48" fill="#ff6b35"/>
+  <!-- 박스 아이콘 (물류/관리) -->
+  <rect x="25" y="30" width="50" height="40" fill="#fff" rx="3"/>
+  <rect x="25" y="30" width="50" height="15" fill="#feca57" rx="3"/>
+  <line x1="25" y1="45" x2="75" y2="45" stroke="#ff6b35" stroke-width="2"/>
+  <line x1="50" y1="30" x2="50" y2="70" stroke="#ff6b35" stroke-width="2"/>
+  <!-- 체크마크 (완료/관리) -->
+  <path d="M 35 55 L 45 65 L 65 40" stroke="#00b894" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+
