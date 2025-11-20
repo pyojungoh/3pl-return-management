@@ -4976,6 +4976,13 @@
         selectedMenu.classList.add('active');
       }
       
+      // 특수작업 전용 컨테이너 숨김 (특수작업 메뉴가 아닐 때)
+      const specialWorksContainer = document.getElementById('specialWorksTab');
+      if (specialWorksContainer && menuName !== 'specialWorks') {
+        specialWorksContainer.classList.add('hidden');
+        specialWorksContainer.style.display = 'none';
+      }
+      
       // 메뉴별 콘텐츠 표시/숨김 처리 (화주사 모드 탭만 처리)
       // 관리자 탭은 건드리지 않음
       const consignorTabIds = ['companyInfoTab', 'returnsTab', 'csTab', 'scheduleTab', 'boardCategoryTab'];
