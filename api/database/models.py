@@ -344,6 +344,46 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_cs_month 
                 ON customer_service(month, created_at)
             ''')
+
+            # PostgreSQL - 특수작업 작업 종류 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS special_work_types (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL UNIQUE,
+                    default_unit_price INTEGER DEFAULT 0,
+                    display_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            # PostgreSQL - 특수작업 작업 목록 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS special_works (
+                    id SERIAL PRIMARY KEY,
+                    company_name TEXT NOT NULL,
+                    work_type_id INTEGER NOT NULL,
+                    work_date DATE NOT NULL,
+                    quantity REAL NOT NULL,
+                    unit_price INTEGER NOT NULL,
+                    total_price INTEGER NOT NULL,
+                    photo_links TEXT,
+                    memo TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (work_type_id) REFERENCES special_work_types(id) ON DELETE CASCADE
+                )
+            ''')
+
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_special_works_company 
+                ON special_works(company_name, work_date)
+            ''')
+
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_special_works_type 
+                ON special_works(work_type_id)
+            ''')
             
         else:
             # SQLite 테이블 생성 (기존 코드)
@@ -659,6 +699,46 @@ def init_db():
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_cs_month 
                 ON customer_service(month, created_at)
+            ''')
+
+            # SQLite - 특수작업 작업 종류 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS special_work_types (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    default_unit_price INTEGER DEFAULT 0,
+                    display_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            # SQLite - 특수작업 작업 목록 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS special_works (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    company_name TEXT NOT NULL,
+                    work_type_id INTEGER NOT NULL,
+                    work_date DATE NOT NULL,
+                    quantity REAL NOT NULL,
+                    unit_price INTEGER NOT NULL,
+                    total_price INTEGER NOT NULL,
+                    photo_links TEXT,
+                    memo TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (work_type_id) REFERENCES special_work_types(id) ON DELETE CASCADE
+                )
+            ''')
+
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_special_works_company 
+                ON special_works(company_name, work_date)
+            ''')
+
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_special_works_type 
+                ON special_works(work_type_id)
             ''')
         
         conn.commit()
