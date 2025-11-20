@@ -4066,3 +4066,123 @@ def delete_popup(popup_id: int) -> bool:
             return False
         finally:
             conn.close()
+
+
+# ========== 스케줄 타입 관리 함수들 ==========
+
+def create_schedule_type(name: str, display_order: int = 0) -> int:
+    """스케줄 타입 생성"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO schedule_types (name, display_order)
+                VALUES (%s, %s)
+                RETURNING id
+            ''', (name, display_order))
+            conn.commit()
+            row = cursor.fetchone()
+            return row[0] if row else 0
+        except Exception as e:
+            print(f"스케줄 타입 생성 오류: {e}")
+            conn.rollback()
+            return 0
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO schedule_types (name, display_order)
+                VALUES (?, ?)
+            ''', (name, display_order))
+            conn.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            print(f"스케줄 타입 생성 오류: {e}")
+            return 0
+        finally:
+            conn.close()
+
+
+def get_all_schedule_types() -> List[Dict]:
+    """모든 스케줄 타입 조회"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT * FROM schedule_types 
+                ORDER BY display_order ASC, created_at ASC
+            ''')
+            rows = cursor.fetchall()
+            result = []
+            for row in rows:
+                row_dict = dict(row)
+                # datetime 객체를 문자열로 변환
+                for key, value in row_dict.items():
+                    if isinstance(value, datetime):
+                        row_dict[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+                result.append(row_dict)
+            return result
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT * FROM schedule_types 
+                ORDER BY display_order ASC, created_at ASC
+            ''')
+            rows = cursor.fetchall()
+            result = []
+            for row in rows:
+                if hasattr(row, 'keys'):
+                    row_dict = dict(row)
+                else:
+                    row_dict = {
+                        'id': row[0],
+                        'name': row[1],
+                        'display_order': row[2],
+                        'created_at': row[3],
+                        'updated_at': row[4] if len(row) > 4 else None
+                    }
+                result.append(row_dict)
+            return result
+        finally:
+            conn.close()
+
+
+def delete_schedule_type(type_id: int) -> bool:
+    """스케줄 타입 삭제"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM schedule_types WHERE id = %s', (type_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"스케줄 타입 삭제 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM schedule_types WHERE id = ?', (type_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"스케줄 타입 삭제 오류: {e}")
+            return False
+        finally:
+            conn.close()

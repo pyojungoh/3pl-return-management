@@ -485,6 +485,140 @@
       white-space: nowrap;
     }
 
+    /* 스케쥴 - 검색형 드롭다운 */
+    .sc-searchable-select {
+      position: relative;
+      width: 100%;
+    }
+
+    .sc-searchable-select input[type="text"] {
+      width: 100%;
+      padding-right: 32px;
+    }
+
+    .sc-dropdown-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #ffffff;
+      border: 2px solid #ffeaa7;
+      border-radius: 10px;
+      max-height: 220px;
+      overflow-y: auto;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+      z-index: 50;
+      display: none;
+      margin-top: 4px;
+    }
+
+    .sc-dropdown-list.show {
+      display: block;
+    }
+
+    .sc-dropdown-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #f5f5f5;
+      transition: background-color 0.2s ease;
+    }
+
+    .sc-dropdown-item:last-child {
+      border-bottom: none;
+    }
+
+    .sc-dropdown-item:hover {
+      background: #fff9e6;
+    }
+
+    .sc-helper-text {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #999;
+    }
+
+    /* 스케쥴 타입 관리 */
+    .sc-type-select {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .sc-type-manage-btn {
+      padding: 10px 14px;
+      border: 2px solid #ffeaa7;
+      border-radius: 10px;
+      background: #fff9e6;
+      color: #ff6b35;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      min-width: 120px;
+    }
+
+    .sc-type-manage-btn:hover {
+      background: #ffecd9;
+    }
+
+    .sc-type-manager {
+      margin-top: 12px;
+      background: #fff9e6;
+      border: 2px solid #ffeaa7;
+      border-radius: 12px;
+      padding: 16px;
+      display: none;
+    }
+
+    .sc-type-add-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .sc-type-add-row input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 2px solid #ffeaa7;
+      border-radius: 8px;
+    }
+
+    .sc-type-add-row button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      color: #ffffff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .sc-type-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .sc-type-chip {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #ffffff;
+      border: 2px solid #ffeaa7;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #2d3436;
+    }
+
+    .sc-type-chip button {
+      border: none;
+      background: transparent;
+      color: #e74c3c;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
     /* 메뉴 순서 고정 (화주/관리자 동일 순서 유지) */
     #companyInfoMenuBtn { order: 0; }
     #returnsMenuBtn { order: 1; }
@@ -2047,6 +2181,12 @@
             <h3 style="margin-bottom: 20px; color: #ff6b35; font-weight: 700; font-size: 20px;">📅 스케쥴 등록</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
               <div>
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">스케줄 타입 *</label>
+                <select id="scheduleType" class="request-input" style="min-height: auto;" required>
+                  <option value="">타입을 선택하세요</option>
+                </select>
+              </div>
+              <div>
                 <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">제목 *</label>
                 <input type="text" id="scheduleTitle" class="request-input" style="min-height: auto;" placeholder="예: 11월 대형 할인행사" required>
               </div>
@@ -2180,21 +2320,29 @@
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
               <div>
                 <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">화주사 선택 *</label>
-                <select id="adminScheduleCompanyName" class="request-input" style="min-height: auto;" required>
-                  <option value="">화주사를 선택하세요</option>
-                  <option value="모든 화주사">모든 화주사</option>
-                </select>
+                <div class="sc-searchable-select">
+                  <input type="text" id="adminScheduleCompanyInput" class="request-input" style="min-height: auto;" placeholder="화주사를 입력하거나 선택하세요" autocomplete="off">
+                  <input type="hidden" id="adminScheduleCompanyName" required>
+                  <div class="sc-dropdown-list" id="adminScheduleCompanyDropdown"></div>
+                </div>
+                <div class="sc-helper-text">"모든 화주사", "제이제이" 등 원하는 이름을 입력하거나 선택하세요.</div>
               </div>
               <div>
                 <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">스케줄 타입 *</label>
-                <select id="adminScheduleType" class="request-input" style="min-height: auto;" required>
-                  <option value="">타입을 선택하세요</option>
-                  <option value="입고">입고</option>
-                  <option value="출고">출고</option>
-                  <option value="행사">행사</option>
-                  <option value="연휴">연휴</option>
-                  <option value="기타">기타</option>
-                </select>
+                <div class="sc-type-select">
+                  <select id="adminScheduleType" class="request-input" style="min-height: auto; flex: 1;" required>
+                    <option value="">타입을 선택하세요</option>
+                  </select>
+                  <button type="button" class="sc-type-manage-btn" onclick="toggleScheduleTypeManager()">⚙ 타입 관리</button>
+                </div>
+                <div id="scheduleTypeManager" class="sc-type-manager">
+                  <div class="sc-type-add-row">
+                    <input type="text" id="scheduleTypeInput" placeholder="추가할 스케줄 타입을 입력하세요">
+                    <button type="button" onclick="addCustomScheduleType()">추가</button>
+                  </div>
+                  <div class="sc-helper-text">기본 타입 외에 상시 사용하는 스케줄 타입을 직접 추가할 수 있습니다.</div>
+                  <div id="scheduleTypeList" class="sc-type-list"></div>
+                </div>
               </div>
               <div>
                 <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">제목 *</label>
@@ -5059,6 +5207,10 @@
         });
         // 스케쥴 목록 로드
         refreshSchedules();
+        // 스케줄 타입 목록 로드 (화주사 모드)
+        if (typeof loadScheduleTypesForConsignor === 'function') {
+          loadScheduleTypesForConsignor();
+        }
       } else if (menuName === 'board') {
         // 게시판 메뉴
         // 모든 화주사 모드 탭 숨기기
@@ -5160,6 +5312,10 @@
         // 스케쥴 캘린더 로드 (관리자 모드)
         if (typeof loadCalendarSchedules === 'function') {
           loadCalendarSchedules();
+        }
+        // 스케줄 타입 목록 로드
+        if (typeof loadScheduleTypes === 'function') {
+          loadScheduleTypes();
         }
       } else if (tabName === 'board') {
         const boardTab = document.getElementById('boardTab');
@@ -5320,15 +5476,42 @@
       const form = document.getElementById('scheduleForm');
       const icon = document.getElementById('addScheduleIcon');
       if (form && icon) {
-        const isHidden = form.style.display === 'none';
+        const isHidden = form.style.display === 'none' || !form.style.display;
         form.style.display = isHidden ? 'block' : 'none';
         icon.textContent = isHidden ? '▼' : '▶';
+        
+        // 폼이 열릴 때 타입 목록 로드
+        if (isHidden && typeof loadScheduleTypesForConsignor === 'function') {
+          loadScheduleTypesForConsignor();
+        }
       }
     }
     window.toggleScheduleForm = toggleScheduleForm;
     
+    // 화주사 모드용 스케줄 타입 목록 로드 (타입 추가 버튼 없이 드롭다운만)
+    async function loadScheduleTypesForConsignor() {
+      try {
+        const response = await fetch('/api/schedules/types');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const select = document.getElementById('scheduleType');
+          if (select) {
+            select.innerHTML = '<option value="">타입을 선택하세요</option>' +
+              result.data.map(type => 
+                `<option value="${escapeHtml(type.name)}">${escapeHtml(type.name)}</option>`
+              ).join('');
+          }
+        }
+      } catch (error) {
+        console.error('스케줄 타입 로드 오류:', error);
+      }
+    }
+    window.loadScheduleTypesForConsignor = loadScheduleTypesForConsignor;
+    
     // 스케쥴 저장
     async function saveSchedule() {
+      const scheduleType = document.getElementById('scheduleType').value.trim();
       const title = document.getElementById('scheduleTitle').value.trim();
       const startDate = document.getElementById('scheduleStartDate').value;
       const endDate = document.getElementById('scheduleEndDate').value;
@@ -5336,7 +5519,7 @@
       const requestNote = document.getElementById('scheduleRequestNote').value.trim();
       const messageDiv = document.getElementById('scheduleMessage');
       
-      if (!title || !startDate || !endDate || !eventDescription) {
+      if (!scheduleType || !title || !startDate || !endDate || !eventDescription) {
         messageDiv.innerHTML = '<span style="color: #e74c3c;">필수 항목을 모두 입력해주세요.</span>';
         return;
       }
@@ -5354,6 +5537,7 @@
           },
           body: JSON.stringify({
             company_name: currentCompany,
+            schedule_type: scheduleType,
             title: title,
             start_date: startDate,
             end_date: endDate,
@@ -5387,6 +5571,8 @@
     
     // 스케쥴 폼 초기화
     function resetScheduleForm() {
+      const scheduleTypeSelect = document.getElementById('scheduleType');
+      if (scheduleTypeSelect) scheduleTypeSelect.value = '';
       document.getElementById('scheduleTitle').value = '';
       document.getElementById('scheduleStartDate').value = '';
       document.getElementById('scheduleEndDate').value = '';
@@ -5630,7 +5816,10 @@
     
     // 관리자 스케쥴 저장
     async function saveAdminSchedule() {
-      const companyName = document.getElementById('adminScheduleCompanyName').value.trim();
+      const companyHidden = document.getElementById('adminScheduleCompanyName');
+      const companyInput = document.getElementById('adminScheduleCompanyInput');
+      // hidden 또는 input에서 값 가져오기 (hidden이 우선)
+      const companyName = (companyHidden && companyHidden.value.trim()) || (companyInput && companyInput.value.trim()) || '';
       const scheduleType = document.getElementById('adminScheduleType').value.trim();
       const title = document.getElementById('adminScheduleTitle').value.trim();
       const startDate = document.getElementById('adminScheduleStartDate').value;
@@ -5689,7 +5878,10 @@
     
     // 관리자 스케쥴 폼 초기화
     function resetAdminScheduleForm() {
-      document.getElementById('adminScheduleCompanyName').value = '';
+      const companyInput = document.getElementById('adminScheduleCompanyInput');
+      const companyHidden = document.getElementById('adminScheduleCompanyName');
+      if (companyInput) companyInput.value = '';
+      if (companyHidden) companyHidden.value = '';
       document.getElementById('adminScheduleType').value = '';
       document.getElementById('adminScheduleTitle').value = '';
       document.getElementById('adminScheduleStartDate').value = '';
@@ -5700,30 +5892,151 @@
     }
     window.resetAdminScheduleForm = resetAdminScheduleForm;
     
-    // 관리자 스케쥴 등록용 화주사 목록 로드
+    // 관리자 스케쥴 등록용 화주사 목록 로드 (검색 가능한 드롭다운)
     async function loadCompaniesForSchedule() {
-      const select = document.getElementById('adminScheduleCompanyName');
-      if (!select) return;
+      const companyInput = document.getElementById('adminScheduleCompanyInput');
+      const companyHidden = document.getElementById('adminScheduleCompanyName');
+      const companyDropdown = document.getElementById('adminScheduleCompanyDropdown');
+      
+      if (!companyInput || !companyHidden || !companyDropdown) return;
       
       try {
         const response = await fetch('/api/auth/companies');
         const result = await response.json();
         
         if (result.success && result.companies) {
-          // 기존 옵션 제거 (첫 번째와 두 번째 옵션 제외 - "화주사를 선택하세요"와 "모든 화주사")
-          while (select.options.length > 2) {
-            select.remove(2);
-          }
+          // "모든 화주사" 추가
+          const allCompanies = [
+            { company_name: '모든 화주사', role: 'special' },
+            { company_name: '제이제이', role: 'special' }
+          ];
           
           // 화주사만 필터링 (관리자 제외)
           const companies = result.companies.filter(company => company.role !== '관리자');
+          const companyList = [...allCompanies, ...companies];
           
-          companies.forEach(company => {
-            const option = document.createElement('option');
-            option.value = company.company_name;
-            option.textContent = company.company_name;
-            select.appendChild(option);
+          // HTML 이스케이프 함수
+          function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+          }
+          
+          // 드롭다운 아이템 생성 함수
+          function updateDropdown(filterText = '') {
+            const filtered = companyList.filter(company => 
+              company.company_name.toLowerCase().includes(filterText.toLowerCase())
+            );
+            
+            if (filtered.length === 0) {
+              companyDropdown.innerHTML = '<div class="sc-dropdown-item" style="color: #999; cursor: default;">검색 결과가 없습니다</div>';
+            } else {
+              companyDropdown.innerHTML = filtered.map(company => 
+                `<div class="sc-dropdown-item" data-value="${escapeHtml(company.company_name)}">${escapeHtml(company.company_name)}</div>`
+              ).join('');
+            }
+          }
+          
+          // 초기 드롭다운 생성
+          updateDropdown();
+          
+          // 기존 이벤트 리스너 제거를 위해 클론
+          const newInput = companyInput.cloneNode(true);
+          companyInput.parentNode.replaceChild(newInput, companyInput);
+          const newHidden = companyHidden.cloneNode(true);
+          companyHidden.parentNode.replaceChild(newHidden, companyHidden);
+          
+          // 새로운 요소 참조
+          const currentInput = document.getElementById('adminScheduleCompanyInput');
+          const currentHidden = document.getElementById('adminScheduleCompanyName');
+          const currentDropdown = document.getElementById('adminScheduleCompanyDropdown');
+          
+          // 드롭다운 열기/닫기 상태 추적
+          let isDropdownOpen = false;
+          let dropdownTimeout = null;
+          
+          // 드롭다운 열기 함수
+          const openDropdown = () => {
+            if (dropdownTimeout) {
+              clearTimeout(dropdownTimeout);
+              dropdownTimeout = null;
+            }
+            updateDropdown(currentInput.value);
+            currentDropdown.classList.add('show');
+            isDropdownOpen = true;
+          };
+          
+          // 드롭다운 닫기 함수
+          const closeDropdown = () => {
+            if (dropdownTimeout) {
+              clearTimeout(dropdownTimeout);
+              dropdownTimeout = null;
+            }
+            currentDropdown.classList.remove('show');
+            isDropdownOpen = false;
+          };
+          
+          // 입력 이벤트
+          currentInput.addEventListener('input', (e) => {
+            const value = e.target.value;
+            currentHidden.value = value;
+            updateDropdown(value);
+            if (!isDropdownOpen) {
+              openDropdown();
+            }
           });
+          
+          // 포커스 이벤트
+          currentInput.addEventListener('focus', (e) => {
+            e.stopPropagation();
+            if (dropdownTimeout) {
+              clearTimeout(dropdownTimeout);
+            }
+            dropdownTimeout = setTimeout(() => {
+              openDropdown();
+            }, 100);
+          });
+          
+          // 클릭 이벤트
+          currentInput.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (dropdownTimeout) {
+              clearTimeout(dropdownTimeout);
+            }
+            dropdownTimeout = setTimeout(() => {
+              openDropdown();
+            }, 100);
+          });
+          
+          // 드롭다운 아이템 클릭
+          currentDropdown.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const item = e.target.closest('.sc-dropdown-item');
+            if (item && item.dataset.value) {
+              currentInput.value = item.dataset.value;
+              currentHidden.value = item.dataset.value;
+              closeDropdown();
+            }
+          });
+          
+          // 외부 클릭 시 드롭다운 닫기
+          const handleDocumentClick = (e) => {
+            if (!currentInput.contains(e.target) && !currentDropdown.contains(e.target)) {
+              setTimeout(() => {
+                if (!currentInput.contains(document.activeElement)) {
+                  closeDropdown();
+                }
+              }, 150);
+            }
+          };
+          
+          // 기존 리스너 제거
+          if (window.scheduleCompanyDropdownCloseHandler) {
+            document.removeEventListener('mousedown', window.scheduleCompanyDropdownCloseHandler);
+          }
+          window.scheduleCompanyDropdownCloseHandler = handleDocumentClick;
+          document.addEventListener('mousedown', handleDocumentClick);
         }
       } catch (error) {
         console.error('화주사 목록 로드 오류:', error);
@@ -5748,6 +6061,148 @@
         }
       }
     }
+    window.toggleAdminScheduleForm = toggleAdminScheduleForm;
+    
+    // ========== 스케줄 타입 관리 함수들 ==========
+    
+    // 스케줄 타입 관리자 토글
+    function toggleScheduleTypeManager() {
+      const manager = document.getElementById('scheduleTypeManager');
+      if (manager) {
+        const isHidden = manager.style.display === 'none' || !manager.style.display;
+        manager.style.display = isHidden ? 'block' : 'none';
+        if (isHidden) {
+          loadScheduleTypes();
+        }
+      }
+    }
+    window.toggleScheduleTypeManager = toggleScheduleTypeManager;
+    
+    // 스케줄 타입 목록 로드
+    async function loadScheduleTypes() {
+      try {
+        const response = await fetch('/api/schedules/types');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          // 드롭다운 업데이트
+          const select = document.getElementById('adminScheduleType');
+          if (select) {
+            select.innerHTML = '<option value="">타입을 선택하세요</option>' +
+              result.data.map(type => 
+                `<option value="${escapeHtml(type.name)}">${escapeHtml(type.name)}</option>`
+              ).join('');
+          }
+          
+          // 타입 목록 업데이트
+          const typeList = document.getElementById('scheduleTypeList');
+          if (typeList) {
+            if (result.data.length === 0) {
+              typeList.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">등록된 스케줄 타입이 없습니다.</div>';
+            } else {
+              typeList.innerHTML = result.data.map(type => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f0f0f0;">
+                  <span>${escapeHtml(type.name)}</span>
+                  <button type="button" class="save-btn" onclick="deleteCustomScheduleType(${type.id}, '${escapeHtml(type.name)}')" style="padding: 4px 8px; font-size: 12px; background: #e74c3c;">삭제</button>
+                </div>
+              `).join('');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('스케줄 타입 로드 오류:', error);
+      }
+    }
+    window.loadScheduleTypes = loadScheduleTypes;
+    
+    // 스케줄 타입 추가
+    async function addCustomScheduleType() {
+      const input = document.getElementById('scheduleTypeInput');
+      if (!input) return;
+      
+      const typeName = input.value.trim();
+      if (!typeName) {
+        alert('스케줄 타입명을 입력하세요.');
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/schedules/types', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: typeName,
+            display_order: 0
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          input.value = '';
+          loadScheduleTypes(); // 목록 새로고침
+          alert('스케줄 타입이 추가되었습니다.');
+        } else {
+          alert(result.message || '스케줄 타입 추가에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('스케줄 타입 추가 오류:', error);
+        alert('스케줄 타입 추가 중 오류가 발생했습니다.');
+      }
+    }
+    window.addCustomScheduleType = addCustomScheduleType;
+    
+    // 스케줄 타입 삭제
+    async function deleteCustomScheduleType(typeId, typeName) {
+      if (!confirm(`'${typeName}' 타입을 삭제하시겠습니까?`)) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/schedules/types/${typeId}`, {
+          method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          loadScheduleTypes(); // 목록 새로고침
+          alert('스케줄 타입이 삭제되었습니다.');
+          
+          // 현재 선택된 타입이 삭제된 타입이면 초기화
+          const select = document.getElementById('adminScheduleType');
+          if (select && select.value === typeName) {
+            select.value = '';
+          }
+        } else {
+          alert(result.message || '스케줄 타입 삭제에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('스케줄 타입 삭제 오류:', error);
+        alert('스케줄 타입 삭제 중 오류가 발생했습니다.');
+      }
+    }
+    window.deleteCustomScheduleType = deleteCustomScheduleType;
+    
+    // HTML 이스케이프 헬퍼 함수
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // 스케줄 폼 열 때 타입 목록도 로드
+    const originalToggleAdminScheduleForm = toggleAdminScheduleForm;
+    toggleAdminScheduleForm = function() {
+      originalToggleAdminScheduleForm();
+      const form = document.getElementById('addAdminScheduleForm');
+      if (form && form.style.display !== 'none') {
+        loadScheduleTypes();
+      }
+    };
     window.toggleAdminScheduleForm = toggleAdminScheduleForm;
     
     // ========== 관리자 달력 뷰 관련 함수 ==========

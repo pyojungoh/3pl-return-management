@@ -11,7 +11,10 @@ from api.database.models import (
     get_schedule_by_id,
     update_schedule,
     delete_schedule,
-    get_all_companies
+    get_all_companies,
+    create_schedule_type,
+    get_all_schedule_types,
+    delete_schedule_type
 )
 
 # Blueprint 생성
@@ -381,5 +384,90 @@ def get_schedule_detail(schedule_id):
             'success': False,
             'data': None,
             'message': f'스케쥴 조회 중 오류: {str(e)}'
+        }), 500
+
+
+# ========== 스케줄 타입 관리 API ==========
+
+@schedules_bp.route('/types', methods=['GET'])
+def get_schedule_types():
+    """스케줄 타입 목록 조회"""
+    try:
+        types = get_all_schedule_types()
+        return jsonify({
+            'success': True,
+            'data': types,
+            'count': len(types)
+        })
+    except Exception as e:
+        print(f'❌ 스케줄 타입 조회 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'data': [],
+            'count': 0,
+            'message': f'스케줄 타입 조회 중 오류: {str(e)}'
+        }), 500
+
+
+@schedules_bp.route('/types', methods=['POST'])
+def create_schedule_type_route():
+    """스케줄 타입 생성"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        display_order = data.get('display_order', 0)
+        
+        if not name:
+            return jsonify({
+                'success': False,
+                'message': '스케줄 타입명은 필수입니다.'
+            }), 400
+        
+        type_id = create_schedule_type(name, display_order)
+        if type_id:
+            return jsonify({
+                'success': True,
+                'message': '스케줄 타입이 생성되었습니다.',
+                'id': type_id
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '스케줄 타입 생성에 실패했습니다. (중복된 이름일 수 있습니다)'
+            }), 400
+    except Exception as e:
+        print(f'❌ 스케줄 타입 생성 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'스케줄 타입 생성 중 오류: {str(e)}'
+        }), 500
+
+
+@schedules_bp.route('/types/<int:type_id>', methods=['DELETE'])
+def delete_schedule_type_route(type_id):
+    """스케줄 타입 삭제"""
+    try:
+        success = delete_schedule_type(type_id)
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '스케줄 타입이 삭제되었습니다.'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '스케줄 타입 삭제에 실패했습니다.'
+            }), 404
+    except Exception as e:
+        print(f'❌ 스케줄 타입 삭제 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'스케줄 타입 삭제 중 오류: {str(e)}'
         }), 500
 
