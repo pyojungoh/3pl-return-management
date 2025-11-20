@@ -1630,6 +1630,7 @@
         <button type="button" class="menu-item" id="csMenuBtn" onclick="switchMenu('cs')">📞 C/S</button>
         <button type="button" class="menu-item" id="scheduleMenuBtn" onclick="switchMenu('schedule')">📅 판매스케쥴</button>
         <button type="button" class="menu-item" id="boardMenuBtn" onclick="switchMenu('board')">📋 게시판</button>
+        <button type="button" class="menu-item" id="specialWorksMenuBtn" onclick="switchMenu('specialWorks')">🔧 특수작업</button>
       </div>
       
       <!-- 관리자 전용 탭 (관리자만 표시) -->
@@ -1640,6 +1641,7 @@
           <button type="button" class="tab-btn" id="scheduleCalendarTabBtn" onclick="switchAdminTab('scheduleCalendar')">📅 스케쥴 관리</button>
           <button type="button" class="tab-btn" id="boardTabBtn" onclick="switchAdminTab('board')">📋 게시판 관리</button>
           <button type="button" class="tab-btn" id="popupTabBtn" onclick="switchAdminTab('popup')">🔔 팝업 관리</button>
+          <button type="button" class="tab-btn" id="specialWorksTabBtn" onclick="switchAdminTab('specialWorks')">🔧 특수작업</button>
           <button type="button" class="tab-btn admin-only-tab" id="registerTabBtn" onclick="switchAdminTab('register')" style="display: none;">🏢 화주사 등록</button>
         </div>
       </div>
@@ -2872,7 +2874,7 @@
       } else {
         // 관리자면 저장된 탭 정보 확인 (F5 새로고침 시 현재 탭 유지)
         const savedTab = localStorage.getItem('activeAdminTab');
-        const validTabs = ['returns', 'cs', 'scheduleCalendar', 'board', 'register'];
+        const validTabs = ['returns', 'cs', 'scheduleCalendar', 'board', 'popup', 'specialWorks', 'register'];
         const activeTab = savedTab && validTabs.includes(savedTab) ? savedTab : 'returns';
         console.log('저장된 탭:', savedTab, '활성화할 탭:', activeTab);
         // 약간의 지연을 두고 탭 전환 (DOM이 완전히 로드된 후)
@@ -5054,6 +5056,18 @@
         setTimeout(() => {
           selectBoardCategory('');
         }, 100);
+      } else if (menuName === 'specialWorks') {
+        // 특수작업 메뉴
+        // 모든 화주사 모드 탭 숨기기
+        consignorTabIds.forEach(tabId => {
+          const tab = document.getElementById(tabId);
+          if (tab) {
+            tab.classList.add('hidden');
+            tab.style.display = 'none';
+          }
+        });
+        // 특수작업 콘텐츠 로드
+        loadSpecialWorksContent();
       }
       
       // 현재 활성 메뉴를 localStorage에 저장 (F5 새로고침 시 복원용)
@@ -5078,7 +5092,7 @@
       }
       
       // 관리자 탭만 명시적으로 숨기기 (화주사 모드 탭에 영향 주지 않도록)
-      const adminTabIds = ['returnsTab', 'csTab', 'scheduleCalendarTab', 'boardTab', 'boardCategoryTab', 'popupTab', 'registerTab'];
+      const adminTabIds = ['returnsTab', 'csTab', 'scheduleCalendarTab', 'boardTab', 'boardCategoryTab', 'popupTab', 'specialWorksTab', 'registerTab'];
       adminTabIds.forEach(tabId => {
         const tab = document.getElementById(tabId);
         if (tab) {
@@ -5161,6 +5175,9 @@
         if (typeof loadCompanies === 'function') {
           loadCompanies();
         }
+      } else if (tabName === 'specialWorks') {
+        // 특수작업 탭
+        loadSpecialWorksContent();
       }
       
       // 현재 활성 탭을 localStorage에 저장 (F5 새로고침 시 복원용)
@@ -5169,6 +5186,108 @@
       console.log('관리자 탭 전환:', tabName);
     }
     window.switchAdminTab = switchAdminTab;
+    
+    // ========== 특수작업 관련 함수 ==========
+    
+    /**
+     * 특수작업 콘텐츠 동적 로드
+     */
+    function loadSpecialWorksContent() {
+      // 특수작업 탭 컨테이너 찾기 또는 생성
+      let container = document.getElementById('specialWorksTab');
+      if (!container) {
+        // 컨테이너가 없으면 생성
+        container = document.createElement('div');
+        container.id = 'specialWorksTab';
+        container.className = 'tab-content';
+        // 관리자 탭 영역에 추가
+        const adminTabs = document.getElementById('adminTabs');
+        if (adminTabs && adminTabs.parentNode) {
+          adminTabs.parentNode.insertBefore(container, adminTabs.nextSibling);
+        } else {
+          // adminTabs를 찾을 수 없으면 body에 추가
+          document.body.appendChild(container);
+        }
+      }
+      
+      // 컨테이너 표시
+      container.classList.remove('hidden');
+      container.style.display = 'block';
+      
+      // 로딩 표시
+      container.innerHTML = '<div style="text-align: center; padding: 40px; color: #636e72;">로딩 중...</div>';
+      
+      // special_works.html 파일 로드
+      fetch('special_works.html')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('특수작업 페이지를 불러올 수 없습니다.');
+          }
+          return response.text();
+        })
+        .then(html => {
+          // HTML 파싱
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          
+          // body 내용 추출
+          const bodyContent = doc.body.innerHTML;
+          const styleContent = doc.head.querySelector('style')?.innerHTML || '';
+          
+          // 컨테이너에 삽입
+          container.innerHTML = `<style>${styleContent}</style>${bodyContent}`;
+          
+          // 전역 변수 설정 (special_works.html에서 사용)
+          // dashboard_server.html의 전역 변수를 window 객체에 명시적으로 설정
+          window.currentRole = typeof currentRole !== 'undefined' ? currentRole : '';
+          window.currentCompany = typeof currentCompany !== 'undefined' ? currentCompany : '';
+          window.currentUsername = typeof currentUsername !== 'undefined' ? currentUsername : '';
+          
+          // localStorage에서도 읽어오기 (백업)
+          if (!window.currentRole) {
+            window.currentRole = localStorage.getItem('client_role') || '';
+          }
+          if (!window.currentCompany) {
+            window.currentCompany = localStorage.getItem('client_company') || '';
+          }
+          if (!window.currentUsername) {
+            window.currentUsername = localStorage.getItem('client_username') || '';
+          }
+          
+          console.log('[SW] 전역 변수 설정:', {
+            role: window.currentRole,
+            company: window.currentCompany,
+            username: window.currentUsername
+          });
+          
+          // 스크립트 실행
+          const scripts = container.querySelectorAll('script');
+          scripts.forEach(script => {
+            const newScript = document.createElement('script');
+            if (script.src) {
+              newScript.src = script.src;
+            } else {
+              newScript.textContent = script.textContent;
+            }
+            document.body.appendChild(newScript);
+            if (script.parentNode) {
+              script.parentNode.removeChild(script);
+            }
+          });
+          
+          // 초기화 함수 호출 (약간의 지연 후)
+          setTimeout(() => {
+            if (typeof window.swCommonInit === 'function') {
+              window.swCommonInit();
+            }
+          }, 100);
+        })
+        .catch(error => {
+          console.error('특수작업 콘텐츠 로드 오류:', error);
+          container.innerHTML = `<div style="text-align: center; padding: 40px; color: #e74c3c;">❌ 특수작업 페이지를 불러오는 중 오류가 발생했습니다: ${error.message}</div>`;
+        });
+    }
+    window.loadSpecialWorksContent = loadSpecialWorksContent;
     
     // ========== 판매 스케쥴 관련 함수 ==========
     

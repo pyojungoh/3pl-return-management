@@ -22,7 +22,7 @@ flask.cli.load_dotenv = _noop_load_dotenv
 try:
     load_dotenv()
 except Exception as e:
-    print(f"⚠️ .env 파일 로드 중 오류 발생 (무시하고 계속 진행): {e}")
+    print(f"[경고] .env 파일 로드 중 오류 발생 (무시하고 계속 진행): {e}")
     print("   환경 변수는 Vercel 설정 또는 .env 파일에서 로드됩니다.")
 
 # Flask 앱 생성
@@ -43,27 +43,27 @@ init_db()
 try:
     fix_missing_return_ids()
 except Exception as e:
-    print(f"⚠️ 반품 ID 생성 중 오류 발생 (무시하고 계속 진행): {e}")
+    print(f"[경고] 반품 ID 생성 중 오류 발생 (무시하고 계속 진행): {e}")
 
 # 초기 관리자 계정 자동 생성 (없는 경우에만)
 try:
     admin_user = get_company_by_username('admin')
     if not admin_user:
-        print("🔧 초기 관리자 계정이 없습니다. 생성 중...")
+        print("[정보] 초기 관리자 계정이 없습니다. 생성 중...")
         create_company(
             company_name='관리자',
             username='admin',
-            password='admin123',  # ⚠️ 배포 후 비밀번호 변경 권장
+            password='admin123',  # [주의] 배포 후 비밀번호 변경 권장
             role='관리자'
         )
-        print("✅ 초기 관리자 계정이 생성되었습니다.")
+        print("[성공] 초기 관리자 계정이 생성되었습니다.")
         print("   아이디: admin")
         print("   비밀번호: admin123")
-        print("   ⚠️ 보안을 위해 배포 후 비밀번호를 변경하세요!")
+        print("   [주의] 보안을 위해 배포 후 비밀번호를 변경하세요!")
     else:
-        print("✅ 관리자 계정이 이미 존재합니다.")
+        print("[성공] 관리자 계정이 이미 존재합니다.")
 except Exception as e:
-    print(f"⚠️ 초기 관리자 계정 생성 중 오류 (무시 가능): {e}")
+    print(f"[경고] 초기 관리자 계정 생성 중 오류 (무시 가능): {e}")
 
 # API 블루프린트 등록 (데이터베이스 기반)
 from api.auth.routes_db import auth_bp
@@ -76,6 +76,7 @@ from api.board.routes_db import board_bp
 from api.popups.routes_db import popups_bp
 from api.cs.routes_db import cs_bp
 from api.cs.scheduler import start_cs_notification_scheduler
+from api.special_works.routes_db import special_works_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(returns_bp)
@@ -86,15 +87,16 @@ app.register_blueprint(schedules_bp)
 app.register_blueprint(board_bp)
 app.register_blueprint(popups_bp)
 app.register_blueprint(cs_bp)
+app.register_blueprint(special_works_bp)
 
 # C/S 알림 스케줄러 시작
-print("🚀 [앱 시작] C/S 알림 스케줄러 시작 시도...")
-print("📅 [앱 시작] 배포 시간: 2025-11-17 15:30") # Force Vercel deployment trigger
+print("[정보] [앱 시작] C/S 알림 스케줄러 시작 시도...")
+print("[정보] [앱 시작] 배포 시간: 2025-11-17 15:30") # Force Vercel deployment trigger
 try:
     start_cs_notification_scheduler()
-    print("✅ [앱 시작] C/S 알림 스케줄러 시작 완료")
+    print("[성공] [앱 시작] C/S 알림 스케줄러 시작 완료")
 except Exception as e:
-    print(f"❌ [앱 시작] C/S 알림 스케줄러 시작 중 오류: {e}")
+    print(f"[오류] [앱 시작] C/S 알림 스케줄러 시작 중 오류: {e}")
     import traceback
     traceback.print_exc()
 
@@ -108,6 +110,18 @@ def index():
         return send_file('dashboard_server.html')
     except FileNotFoundError:
         return '<h1>대시보드 파일을 찾을 수 없습니다.</h1><p>dashboard_server.html 파일이 필요합니다.</p>', 404
+    except Exception as e:
+        return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
+
+
+@app.route('/special_works.html')
+def special_works():
+    """특수작업 관리 페이지"""
+    try:
+        # special_works.html 파일 직접 제공
+        return send_file('special_works.html')
+    except FileNotFoundError:
+        return '<h1>특수작업 페이지 파일을 찾을 수 없습니다.</h1><p>special_works.html 파일이 필요합니다.</p>', 404
     except Exception as e:
         return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
 
@@ -159,7 +173,7 @@ def serve_static(filename):
 # 에러 핸들러
 @app.errorhandler(404)
 def not_found(error):
-    print(f"❌ 404 에러 발생: {request.url}")
+    print(f"[오류] 404 에러 발생: {request.url}")
     print(f"   요청 경로: {request.path}")
     print(f"   요청 메서드: {request.method}")
     # API 요청인 경우 더 자세한 정보 제공

@@ -17,7 +17,7 @@ if USE_POSTGRESQL:
     import psycopg2
     from psycopg2.extras import RealDictCursor
     from psycopg2 import IntegrityError, OperationalError
-    print("✅ PostgreSQL 데이터베이스 사용 (Neon)")
+    print("PostgreSQL 데이터베이스 사용 (Neon)")
 else:
     # SQLite 사용 (로컬 개발용)
     import sqlite3
@@ -29,7 +29,7 @@ else:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(os.path.dirname(current_dir))
         DB_PATH = os.path.join(project_root, 'data.db')
-    print("⚠️ SQLite 데이터베이스 사용 (로컬)")
+    print("SQLite 데이터베이스 사용 (로컬)")
 
 
 def get_db_connection():
@@ -52,7 +52,7 @@ def get_db_connection():
             # 트랜잭션은 각 함수에서 명시적으로 commit/rollback 처리
             return conn
         except Exception as e:
-            print(f"❌ PostgreSQL 연결 오류: {e}")
+            print(f"[오류] PostgreSQL 연결 오류: {e}")
             import traceback
             traceback.print_exc()
             raise
@@ -169,11 +169,11 @@ def init_db():
             # schedule_type 컬럼 추가 (없는 경우에만)
             try:
                 cursor.execute('ALTER TABLE schedules ADD COLUMN schedule_type TEXT')
-                print("✅ schedules 테이블에 schedule_type 컬럼이 추가되었습니다.")
+                print("[성공] schedules 테이블에 schedule_type 컬럼이 추가되었습니다.")
             except Exception as e:
                 # 컬럼이 이미 존재하는 경우 무시
                 if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
-                    print(f"⚠️ schedule_type 컬럼 추가 중 오류 (무시 가능): {e}")
+                    print(f"[경고] schedule_type 컬럼 추가 중 오류 (무시 가능): {e}")
             
             # PostgreSQL - 게시판 카테고리 테이블
             cursor.execute('''
@@ -479,11 +479,11 @@ def init_db():
             # schedule_type 컬럼 추가 (없는 경우에만)
             try:
                 cursor.execute('ALTER TABLE schedules ADD COLUMN schedule_type TEXT')
-                print("✅ schedules 테이블에 schedule_type 컬럼이 추가되었습니다.")
+                print("[성공] schedules 테이블에 schedule_type 컬럼이 추가되었습니다.")
             except Exception as e:
                 # 컬럼이 이미 존재하는 경우 무시
                 if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
-                    print(f"⚠️ schedule_type 컬럼 추가 중 오류 (무시 가능): {e}")
+                    print(f"[경고] schedule_type 컬럼 추가 중 오류 (무시 가능): {e}")
             
             # SQLite - 게시판 카테고리 테이블
             cursor.execute('''
@@ -662,10 +662,10 @@ def init_db():
             ''')
         
         conn.commit()
-        print("✅ 데이터베이스 초기화 완료")
+        print("데이터베이스 초기화 완료")
     
     except Exception as e:
-        print(f"❌ 데이터베이스 초기화 오류: {e}")
+        print(f"데이터베이스 초기화 오류: {e}")
         import traceback
         traceback.print_exc()
         conn.rollback()
@@ -717,12 +717,12 @@ def get_company_by_username(username: str) -> Optional[Dict]:
                             'updated_at': row[13] if len(row) > 13 else None
                         }
                 except Exception as e:
-                    print(f"❌ SQLite row 변환 오류: {e}")
+                    print(f"[오류] SQLite row 변환 오류: {e}")
                     print(f"   Row 타입: {type(row)}, Row 내용: {row}")
                     raise
             return None
         except Exception as e:
-            print(f"❌ get_company_by_username 오류: {e}")
+            print(f"[오류] get_company_by_username 오류: {e}")
             import traceback
             traceback.print_exc()
             raise
@@ -778,7 +778,7 @@ def get_all_companies() -> List[Dict]:
             select_columns = [col for col in desired_columns if col in available_columns]
             
             if not select_columns:
-                print('⚠️ companies 테이블에 컬럼이 없습니다.')
+                print('[경고] companies 테이블에 컬럼이 없습니다.')
                 return []
             
             # 모든 컬럼 조회 (존재하지 않는 컬럼은 NULL로 처리)
@@ -801,7 +801,7 @@ def get_all_companies() -> List[Dict]:
             
             return result
         except Exception as e:
-            print(f"❌ get_all_companies SQLite 오류: {e}")
+            print(f"[오류] get_all_companies SQLite 오류: {e}")
             import traceback
             traceback.print_exc()
             return []
@@ -816,7 +816,7 @@ def create_company(company_name: str, username: str, password: str, role: str = 
     """화주사 계정 생성"""
     conn = get_db_connection()
     
-    print(f"📝 create_company 호출 - company_name: '{company_name}', username: '{username}', role: '{role}'")
+    print(f"[정보] create_company 호출 - company_name: '{company_name}', username: '{username}', role: '{role}'")
     
     if USE_POSTGRESQL:
         cursor = conn.cursor()
@@ -830,15 +830,15 @@ def create_company(company_name: str, username: str, password: str, role: str = 
                   business_number, business_name, business_address,
                   business_tel, business_email, business_certificate_url))
             conn.commit()
-            print(f"✅ 화주사 계정 생성 성공: {company_name} ({username})")
+            print(f"[성공] 화주사 계정 생성 성공: {company_name} ({username})")
             return True
         except IntegrityError as e:
             conn.rollback()
-            print(f"❌ 화주사 계정 생성 실패 (중복): {username} - {e}")
+            print(f"[오류] 화주사 계정 생성 실패 (중복): {username} - {e}")
             return False
         except Exception as e:
             conn.rollback()
-            print(f"❌ 화주사 계정 생성 실패 (오류): {username} - {e}")
+            print(f"[오류] 화주사 계정 생성 실패 (오류): {username} - {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -857,13 +857,13 @@ def create_company(company_name: str, username: str, password: str, role: str = 
                   business_number, business_name, business_address,
                   business_tel, business_email, business_certificate_url))
             conn.commit()
-            print(f"✅ 화주사 계정 생성 성공: {company_name} ({username})")
+            print(f"[성공] 화주사 계정 생성 성공: {company_name} ({username})")
             return True
         except sqlite3.IntegrityError as e:
-            print(f"❌ 화주사 계정 생성 실패 (중복): {username} - {e}")
+            print(f"[오류] 화주사 계정 생성 실패 (중복): {username} - {e}")
             return False
         except Exception as e:
-            print(f"❌ 화주사 계정 생성 실패 (오류): {username} - {e}")
+            print(f"[오류] 화주사 계정 생성 실패 (오류): {username} - {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -1303,7 +1303,7 @@ def get_company_search_keywords(company_name: str) -> List[str]:
             return list(set(keywords))  # 중복 제거
         return [normalize_company_name(company_name)]
     except Exception as e:
-        print(f"⚠️ get_company_search_keywords 오류: {e}")
+        print(f"[경고] get_company_search_keywords 오류: {e}")
         return [normalize_company_name(company_name)]
     finally:
         if 'cursor' in locals():
@@ -1332,7 +1332,7 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
             else:
                 # 화주사는 자신의 데이터만 조회
                 if not company or not company.strip():
-                    print(f"   ⚠️ 화주사인데 company가 비어있음! 빈 리스트 반환")
+                    print(f"   [경고] 화주사인데 company가 비어있음! 빈 리스트 반환")
                     return []
                 
                 # 검색 가능한 키워드 목록 가져오기
@@ -1381,7 +1381,7 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
                                     AND (id IS NULL OR id = 0)
                                 ''', (new_id, customer_name, tracking_number, month))
                                 item['id'] = new_id
-                                print(f"   ✅ ID 생성: {new_id} - {customer_name}, {tracking_number}")
+                                print(f"   [성공] ID 생성: {new_id} - {customer_name}, {tracking_number}")
                     
                     conn.commit()
                 finally:
@@ -1394,7 +1394,7 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
                     company_counts[comp_name] = company_counts.get(comp_name, 0) + 1
                 print(f"   화주사별 데이터 개수: {company_counts}")
                 if role != '관리자' and len(company_counts) > 1:
-                    print(f"   ⚠️ 경고: 화주사 모드인데 여러 화주사 데이터가 조회됨!")
+                    print(f"   [경고] 경고: 화주사 모드인데 여러 화주사 데이터가 조회됨!")
             
             rows.sort(key=lambda x: (
                 not x.get('return_date') or x.get('return_date') == '',
@@ -1415,7 +1415,7 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
                 result = [dict(row) for row in rows]
             else:
                 if not company or not company.strip():
-                    print(f"   ⚠️ 화주사인데 company가 비어있음! 빈 리스트 반환")
+                    print(f"   [경고] 화주사인데 company가 비어있음! 빈 리스트 반환")
                     return []
                 
                 # 검색 가능한 키워드 목록 가져오기
@@ -1463,7 +1463,7 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
                                     AND (id IS NULL OR id = 0)
                                 ''', (new_id, customer_name, tracking_number, month))
                                 item['id'] = new_id
-                                print(f"   ✅ ID 생성: {new_id} - {customer_name}, {tracking_number}")
+                                print(f"   [성공] ID 생성: {new_id} - {customer_name}, {tracking_number}")
                     
                     conn.commit()
                 finally:
@@ -1475,7 +1475,7 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
                     company_counts[comp_name] = company_counts.get(comp_name, 0) + 1
                 print(f"   화주사별 데이터 개수: {company_counts}")
                 if role != '관리자' and len(company_counts) > 1:
-                    print(f"   ⚠️ 경고: 화주사 모드인데 여러 화주사 데이터가 조회됨!")
+                    print(f"   [경고] 경고: 화주사 모드인데 여러 화주사 데이터가 조회됨!")
             
             result.sort(key=lambda x: (
                 not x.get('return_date') or x.get('return_date') == '',
@@ -1785,7 +1785,7 @@ def create_return(return_data: Dict) -> int:
             ))
             conn.commit()
             new_id = cursor.lastrowid
-            print(f"   ✅ 새 반품 데이터 생성 완료: ID = {new_id}")
+            print(f"   [성공] 새 반품 데이터 생성 완료: ID = {new_id}")
             if not new_id or new_id == 0:
                 # ID가 없으면 조회해서 가져오기
                 cursor.execute('''
@@ -1867,7 +1867,7 @@ def create_return(return_data: Dict) -> int:
                     existing_id = row['id']
                 else:
                     existing_id = row[0]
-                print(f"   ✅ 기존 반품 데이터 업데이트 완료: ID = {existing_id}")
+                print(f"   [성공] 기존 반품 데이터 업데이트 완료: ID = {existing_id}")
                 return existing_id if existing_id else 0
             return 0
         except Exception as e:
@@ -1889,10 +1889,10 @@ def fix_missing_return_ids():
             rows = cursor.fetchall()
             
             if len(rows) == 0:
-                print("✅ ID가 없는 데이터가 없습니다.")
+                print("[성공] ID가 없는 데이터가 없습니다.")
                 return
             
-            print(f"📝 ID가 없는 데이터 {len(rows)}건 발견")
+            print(f"[정보] ID가 없는 데이터 {len(rows)}건 발견")
             
             # 각 행에 대해 ID 생성
             for row in rows:
@@ -1919,11 +1919,11 @@ def fix_missing_return_ids():
                     print(f"   ✅ ID 생성: {new_id} - {customer_name}, {tracking_number}")
             
             conn.commit()
-            print(f"✅ 총 {len(rows)}건의 데이터에 ID를 생성했습니다.")
+            print(f"[성공] 총 {len(rows)}건의 데이터에 ID를 생성했습니다.")
             
         except Exception as e:
             conn.rollback()
-            print(f"❌ 오류 발생: {e}")
+            print(f"[오류] 오류 발생: {e}")
             import traceback
             traceback.print_exc()
         finally:
@@ -1938,10 +1938,10 @@ def fix_missing_return_ids():
             rows = cursor.fetchall()
             
             if len(rows) == 0:
-                print("✅ ID가 없는 데이터가 없습니다.")
+                print("[성공] ID가 없는 데이터가 없습니다.")
                 return
             
-            print(f"📝 ID가 없는 데이터 {len(rows)}건 발견")
+            print(f"[정보] ID가 없는 데이터 {len(rows)}건 발견")
             
             # 각 행에 대해 ID 생성
             for row in rows:
@@ -1967,7 +1967,7 @@ def fix_missing_return_ids():
                         tracking_number = row[4] if len(row) > 4 else None
                         month = row[15] if len(row) > 15 else None
                 except (KeyError, IndexError, TypeError) as e:
-                    print(f"   ⚠️ 행 데이터 파싱 오류: {e}, row: {row}")
+                    print(f"   [경고] 행 데이터 파싱 오류: {e}, row: {row}")
                     continue
                 
                 if customer_name and tracking_number and month:
@@ -1983,10 +1983,10 @@ def fix_missing_return_ids():
                     print(f"   ✅ ID 생성: {new_id} - {customer_name}, {tracking_number}")
             
             conn.commit()
-            print(f"✅ 총 {len(rows)}건의 데이터에 ID를 생성했습니다.")
+            print(f"[성공] 총 {len(rows)}건의 데이터에 ID를 생성했습니다.")
             
         except Exception as e:
-            print(f"❌ 오류 발생: {e}")
+            print(f"[오류] 오류 발생: {e}")
             import traceback
             traceback.print_exc()
         finally:
@@ -2218,7 +2218,7 @@ def find_return_by_tracking_number(tracking_number: str, month: str = None) -> O
                 ''', (month, tracking_number.strip(), tracking_normalized))
                 row = cursor.fetchone()
                 if row:
-                    print(f"   ✅ 정확한 매칭으로 데이터 발견")
+                    print(f"   [성공] 정확한 매칭으로 데이터 발견")
                     return dict(row)
                 
                 # 정확한 매칭이 실패하면 해당 월의 모든 데이터를 확인
@@ -2241,7 +2241,7 @@ def find_return_by_tracking_number(tracking_number: str, month: str = None) -> O
                         ''', (db_month, tracking_number.strip(), tracking_normalized))
                         row = cursor.fetchone()
                         if row:
-                            print(f"   ✅ 유사한 월 형식으로 데이터 발견: '{db_month}'")
+                            print(f"   [성공] 유사한 월 형식으로 데이터 발견: '{db_month}'")
                             return dict(row)
                 
                 return None
@@ -2284,7 +2284,7 @@ def find_return_by_tracking_number(tracking_number: str, month: str = None) -> O
                 ''', (month, tracking_number.strip(), tracking_normalized))
                 row = cursor.fetchone()
                 if row:
-                    print(f"   ✅ 정확한 매칭으로 데이터 발견")
+                    print(f"   [성공] 정확한 매칭으로 데이터 발견")
                     return dict(row)
                 
                 # 정확한 매칭이 실패하면 해당 월의 모든 데이터를 확인
@@ -2307,7 +2307,7 @@ def find_return_by_tracking_number(tracking_number: str, month: str = None) -> O
                         ''', (db_month, tracking_number.strip(), tracking_normalized))
                         row = cursor.fetchone()
                         if row:
-                            print(f"   ✅ 유사한 월 형식으로 데이터 발견: '{db_month}'")
+                            print(f"   [성공] 유사한 월 형식으로 데이터 발견: '{db_month}'")
                             return dict(row)
                 
                 return None
@@ -2639,10 +2639,10 @@ def create_board(board_data: Dict) -> int:
                 created_at
             ))
             conn.commit()
-            print(f"✅ 게시글 생성 성공 - 생성된 ID: {new_id} (최대 ID: {max_id})")
+            print(f"[성공] 게시글 생성 성공 - 생성된 ID: {new_id} (최대 ID: {max_id})")
             return new_id
         except Exception as e:
-            print(f"❌ 게시글 생성 오류: {e}")
+            print(f"[오류] 게시글 생성 오류: {e}")
             import traceback
             traceback.print_exc()
             return 0
@@ -3214,7 +3214,7 @@ def create_schedule(schedule_data: Dict) -> int:
                 created_at
             ))
             conn.commit()
-            print(f"✅ 스케줄 생성 성공 - 생성된 ID: {new_id}")
+            print(f"[성공] 스케줄 생성 성공 - 생성된 ID: {new_id}")
             return new_id
         except Exception as e:
             print(f"스케쥴 생성 오류: {e}")
@@ -3282,7 +3282,7 @@ def get_schedules_by_company(company_name: str) -> List[Dict]:
                     }
                 # ID 디버깅
                 if row_dict.get('id') is None:
-                    print(f'⚠️ 스케줄 ID가 None입니다. Row: {row}, Dict: {row_dict}')
+                    print(f'[경고] 스케줄 ID가 None입니다. Row: {row}, Dict: {row_dict}')
                 result.append(row_dict)
             return result
         finally:
@@ -3344,7 +3344,7 @@ def get_all_schedules() -> List[Dict]:
                     }
                 # ID 디버깅
                 if row_dict.get('id') is None:
-                    print(f'⚠️ 스케줄 ID가 None입니다. Row: {row}, Dict: {row_dict}')
+                    print(f'[경고] 스케줄 ID가 None입니다. Row: {row}, Dict: {row_dict}')
                 result.append(row_dict)
             return result
         finally:
@@ -3412,7 +3412,7 @@ def get_schedules_by_date_range(start_date: str, end_date: str) -> List[Dict]:
                     }
                 # ID 디버깅
                 if row_dict.get('id') is None:
-                    print(f'⚠️ 스케줄 ID가 None입니다. Row: {row}, Dict: {row_dict}')
+                    print(f'[경고] 스케줄 ID가 None입니다. Row: {row}, Dict: {row_dict}')
                 result.append(row_dict)
             return result
         finally:
@@ -3520,7 +3520,7 @@ def delete_schedule(schedule_id: int, role: str = '관리자', company_name: str
             before = cursor.fetchone()
             
             if not before:
-                print(f'⚠️ 삭제할 스케줄을 찾을 수 없습니다: id={schedule_id}')
+                print(f'[경고] 삭제할 스케줄을 찾을 수 없습니다: id={schedule_id}')
                 return False
             
             schedule_type = before.get('schedule_type', '')
@@ -3546,7 +3546,7 @@ def delete_schedule(schedule_id: int, role: str = '관리자', company_name: str
                     ''', (title, start_date, end_date))
                     conn.commit()
                     deleted_count = cursor.rowcount
-                    print(f'✅ "모든화주사" 스케줄 일괄 삭제 성공: 삭제된 행 수={deleted_count}')
+                    print(f'[성공] "모든화주사" 스케줄 일괄 삭제 성공: 삭제된 행 수={deleted_count}')
                     return deleted_count > 0
                 else:
                     # 화주사 모드: 본인의 스케줄만 삭제
@@ -3561,14 +3561,14 @@ def delete_schedule(schedule_id: int, role: str = '관리자', company_name: str
                     ''', (company_name, title, start_date, end_date))
                     conn.commit()
                     deleted_count = cursor.rowcount
-                    print(f'✅ 화주사 스케줄 삭제 성공: company={company_name}, 삭제된 행 수={deleted_count}')
+                    print(f'[성공] 화주사 스케줄 삭제 성공: company={company_name}, 삭제된 행 수={deleted_count}')
                     return deleted_count > 0
             else:
                 # 일반 스케줄: ID로 삭제
                 cursor.execute('DELETE FROM schedules WHERE id = %s', (schedule_id,))
                 conn.commit()
                 deleted_count = cursor.rowcount
-                print(f'✅ 스케줄 삭제 성공: id={schedule_id}, 삭제된 행 수={deleted_count}')
+                print(f'[성공] 스케줄 삭제 성공: id={schedule_id}, 삭제된 행 수={deleted_count}')
                 return deleted_count > 0
         except Exception as e:
             print(f"스케쥴 삭제 오류: {e}")
@@ -3621,7 +3621,7 @@ def delete_schedule(schedule_id: int, role: str = '관리자', company_name: str
                         ''', (title, start_date, end_date))
                         conn.commit()
                         deleted_count = cursor.rowcount
-                        print(f'✅ "모든화주사" 스케줄 일괄 삭제 성공: 삭제된 행 수={deleted_count}')
+                        print(f'[성공] "모든화주사" 스케줄 일괄 삭제 성공: 삭제된 행 수={deleted_count}')
                         return deleted_count > 0
                     else:
                         # 화주사 모드: 본인의 스케줄만 삭제
@@ -3636,7 +3636,7 @@ def delete_schedule(schedule_id: int, role: str = '관리자', company_name: str
                         ''', (company_name, title, start_date, end_date))
                         conn.commit()
                         deleted_count = cursor.rowcount
-                        print(f'✅ 화주사 스케줄 삭제 성공: company={company_name}, 삭제된 행 수={deleted_count}')
+                        print(f'[성공] 화주사 스케줄 삭제 성공: company={company_name}, 삭제된 행 수={deleted_count}')
                         return deleted_count > 0
                 else:
                     # 일반 스케줄: rowid로 삭제 (더 확실함)
@@ -3663,13 +3663,13 @@ def delete_schedule(schedule_id: int, role: str = '관리자', company_name: str
                     if deleted_count > 0:
                         print(f'✅ 스케줄 삭제 성공: id={schedule_id_int}, 삭제된 행 수={deleted_count}')
                         if after:
-                            print(f'⚠️ 경고: 삭제 후에도 스케줄이 존재합니다!')
+                            print(f'[경고] 경고: 삭제 후에도 스케줄이 존재합니다!')
                         return True
                     else:
-                        print(f'❌ 스케줄 삭제 실패: id={schedule_id_int}, 삭제된 행 수={deleted_count}')
+                        print(f'[오류] 스케줄 삭제 실패: id={schedule_id_int}, 삭제된 행 수={deleted_count}')
                         return False
             else:
-                print(f'⚠️ 삭제할 스케줄을 찾을 수 없습니다: id={schedule_id} (int: {schedule_id_int})')
+                print(f'[경고] 삭제할 스케줄을 찾을 수 없습니다: id={schedule_id} (int: {schedule_id_int})')
                 # 모든 스케줄 ID 확인 (디버깅용)
                 cursor.execute('SELECT id, title, company_name FROM schedules LIMIT 5')
                 all_schedules = cursor.fetchall()
