@@ -175,6 +175,31 @@ def init_db():
                 if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
                     print(f"[경고] schedule_type 컬럼 추가 중 오류 (무시 가능): {e}")
             
+            # PostgreSQL - 스케줄 타입 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS schedule_types (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL UNIQUE,
+                    display_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 기본 스케줄 타입 추가 (없는 경우에만)
+            default_types = ['입고', '출고', '행사', '연휴', '기타']
+            for idx, type_name in enumerate(default_types):
+                try:
+                    cursor.execute('''
+                        INSERT INTO schedule_types (name, display_order)
+                        VALUES (%s, %s)
+                        ON CONFLICT (name) DO NOTHING
+                    ''', (type_name, idx))
+                except Exception as e:
+                    print(f"[경고] 기본 스케줄 타입 추가 중 오류 (무시 가능): {e}")
+            
+            conn.commit()
+            
             # PostgreSQL - 게시판 카테고리 테이블
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS board_categories (
@@ -524,6 +549,30 @@ def init_db():
                 # 컬럼이 이미 존재하는 경우 무시
                 if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
                     print(f"[경고] schedule_type 컬럼 추가 중 오류 (무시 가능): {e}")
+            
+            # SQLite - 스케줄 타입 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS schedule_types (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    display_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 기본 스케줄 타입 추가 (없는 경우에만)
+            default_types = ['입고', '출고', '행사', '연휴', '기타']
+            for idx, type_name in enumerate(default_types):
+                try:
+                    cursor.execute('''
+                        INSERT OR IGNORE INTO schedule_types (name, display_order)
+                        VALUES (?, ?)
+                    ''', (type_name, idx))
+                except Exception as e:
+                    print(f"[경고] 기본 스케줄 타입 추가 중 오류 (무시 가능): {e}")
+            
+            conn.commit()
             
             # SQLite - 게시판 카테고리 테이블
             cursor.execute('''
@@ -4112,50 +4161,56 @@ def get_all_schedule_types() -> List[Dict]:
     """모든 스케줄 타입 조회"""
     conn = get_db_connection()
     
-    if USE_POSTGRESQL:
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        try:
-            cursor.execute('''
-                SELECT * FROM schedule_types 
-                ORDER BY display_order ASC, created_at ASC
-            ''')
-            rows = cursor.fetchall()
-            result = []
-            for row in rows:
-                row_dict = dict(row)
-                # datetime 객체를 문자열로 변환
-                for key, value in row_dict.items():
-                    if isinstance(value, datetime):
-                        row_dict[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
-                result.append(row_dict)
-            return result
-        finally:
-            cursor.close()
-            conn.close()
-    else:
-        cursor = conn.cursor()
-        try:
-            cursor.execute('''
-                SELECT * FROM schedule_types 
-                ORDER BY display_order ASC, created_at ASC
-            ''')
-            rows = cursor.fetchall()
-            result = []
-            for row in rows:
-                if hasattr(row, 'keys'):
+    try:
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            try:
+                cursor.execute('''
+                    SELECT * FROM schedule_types 
+                    ORDER BY display_order ASC, created_at ASC
+                ''')
+                rows = cursor.fetchall()
+                result = []
+                for row in rows:
                     row_dict = dict(row)
-                else:
-                    row_dict = {
-                        'id': row[0],
-                        'name': row[1],
-                        'display_order': row[2],
-                        'created_at': row[3],
-                        'updated_at': row[4] if len(row) > 4 else None
-                    }
-                result.append(row_dict)
-            return result
-        finally:
-            conn.close()
+                    # datetime 객체를 문자열로 변환
+                    for key, value in row_dict.items():
+                        if isinstance(value, datetime):
+                            row_dict[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+                    result.append(row_dict)
+                return result
+            finally:
+                cursor.close()
+                conn.close()
+        else:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('''
+                    SELECT * FROM schedule_types 
+                    ORDER BY display_order ASC, created_at ASC
+                ''')
+                rows = cursor.fetchall()
+                result = []
+                for row in rows:
+                    if hasattr(row, 'keys'):
+                        row_dict = dict(row)
+                    else:
+                        row_dict = {
+                            'id': row[0],
+                            'name': row[1],
+                            'display_order': row[2],
+                            'created_at': row[3],
+                            'updated_at': row[4] if len(row) > 4 else None
+                        }
+                    result.append(row_dict)
+                return result
+            finally:
+                conn.close()
+    except Exception as e:
+        print(f"[경고] schedule_types 테이블이 없거나 조회 중 오류: {e}")
+        # 테이블이 없으면 기본 타입 반환
+        default_types = ['입고', '출고', '행사', '연휴', '기타']
+        return [{'id': i+1, 'name': name, 'display_order': i} for i, name in enumerate(default_types)]
 
 
 def delete_schedule_type(type_id: int) -> bool:
