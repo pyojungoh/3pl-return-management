@@ -5092,7 +5092,7 @@
       }
       
       // 관리자 탭만 명시적으로 숨기기 (화주사 모드 탭에 영향 주지 않도록)
-      const adminTabIds = ['returnsTab', 'csTab', 'scheduleCalendarTab', 'boardTab', 'boardCategoryTab', 'popupTab', 'specialWorksTab', 'registerTab'];
+      const adminTabIds = ['returnsTab', 'csTab', 'specialWorksTab', 'scheduleCalendarTab', 'boardTab', 'boardCategoryTab', 'popupTab', 'registerTab'];
       adminTabIds.forEach(tabId => {
         const tab = document.getElementById(tabId);
         if (tab) {
