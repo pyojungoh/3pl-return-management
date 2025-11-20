@@ -484,6 +484,14 @@
       transition: all 0.3s ease;
       white-space: nowrap;
     }
+
+    /* 메뉴 순서 고정 (화주/관리자 동일 순서 유지) */
+    #companyInfoMenuBtn { order: 0; }
+    #returnsMenuBtn { order: 1; }
+    #csMenuBtn { order: 2; }
+    #specialWorksMenuBtn { order: 3; }
+    #scheduleMenuBtn { order: 4; }
+    #boardMenuBtn { order: 5; }
     
     .menu-item:hover {
       background: #fff9e6;
@@ -525,6 +533,15 @@
       background: #fff9e6;
       color: #ff6b35;
     }
+
+    /* 관리자 탭 순서 고정 */
+    #returnsTabBtn { order: 0; }
+    #csTabBtn { order: 1; }
+    #specialWorksTabBtn { order: 2; }
+    #scheduleCalendarTabBtn { order: 3; }
+    #boardTabBtn { order: 4; }
+    #popupTabBtn { order: 5; }
+    #registerTabBtn { order: 6; }
     
     .tab-btn.active {
       background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
