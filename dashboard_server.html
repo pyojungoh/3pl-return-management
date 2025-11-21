@@ -5171,6 +5171,8 @@
             }
           }
         });
+        // 반품 내역 데이터 자동 로드
+        refreshReturnsData();
       } else if (menuName === 'cs') {
         consignorTabIds.forEach(tabId => {
           const tab = document.getElementById(tabId);
