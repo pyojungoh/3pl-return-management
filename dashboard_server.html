@@ -1780,7 +1780,7 @@
         <button type="button" class="menu-item" id="returnsMenuBtn" onclick="switchMenu('returns')">📦 반품관리</button>
         <button type="button" class="menu-item" id="csMenuBtn" onclick="switchMenu('cs')">📞 C/S</button>
         <button type="button" class="menu-item" id="specialWorksMenuBtn" onclick="switchMenu('specialWorks')">🔧 특수작업</button>
-        <button type="button" class="menu-item" id="scheduleMenuBtn" onclick="switchMenu('schedule')">📅 판매스케쥴</button>
+        <button type="button" class="menu-item" id="scheduleMenuBtn" onclick="switchMenu('schedule')">📅 스케쥴</button>
         <button type="button" class="menu-item" id="boardMenuBtn" onclick="switchMenu('board')">📋 게시판</button>
       </div>
       
@@ -2167,7 +2167,7 @@
         </div>
       </div>
       <!-- C/S 탭 끝 -->
-      <!-- 판매스케쥴 탭 (화주사 모드) -->
+      <!-- 스케쥴 탭 (화주사 모드) -->
       <div id="scheduleTab" class="tab-content hidden">
         <!-- 스케쥴 등록 접이식 버튼 -->
         <div style="margin-bottom: 20px;">
@@ -2220,7 +2220,7 @@
           <div style="display: flex; align-items: flex-start; gap: 12px;">
             <div style="font-size: 24px; line-height: 1;">ℹ️</div>
             <div style="flex: 1;">
-              <h4 style="margin: 0 0 12px 0; color: #ff6b35; font-weight: 700; font-size: 16px;">📋 판매스케쥴 등록 안내</h4>
+              <h4 style="margin: 0 0 12px 0; color: #ff6b35; font-weight: 700; font-size: 16px;">📋 스케쥴 등록 안내</h4>
               <div style="color: #2d3436; font-size: 14px; line-height: 1.7;">
                 <p style="margin: 0 0 10px 0;">
                   이 메뉴는 화주사님의 <strong>입고, 출고, 판매 스케쥴</strong>을 사전에 등록하는 공간입니다.
@@ -2235,6 +2235,20 @@
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+        
+        <!-- 스케쥴 달력 -->
+        <div style="background: #ffffff; padding: 24px; border-radius: 14px; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1); margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0; color: #ff6b35; font-weight: 700; font-size: 20px;">📅 스케쥴 달력</h3>
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <input type="month" id="consignorCalendarMonthSelect" style="padding: 8px 12px; border: 2px solid #ffeaa7; border-radius: 8px; font-size: 14px;" onchange="loadConsignorCalendarSchedules()">
+              <button class="refresh-btn" onclick="loadConsignorCalendarSchedules()">🔄 새로고침</button>
+            </div>
+          </div>
+          <div id="consignorCalendarContainer" style="min-height: 500px;">
+            <!-- 달력이 여기에 동적으로 생성됩니다 -->
           </div>
         </div>
         
@@ -2265,7 +2279,7 @@
           </div>
         </div>
       </div>
-      <!-- 판매스케쥴 탭 끝 -->
+      <!-- 스케쥴 탭 끝 -->
       
       <!-- 게시판 탭 (화주사 모드) -->
       <div id="boardCategoryTab" class="tab-content hidden">
@@ -3014,11 +3028,18 @@
       }
       
       
-      // 달력 월 선택 초기화
+      // 달력 월 선택 초기화 (관리자 모드)
       const calendarMonthSelect = document.getElementById('calendarMonthSelect');
       if (calendarMonthSelect) {
         const today = new Date();
         calendarMonthSelect.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+      }
+      
+      // 달력 월 선택 초기화 (화주사 모드)
+      const consignorCalendarMonthSelect = document.getElementById('consignorCalendarMonthSelect');
+      if (consignorCalendarMonthSelect) {
+        const today = new Date();
+        consignorCalendarMonthSelect.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
       }
       
       // 관리자 탭 표시/숨기기
@@ -3531,6 +3552,7 @@
         const isCompleted = row['처리완료'] && row['처리완료'].toString().trim();
         const isConfirmed = row['화주사확인완료'] && row['화주사확인완료'].toString().trim();
         const memoText = row['비고'] || '';
+        const memoUpdatedAt = row['비고_작성시간'] || '';  // 비고 작성 시간
         
         // 사진 링크 처리
         let photoHtml = '-';
@@ -3625,6 +3647,7 @@
           `<td class="admin-only">${companyNameValue}</td>`;
         
         const memoTextSafe = escapeHtml(memoText || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
+        const memoUpdatedAtSafe = escapeHtml(memoUpdatedAt || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         const memoCell = `
           <td class="admin-only" style="text-align: center; min-width: 80px;">
             <button class="save-btn" onclick="editMemo(${index}, '${returnId}', '${memoTextSafe}')" style="background: linear-gradient(135deg, #ffeaa7 0%, #ffd93d 100%); color: #2d3436; border: none; padding: 3px 8px; font-size: 10px; border-radius: 4px; box-shadow: none;">
@@ -3650,8 +3673,9 @@
         const productCellAttributes = hasMemo 
           ? `class="${productCellClass}" style="text-align: center; position: relative; cursor: help;" 
              data-memo="${escapeHtml(memoText || '')}" 
+             data-memo-updated-at="${escapeHtml(memoUpdatedAt || '')}"
              title="${escapeHtml(memoText || '')}"
-             onmouseenter="showMemoTooltip(event, '${memoTextSafe.replace(/'/g, "\\'")}')" 
+             onmouseenter="showMemoTooltip(event, '${memoTextSafe.replace(/'/g, "\\'")}', '${memoUpdatedAtSafe.replace(/'/g, "\\'")}')" 
              onmouseleave="hideMemoTooltip()"`
           : `class="${productCellClass}" style="text-align: center;"`;
         
@@ -3671,7 +3695,7 @@
         const productNameForInputAttr = productNameRaw.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         
         const productCell = isAdmin ?
-          `<td class="${productCellClass} editable-cell" style="${productCellStyle}" data-field="product" data-id="${returnId}" data-original="${productNameForAttr}" ${hasMemo ? `data-memo="${escapeHtml(memoText || '')}" title="${escapeHtml(memoText || '')}" onmouseenter="showMemoTooltip(event, '${memoTextSafe.replace(/'/g, "\\'")}')" onmouseleave="hideMemoTooltip()"` : ''} onclick="if(event.target.tagName !== 'INPUT' && event.target.tagName !== 'SPAN') startEditCell(this, '${productNameForJs}')">
+          `<td class="${productCellClass} editable-cell" style="${productCellStyle}" data-field="product" data-id="${returnId}" data-original="${productNameForAttr}" ${hasMemo ? `data-memo="${escapeHtml(memoText || '')}" data-memo-updated-at="${escapeHtml(memoUpdatedAt || '')}" title="${escapeHtml(memoText || '')}" onmouseenter="showMemoTooltip(event, '${memoTextSafe.replace(/'/g, "\\'")}', '${memoUpdatedAtSafe.replace(/'/g, "\\'")}')" onmouseleave="hideMemoTooltip()"` : ''} onclick="if(event.target.tagName !== 'INPUT' && event.target.tagName !== 'SPAN') startEditCell(this, '${productNameForJs}')">
             <span class="cell-content">${productName || '<span style="color: #b2bec3;">클릭하여 수정</span>'}</span>
             <input type="text" class="cell-input" value="${productNameForInputAttr}" style="display: none; width: 100%; padding: 4px; border: 2px solid #ff6b35; border-radius: 4px;" onblur="finishEditCell(this)" onkeydown="if(event.key === 'Enter') { event.preventDefault(); event.target.blur(); }">
           </td>` :
@@ -4622,7 +4646,7 @@
     };
     
     // 비고 툴팁 표시
-    window.showMemoTooltip = function showMemoTooltip(event, memoText) {
+    window.showMemoTooltip = function showMemoTooltip(event, memoText, memoUpdatedAt) {
       if (!memoText || memoText.trim() === '' || memoText === 'undefined') {
         return; // 비고가 없으면 툴팁 표시 안 함
       }
@@ -4634,7 +4658,47 @@
       const tooltip = document.createElement('div');
       tooltip.id = 'memoTooltip';
       tooltip.className = 'memo-tooltip';
-      tooltip.textContent = memoText.replace(/\\n/g, '\n');
+      
+      // 비고 내용
+      const memoContent = document.createElement('div');
+      memoContent.textContent = memoText.replace(/\\n/g, '\n');
+      memoContent.style.marginBottom = memoUpdatedAt ? '8px' : '0';
+      tooltip.appendChild(memoContent);
+      
+        // 작성 시간 표시 (있을 경우만)
+        if (memoUpdatedAt && memoUpdatedAt.trim() !== '' && memoUpdatedAt !== 'undefined') {
+          const timeDiv = document.createElement('div');
+          timeDiv.style.fontSize = '11px';
+          timeDiv.style.color = '#b2bec3';
+          timeDiv.style.marginTop = '8px';
+          timeDiv.style.paddingTop = '8px';
+          timeDiv.style.borderTop = '1px solid rgba(255, 255, 255, 0.2)';
+          
+          // 시간 포맷팅 (한국 표준시간 KST로 변환)
+          try {
+            const date = new Date(memoUpdatedAt);
+            if (!isNaN(date.getTime())) {
+              // 한국 표준시간(KST, UTC+9)으로 변환하여 포맷팅
+              const year = date.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric' });
+              const month = String(date.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit' })).padStart(2, '0');
+              const day = String(date.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', day: '2-digit' })).padStart(2, '0');
+              const hours = String(date.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', hour12: false })).padStart(2, '0');
+              const minutes = String(date.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', minute: '2-digit' })).padStart(2, '0');
+              const seconds = String(date.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', second: '2-digit' })).padStart(2, '0');
+              
+              timeDiv.textContent = `작성시간: ${year}-${month}-${day} ${hours}:${minutes}:${seconds} (KST)`;
+            } else {
+              // 날짜 파싱 실패 시 원본 표시
+              timeDiv.textContent = `작성시간: ${memoUpdatedAt}`;
+            }
+          } catch (e) {
+            // 오류 발생 시 원본 표시
+            timeDiv.textContent = `작성시간: ${memoUpdatedAt}`;
+          }
+          
+          tooltip.appendChild(timeDiv);
+        }
+      
       document.body.appendChild(tooltip);
       
       // 마우스 위치에 툴팁 표시
@@ -5207,8 +5271,18 @@
             }
           }
         });
+        // 달력 월 선택 초기화 (메뉴 전환 시)
+        const consignorCalendarMonthSelect = document.getElementById('consignorCalendarMonthSelect');
+        if (consignorCalendarMonthSelect && !consignorCalendarMonthSelect.value) {
+          const today = new Date();
+          consignorCalendarMonthSelect.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+        }
         // 스케쥴 목록 로드
         refreshSchedules();
+        // 달력 로드
+        if (typeof loadConsignorCalendarSchedules === 'function') {
+          loadConsignorCalendarSchedules();
+        }
         // 스케줄 타입 목록 로드 (화주사 모드)
         if (typeof loadScheduleTypesForConsignor === 'function') {
           loadScheduleTypesForConsignor();
@@ -5310,6 +5384,12 @@
         if (scheduleCalendarTab) {
           scheduleCalendarTab.classList.remove('hidden');
           scheduleCalendarTab.style.display = 'block';
+        }
+        // 달력 월 선택 초기화 (메뉴 전환 시)
+        const calendarMonthSelect = document.getElementById('calendarMonthSelect');
+        if (calendarMonthSelect && !calendarMonthSelect.value) {
+          const today = new Date();
+          calendarMonthSelect.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
         }
         // 스케쥴 캘린더 로드 (관리자 모드)
         if (typeof loadCalendarSchedules === 'function') {
@@ -5605,6 +5685,8 @@
         if (result.success && result.data) {
           if (result.data.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" class="no-data">등록된 스케쥴이 없습니다.</td></tr>';
+            // 달력도 함께 업데이트
+            loadConsignorCalendarSchedules();
             return;
           }
           
@@ -5627,6 +5709,9 @@
             `;
             tbody.appendChild(row);
           });
+          
+          // 달력도 함께 업데이트
+          loadConsignorCalendarSchedules();
         } else {
           tbody.innerHTML = '<tr><td colspan="6" class="no-data">스케쥴을 불러오는 중 오류가 발생했습니다.</td></tr>';
         }
@@ -5636,6 +5721,183 @@
       }
     }
     window.refreshSchedules = refreshSchedules;
+    
+    // 화주사 모드 달력 스케쥴 로드
+    async function loadConsignorCalendarSchedules() {
+      const container = document.getElementById('consignorCalendarContainer');
+      if (!container) return;
+      
+      container.innerHTML = '<div style="text-align: center; padding: 40px; color: #636e72;">로딩 중...</div>';
+      
+      try {
+        const monthInput = document.getElementById('consignorCalendarMonthSelect');
+        // 초기화: 현재 월로 설정
+        if (monthInput && !monthInput.value) {
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          monthInput.value = `${year}-${month}`;
+        }
+        const month = monthInput ? monthInput.value : '';
+        
+        // 화주사 모드에서는 자신의 스케쥴만 조회
+        let url = `/api/schedules/list?company=${encodeURIComponent(currentCompany)}&role=${encodeURIComponent(currentRole || '화주사')}`;
+        
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          // 선택된 월에 해당하는 스케쥴만 필터링
+          let filteredSchedules = result.data;
+          if (month) {
+            const [year, monthNum] = month.split('-');
+            const startDate = `${year}-${monthNum}-01`;
+            const nextMonth = parseInt(monthNum) === 12 ? 1 : parseInt(monthNum) + 1;
+            const nextYear = parseInt(monthNum) === 12 ? parseInt(year) + 1 : parseInt(year);
+            const endDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+            
+            filteredSchedules = result.data.filter(schedule => {
+              const scheduleStart = new Date(schedule.start_date);
+              const scheduleEnd = new Date(schedule.end_date);
+              const rangeStart = new Date(startDate);
+              const rangeEnd = new Date(endDate);
+              
+              // 스케쥴이 선택된 월과 겹치는지 확인
+              return (scheduleStart < rangeEnd && scheduleEnd >= rangeStart);
+            });
+          }
+          
+          renderConsignorCalendar(filteredSchedules, month);
+        } else {
+          container.innerHTML = '<div style="text-align: center; padding: 40px; color: #e74c3c;">스케쥴을 불러오는 중 오류가 발생했습니다.</div>';
+        }
+      } catch (error) {
+        console.error('화주사 달력 스케쥴 조회 오류:', error);
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #e74c3c;">스케쥴을 불러오는 중 오류가 발생했습니다.</div>';
+      }
+    }
+    window.loadConsignorCalendarSchedules = loadConsignorCalendarSchedules;
+    
+    // 화주사 모드 달력 렌더링
+    function renderConsignorCalendar(schedules, month) {
+      const container = document.getElementById('consignorCalendarContainer');
+      if (!container) return;
+      
+      // 월 설정
+      let currentDate;
+      if (month) {
+        const [year, monthNum] = month.split('-');
+        currentDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
+      } else {
+        currentDate = new Date();
+        currentDate.setDate(1);
+      }
+      
+      const year = currentDate.getFullYear();
+      const monthNum = currentDate.getMonth();
+      const firstDay = new Date(year, monthNum, 1);
+      const lastDay = new Date(year, monthNum + 1, 0);
+      const daysInMonth = lastDay.getDate();
+      const startingDayOfWeek = firstDay.getDay();
+      
+      // 날짜별로 스케쥴 그룹화
+      const schedulesByDate = {};
+      
+      schedules.forEach(schedule => {
+        const start = new Date(schedule.start_date);
+        const end = new Date(schedule.end_date);
+        const current = new Date(start);
+        
+        while (current <= end) {
+          const dateKey = current.toISOString().split('T')[0];
+          if (!schedulesByDate[dateKey]) {
+            schedulesByDate[dateKey] = [];
+          }
+          schedulesByDate[dateKey].push(schedule);
+          current.setDate(current.getDate() + 1);
+        }
+      });
+      
+      // 달력 HTML 생성
+      const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+      
+      let html = `
+        <div style="background: #ffffff; border-radius: 14px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <h4 style="text-align: center; margin-bottom: 20px; color: #ff6b35; font-size: 24px; font-weight: 700;">
+            ${year}년 ${monthNames[monthNum]}
+          </h4>
+          <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;">
+      `;
+      
+      // 요일 헤더
+      dayNames.forEach(day => {
+        html += `
+          <div style="text-align: center; padding: 12px; font-weight: 700; color: ${day === '일' ? '#e74c3c' : day === '토' ? '#3498db' : '#2d3436'}; background: #fff9e6; border-radius: 8px;">
+            ${day}
+          </div>
+        `;
+      });
+      
+      // 빈 칸 (첫 주 시작일 전)
+      for (let i = 0; i < startingDayOfWeek; i++) {
+        html += '<div style="min-height: 100px; background: #f8f9fa; border-radius: 8px;"></div>';
+      }
+      
+      // 날짜 칸
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateKey = `${year}-${String(monthNum + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const daySchedules = schedulesByDate[dateKey] || [];
+        const isToday = new Date().toDateString() === new Date(year, monthNum, day).toDateString();
+        
+        const schedulesJson = JSON.stringify(daySchedules).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
+        html += `
+          <div style="min-height: 100px; background: ${isToday ? '#fff9e6' : '#ffffff'}; border: 2px solid ${isToday ? '#ff6b35' : '#ffeaa7'}; border-radius: 8px; padding: 8px; cursor: pointer; transition: all 0.2s;" 
+               onclick="showScheduleModal('${dateKey}', '${schedulesJson}')">
+            <div style="font-weight: 700; margin-bottom: 6px; color: ${isToday ? '#ff6b35' : '#2d3436'};">
+              ${day}
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+        `;
+        
+        // 스케쥴 표시 (최대 3개) - 화주사 모드: 색상 없이 검정색 텍스트로 "- 타입" 형식
+        daySchedules.slice(0, 3).forEach((schedule, idx) => {
+          let scheduleType = escapeHtml(schedule.schedule_type || '');
+          const title = escapeHtml(schedule.title || '');
+          
+          // schedule_type이 "모든화주사-"로 시작하면 접두사 제거
+          if (scheduleType.startsWith('모든화주사-')) {
+            scheduleType = scheduleType.replace('모든화주사-', '');
+          }
+          
+          // "- 타입" 형식으로 표시 (화주사 모드: 연한 배경색 + 진한 텍스트로 가독성 향상)
+          const displayText = scheduleType ? `- ${scheduleType}` : (title.length > 12 ? title.substring(0, 12) + '...' : title);
+          html += `
+            <div style="background: #f5f5f5; border: 1px solid #e0e0e0; color: #1a1a1a; padding: 4px 6px; font-size: 11px; font-weight: 600; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" 
+                 title="${scheduleType ? scheduleType + ': ' : ''}${title}">
+              ${displayText}
+            </div>
+          `;
+        });
+        
+        if (daySchedules.length > 3) {
+          html += `<div style="font-size: 10px; color: #636e72; text-align: center;">+${daySchedules.length - 3}개</div>`;
+        }
+        
+        html += `
+            </div>
+          </div>
+        `;
+      }
+      
+      html += `
+          </div>
+        </div>
+      `;
+      
+      container.innerHTML = html;
+    }
+    window.renderConsignorCalendar = renderConsignorCalendar;
     
     // 스케쥴 수정
     async function editSchedule(scheduleId) {
@@ -5790,11 +6052,11 @@
               }
             }, 300);
           } else {
-            // 화주사 모드: 스케쥴 목록 새로고침
-            console.log('화주사 모드: 스케쥴 목록 새로고침');
+            // 화주사 모드: 스케쥴 목록 및 달력 새로고침
+            console.log('화주사 모드: 스케쥴 목록 및 달력 새로고침');
             setTimeout(() => {
               if (typeof refreshSchedules === 'function') {
-                console.log('refreshSchedules 함수 호출');
+                console.log('refreshSchedules 함수 호출 (달력도 함께 업데이트됨)');
                 refreshSchedules();
               } else {
                 console.error('refreshSchedules 함수를 찾을 수 없습니다. 페이지 새로고침');

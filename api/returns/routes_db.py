@@ -211,6 +211,7 @@ def get_returns_data():
                 '검품유무': ret.get('inspection', ''),
                 '처리완료': ret.get('completed', ''),
                 '비고': ret.get('memo', ''),
+                '비고_작성시간': ret.get('updated_at', ''),  # 비고 작성 시간 (memo가 있을 때만 의미 있음)
                 '사진': photo_links,
                 '다른외부택배사': ret.get('other_courier', ''),
                 '배송비': ret.get('shipping_fee', ''),
