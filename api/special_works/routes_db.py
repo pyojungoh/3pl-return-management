@@ -418,6 +418,105 @@ def get_works():
         }), 500
 
 
+@special_works_bp.route('/works/<int:work_id>', methods=['GET'])
+def get_work(work_id):
+    """작업 상세 조회"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        company_name = user_context['company_name']
+        
+        conn = get_db_connection()
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
+        
+        try:
+            # 작업 조회
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    SELECT 
+                        sw.id,
+                        sw.company_name,
+                        sw.work_type_id,
+                        swt.name as work_type_name,
+                        sw.work_date,
+                        sw.quantity,
+                        sw.unit_price,
+                        sw.total_price,
+                        sw.photo_links,
+                        sw.memo,
+                        sw.created_at,
+                        sw.updated_at
+                    FROM special_works sw
+                    LEFT JOIN special_work_types swt ON sw.work_type_id = swt.id
+                    WHERE sw.id = %s
+                ''', (work_id,))
+            else:
+                cursor.execute('''
+                    SELECT 
+                        sw.id,
+                        sw.company_name,
+                        sw.work_type_id,
+                        swt.name as work_type_name,
+                        sw.work_date,
+                        sw.quantity,
+                        sw.unit_price,
+                        sw.total_price,
+                        sw.photo_links,
+                        sw.memo,
+                        sw.created_at,
+                        sw.updated_at
+                    FROM special_works sw
+                    LEFT JOIN special_work_types swt ON sw.work_type_id = swt.id
+                    WHERE sw.id = ?
+                ''', (work_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({
+                    'success': False,
+                    'data': None,
+                    'message': '작업을 찾을 수 없습니다.'
+                }), 404
+            
+            result = dict(row)
+            
+            # 화주사는 자신의 작업만 조회 가능
+            if role != '관리자':
+                if not company_name or result.get('company_name') != company_name:
+                    return jsonify({
+                        'success': False,
+                        'data': None,
+                        'message': '작업을 찾을 수 없습니다.'
+                    }), 404
+            
+            # datetime 객체를 문자열로 변환
+            for key, value in result.items():
+                if isinstance(value, datetime):
+                    result[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+                elif isinstance(value, date):
+                    result[key] = value.strftime('%Y-%m-%d') if value else None
+            
+            return jsonify({
+                'success': True,
+                'data': result
+            })
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f'[오류] 작업 상세 조회 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'data': None,
+            'message': f'작업 상세 조회 중 오류: {str(e)}'
+        }), 500
+
+
 @special_works_bp.route('/works', methods=['POST'])
 def create_work():
     """작업 등록"""
@@ -516,6 +615,136 @@ def create_work():
         return jsonify({
             'success': False,
             'message': f'작업 등록 중 오류: {str(e)}'
+        }), 500
+
+
+@special_works_bp.route('/works/<int:work_id>', methods=['PUT'])
+def update_work(work_id):
+    """작업 수정"""
+    try:
+        user_context = get_user_context()
+        if user_context['role'] != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 작업을 수정할 수 있습니다.'
+            }), 403
+        
+        data = request.get_json()
+        company_name = data.get('company_name')
+        work_type_id = data.get('work_type_id')
+        work_date = data.get('work_date')
+        quantity = data.get('quantity')
+        unit_price = data.get('unit_price')
+        photo_links = data.get('photo_links')
+        memo = data.get('memo')
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            updates = []
+            params = []
+            
+            if company_name is not None:
+                updates.append('company_name = %s' if USE_POSTGRESQL else 'company_name = ?')
+                params.append(company_name.strip())
+            
+            if work_type_id is not None:
+                updates.append('work_type_id = %s' if USE_POSTGRESQL else 'work_type_id = ?')
+                params.append(int(work_type_id))
+            
+            if work_date is not None:
+                updates.append('work_date = %s' if USE_POSTGRESQL else 'work_date = ?')
+                params.append(work_date.strip())
+            
+            if quantity is not None:
+                updates.append('quantity = %s' if USE_POSTGRESQL else 'quantity = ?')
+                params.append(float(quantity))
+            
+            if unit_price is not None:
+                updates.append('unit_price = %s' if USE_POSTGRESQL else 'unit_price = ?')
+                params.append(int(unit_price))
+            
+            if photo_links is not None:
+                updates.append('photo_links = %s' if USE_POSTGRESQL else 'photo_links = ?')
+                params.append(photo_links.strip())
+            
+            if memo is not None:
+                updates.append('memo = %s' if USE_POSTGRESQL else 'memo = ?')
+                params.append(memo.strip())
+            
+            if not updates:
+                return jsonify({
+                    'success': False,
+                    'message': '수정할 데이터가 없습니다.'
+                }), 400
+            
+            # quantity와 unit_price가 모두 있으면 total_price 계산
+            if quantity is not None and unit_price is not None:
+                total_price = float(quantity) * int(unit_price)
+                updates.append('total_price = %s' if USE_POSTGRESQL else 'total_price = ?')
+                params.append(int(total_price))
+            elif quantity is not None or unit_price is not None:
+                # 하나만 변경된 경우 기존 값으로 계산
+                if USE_POSTGRESQL:
+                    cursor.execute('SELECT quantity, unit_price FROM special_works WHERE id = %s', (work_id,))
+                else:
+                    cursor.execute('SELECT quantity, unit_price FROM special_works WHERE id = ?', (work_id,))
+                existing = cursor.fetchone()
+                if existing:
+                    existing_quantity = float(quantity) if quantity is not None else existing[0]
+                    existing_unit_price = int(unit_price) if unit_price is not None else existing[1]
+                    total_price = existing_quantity * existing_unit_price
+                    updates.append('total_price = %s' if USE_POSTGRESQL else 'total_price = ?')
+                    params.append(int(total_price))
+            
+            updates.append('updated_at = CURRENT_TIMESTAMP')
+            params.append(work_id)
+            
+            if USE_POSTGRESQL:
+                cursor.execute(f'''
+                    UPDATE special_works 
+                    SET {', '.join(updates)}
+                    WHERE id = %s
+                ''', params)
+            else:
+                cursor.execute(f'''
+                    UPDATE special_works 
+                    SET {', '.join(updates)}
+                    WHERE id = ?
+                ''', params)
+            
+            conn.commit()
+            
+            if cursor.rowcount > 0:
+                return jsonify({
+                    'success': True,
+                    'message': '작업이 수정되었습니다.'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '작업을 찾을 수 없습니다.'
+                }), 404
+        except Exception as e:
+            conn.rollback() if USE_POSTGRESQL else None
+            print(f'[오류] 작업 수정 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'작업 수정 중 오류: {str(e)}'
+            }), 500
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f'❌ 작업 수정 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'작업 수정 중 오류: {str(e)}'
         }), 500
 
 

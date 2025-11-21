@@ -593,6 +593,67 @@
     </div>
   </div>
 
+  <!-- 작업 수정 모달 -->
+  <div id="swEditWorkModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; overflow-y: auto;">
+    <div style="max-width: 800px; margin: 50px auto; background: white; border-radius: 14px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h2 style="margin: 0; color: #ff6b35; font-weight: 700;">작업 수정</h2>
+        <button onclick="swAdminCloseEditModal()" style="background: #e17055; color: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 18px;">×</button>
+      </div>
+      <form id="swEditWorkForm" onsubmit="swAdminHandleEditWorkSubmit(event)">
+        <input type="hidden" id="swEditWorkId">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+          <div class="sw-form-group">
+            <label class="sw-form-label">화주사 *</label>
+            <div class="sw-searchable-select">
+              <input type="text" id="swEditWorkCompanyInput" class="sw-form-input" placeholder="화주사명을 입력하거나 선택하세요" autocomplete="off" required>
+              <input type="hidden" id="swEditWorkCompanySelect" required>
+              <div id="swEditWorkCompanyDropdown" class="sw-dropdown-list"></div>
+            </div>
+          </div>
+          <div class="sw-form-group">
+            <label class="sw-form-label">작업 종류 *</label>
+            <select id="swEditWorkTypeSelect" class="sw-form-select" required onchange="swAdminUpdateEditUnitPrice()">
+              <option value="">선택하세요</option>
+            </select>
+          </div>
+          <div class="sw-form-group">
+            <label class="sw-form-label">작업 일자 *</label>
+            <input type="date" id="swEditWorkDate" class="sw-form-input" required>
+          </div>
+          <div class="sw-form-group">
+            <label class="sw-form-label">수량 *</label>
+            <input type="number" id="swEditWorkQuantity" class="sw-form-input" value="1" min="0.01" step="0.01" required onchange="swAdminCalculateEditTotalPrice()">
+          </div>
+          <div class="sw-form-group">
+            <label class="sw-form-label">단가 (원) *</label>
+            <input type="number" id="swEditWorkUnitPrice" class="sw-form-input" min="0" step="1" required onchange="swAdminCalculateEditTotalPrice()">
+          </div>
+          <div class="sw-form-group">
+            <label class="sw-form-label">총액 (원)</label>
+            <input type="number" id="swEditWorkTotalPrice" class="sw-form-input" readonly>
+          </div>
+        </div>
+        <div class="sw-form-group">
+          <label class="sw-form-label">사진 첨부</label>
+          <div class="sw-photo-upload-area" onclick="document.getElementById('swEditPhotoInput').click()">
+            <p>📷 클릭하여 사진 추가</p>
+            <input type="file" id="swEditPhotoInput" multiple accept="image/*" style="display: none;" onchange="swAdminHandleEditPhotoSelect(event)">
+          </div>
+          <div id="swEditPhotoPreviewContainer" class="sw-photo-preview-container"></div>
+        </div>
+        <div class="sw-form-group">
+          <label class="sw-form-label">메모</label>
+          <textarea id="swEditWorkMemo" class="sw-form-textarea" placeholder="작업 관련 메모를 입력하세요"></textarea>
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 24px; padding-top: 24px; border-top: 2px solid #ffeaa7;">
+          <button type="submit" class="sw-btn">💾 수정</button>
+          <button type="button" class="sw-btn-secondary" onclick="swAdminCloseEditModal()">취소</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     // 전역 변수
     var swCurrentRole = '';
@@ -601,6 +662,8 @@
     var swWorkTypes = [];
     var swSelectedWorkType = null;
     var swSelectedPhotos = [];
+    var swEditSelectedPhotos = []; // 수정 모달용 사진
+    var swEditExistingPhotos = []; // 수정 모달용 기존 사진
     var swInitialized = false;
     
     // 공통 초기화 함수
@@ -1419,6 +1482,7 @@
             <td>${photoThumbnails || '<span style="color: #999;">사진 없음</span>'}${morePhotos}</td>
             <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${swEscapeHtml(work.memo || '')}">${swEscapeHtml(work.memo || '')}</td>
             <td class="sw-admin-only">
+              <button class="sw-btn-action sw-btn-edit" onclick="swAdminEditWork(${work.id || 0})">수정</button>
               <button class="sw-btn-action sw-btn-delete" onclick="swAdminDeleteWork(${work.id || 0})">삭제</button>
             </td>
           </tr>
@@ -1471,6 +1535,406 @@
       
       statsContainer.innerHTML = html;
       statsContainer.style.display = 'flex';
+    }
+    
+    /**
+     * 관리자 작업 수정 모달 열기
+     */
+    async function swAdminEditWork(workId) {
+      const container = document.getElementById('swContainer');
+      if (!container) return;
+      
+      // 작업 데이터 가져오기
+      try {
+        const response = await fetch(`/api/special-works/works/${workId}`, {
+          credentials: 'include',
+          headers: swGetUserHeaders()
+        });
+        const data = await response.json();
+        
+        if (!data.success || !data.data) {
+          alert('작업 정보를 불러올 수 없습니다.');
+          return;
+        }
+        
+        const work = data.data;
+        
+        // 모달에 데이터 채우기
+        document.getElementById('swEditWorkId').value = work.id;
+        document.getElementById('swEditWorkCompanyInput').value = work.company_name || '';
+        document.getElementById('swEditWorkCompanySelect').value = work.company_name || '';
+        document.getElementById('swEditWorkDate').value = work.work_date || '';
+        document.getElementById('swEditWorkQuantity').value = work.quantity || 1;
+        document.getElementById('swEditWorkUnitPrice').value = work.unit_price || 0;
+        document.getElementById('swEditWorkTotalPrice').value = work.total_price || 0;
+        document.getElementById('swEditWorkMemo').value = work.memo || '';
+        
+        // 작업 종류 선택 (작업 종류 목록이 로드되어 있어야 함)
+        const workTypeSelect = document.getElementById('swEditWorkTypeSelect');
+        if (workTypeSelect) {
+          // 작업 종류 목록이 없으면 먼저 로드
+          if (swWorkTypes.length === 0) {
+            await swCommonLoadWorkTypes();
+          }
+          // 작업 종류 선택 드롭다운 업데이트
+          workTypeSelect.innerHTML = '<option value="">선택하세요</option>' + 
+            swWorkTypes.map(type => 
+              `<option value="${type.id}" data-price="${type.default_unit_price}">${swEscapeHtml(type.name)}</option>`
+            ).join('');
+          workTypeSelect.value = work.work_type_id || '';
+          swAdminUpdateEditUnitPrice();
+        }
+        
+        // 기존 사진 로드
+        swEditExistingPhotos = work.photo_links ? work.photo_links.split(',').map(url => url.trim()).filter(url => url) : [];
+        swEditSelectedPhotos = [];
+        swAdminRenderEditPhotoPreviews();
+        
+        // 모달 열기
+        document.getElementById('swEditWorkModal').style.display = 'block';
+        
+        // 화주사 드롭다운 초기화
+        swAdminInitEditCompanyDropdown();
+      } catch (error) {
+        console.error('[SW] 작업 정보 로드 오류:', error);
+        alert('작업 정보를 불러오는 중 오류가 발생했습니다.');
+      }
+    }
+    
+    /**
+     * 관리자 작업 수정 모달 닫기
+     */
+    function swAdminCloseEditModal() {
+      document.getElementById('swEditWorkModal').style.display = 'none';
+      document.getElementById('swEditWorkForm').reset();
+      swEditSelectedPhotos = [];
+      swEditExistingPhotos = [];
+      swAdminRenderEditPhotoPreviews();
+    }
+    
+    /**
+     * 관리자 수정 폼 단가 업데이트
+     */
+    function swAdminUpdateEditUnitPrice() {
+      const select = document.getElementById('swEditWorkTypeSelect');
+      if (!select) return;
+      
+      const selectedOption = select.options[select.selectedIndex];
+      if (selectedOption && selectedOption.value) {
+        const price = selectedOption.getAttribute('data-price') || '0';
+        const unitPriceInput = document.getElementById('swEditWorkUnitPrice');
+        if (unitPriceInput) {
+          unitPriceInput.value = price;
+          swAdminCalculateEditTotalPrice();
+        }
+      }
+    }
+    
+    /**
+     * 관리자 수정 폼 총액 계산
+     */
+    function swAdminCalculateEditTotalPrice() {
+      const quantity = parseFloat(document.getElementById('swEditWorkQuantity')?.value) || 0;
+      const unitPrice = parseFloat(document.getElementById('swEditWorkUnitPrice')?.value) || 0;
+      const totalPrice = quantity * unitPrice;
+      
+      const totalPriceInput = document.getElementById('swEditWorkTotalPrice');
+      if (totalPriceInput) {
+        totalPriceInput.value = Math.round(totalPrice);
+      }
+    }
+    
+    /**
+     * 관리자 수정 폼 사진 선택 처리
+     */
+    function swAdminHandleEditPhotoSelect(event) {
+      const files = Array.from(event.target.files);
+      files.forEach(file => {
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            swEditSelectedPhotos.push({
+              file: file,
+              url: e.target.result
+            });
+            swAdminRenderEditPhotoPreviews();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+      event.target.value = '';
+    }
+    
+    /**
+     * 관리자 수정 폼 사진 미리보기 렌더링
+     */
+    function swAdminRenderEditPhotoPreviews() {
+      const previewContainer = document.getElementById('swEditPhotoPreviewContainer');
+      if (!previewContainer) return;
+      
+      // 기존 사진 + 새로 선택한 사진
+      const allPhotos = [
+        ...swEditExistingPhotos.map(url => ({ url: url, isExisting: true })),
+        ...swEditSelectedPhotos.map(photo => ({ url: photo.url, isExisting: false, file: photo.file }))
+      ];
+      
+      previewContainer.innerHTML = allPhotos.map((photo, index) => {
+        const isExisting = photo.isExisting;
+        return `
+          <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; border: 2px solid #ffeaa7;">
+            <img src="${swEscapeHtml(photo.url)}" alt="미리보기" style="width: 100%; height: 100%; object-fit: cover;">
+            <button onclick="swAdminRemoveEditPhoto(${index}, ${isExisting})" style="position: absolute; top: 5px; right: 5px; background: rgba(225, 112, 85, 0.9); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button>
+            ${isExisting ? '<span style="position: absolute; bottom: 5px; left: 5px; background: rgba(116, 185, 255, 0.9); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px;">기존</span>' : ''}
+          </div>
+        `;
+      }).join('');
+    }
+    
+    /**
+     * 관리자 수정 폼 사진 제거
+     */
+    function swAdminRemoveEditPhoto(index, isExisting) {
+      if (isExisting) {
+        // 기존 사진 제거
+        swEditExistingPhotos.splice(index, 1);
+      } else {
+        // 새로 선택한 사진 제거
+        const newIndex = index - swEditExistingPhotos.length;
+        swEditSelectedPhotos.splice(newIndex, 1);
+      }
+      swAdminRenderEditPhotoPreviews();
+    }
+    
+    /**
+     * 관리자 수정 폼 화주사 드롭다운 초기화
+     */
+    function swAdminInitEditCompanyDropdown() {
+      fetch('/api/auth/companies', {
+        credentials: 'include'
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const companies = data.companies || [];
+            const input = document.getElementById('swEditWorkCompanyInput');
+            const hidden = document.getElementById('swEditWorkCompanySelect');
+            const dropdown = document.getElementById('swEditWorkCompanyDropdown');
+            
+            if (input && hidden && dropdown) {
+              function updateDropdown(filterText = '') {
+                const filtered = companies.filter(company => 
+                  company.company_name.toLowerCase().includes(filterText.toLowerCase())
+                );
+                
+                if (filtered.length === 0) {
+                  dropdown.innerHTML = '<div class="sw-dropdown-item" style="color: #999; cursor: default;">검색 결과가 없습니다</div>';
+                } else {
+                  dropdown.innerHTML = filtered.map(company => 
+                    `<div class="sw-dropdown-item" data-value="${swEscapeHtml(company.company_name)}">${swEscapeHtml(company.company_name)}</div>`
+                  ).join('');
+                }
+              }
+              
+              updateDropdown();
+              
+              let isDropdownOpen = false;
+              let dropdownTimeout = null;
+              
+              const openDropdown = () => {
+                if (dropdownTimeout) {
+                  clearTimeout(dropdownTimeout);
+                  dropdownTimeout = null;
+                }
+                updateDropdown(input.value);
+                dropdown.classList.add('show');
+                isDropdownOpen = true;
+              };
+              
+              const closeDropdown = () => {
+                if (dropdownTimeout) {
+                  clearTimeout(dropdownTimeout);
+                  dropdownTimeout = null;
+                }
+                dropdown.classList.remove('show');
+                isDropdownOpen = false;
+              };
+              
+              input.addEventListener('input', (e) => {
+                const value = e.target.value;
+                hidden.value = value;
+                updateDropdown(value);
+                if (!isDropdownOpen) {
+                  openDropdown();
+                }
+              });
+              
+              input.addEventListener('focus', (e) => {
+                e.stopPropagation();
+                if (dropdownTimeout) {
+                  clearTimeout(dropdownTimeout);
+                }
+                dropdownTimeout = setTimeout(() => {
+                  openDropdown();
+                }, 100);
+              });
+              
+              input.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (dropdownTimeout) {
+                  clearTimeout(dropdownTimeout);
+                }
+                dropdownTimeout = setTimeout(() => {
+                  openDropdown();
+                }, 100);
+              });
+              
+              dropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const item = e.target.closest('.sw-dropdown-item');
+                if (item && item.dataset.value) {
+                  input.value = item.dataset.value;
+                  hidden.value = item.dataset.value;
+                  closeDropdown();
+                }
+              });
+              
+              const handleDocumentClick = (e) => {
+                if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                  setTimeout(() => {
+                    if (!input.contains(document.activeElement)) {
+                      closeDropdown();
+                    }
+                  }, 150);
+                }
+              };
+              
+              document.addEventListener('mousedown', handleDocumentClick);
+            }
+          }
+        })
+        .catch(error => {
+          console.error('[SW] 화주사 목록 로드 오류:', error);
+        });
+    }
+    
+    /**
+     * 관리자 작업 수정 처리
+     */
+    async function swAdminHandleEditWorkSubmit(event) {
+      event.preventDefault();
+      console.log('[SW] swAdminHandleEditWorkSubmit 호출');
+      
+      const workId = document.getElementById('swEditWorkId').value;
+      if (!workId) {
+        alert('작업 ID를 찾을 수 없습니다.');
+        return;
+      }
+      
+      // 화주사 입력값 검증
+      const companyInput = document.getElementById('swEditWorkCompanyInput');
+      const companyHidden = document.getElementById('swEditWorkCompanySelect');
+      if (companyInput && companyHidden) {
+        const inputValue = companyInput.value.trim();
+        if (!inputValue) {
+          alert('화주사를 입력하거나 선택해주세요.');
+          companyInput.focus();
+          return;
+        }
+        companyHidden.value = inputValue;
+      }
+      
+      // 새로 추가한 사진 업로드
+      let newPhotoLinks = '';
+      if (swEditSelectedPhotos.length > 0) {
+        try {
+          const imageDataList = swEditSelectedPhotos.map(photo => photo.url);
+          const trackingIdentifier = `special_${(companyHidden?.value || companyInput?.value || 'unknown')
+            .replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`;
+          
+          const uploadResponse = await fetch('/api/uploads/upload-images', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...swGetUserHeaders()
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              images: imageDataList,
+              trackingNumber: trackingIdentifier
+            })
+          });
+          
+          const uploadData = await uploadResponse.json();
+          console.log('[SW] 사진 업로드 응답:', uploadData);
+          
+          if (!uploadResponse.ok || !uploadData.success) {
+            throw new Error(uploadData.message || '사진 업로드에 실패했습니다.');
+          }
+          
+          if (uploadData.photoLinks) {
+            const lines = uploadData.photoLinks.split('\n').filter(line => line.trim());
+            const urls = lines.map(line => {
+              const parts = line.split(':');
+              if (parts.length >= 2) {
+                return parts.slice(1).join(':').trim();
+              }
+              return '';
+            }).filter(url => url);
+            newPhotoLinks = urls.join(',');
+          } else if (uploadData.urls) {
+            newPhotoLinks = uploadData.urls.join(',');
+          }
+        } catch (error) {
+          console.error('[SW] 사진 업로드 오류:', error);
+          alert('사진 업로드 중 오류가 발생했습니다: ' + error.message);
+          return;
+        }
+      }
+      
+      // 기존 사진 + 새 사진 합치기
+      let allPhotoLinks = [...swEditExistingPhotos];
+      if (newPhotoLinks) {
+        allPhotoLinks = allPhotoLinks.concat(newPhotoLinks.split(',').map(url => url.trim()).filter(url => url));
+      }
+      const finalPhotoLinks = allPhotoLinks.join(',');
+      
+      // 작업 데이터 전송
+      const workData = {
+        company_name: companyHidden?.value || companyInput?.value,
+        work_type_id: parseInt(document.getElementById('swEditWorkTypeSelect')?.value),
+        work_date: document.getElementById('swEditWorkDate')?.value,
+        quantity: parseFloat(document.getElementById('swEditWorkQuantity')?.value),
+        unit_price: parseFloat(document.getElementById('swEditWorkUnitPrice')?.value),
+        photo_links: finalPhotoLinks,
+        memo: document.getElementById('swEditWorkMemo')?.value || ''
+      };
+      
+      console.log('[SW] 작업 수정 요청:', workData);
+      
+      fetch(`/api/special-works/works/${workId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...swGetUserHeaders()
+        },
+        credentials: 'include',
+        body: JSON.stringify(workData)
+      })
+        .then(response => response.json())
+        .then(data => {
+          console.log('[SW] 작업 수정 응답:', data);
+          if (data.success) {
+            alert('작업이 수정되었습니다.');
+            swAdminCloseEditModal();
+            swAdminLoadWorks();
+          } else {
+            alert(data.message || '작업 수정에 실패했습니다.');
+          }
+        })
+        .catch(error => {
+          console.error('[SW] 작업 수정 오류:', error);
+          alert('작업 수정 중 오류가 발생했습니다.');
+        });
     }
     
     /**
