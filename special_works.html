@@ -525,12 +525,8 @@
     <div id="swAdminFilterSection" class="sw-admin-only sw-section">
       <div class="sw-filters">
         <div class="sw-filter-group">
-          <label for="swAdminFilterStartDate">시작일</label>
-          <input type="date" id="swAdminFilterStartDate">
-        </div>
-        <div class="sw-filter-group">
-          <label for="swAdminFilterEndDate">종료일</label>
-          <input type="date" id="swAdminFilterEndDate">
+          <label for="swAdminFilterMonth">조회 월</label>
+          <input type="month" id="swAdminFilterMonth">
         </div>
         <div class="sw-filter-group">
           <label for="swAdminFilterWorkType">작업 종류</label>
@@ -824,14 +820,12 @@
       const container = document.getElementById('swContainer');
       if (!container) return;
       
-      // 1. 날짜 필터 초기화 (오늘 날짜)
+      // 1. 월 필터 초기화 (오늘 월)
       const today = new Date().toISOString().split('T')[0];
-      const startDate = container.querySelector('#swAdminFilterStartDate');
-      const endDate = container.querySelector('#swAdminFilterEndDate');
-      if (startDate) startDate.value = today;
-      if (endDate) endDate.value = today;
+      const monthInput = container.querySelector('#swAdminFilterMonth');
+      if (monthInput) monthInput.value = today.slice(0, 7); // YYYY-MM
       
-      // 2. 작업 등록 폼 날짜 초기화
+      // 2. 작업 등록 폼 날짜 초기화 (오늘 날짜)
       const workDate = container.querySelector('#swAdminWorkDate');
       if (workDate) workDate.value = today;
       
@@ -1329,21 +1323,28 @@
       const container = document.getElementById('swContainer');
       if (!container) return;
       
-      // 1. 필터 값 수집
-      const startDate = container.querySelector('#swAdminFilterStartDate')?.value || '';
-      const endDate = container.querySelector('#swAdminFilterEndDate')?.value || '';
+      // 1. 월 필터 값 수집
+      const monthValue = container.querySelector('#swAdminFilterMonth')?.value || '';
       const workTypeId = container.querySelector('#swAdminFilterWorkType')?.value || '';
       const companyName = container.querySelector('#swAdminFilterCompany')?.value || '';
       
-      // 2. 날짜가 비어있으면 오늘 날짜로 설정
-      const today = new Date().toISOString().split('T')[0];
-      const finalStartDate = startDate || today;
-      const finalEndDate = endDate || today;
+      // 2. 월을 날짜 범위로 변환
+      let startDate = '';
+      let endDate = '';
+      if (monthValue) {
+        const [yearStr, monthStr] = monthValue.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStr, 10);
+        const lastDay = new Date(year, month, 0).getDate();
+        const paddedMonth = monthStr.padStart(2, '0');
+        startDate = `${yearStr}-${paddedMonth}-01`;
+        endDate = `${yearStr}-${paddedMonth}-${String(lastDay).padStart(2, '0')}`;
+      }
       
-      // 3. API URL 구성
+      // 3. API URL 구성 (월이 비어있으면 모든 데이터 조회)
       let url = '/api/special-works/works?';
-      if (finalStartDate) url += `start_date=${finalStartDate}&`;
-      if (finalEndDate) url += `end_date=${finalEndDate}&`;
+      if (startDate) url += `start_date=${startDate}&`;
+      if (endDate) url += `end_date=${endDate}&`;
       if (workTypeId) url += `work_type_id=${workTypeId}&`;
       if (companyName) url += `company_name=${encodeURIComponent(companyName)}&`;
       
