@@ -77,6 +77,8 @@ from api.popups.routes_db import popups_bp
 from api.cs.routes_db import cs_bp
 from api.cs.scheduler import start_cs_notification_scheduler
 from api.special_works.routes_db import special_works_bp
+from api.schedule_notifications.scheduler import start_schedule_notification_scheduler
+from api.schedule_notifications.routes import schedule_notifications_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(returns_bp)
@@ -88,6 +90,7 @@ app.register_blueprint(board_bp)
 app.register_blueprint(popups_bp)
 app.register_blueprint(cs_bp)
 app.register_blueprint(special_works_bp)
+app.register_blueprint(schedule_notifications_bp)
 
 # C/S 알림 스케줄러 시작
 print("[정보] [앱 시작] C/S 알림 스케줄러 시작 시도...")
@@ -97,6 +100,16 @@ try:
     print("[성공] [앱 시작] C/S 알림 스케줄러 시작 완료")
 except Exception as e:
     print(f"[오류] [앱 시작] C/S 알림 스케줄러 시작 중 오류: {e}")
+    import traceback
+    traceback.print_exc()
+
+# 스케쥴 알림 스케줄러 시작
+print("[정보] [앱 시작] 스케쥴 알림 스케줄러 시작 시도...")
+try:
+    start_schedule_notification_scheduler()
+    print("[성공] [앱 시작] 스케쥴 알림 스케줄러 시작 완료")
+except Exception as e:
+    print(f"[오류] [앱 시작] 스케쥴 알림 스케줄러 시작 중 오류: {e}")
     import traceback
     traceback.print_exc()
 

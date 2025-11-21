@@ -2,7 +2,7 @@
 판매 스케쥴 관리 API 라우트
 """
 from flask import Blueprint, request, jsonify
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from api.database.models import (
     create_schedule,
     get_schedules_by_company,
@@ -16,6 +16,8 @@ from api.database.models import (
     get_all_schedule_types,
     delete_schedule_type
 )
+from api.schedule_notifications.telegram import send_schedule_notification
+from api.database.models import get_db_connection, USE_POSTGRESQL
 
 # Blueprint 생성
 schedules_bp = Blueprint('schedules', __name__, url_prefix='/api/schedules')
@@ -228,6 +230,35 @@ def create_schedule_route():
                     failed_count += 1
             
             if created_count > 0:
+                # "모든 화주사" 스케쥴 등록 알림 (첫 번째 스케쥴 정보 사용)
+                if schedule_ids:
+                    try:
+                        first_schedule = get_schedule_by_id(schedule_ids[0])
+                        if first_schedule:
+                            kst = timezone(timedelta(hours=9))
+                            current_time_kst = datetime.now(kst).strftime('%Y-%m-%d %H:%M:%S')
+                            
+                            schedule_type = first_schedule.get('schedule_type', '')
+                            if schedule_type.startswith('모든화주사-'):
+                                schedule_type = schedule_type.replace('모든화주사-', '')
+                            
+                            message = f"📅 <b>새로운 스케쥴 등록 (모든 화주사)</b>\n\n"
+                            message += f"🏢 화주사: 모든 화주사 ({created_count}개)\n"
+                            if schedule_type:
+                                message += f"📋 타입: {schedule_type}\n"
+                            message += f"📝 제목: {first_schedule.get('title', '')}\n"
+                            message += f"📅 기간: {first_schedule.get('start_date', '')} ~ {first_schedule.get('end_date', '')}\n"
+                            if first_schedule.get('event_description'):
+                                message += f"📄 내용: {first_schedule.get('event_description', '')[:200]}{'...' if len(first_schedule.get('event_description', '')) > 200 else ''}\n"
+                            if first_schedule.get('request_note'):
+                                message += f"💬 요청사항: {first_schedule.get('request_note', '')[:100]}{'...' if len(first_schedule.get('request_note', '')) > 100 else ''}\n"
+                            message += f"\n등록 시간: {current_time_kst}"
+                            
+                            print(f"📝 [스케쥴 등록] 텔레그램 메시지 전송 시도")
+                            send_schedule_notification(message)
+                    except Exception as e:
+                        print(f"⚠️ [스케쥴 등록] 텔레그램 알림 전송 중 오류 (무시): {e}")
+                
                 return jsonify({
                     'success': True,
                     'message': f'{created_count}개 화주사에게 스케쥴이 등록되었습니다.',
@@ -244,6 +275,52 @@ def create_schedule_route():
             # 단일 화주사 스케줄 생성
             schedule_id = create_schedule(data)
             if schedule_id:
+                # 스케쥴 등록 즉시 알림 전송
+                try:
+                    schedule = get_schedule_by_id(schedule_id)
+                    if schedule:
+                        kst = timezone(timedelta(hours=9))
+                        current_time_kst = datetime.now(kst).strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        company_name = schedule.get('company_name', '알 수 없음')
+                        schedule_type = schedule.get('schedule_type', '')
+                        title = schedule.get('title', '')
+                        start_date = schedule.get('start_date', '')
+                        end_date = schedule.get('end_date', '')
+                        event_description = schedule.get('event_description', '')
+                        request_note = schedule.get('request_note', '')
+                        
+                        message = f"📅 <b>새로운 스케쥴 등록</b>\n\n"
+                        message += f"🏢 화주사: {company_name}\n"
+                        if schedule_type:
+                            message += f"📋 타입: {schedule_type}\n"
+                        message += f"📝 제목: {title}\n"
+                        message += f"📅 기간: {start_date} ~ {end_date}\n"
+                        if event_description:
+                            message += f"📄 내용: {event_description[:200]}{'...' if len(event_description) > 200 else ''}\n"
+                        if request_note:
+                            message += f"💬 요청사항: {request_note[:100]}{'...' if len(request_note) > 100 else ''}\n"
+                        message += f"\n등록 시간: {current_time_kst}"
+                        
+                        print(f"📝 [스케쥴 등록] 텔레그램 메시지 전송 시도")
+                        send_schedule_notification(message)
+                        
+                        # 알림 전송 플래그 업데이트
+                        try:
+                            conn = get_db_connection()
+                            cursor = conn.cursor()
+                            if USE_POSTGRESQL:
+                                cursor.execute('UPDATE schedules SET notification_sent_registered = TRUE WHERE id = %s', (schedule_id,))
+                            else:
+                                cursor.execute('UPDATE schedules SET notification_sent_registered = 1 WHERE id = ?', (schedule_id,))
+                            conn.commit()
+                            cursor.close()
+                            conn.close()
+                        except Exception as e:
+                            print(f"⚠️ [스케쥴 등록] 알림 플래그 업데이트 중 오류 (무시): {e}")
+                except Exception as e:
+                    print(f"⚠️ [스케쥴 등록] 텔레그램 알림 전송 중 오류 (무시): {e}")
+                
                 return jsonify({
                     'success': True,
                     'message': '스케쥴이 등록되었습니다.',

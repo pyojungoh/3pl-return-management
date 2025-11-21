@@ -175,6 +175,21 @@ def init_db():
                 if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
                     print(f"[경고] schedule_type 컬럼 추가 중 오류 (무시 가능): {e}")
             
+            # 알림 플래그 컬럼 추가 (없는 경우에만)
+            notification_columns = [
+                'notification_sent_registered',
+                'notification_sent_before_start',
+                'notification_sent_start',
+                'notification_sent_end'
+            ]
+            for col in notification_columns:
+                try:
+                    cursor.execute(f'ALTER TABLE schedules ADD COLUMN {col} BOOLEAN DEFAULT FALSE')
+                    print(f"[성공] schedules 테이블에 {col} 컬럼이 추가되었습니다.")
+                except Exception as e:
+                    if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
+                        print(f"[경고] {col} 컬럼 추가 중 오류 (무시 가능): {e}")
+            
             # PostgreSQL - 스케줄 타입 테이블
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS schedule_types (
@@ -549,6 +564,21 @@ def init_db():
                 # 컬럼이 이미 존재하는 경우 무시
                 if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
                     print(f"[경고] schedule_type 컬럼 추가 중 오류 (무시 가능): {e}")
+            
+            # 알림 플래그 컬럼 추가 (없는 경우에만)
+            notification_columns = [
+                'notification_sent_registered',
+                'notification_sent_before_start',
+                'notification_sent_start',
+                'notification_sent_end'
+            ]
+            for col in notification_columns:
+                try:
+                    cursor.execute(f'ALTER TABLE schedules ADD COLUMN {col} INTEGER DEFAULT 0')
+                    print(f"[성공] schedules 테이블에 {col} 컬럼이 추가되었습니다.")
+                except Exception as e:
+                    if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
+                        print(f"[경고] {col} 컬럼 추가 중 오류 (무시 가능): {e}")
             
             # SQLite - 스케줄 타입 테이블
             cursor.execute('''
