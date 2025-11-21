@@ -423,6 +423,15 @@
       border-radius: 6px;
       cursor: pointer;
       margin-left: 8px;
+      display: inline-block;
+      white-space: nowrap;
+    }
+    
+    .sw-btn-action-container {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
     }
     
     .sw-btn-edit {
@@ -1196,23 +1205,79 @@
     }
     
     /**
+     * 이미지 압축 함수
+     */
+    function swCompressImage(file, maxWidth = 1920, maxHeight = 1920, quality = 0.8) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            
+            // 비율 유지하면서 크기 조정
+            if (width > height) {
+              if (width > maxWidth) {
+                height = (height * maxWidth) / width;
+                width = maxWidth;
+              }
+            } else {
+              if (height > maxHeight) {
+                width = (width * maxHeight) / height;
+                height = maxHeight;
+              }
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // JPEG로 변환 (품질 설정)
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+            resolve(compressedDataUrl);
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+    
+    /**
      * 관리자 사진 선택 처리
      */
-    function swAdminHandlePhotoSelect(event) {
+    async function swAdminHandlePhotoSelect(event) {
       const files = Array.from(event.target.files);
-      files.forEach(file => {
+      for (const file of files) {
         if (file.type.startsWith('image/')) {
-          const reader = new FileReader();
-          reader.onload = function(e) {
+          try {
+            // 이미지 압축
+            const compressedUrl = await swCompressImage(file);
             swSelectedPhotos.push({
               file: file,
-              url: e.target.result
+              url: compressedUrl
             });
             swAdminRenderPhotoPreviews();
-          };
-          reader.readAsDataURL(file);
+          } catch (error) {
+            console.error('[SW] 이미지 압축 오류:', error);
+            // 압축 실패 시 원본 사용
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              swSelectedPhotos.push({
+                file: file,
+                url: e.target.result
+              });
+              swAdminRenderPhotoPreviews();
+            };
+            reader.readAsDataURL(file);
+          }
         }
-      });
+      }
       event.target.value = '';
     }
     
@@ -1310,7 +1375,19 @@
             })
           });
           
-          const uploadData = await uploadResponse.json();
+          // 413 에러 처리
+          if (uploadResponse.status === 413) {
+            throw new Error('사진 파일 크기가 너무 큽니다. 더 작은 사진을 선택해주세요.');
+          }
+          
+          let uploadData;
+          try {
+            uploadData = await uploadResponse.json();
+          } catch (e) {
+            // JSON 파싱 실패 시 (413 에러 등)
+            throw new Error('사진 업로드에 실패했습니다. 파일 크기를 확인해주세요.');
+          }
+          
           console.log('[SW] 사진 업로드 응답:', uploadData);
           
           if (!uploadResponse.ok || !uploadData.success) {
@@ -1482,8 +1559,10 @@
             <td>${photoThumbnails || '<span style="color: #999;">사진 없음</span>'}${morePhotos}</td>
             <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${swEscapeHtml(work.memo || '')}">${swEscapeHtml(work.memo || '')}</td>
             <td class="sw-admin-only">
-              <button class="sw-btn-action sw-btn-edit" onclick="swAdminEditWork(${work.id || 0})">수정</button>
-              <button class="sw-btn-action sw-btn-delete" onclick="swAdminDeleteWork(${work.id || 0})">삭제</button>
+              <div class="sw-btn-action-container">
+                <button class="sw-btn-action sw-btn-edit" onclick="swAdminEditWork(${work.id || 0})">수정</button>
+                <button class="sw-btn-action sw-btn-delete" onclick="swAdminDeleteWork(${work.id || 0})">삭제</button>
+              </div>
             </td>
           </tr>
         `;
@@ -1647,21 +1726,33 @@
     /**
      * 관리자 수정 폼 사진 선택 처리
      */
-    function swAdminHandleEditPhotoSelect(event) {
+    async function swAdminHandleEditPhotoSelect(event) {
       const files = Array.from(event.target.files);
-      files.forEach(file => {
+      for (const file of files) {
         if (file.type.startsWith('image/')) {
-          const reader = new FileReader();
-          reader.onload = function(e) {
+          try {
+            // 이미지 압축
+            const compressedUrl = await swCompressImage(file);
             swEditSelectedPhotos.push({
               file: file,
-              url: e.target.result
+              url: compressedUrl
             });
             swAdminRenderEditPhotoPreviews();
-          };
-          reader.readAsDataURL(file);
+          } catch (error) {
+            console.error('[SW] 이미지 압축 오류:', error);
+            // 압축 실패 시 원본 사용
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              swEditSelectedPhotos.push({
+                file: file,
+                url: e.target.result
+              });
+              swAdminRenderEditPhotoPreviews();
+            };
+            reader.readAsDataURL(file);
+          }
         }
-      });
+      }
       event.target.value = '';
     }
     
@@ -1864,7 +1955,19 @@
             })
           });
           
-          const uploadData = await uploadResponse.json();
+          // 413 에러 처리
+          if (uploadResponse.status === 413) {
+            throw new Error('사진 파일 크기가 너무 큽니다. 더 작은 사진을 선택해주세요.');
+          }
+          
+          let uploadData;
+          try {
+            uploadData = await uploadResponse.json();
+          } catch (e) {
+            // JSON 파싱 실패 시 (413 에러 등)
+            throw new Error('사진 업로드에 실패했습니다. 파일 크기를 확인해주세요.');
+          }
+          
           console.log('[SW] 사진 업로드 응답:', uploadData);
           
           if (!uploadResponse.ok || !uploadData.success) {
