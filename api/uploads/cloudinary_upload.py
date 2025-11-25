@@ -23,10 +23,10 @@ if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
         api_secret=CLOUDINARY_API_SECRET,
         secure=True  # HTTPS 사용
     )
-    print("✅ Cloudinary 초기화 완료")
+    print("[성공] Cloudinary 초기화 완료")
     print(f"   Cloud Name: {CLOUDINARY_CLOUD_NAME}")
 else:
-    print("⚠️ Cloudinary 환경 변수가 설정되지 않았습니다.")
+    print("[경고] Cloudinary 환경 변수가 설정되지 않았습니다.")
     print("   CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET 환경 변수를 설정하세요.")
 
 
@@ -43,11 +43,11 @@ def upload_images_to_cloudinary(image_data_list: List[str], tracking_number: str
     """
     try:
         if not image_data_list or len(image_data_list) == 0:
-            print("⚠️ 이미지 데이터가 없습니다.")
+            print("[경고] 이미지 데이터가 없습니다.")
             return ''
         
         if not tracking_number:
-            print("⚠️ 송장번호가 없습니다.")
+            print("[경고] 송장번호가 없습니다.")
             return ''
         
         # Cloudinary 설정 확인
@@ -64,22 +64,22 @@ def upload_images_to_cloudinary(image_data_list: List[str], tracking_number: str
                 "CLOUDINARY_API_SECRET=your_api_secret"
             )
         
-        print(f"📸 Cloudinary 이미지 업로드 시작: {len(image_data_list)}개")
+        print(f"[정보] Cloudinary 이미지 업로드 시작: {len(image_data_list)}개")
         
         # 타임스탬프 생성
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         photo_texts = []
         
-        print("🖼️ 개별 이미지 업로드 시작...")
+        print("[정보] 개별 이미지 업로드 시작...")
         
         # 모든 이미지 업로드
         for i, image_data in enumerate(image_data_list, 1):
             try:
                 if not image_data or not isinstance(image_data, str):
-                    print(f"⚠️ 이미지 {i} 데이터가 유효하지 않습니다.")
+                    print(f"[경고] 이미지 {i} 데이터가 유효하지 않습니다.")
                     continue
                 
-                print(f"📤 이미지 {i} 업로드 중...")
+                print(f"[정보] 이미지 {i} 업로드 중...")
                 
                 # Base64 데이터 디코딩
                 if ',' in image_data:
@@ -119,19 +119,19 @@ def upload_images_to_cloudinary(image_data_list: List[str], tracking_number: str
                 image_url = upload_result.get('secure_url', upload_result.get('url', ''))
                 
                 if not image_url:
-                    print(f"⚠️ 이미지 {i} URL을 가져올 수 없습니다.")
+                    print(f"[경고] 이미지 {i} URL을 가져올 수 없습니다.")
                     continue
                 
                 link_text = f"사진{i}"
                 photo_texts.append(f"{link_text}: {image_url}")
                 
-                print(f"✅ 이미지 {i} 업로드 완료: {filename}")
-                print(f"🔗 URL: {image_url}")
+                print(f"[성공] 이미지 {i} 업로드 완료: {filename}")
+                print(f"[정보] URL: {image_url}")
                 
             except Exception as error:
                 error_msg = str(error)
                 error_type = type(error).__name__
-                print(f"❌ 이미지 {i} 업로드 오류 ({error_type}): {error_msg}")
+                print(f"[오류] 이미지 {i} 업로드 오류 ({error_type}): {error_msg}")
                 import traceback
                 traceback.print_exc()
                 
@@ -153,10 +153,10 @@ def upload_images_to_cloudinary(image_data_list: List[str], tracking_number: str
                     )
                 
                 # 개별 이미지 실패해도 계속 진행 (다른 오류인 경우)
-                print(f"⚠️ 이미지 {i} 업로드 실패했지만 계속 진행합니다.")
+                print(f"[경고] 이미지 {i} 업로드 실패했지만 계속 진행합니다.")
                 continue
         
-        print(f"🎉 모든 이미지 업로드 완료: {len(photo_texts)}개")
+        print(f"[성공] 모든 이미지 업로드 완료: {len(photo_texts)}개")
         
         if len(photo_texts) == 0:
             raise Exception("업로드된 이미지가 없습니다.")
@@ -165,7 +165,7 @@ def upload_images_to_cloudinary(image_data_list: List[str], tracking_number: str
         return '\n'.join(photo_texts)
         
     except Exception as e:
-        print(f"💥 Cloudinary 이미지 업로드 전체 오류: {e}")
+        print(f"[오류] Cloudinary 이미지 업로드 전체 오류: {e}")
         import traceback
         traceback.print_exc()
         raise Exception(f"이미지 업로드 실패: {str(e)}")
@@ -213,11 +213,11 @@ def upload_single_file_to_cloudinary(base64_data: str, filename: str, folder: st
         )
         
         url = result.get('secure_url', result.get('url', ''))
-        print(f"✅ 파일 업로드 완료: {url}")
+        print(f"[성공] 파일 업로드 완료: {url}")
         return url
         
     except Exception as e:
-        print(f"❌ 파일 업로드 오류: {e}")
+        print(f"[오류] 파일 업로드 오류: {e}")
         import traceback
         traceback.print_exc()
         raise
@@ -263,7 +263,7 @@ def upload_to_cloudinary(file, folder: str = 'uploads') -> dict:
         url = result.get('secure_url', result.get('url', ''))
         file_size = result.get('bytes', len(file_data))
         
-        print(f"✅ 파일 업로드 완료: {url}")
+        print(f"[성공] 파일 업로드 완료: {url}")
         return {
             'secure_url': url,
             'url': url,
@@ -273,7 +273,7 @@ def upload_to_cloudinary(file, folder: str = 'uploads') -> dict:
         }
         
     except Exception as e:
-        print(f"❌ 파일 업로드 오류: {e}")
+        print(f"[오류] 파일 업로드 오류: {e}")
         import traceback
         traceback.print_exc()
         raise

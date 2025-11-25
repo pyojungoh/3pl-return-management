@@ -6,16 +6,16 @@ from flask import Blueprint, request, jsonify
 try:
     from api.uploads.cloudinary_upload import upload_images_to_cloudinary
     upload_images_to_drive = upload_images_to_cloudinary  # 호환성을 위한 별칭
-    print("✅ Cloudinary 모듈 사용")
+    print("[성공] Cloudinary 모듈 사용")
 except ImportError:
     # Cloudinary 모듈이 없으면 OAuth 2.0 사용
     try:
         from api.uploads.oauth_drive import upload_images_to_drive
-        print("⚠️ Cloudinary 모듈을 찾을 수 없습니다. OAuth 2.0 모듈 사용")
+        print("[경고] Cloudinary 모듈을 찾을 수 없습니다. OAuth 2.0 모듈 사용")
     except ImportError:
         # OAuth 2.0 모듈이 없으면 기존 서비스 계정 모듈 사용
         from api.uploads.google_drive import upload_images_to_drive
-        print("⚠️ Cloudinary 및 OAuth 2.0 모듈을 찾을 수 없습니다. 서비스 계정 모듈 사용 (제한 있음)")
+        print("[경고] Cloudinary 및 OAuth 2.0 모듈을 찾을 수 없습니다. 서비스 계정 모듈 사용 (제한 있음)")
 
 from api.database.models import (
     find_return_by_tracking_number,
@@ -48,14 +48,14 @@ def upload_images():
         }
     """
     try:
-        print(f"📤 이미지 업로드 API 호출됨")
+        print(f"[정보] 이미지 업로드 API 호출됨")
         print(f"   요청 URL: {request.url}")
         print(f"   요청 메서드: {request.method}")
         print(f"   Content-Type: {request.content_type}")
         
         # JSON 데이터 확인
         if not request.is_json:
-            print(f"❌ JSON이 아닌 요청")
+            print(f"[오류] JSON이 아닌 요청")
             return jsonify({
                 'success': False,
                 'message': 'JSON 형식의 데이터가 필요합니다.'
@@ -63,7 +63,7 @@ def upload_images():
         
         data = request.get_json()
         if not data:
-            print(f"❌ 요청 데이터가 없음")
+            print(f"[오류] 요청 데이터가 없음")
             return jsonify({
                 'success': False,
                 'message': '요청 데이터가 없습니다.'
@@ -76,27 +76,27 @@ def upload_images():
         print(f"   송장번호: '{tracking_number}'")
         
         if not images or len(images) == 0:
-            print(f"❌ 이미지 데이터가 없음")
+            print(f"[오류] 이미지 데이터가 없음")
             return jsonify({
                 'success': False,
                 'message': '이미지 데이터가 없습니다.'
             }), 400
         
         if not tracking_number:
-            print(f"❌ 송장번호가 없음")
+            print(f"[오류] 송장번호가 없음")
             return jsonify({
                 'success': False,
                 'message': '송장번호가 없습니다.'
             }), 400
         
         # Cloudinary에 이미지 업로드
-        print(f"📸 Cloudinary 업로드 시작: {len(images)}장")
+        print(f"[정보] Cloudinary 업로드 시작: {len(images)}장")
         try:
             photo_links = upload_images_to_drive(images, tracking_number)
-            print(f"✅ Cloudinary 업로드 완료: {len(photo_links.split(chr(10))) if photo_links else 0}개 링크")
+            print(f"[성공] Cloudinary 업로드 완료: {len(photo_links.split(chr(10))) if photo_links else 0}개 링크")
             
             if not photo_links:
-                print(f"⚠️ 업로드된 링크가 없음")
+                print(f"[경고] 업로드된 링크가 없음")
                 return jsonify({
                     'success': False,
                     'message': '이미지 업로드는 완료되었지만 링크를 가져올 수 없습니다.'
@@ -108,7 +108,7 @@ def upload_images():
                 'message': f'{len(images)}장의 이미지가 업로드되었습니다.'
             })
         except Exception as upload_error:
-            print(f"❌ Cloudinary 업로드 오류: {upload_error}")
+            print(f"[오류] Cloudinary 업로드 오류: {upload_error}")
             import traceback
             traceback.print_exc()
             
@@ -127,7 +127,7 @@ def upload_images():
             }), 500
         
     except Exception as e:
-        print(f'❌ 이미지 업로드 API 오류: {e}')
+        print(f'[오류] 이미지 업로드 API 오류: {e}')
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -160,7 +160,7 @@ def find_by_tracking():
             "message": str
         }
     """
-    print(f"🔍 find_by_tracking 엔드포인트 호출됨!")
+    print(f"[정보] find_by_tracking 엔드포인트 호출됨!")
     print(f"   요청 URL: {request.url}")
     print(f"   요청 메서드: {request.method}")
     print(f"   쿼리 파라미터: {request.args}")
@@ -176,31 +176,31 @@ def find_by_tracking():
         
         # 데이터베이스에서 검색
         # month가 있으면 해당 월에서만 검색, 없으면 모든 월에서 검색
-        print(f"🔍 송장번호 검색 요청:")
+        print(f"[정보] 송장번호 검색 요청:")
         print(f"   송장번호: {tracking_number}")
         print(f"   요청된 월: '{month}' (길이: {len(month) if month else 0})")
         
         return_data = None
         if month:
             # 지정된 월에서 먼저 검색
-            print(f"   📅 지정된 월에서 검색 시도: '{month}'")
+            print(f"   [정보] 지정된 월에서 검색 시도: '{month}'")
             return_data = find_return_by_tracking_number(tracking_number, month)
             if return_data:
                 found_month = return_data.get('month', '알 수 없음')
-                print(f"   ✅ 지정된 월에서 데이터 발견: {found_month}")
+                print(f"   [성공] 지정된 월에서 데이터 발견: {found_month}")
             else:
-                print(f"   ❌ 지정된 월에서 데이터를 찾지 못함")
+                print(f"   [오류] 지정된 월에서 데이터를 찾지 못함")
         
         # 월이 없거나 지정된 월에서 찾지 못한 경우 모든 월에서 검색
         if not return_data:
-            print(f"🔍 모든 월에서 송장번호 검색: {tracking_number}")
+            print(f"[정보] 모든 월에서 송장번호 검색: {tracking_number}")
             return_data = find_return_by_tracking_number(tracking_number, None)
             if return_data:
                 found_month = return_data.get('month', '알 수 없음')
-                print(f"   ✅ 모든 월에서 데이터 발견: {found_month}월")
-                print(f"   ⚠️ 요청된 월 '{month}'와 저장된 월 '{found_month}'가 일치하지 않음!")
+                print(f"   [성공] 모든 월에서 데이터 발견: {found_month}월")
+                print(f"   [경고] 요청된 월 '{month}'와 저장된 월 '{found_month}'가 일치하지 않음!")
             else:
-                print(f"   ❌ 모든 월에서도 데이터를 찾지 못함")
+                print(f"   [오류] 모든 월에서도 데이터를 찾지 못함")
         
         if return_data:
             return jsonify({
@@ -223,7 +223,7 @@ def find_by_tracking():
             }), 404
         
     except Exception as e:
-        print(f'❌ 송장번호 검색 오류: {e}')
+        print(f'[오류] 송장번호 검색 오류: {e}')
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -274,7 +274,7 @@ def update_photo_links_route():
             }), 500
         
     except Exception as e:
-        print(f'❌ 사진 링크 업데이트 오류: {e}')
+        print(f'[오류] 사진 링크 업데이트 오류: {e}')
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -353,7 +353,7 @@ def upload_certificate():
             })
         
     except Exception as e:
-        print(f"❌ 사업자 등록증 업로드 오류: {e}")
+        print(f"[오류] 사업자 등록증 업로드 오류: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({

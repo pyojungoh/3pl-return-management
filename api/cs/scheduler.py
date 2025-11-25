@@ -53,7 +53,7 @@ def convert_to_kst(value) -> str:
         
         return dt.strftime('%Y-%m-%d %H:%M:%S')
     except Exception as e:
-        print(f"⚠️ 시간 변환 오류: {e}, 원본: {value}")
+        print(f"[경고] 시간 변환 오류: {e}, 원본: {value}")
         value_str = str(value)
         return value_str.split('.')[0] if '.' in value_str else value_str
 
@@ -66,11 +66,11 @@ def send_cs_notifications():
         # KST 시간대 사용
         kst = timezone(timedelta(hours=9))
         current_time = datetime.now(kst)
-        print(f"🕐 [스케줄러] 실행 시작: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"[정보] [스케줄러] 실행 시작: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
         
         # 취소건: 1분마다 알림
         cancellation_requests = get_pending_cs_requests_by_issue_type('취소')
-        print(f"📊 [스케줄러] 취소건 조회: {len(cancellation_requests)}건")
+        print(f"[정보] [스케줄러] 취소건 조회: {len(cancellation_requests)}건")
         
         for cs in cancellation_requests:
             cs_id = cs.get('id')
@@ -109,7 +109,7 @@ def send_cs_notifications():
             message += f"내용: {content_preview}\n"
             message += f"접수일: {created_at_kst}"
             
-            print(f"📤 [스케줄러] 취소건 알림 전송: C/S #{cs_id}")
+            print(f"[정보] [스케줄러] 취소건 알림 전송: C/S #{cs_id}")
             send_telegram_notification(message)
             
             # 마지막 알림 시간 업데이트
@@ -118,7 +118,7 @@ def send_cs_notifications():
         # 일반 미처리 항목: 5분마다 알림 (취소건 제외)
         all_pending = get_pending_cs_requests()
         non_cancellation_requests = [cs for cs in all_pending if cs.get('issue_type') != '취소' and cs.get('status') == '접수']
-        print(f"📊 [스케줄러] 일반 미처리 항목 조회: {len(non_cancellation_requests)}건")
+        print(f"[정보] [스케줄러] 일반 미처리 항목 조회: {len(non_cancellation_requests)}건")
         if len(non_cancellation_requests) > 0:
             print(f"   - C/S ID 목록: {[cs.get('id') for cs in non_cancellation_requests]}")
             print(f"   - 저장된 알림 시간 키: {list(last_notification_times.keys())}")
@@ -142,20 +142,20 @@ def send_cs_notifications():
             if last_time:
                 # 이전에 알림을 보낸 적이 있으면, 5분 이상 지났는지 확인
                 time_diff = (current_time - last_time).total_seconds()
-                print(f"🔍 [스케줄러] C/S #{cs_id}: 마지막 알림 시간 확인")
+                print(f"[정보] [스케줄러] C/S #{cs_id}: 마지막 알림 시간 확인")
                 print(f"   - 마지막 알림: {last_time.strftime('%Y-%m-%d %H:%M:%S') if hasattr(last_time, 'strftime') else last_time}")
                 print(f"   - 현재 시간: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
                 print(f"   - 경과 시간: {time_diff:.0f}초 ({time_diff/60:.1f}분)")
                 
                 if time_diff >= 300:  # 5분 이상 지났으면 알림 전송
                     should_send = True
-                    print(f"✅ [스케줄러] C/S #{cs_id}: 5분 이상 경과, 알림 전송")
+                    print(f"[성공] [스케줄러] C/S #{cs_id}: 5분 이상 경과, 알림 전송")
                 else:
-                    print(f"⏸️ [스케줄러] C/S #{cs_id}: 5분 미만 ({time_diff/60:.1f}분), 스킵 (다음 체크 대기)")
+                    print(f"[정보] [스케줄러] C/S #{cs_id}: 5분 미만 ({time_diff/60:.1f}분), 스킵 (다음 체크 대기)")
             else:
                 # 첫 알림인 경우, 접수일로부터 1분 이상 지났는지 확인 (5분에서 1분으로 완화)
                 created_at_str = cs.get('created_at', '')
-                print(f"🔍 [스케줄러] C/S #{cs_id}: 첫 알림 체크, 접수일: {created_at_str}")
+                print(f"[정보] [스케줄러] C/S #{cs_id}: 첫 알림 체크, 접수일: {created_at_str}")
                 
                 if created_at_str:
                     try:
@@ -179,25 +179,25 @@ def send_cs_notifications():
                         if created_at:
                             # 접수일로부터 1분 이상 지났는지 확인 (5분에서 1분으로 완화)
                             time_since_creation = (current_time - created_at).total_seconds()
-                            print(f"⏱️ [스케줄러] C/S #{cs_id}: 접수일로부터 {time_since_creation:.0f}초 경과")
+                            print(f"[정보] [스케줄러] C/S #{cs_id}: 접수일로부터 {time_since_creation:.0f}초 경과")
                             
                             if time_since_creation >= 60:  # 1분 이상 지났으면 알림 전송
                                 should_send = True
-                                print(f"✅ [스케줄러] C/S #{cs_id}: 1분 이상 경과, 알림 전송")
+                                print(f"[성공] [스케줄러] C/S #{cs_id}: 1분 이상 경과, 알림 전송")
                             else:
-                                print(f"⏸️ [스케줄러] C/S #{cs_id}: 1분 미만, 스킵 (다음 체크 대기)")
+                                print(f"[정보] [스케줄러] C/S #{cs_id}: 1분 미만, 스킵 (다음 체크 대기)")
                         else:
                             # 파싱 실패 시에도 알림 전송 (안전장치)
                             should_send = True
-                            print(f"⚠️ [스케줄러] C/S #{cs_id}: 접수일 파싱 실패, 알림 전송 (안전장치)")
+                            print(f"[경고] [스케줄러] C/S #{cs_id}: 접수일 파싱 실패, 알림 전송 (안전장치)")
                     except Exception as e:
-                        print(f"⚠️ [스케줄러] 접수일 파싱 오류: {e}, C/S #{cs_id}")
+                        print(f"[경고] [스케줄러] 접수일 파싱 오류: {e}, C/S #{cs_id}")
                         # 오류 발생 시에도 알림 전송 (안전장치)
                         should_send = True
                 else:
                     # created_at이 없으면 알림 전송 (안전장치)
                     should_send = True
-                    print(f"⚠️ [스케줄러] C/S #{cs_id}: 접수일 정보 없음, 알림 전송 (안전장치)")
+                    print(f"[경고] [스케줄러] C/S #{cs_id}: 접수일 정보 없음, 알림 전송 (안전장치)")
             
             if not should_send:
                 continue
@@ -220,15 +220,15 @@ def send_cs_notifications():
             message += f"내용: {content_preview}\n"
             message += f"접수일: {created_at_kst}"
             
-            print(f"📤 [스케줄러] 일반 미처리 항목 알림 전송: C/S #{cs_id}")
+            print(f"[정보] [스케줄러] 일반 미처리 항목 알림 전송: C/S #{cs_id}")
             send_telegram_notification(message)
             
             # 마지막 알림 시간 업데이트
             last_notification_times[last_time_key] = current_time
-            print(f"💾 [스케줄러] C/S #{cs_id}: 마지막 알림 시간 저장 완료: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"[성공] [스케줄러] C/S #{cs_id}: 마지막 알림 시간 저장 완료: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
             
     except Exception as e:
-        print(f"❌ C/S 알림 전송 오류: {e}")
+        print(f"[오류] C/S 알림 전송 오류: {e}")
         import traceback
         traceback.print_exc()
 
@@ -239,22 +239,22 @@ def start_cs_notification_scheduler():
     is_vercel = os.environ.get('VERCEL') == '1'
     
     if is_vercel:
-        print("⚠️ [스케줄러] Vercel 환경 감지 - 백그라운드 스레드는 제한적일 수 있습니다.")
+        print("[경고] [스케줄러] Vercel 환경 감지 - 백그라운드 스레드는 제한적일 수 있습니다.")
         print("   Vercel Cron Jobs를 사용하는 것을 권장합니다: /api/cs/check-notifications")
     
     def scheduler_loop():
-        print("🔄 [스케줄러] 루프 시작 (백그라운드 스레드)")
+        print("[정보] [스케줄러] 루프 시작 (백그라운드 스레드)")
         loop_count = 0
         while True:
             try:
                 loop_count += 1
                 if loop_count % 5 == 0:  # 5분마다 한 번씩 로그 출력
-                    print(f"🔄 [스케줄러] 루프 실행 중... (실행 횟수: {loop_count})")
+                    print(f"[정보] [스케줄러] 루프 실행 중... (실행 횟수: {loop_count})")
                 elif loop_count == 1:
-                    print(f"🔄 [스케줄러] 첫 실행: {loop_count}")
+                    print(f"[정보] [스케줄러] 첫 실행: {loop_count}")
                 send_cs_notifications()
             except Exception as e:
-                print(f"❌ [스케줄러] 루프 오류: {e}")
+                print(f"[오류] [스케줄러] 루프 오류: {e}")
                 import traceback
                 traceback.print_exc()
             
@@ -264,7 +264,7 @@ def start_cs_notification_scheduler():
     try:
         scheduler_thread = threading.Thread(target=scheduler_loop, daemon=True)
         scheduler_thread.start()
-        print("✅ [스케줄러] C/S 알림 스케줄러가 시작되었습니다.")
+        print("[성공] [스케줄러] C/S 알림 스케줄러가 시작되었습니다.")
         print("   - 취소건: 1분마다 알림")
         print("   - 일반 항목: 첫 알림은 접수 후 1분, 이후 5분마다 알림")
         print(f"   - 스레드 상태: {'활성' if scheduler_thread.is_alive() else '비활성'}")
@@ -273,9 +273,9 @@ def start_cs_notification_scheduler():
         import time as time_module
         time_module.sleep(0.1)  # 잠시 대기
         if not scheduler_thread.is_alive():
-            print("⚠️ [스케줄러] 경고: 스레드가 즉시 종료되었습니다. Vercel 환경에서는 작동하지 않을 수 있습니다.")
+            print("[경고] [스케줄러] 경고: 스레드가 즉시 종료되었습니다. Vercel 환경에서는 작동하지 않을 수 있습니다.")
     except Exception as e:
-        print(f"❌ [스케줄러] 스레드 시작 오류: {e}")
+        print(f"[오류] [스케줄러] 스레드 시작 오류: {e}")
         import traceback
         traceback.print_exc()
 

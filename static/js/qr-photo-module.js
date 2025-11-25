@@ -642,3 +642,5 @@ window.closeManualInput = function() {
     document.querySelector('.manual-input-mode').classList.remove('active');
 };
 
+
+
