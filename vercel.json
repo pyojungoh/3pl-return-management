@@ -19,11 +19,6 @@
   "env": {
     "VERCEL": "1"
   },
-  "crons": [
-    {
-      "path": "/api/schedule-notifications/check-notifications",
-      "schedule": "0 * * * *"
-    }
-  ]
+  "crons": []
 }
 
