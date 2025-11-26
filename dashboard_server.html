@@ -6773,6 +6773,8 @@
       }
       
       try {
+        console.log('📝 [스케줄 타입 추가] 요청 시작:', typeName);
+        
         const response = await fetch('/api/schedules/types', {
           method: 'POST',
           headers: {
@@ -6784,18 +6786,22 @@
           })
         });
         
+        console.log('📝 [스케줄 타입 추가] 응답 상태:', response.status, response.statusText);
+        
         const result = await response.json();
+        console.log('📝 [스케줄 타입 추가] 응답 데이터:', result);
         
         if (result.success) {
           input.value = '';
           loadScheduleTypes(); // 목록 새로고침
           alert('스케줄 타입이 추가되었습니다.');
         } else {
+          console.error('❌ [스케줄 타입 추가] 실패:', result.message);
           alert(result.message || '스케줄 타입 추가에 실패했습니다.');
         }
       } catch (error) {
-        console.error('스케줄 타입 추가 오류:', error);
-        alert('스케줄 타입 추가 중 오류가 발생했습니다.');
+        console.error('❌ [스케줄 타입 추가] 오류:', error);
+        alert('스케줄 타입 추가 중 오류가 발생했습니다: ' + error.message);
       }
     }
     window.addCustomScheduleType = addCustomScheduleType;

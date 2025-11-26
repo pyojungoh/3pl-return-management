@@ -493,10 +493,22 @@ def create_schedule_type_route():
     """스케줄 타입 생성"""
     try:
         data = request.get_json()
+        print(f'📝 [스케줄 타입 생성 요청] 받은 데이터: {data}')
+        
+        if not data:
+            print('❌ [스케줄 타입 생성] 요청 데이터가 없습니다.')
+            return jsonify({
+                'success': False,
+                'message': '요청 데이터가 없습니다.'
+            }), 400
+        
         name = data.get('name', '').strip()
         display_order = data.get('display_order', 0)
         
+        print(f'📝 [스케줄 타입 생성] 타입명: "{name}", display_order: {display_order}')
+        
         if not name:
+            print('❌ [스케줄 타입 생성] 타입명이 비어있습니다.')
             return jsonify({
                 'success': False,
                 'message': '스케줄 타입명은 필수입니다.'
@@ -507,17 +519,28 @@ def create_schedule_type_route():
         existing_types = get_all_schedule_types()
         normalized_input = name.strip().lower()
         
+        print(f'📝 [스케줄 타입 생성] 기존 타입 개수: {len(existing_types)}')
+        print(f'📝 [스케줄 타입 생성] 기존 타입 목록: {[t.get("name") for t in existing_types]}')
+        print(f'📝 [스케줄 타입 생성] 입력 타입 (정규화): "{normalized_input}"')
+        
         for existing_type in existing_types:
             existing_name = existing_type.get('name', '').strip().lower()
+            print(f'📝 [스케줄 타입 생성] 비교: "{normalized_input}" vs "{existing_name}"')
             if existing_name == normalized_input:
+                print(f'❌ [스케줄 타입 생성] 중복 발견: "{name}" == "{existing_type.get("name")}"')
                 return jsonify({
                     'success': False,
                     'message': f'이미 존재하는 스케줄 타입입니다: "{name}"'
                 }), 400
         
+        print(f'✅ [스케줄 타입 생성] 중복 없음, 생성 시도: "{name}"')
+        
         # create_schedule_type 함수 내부에서도 중복 체크를 수행하지만, 여기서 먼저 체크
         type_id = create_schedule_type(name, display_order)
+        print(f'📝 [스케줄 타입 생성] create_schedule_type 결과: {type_id}')
+        
         if type_id:
+            print(f'✅ [스케줄 타입 생성] 성공: id={type_id}, name="{name}"')
             return jsonify({
                 'success': True,
                 'message': '스케줄 타입이 생성되었습니다.',
@@ -525,6 +548,7 @@ def create_schedule_type_route():
             })
         else:
             # create_schedule_type이 실패한 경우 (중복 체크는 이미 했으므로 다른 오류)
+            print(f'❌ [스케줄 타입 생성] 실패: type_id={type_id}, name="{name}"')
             return jsonify({
                 'success': False,
                 'message': f'스케줄 타입 생성에 실패했습니다. (타입명: "{name}")'
