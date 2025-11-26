@@ -6156,16 +6156,36 @@
         let endDate = schedule.end_date || '';
         
         // 날짜가 datetime 형식이면 YYYY-MM-DD로 변환
-        if (startDate && startDate.includes('T')) {
-          startDate = startDate.split('T')[0];
-        } else if (startDate && startDate.includes(' ')) {
-          startDate = startDate.split(' ')[0];
+        if (startDate) {
+          if (typeof startDate === 'string') {
+            if (startDate.includes('T')) {
+              startDate = startDate.split('T')[0];
+            } else if (startDate.includes(' ')) {
+              startDate = startDate.split(' ')[0];
+            }
+          } else if (startDate instanceof Date) {
+            // Date 객체인 경우
+            const year = startDate.getFullYear();
+            const month = String(startDate.getMonth() + 1).padStart(2, '0');
+            const day = String(startDate.getDate()).padStart(2, '0');
+            startDate = `${year}-${month}-${day}`;
+          }
         }
         
-        if (endDate && endDate.includes('T')) {
-          endDate = endDate.split('T')[0];
-        } else if (endDate && endDate.includes(' ')) {
-          endDate = endDate.split(' ')[0];
+        if (endDate) {
+          if (typeof endDate === 'string') {
+            if (endDate.includes('T')) {
+              endDate = endDate.split('T')[0];
+            } else if (endDate.includes(' ')) {
+              endDate = endDate.split(' ')[0];
+            }
+          } else if (endDate instanceof Date) {
+            // Date 객체인 경우
+            const year = endDate.getFullYear();
+            const month = String(endDate.getMonth() + 1).padStart(2, '0');
+            const day = String(endDate.getDate()).padStart(2, '0');
+            endDate = `${year}-${month}-${day}`;
+          }
         }
         
         // 모달에 데이터 채우기

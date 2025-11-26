@@ -3580,6 +3580,8 @@ def get_schedules_by_date_range(start_date: str, end_date: str) -> List[Dict]:
 
 def get_schedule_by_id(schedule_id: int) -> Optional[Dict]:
     """스케쥴 ID로 조회"""
+    from datetime import datetime, date
+    
     conn = get_db_connection()
     
     if USE_POSTGRESQL:
@@ -3587,16 +3589,65 @@ def get_schedule_by_id(schedule_id: int) -> Optional[Dict]:
         try:
             cursor.execute('SELECT * FROM schedules WHERE id = %s', (schedule_id,))
             row = cursor.fetchone()
-            return dict(row) if row else None
+            if not row:
+                return None
+            
+            result = dict(row)
+            # 날짜 형식 변환 (YYYY-MM-DD 형식으로)
+            if result.get('start_date'):
+                start_date = result['start_date']
+                if isinstance(start_date, (datetime, date)):
+                    result['start_date'] = start_date.strftime('%Y-%m-%d')
+                elif isinstance(start_date, str):
+                    # 이미 문자열이면 그대로 사용 (YYYY-MM-DD 형식이어야 함)
+                    if 'T' in start_date:
+                        result['start_date'] = start_date.split('T')[0]
+                    elif ' ' in start_date:
+                        result['start_date'] = start_date.split(' ')[0]
+            
+            if result.get('end_date'):
+                end_date = result['end_date']
+                if isinstance(end_date, (datetime, date)):
+                    result['end_date'] = end_date.strftime('%Y-%m-%d')
+                elif isinstance(end_date, str):
+                    # 이미 문자열이면 그대로 사용 (YYYY-MM-DD 형식이어야 함)
+                    if 'T' in end_date:
+                        result['end_date'] = end_date.split('T')[0]
+                    elif ' ' in end_date:
+                        result['end_date'] = end_date.split(' ')[0]
+            
+            return result
         finally:
             cursor.close()
             conn.close()
     else:
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         try:
             cursor.execute('SELECT * FROM schedules WHERE id = ?', (schedule_id,))
             row = cursor.fetchone()
-            return dict(row) if row else None
+            if not row:
+                return None
+            
+            result = dict(row)
+            # 날짜 형식 변환 (YYYY-MM-DD 형식으로)
+            if result.get('start_date'):
+                start_date = result['start_date']
+                if isinstance(start_date, str):
+                    if 'T' in start_date:
+                        result['start_date'] = start_date.split('T')[0]
+                    elif ' ' in start_date:
+                        result['start_date'] = start_date.split(' ')[0]
+            
+            if result.get('end_date'):
+                end_date = result['end_date']
+                if isinstance(end_date, str):
+                    if 'T' in end_date:
+                        result['end_date'] = end_date.split('T')[0]
+                    elif ' ' in end_date:
+                        result['end_date'] = end_date.split(' ')[0]
+            
+            return result
         finally:
             conn.close()
 
