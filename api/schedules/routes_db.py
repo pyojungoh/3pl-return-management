@@ -502,6 +502,19 @@ def create_schedule_type_route():
                 'message': '스케줄 타입명은 필수입니다.'
             }), 400
         
+        # 중복 체크를 먼저 수행
+        from api.database.models import get_all_schedule_types
+        existing_types = get_all_schedule_types()
+        normalized_input = name.strip().lower()
+        
+        for existing_type in existing_types:
+            existing_name = existing_type.get('name', '').strip().lower()
+            if existing_name == normalized_input:
+                return jsonify({
+                    'success': False,
+                    'message': f'이미 존재하는 스케줄 타입입니다: "{name}"'
+                }), 400
+        
         type_id = create_schedule_type(name, display_order)
         if type_id:
             return jsonify({
@@ -512,7 +525,7 @@ def create_schedule_type_route():
         else:
             return jsonify({
                 'success': False,
-                'message': '스케줄 타입 생성에 실패했습니다. (중복된 이름일 수 있습니다)'
+                'message': f'스케줄 타입 생성에 실패했습니다. (타입명: "{name}")'
             }), 400
     except Exception as e:
         print(f'❌ 스케줄 타입 생성 오류: {e}')

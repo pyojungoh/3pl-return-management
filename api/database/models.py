@@ -4153,19 +4153,37 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
     """스케줄 타입 생성"""
     conn = get_db_connection()
     
+    # 이름 정규화 (공백 제거, 대소문자 통일)
+    normalized_name = name.strip()
+    
     if USE_POSTGRESQL:
         cursor = conn.cursor()
         try:
+            # 먼저 중복 체크 (대소문자 무시, 공백 무시)
+            cursor.execute('''
+                SELECT id, name FROM schedule_types 
+                WHERE TRIM(LOWER(name)) = TRIM(LOWER(%s))
+            ''', (normalized_name,))
+            existing = cursor.fetchone()
+            
+            if existing:
+                print(f"스케줄 타입 중복: '{normalized_name}' (기존: '{existing[1]}')")
+                return 0
+            
             cursor.execute('''
                 INSERT INTO schedule_types (name, display_order)
                 VALUES (%s, %s)
                 RETURNING id
-            ''', (name, display_order))
+            ''', (normalized_name, display_order))
             conn.commit()
             row = cursor.fetchone()
             return row[0] if row else 0
         except Exception as e:
-            print(f"스케줄 타입 생성 오류: {e}")
+            error_msg = str(e).lower()
+            if 'unique' in error_msg or 'duplicate' in error_msg:
+                print(f"스케줄 타입 중복 (UNIQUE 제약조건): '{normalized_name}'")
+            else:
+                print(f"스케줄 타입 생성 오류: {e}")
             conn.rollback()
             return 0
         finally:
@@ -4174,14 +4192,29 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
     else:
         cursor = conn.cursor()
         try:
+            # 먼저 중복 체크 (대소문자 무시, 공백 무시)
+            cursor.execute('''
+                SELECT id, name FROM schedule_types 
+                WHERE TRIM(LOWER(name)) = TRIM(LOWER(?))
+            ''', (normalized_name,))
+            existing = cursor.fetchone()
+            
+            if existing:
+                print(f"스케줄 타입 중복: '{normalized_name}' (기존: '{existing[1]}')")
+                return 0
+            
             cursor.execute('''
                 INSERT INTO schedule_types (name, display_order)
                 VALUES (?, ?)
-            ''', (name, display_order))
+            ''', (normalized_name, display_order))
             conn.commit()
             return cursor.lastrowid
         except Exception as e:
-            print(f"스케줄 타입 생성 오류: {e}")
+            error_msg = str(e).lower()
+            if 'unique' in error_msg or 'duplicate' in error_msg:
+                print(f"스케줄 타입 중복 (UNIQUE 제약조건): '{normalized_name}'")
+            else:
+                print(f"스케줄 타입 생성 오류: {e}")
             return 0
         finally:
             conn.close()

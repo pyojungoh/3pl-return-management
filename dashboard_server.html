@@ -6151,13 +6151,30 @@
         
         const schedule = result.data;
         
+        // 날짜 형식 변환 (YYYY-MM-DD 형식으로)
+        let startDate = schedule.start_date || '';
+        let endDate = schedule.end_date || '';
+        
+        // 날짜가 datetime 형식이면 YYYY-MM-DD로 변환
+        if (startDate && startDate.includes('T')) {
+          startDate = startDate.split('T')[0];
+        } else if (startDate && startDate.includes(' ')) {
+          startDate = startDate.split(' ')[0];
+        }
+        
+        if (endDate && endDate.includes('T')) {
+          endDate = endDate.split('T')[0];
+        } else if (endDate && endDate.includes(' ')) {
+          endDate = endDate.split(' ')[0];
+        }
+        
         // 모달에 데이터 채우기
         document.getElementById('editScheduleId').value = schedule.id;
         document.getElementById('editScheduleCompanyInput').value = schedule.company_name || '';
         document.getElementById('editScheduleCompanyName').value = schedule.company_name || '';
         document.getElementById('editScheduleTitle').value = schedule.title || '';
-        document.getElementById('editScheduleStartDate').value = schedule.start_date || '';
-        document.getElementById('editScheduleEndDate').value = schedule.end_date || '';
+        document.getElementById('editScheduleStartDate').value = startDate;
+        document.getElementById('editScheduleEndDate').value = endDate;
         document.getElementById('editScheduleEventDescription').value = schedule.event_description || '';
         document.getElementById('editScheduleRequestNote').value = schedule.request_note || '';
         
