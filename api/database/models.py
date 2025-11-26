@@ -4231,10 +4231,13 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
             return row[0] if row else 0
         except Exception as e:
             error_msg = str(e).lower()
+            import traceback
+            traceback.print_exc()
             if 'unique' in error_msg or 'duplicate' in error_msg:
-                print(f"스케줄 타입 중복 (UNIQUE 제약조건): '{normalized_name}'")
+                print(f"스케줄 타입 중복 (UNIQUE 제약조건): '{normalized_name}' - {e}")
             else:
-                print(f"스케줄 타입 생성 오류: {e}")
+                print(f"스케줄 타입 생성 오류: '{normalized_name}' - {e}")
+                print(f"전체 에러: {traceback.format_exc()}")
             conn.rollback()
             return 0
         finally:
@@ -4262,10 +4265,13 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
             return cursor.lastrowid
         except Exception as e:
             error_msg = str(e).lower()
+            import traceback
+            traceback.print_exc()
             if 'unique' in error_msg or 'duplicate' in error_msg:
-                print(f"스케줄 타입 중복 (UNIQUE 제약조건): '{normalized_name}'")
+                print(f"스케줄 타입 중복 (UNIQUE 제약조건): '{normalized_name}' - {e}")
             else:
-                print(f"스케줄 타입 생성 오류: {e}")
+                print(f"스케줄 타입 생성 오류: '{normalized_name}' - {e}")
+                print(f"전체 에러: {traceback.format_exc()}")
             return 0
         finally:
             conn.close()
