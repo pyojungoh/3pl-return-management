@@ -4,7 +4,7 @@ DATABASE_URL 환경 변수가 있으면 PostgreSQL 사용, 없으면 SQLite 사�
 """
 import os
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 
 # 데이터베이스 연결 문자열
 DATABASE_URL = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
@@ -4200,8 +4200,14 @@ def delete_popup(popup_id: int) -> bool:
 
 # ========== 스케줄 타입 관리 함수들 ==========
 
-def create_schedule_type(name: str, display_order: int = 0) -> int:
-    """스케줄 타입 생성"""
+def create_schedule_type(name: str, display_order: int = 0) -> Tuple[int, Optional[str]]:
+    """스케줄 타입 생성
+
+    Returns:
+        tuple[int, Optional[str]]: (생성된 타입 ID, 오류 메시지)
+        - 성공 시 (type_id, None)
+        - 실패 시 (0, 오류 메시지)
+    """
     conn = get_db_connection()
     
     # 이름 정규화 (공백 제거, 대소문자 통일)
@@ -4220,8 +4226,9 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
             existing = cursor.fetchone()
             
             if existing:
-                print(f"❌ [create_schedule_type] 스케줄 타입 중복: '{normalized_name}' (기존: '{existing[1]}')")
-                return 0
+                message = f"스케줄 타입 중복: '{normalized_name}' (기존: '{existing[1]}')"
+                print(f"❌ [create_schedule_type] {message}")
+                return 0, message
             
             print(f'✅ [create_schedule_type] 중복 없음, INSERT 시도: "{normalized_name}"')
             
@@ -4240,7 +4247,7 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
             conn.commit()
             print(f'✅ [create_schedule_type] 커밋 완료: type_id={type_id}')
             
-            return type_id
+            return type_id, None
         except Exception as e:
             error_msg = str(e).lower()
             import traceback
@@ -4251,7 +4258,7 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
                 print(f"스케줄 타입 생성 오류: '{normalized_name}' - {e}")
                 print(f"전체 에러: {traceback.format_exc()}")
             conn.rollback()
-            return 0
+            return 0, str(e)
         finally:
             cursor.close()
             conn.close()
@@ -4268,8 +4275,9 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
             existing = cursor.fetchone()
             
             if existing:
-                print(f"❌ [create_schedule_type] 스케줄 타입 중복: '{normalized_name}' (기존: '{existing[1]}')")
-                return 0
+                message = f"스케줄 타입 중복: '{normalized_name}' (기존: '{existing[1]}')"
+                print(f"❌ [create_schedule_type] {message}")
+                return 0, message
             
             print(f'✅ [create_schedule_type] 중복 없음, INSERT 시도: "{normalized_name}"')
             
@@ -4284,7 +4292,7 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
             conn.commit()
             print(f'✅ [create_schedule_type] 커밋 완료: type_id={type_id}')
             
-            return type_id
+            return type_id, None
         except Exception as e:
             error_msg = str(e).lower()
             import traceback
@@ -4294,7 +4302,7 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
             else:
                 print(f"스케줄 타입 생성 오류: '{normalized_name}' - {e}")
                 print(f"전체 에러: {traceback.format_exc()}")
-            return 0
+            return 0, str(e)
         finally:
             conn.close()
 

@@ -536,8 +536,8 @@ def create_schedule_type_route():
         print(f'✅ [스케줄 타입 생성] 중복 없음, 생성 시도: "{name}"')
         
         # create_schedule_type 함수 내부에서도 중복 체크를 수행하지만, 여기서 먼저 체크
-        type_id = create_schedule_type(name, display_order)
-        print(f'📝 [스케줄 타입 생성] create_schedule_type 결과: {type_id}')
+        type_id, error_message = create_schedule_type(name, display_order)
+        print(f'📝 [스케줄 타입 생성] create_schedule_type 결과: id={type_id}, error={error_message}')
         
         if type_id:
             print(f'✅ [스케줄 타입 생성] 성공: id={type_id}, name="{name}"')
@@ -548,10 +548,11 @@ def create_schedule_type_route():
             })
         else:
             # create_schedule_type이 실패한 경우 (중복 체크는 이미 했으므로 다른 오류)
+            error_detail = error_message or '알 수 없는 오류'
             print(f'❌ [스케줄 타입 생성] 실패: type_id={type_id}, name="{name}"')
             return jsonify({
                 'success': False,
-                'message': f'스케줄 타입 생성에 실패했습니다. (타입명: "{name}")'
+                'message': f'스케줄 타입 생성에 실패했습니다. (타입명: "{name}", 오류: {error_detail})'
             }), 400
     except Exception as e:
         print(f'❌ 스케줄 타입 생성 오류: {e}')
