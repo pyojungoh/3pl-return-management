@@ -4210,6 +4210,8 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
     if USE_POSTGRESQL:
         cursor = conn.cursor()
         try:
+            print(f'📝 [create_schedule_type] PostgreSQL 모드, 타입명: "{normalized_name}"')
+            
             # 먼저 중복 체크 (대소문자 무시, 공백 무시)
             cursor.execute('''
                 SELECT id, name FROM schedule_types 
@@ -4218,17 +4220,27 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
             existing = cursor.fetchone()
             
             if existing:
-                print(f"스케줄 타입 중복: '{normalized_name}' (기존: '{existing[1]}')")
+                print(f"❌ [create_schedule_type] 스케줄 타입 중복: '{normalized_name}' (기존: '{existing[1]}')")
                 return 0
+            
+            print(f'✅ [create_schedule_type] 중복 없음, INSERT 시도: "{normalized_name}"')
             
             cursor.execute('''
                 INSERT INTO schedule_types (name, display_order)
                 VALUES (%s, %s)
                 RETURNING id
             ''', (normalized_name, display_order))
-            conn.commit()
+            
+            # RETURNING 결과는 commit 전에 가져와야 함
             row = cursor.fetchone()
-            return row[0] if row else 0
+            type_id = row[0] if row else 0
+            
+            print(f'📝 [create_schedule_type] INSERT 결과: type_id={type_id}')
+            
+            conn.commit()
+            print(f'✅ [create_schedule_type] 커밋 완료: type_id={type_id}')
+            
+            return type_id
         except Exception as e:
             error_msg = str(e).lower()
             import traceback
@@ -4246,6 +4258,8 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
     else:
         cursor = conn.cursor()
         try:
+            print(f'📝 [create_schedule_type] SQLite 모드, 타입명: "{normalized_name}"')
+            
             # 먼저 중복 체크 (대소문자 무시, 공백 무시)
             cursor.execute('''
                 SELECT id, name FROM schedule_types 
@@ -4254,15 +4268,23 @@ def create_schedule_type(name: str, display_order: int = 0) -> int:
             existing = cursor.fetchone()
             
             if existing:
-                print(f"스케줄 타입 중복: '{normalized_name}' (기존: '{existing[1]}')")
+                print(f"❌ [create_schedule_type] 스케줄 타입 중복: '{normalized_name}' (기존: '{existing[1]}')")
                 return 0
+            
+            print(f'✅ [create_schedule_type] 중복 없음, INSERT 시도: "{normalized_name}"')
             
             cursor.execute('''
                 INSERT INTO schedule_types (name, display_order)
                 VALUES (?, ?)
             ''', (normalized_name, display_order))
+            
+            type_id = cursor.lastrowid
+            print(f'📝 [create_schedule_type] INSERT 결과: type_id={type_id}')
+            
             conn.commit()
-            return cursor.lastrowid
+            print(f'✅ [create_schedule_type] 커밋 완료: type_id={type_id}')
+            
+            return type_id
         except Exception as e:
             error_msg = str(e).lower()
             import traceback
