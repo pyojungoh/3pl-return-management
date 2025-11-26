@@ -2432,6 +2432,63 @@
       </div>
       <!-- 스케쥴 달력 탭 끝 -->
       
+      <!-- 스케쥴 수정 모달 (관리자 모드) -->
+      <div id="editScheduleModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; overflow-y: auto;">
+        <div style="max-width: 800px; margin: 50px auto; background: white; border-radius: 14px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <h2 style="margin: 0; color: #ff6b35; font-weight: 700;">스케쥴 수정</h2>
+            <button onclick="closeEditScheduleModal()" style="background: #e17055; color: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 18px;">×</button>
+          </div>
+          <form id="editScheduleForm" onsubmit="event.preventDefault(); return false;">
+            <input type="hidden" id="editScheduleId">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+              <div>
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">화주사 선택 *</label>
+                <div class="sc-searchable-select">
+                  <input type="text" id="editScheduleCompanyInput" class="request-input" style="min-height: auto;" placeholder="화주사를 입력하거나 선택하세요" autocomplete="off" required>
+                  <input type="hidden" id="editScheduleCompanyName" required>
+                  <div class="sc-dropdown-list" id="editScheduleCompanyDropdown"></div>
+                </div>
+                <div class="sc-helper-text">"모든 화주사", "제이제이" 등 원하는 이름을 입력하거나 선택하세요.</div>
+              </div>
+              <div>
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">스케줄 타입 *</label>
+                <div class="sc-type-select">
+                  <select id="editScheduleType" class="request-input" style="min-height: auto; flex: 1;" required onkeydown="if(event.key==='Enter'){event.preventDefault();return false;}">
+                    <option value="">타입을 선택하세요</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">제목 *</label>
+                <input type="text" id="editScheduleTitle" class="request-input" style="min-height: auto;" placeholder="예: 11월 대형 할인행사" required onkeydown="if(event.key==='Enter'){event.preventDefault();return false;}">
+              </div>
+              <div>
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">시작일 *</label>
+                <input type="date" id="editScheduleStartDate" class="request-input" style="min-height: auto;" required onkeydown="if(event.key==='Enter'){event.preventDefault();return false;}">
+              </div>
+              <div>
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">종료일 *</label>
+                <input type="date" id="editScheduleEndDate" class="request-input" style="min-height: auto;" required onkeydown="if(event.key==='Enter'){event.preventDefault();return false;}">
+              </div>
+              <div style="grid-column: 1 / -1;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">행사 내용 *</label>
+                <textarea id="editScheduleEventDescription" class="request-input" style="min-height: 80px;" placeholder="행사 내용을 입력하세요" required onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();return false;}"></textarea>
+              </div>
+              <div style="grid-column: 1 / -1;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">요청사항 (선택사항)</label>
+                <textarea id="editScheduleRequestNote" class="request-input" style="min-height: 60px;" placeholder="특별 요청사항이 있으면 입력하세요" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();return false;}"></textarea>
+              </div>
+            </div>
+            <div style="margin-top: 20px; display: flex; gap: 12px;">
+              <button type="button" class="save-btn" onclick="saveEditSchedule()">저장</button>
+              <button type="button" class="save-btn" onclick="closeEditScheduleModal()" style="background: linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%); box-shadow: 0 3px 10px rgba(178, 190, 195, 0.25);">취소</button>
+            </div>
+            <div id="editScheduleMessage" style="margin-top: 15px;"></div>
+          </form>
+        </div>
+      </div>
+      
       <!-- 게시판 관리 탭 (관리자 모드) -->
       <div id="boardTab" class="tab-content hidden">
         <!-- 카테고리 관리 섹션 (접이식) -->
@@ -6076,6 +6133,294 @@
     }
     window.deleteSchedule = deleteSchedule;
     
+    // ========== 관리자 스케쥴 수정 관련 함수 ==========
+    
+    /**
+     * 스케쥴 수정 모달 열기
+     */
+    async function editSchedule(scheduleId) {
+      try {
+        // 스케쥴 정보 가져오기
+        const response = await fetch(`/api/schedules/${scheduleId}`);
+        const result = await response.json();
+        
+        if (!result.success || !result.data) {
+          alert('스케쥴 정보를 불러올 수 없습니다.');
+          return;
+        }
+        
+        const schedule = result.data;
+        
+        // 모달에 데이터 채우기
+        document.getElementById('editScheduleId').value = schedule.id;
+        document.getElementById('editScheduleCompanyInput').value = schedule.company_name || '';
+        document.getElementById('editScheduleCompanyName').value = schedule.company_name || '';
+        document.getElementById('editScheduleTitle').value = schedule.title || '';
+        document.getElementById('editScheduleStartDate').value = schedule.start_date || '';
+        document.getElementById('editScheduleEndDate').value = schedule.end_date || '';
+        document.getElementById('editScheduleEventDescription').value = schedule.event_description || '';
+        document.getElementById('editScheduleRequestNote').value = schedule.request_note || '';
+        
+        // 스케줄 타입 선택 (스케줄 타입 목록이 로드되어 있어야 함)
+        const scheduleTypeSelect = document.getElementById('editScheduleType');
+        if (scheduleTypeSelect) {
+          // 스케줄 타입 목록이 없으면 먼저 로드
+          if (typeof loadScheduleTypes === 'function') {
+            await loadScheduleTypes();
+          }
+          // 스케줄 타입 선택 드롭다운 업데이트
+          const typesResponse = await fetch('/api/schedules/types');
+          const typesResult = await typesResponse.json();
+          if (typesResult.success && typesResult.data) {
+            scheduleTypeSelect.innerHTML = '<option value="">타입을 선택하세요</option>' + 
+              typesResult.data.map(type => 
+                `<option value="${escapeHtml(type.name)}">${escapeHtml(type.name)}</option>`
+              ).join('');
+            
+            // schedule_type이 "모든화주사-"로 시작하면 접두사 제거
+            let scheduleType = schedule.schedule_type || '';
+            if (scheduleType.startsWith('모든화주사-')) {
+              scheduleType = scheduleType.replace('모든화주사-', '');
+            }
+            scheduleTypeSelect.value = scheduleType;
+          }
+        }
+        
+        // 화주사 드롭다운 초기화
+        initEditScheduleCompanyDropdown();
+        
+        // 모달 열기
+        document.getElementById('editScheduleModal').style.display = 'block';
+      } catch (error) {
+        console.error('스케쥴 정보 로드 오류:', error);
+        alert('스케쥴 정보를 불러오는 중 오류가 발생했습니다.');
+      }
+    }
+    window.editSchedule = editSchedule;
+    
+    /**
+     * 스케쥴 수정 모달 닫기
+     */
+    function closeEditScheduleModal() {
+      document.getElementById('editScheduleModal').style.display = 'none';
+      document.getElementById('editScheduleForm').reset();
+      document.getElementById('editScheduleMessage').innerHTML = '';
+    }
+    window.closeEditScheduleModal = closeEditScheduleModal;
+    
+    /**
+     * 수정 모달 화주사 드롭다운 초기화
+     */
+    function initEditScheduleCompanyDropdown() {
+      fetch('/api/auth/companies')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const companies = data.companies || [];
+            const input = document.getElementById('editScheduleCompanyInput');
+            const hidden = document.getElementById('editScheduleCompanyName');
+            const dropdown = document.getElementById('editScheduleCompanyDropdown');
+            
+            if (input && hidden && dropdown) {
+              function updateDropdown(filterText = '') {
+                const filtered = companies.filter(company => 
+                  company.company_name.toLowerCase().includes(filterText.toLowerCase())
+                );
+                
+                if (filtered.length === 0) {
+                  dropdown.innerHTML = '<div class="sc-dropdown-item" style="color: #999; cursor: default;">검색 결과가 없습니다</div>';
+                } else {
+                  dropdown.innerHTML = filtered.map(company => 
+                    `<div class="sc-dropdown-item" data-value="${escapeHtml(company.company_name)}">${escapeHtml(company.company_name)}</div>`
+                  ).join('');
+                }
+              }
+              
+              updateDropdown();
+              
+              let isDropdownOpen = false;
+              let dropdownTimeout = null;
+              
+              const openDropdown = () => {
+                if (dropdownTimeout) {
+                  clearTimeout(dropdownTimeout);
+                  dropdownTimeout = null;
+                }
+                updateDropdown(input.value);
+                dropdown.classList.add('show');
+                isDropdownOpen = true;
+              };
+              
+              const closeDropdown = () => {
+                if (dropdownTimeout) {
+                  clearTimeout(dropdownTimeout);
+                  dropdownTimeout = null;
+                }
+                dropdown.classList.remove('show');
+                isDropdownOpen = false;
+              };
+              
+              input.addEventListener('input', (e) => {
+                const value = e.target.value;
+                hidden.value = value;
+                updateDropdown(value);
+                if (!isDropdownOpen) {
+                  openDropdown();
+                }
+              });
+              
+              input.addEventListener('focus', (e) => {
+                e.stopPropagation();
+                if (dropdownTimeout) {
+                  clearTimeout(dropdownTimeout);
+                }
+                dropdownTimeout = setTimeout(() => {
+                  openDropdown();
+                }, 100);
+              });
+              
+              input.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (dropdownTimeout) {
+                  clearTimeout(dropdownTimeout);
+                }
+                dropdownTimeout = setTimeout(() => {
+                  openDropdown();
+                }, 100);
+              });
+              
+              // 엔터 키 처리: 드롭다운에서 선택만 하고 폼 제출 방지
+              input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  
+                  if (isDropdownOpen && dropdown.children.length > 0) {
+                    const firstItem = dropdown.querySelector('.sc-dropdown-item[data-value]');
+                    if (firstItem && firstItem.dataset.value) {
+                      input.value = firstItem.dataset.value;
+                      hidden.value = firstItem.dataset.value;
+                      closeDropdown();
+                      return;
+                    }
+                  }
+                  
+                  const inputValue = input.value.trim().toLowerCase();
+                  if (inputValue) {
+                    const matchedItem = Array.from(dropdown.querySelectorAll('.sc-dropdown-item[data-value]'))
+                      .find(item => item.dataset.value.toLowerCase() === inputValue || 
+                                    item.dataset.value.toLowerCase().includes(inputValue));
+                    if (matchedItem && matchedItem.dataset.value) {
+                      input.value = matchedItem.dataset.value;
+                      hidden.value = matchedItem.dataset.value;
+                      closeDropdown();
+                      return;
+                    }
+                  }
+                  
+                  if (!isDropdownOpen) {
+                    openDropdown();
+                  }
+                }
+              });
+              
+              dropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const item = e.target.closest('.sc-dropdown-item');
+                if (item && item.dataset.value) {
+                  input.value = item.dataset.value;
+                  hidden.value = item.dataset.value;
+                  closeDropdown();
+                }
+              });
+              
+              const handleDocumentClick = (e) => {
+                if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                  setTimeout(() => {
+                    if (!input.contains(document.activeElement)) {
+                      closeDropdown();
+                    }
+                  }, 150);
+                }
+              };
+              
+              document.addEventListener('mousedown', handleDocumentClick);
+            }
+          }
+        })
+        .catch(error => {
+          console.error('화주사 목록 로드 오류:', error);
+        });
+    }
+    
+    /**
+     * 스케쥴 수정 저장
+     */
+    async function saveEditSchedule() {
+      const scheduleId = document.getElementById('editScheduleId').value;
+      if (!scheduleId) {
+        alert('스케쥴 ID를 찾을 수 없습니다.');
+        return;
+      }
+      
+      const companyHidden = document.getElementById('editScheduleCompanyName');
+      const companyInput = document.getElementById('editScheduleCompanyInput');
+      const companyName = (companyHidden && companyHidden.value.trim()) || (companyInput && companyInput.value.trim()) || '';
+      const scheduleType = document.getElementById('editScheduleType').value.trim();
+      const title = document.getElementById('editScheduleTitle').value.trim();
+      const startDate = document.getElementById('editScheduleStartDate').value;
+      const endDate = document.getElementById('editScheduleEndDate').value;
+      const eventDescription = document.getElementById('editScheduleEventDescription').value.trim();
+      const requestNote = document.getElementById('editScheduleRequestNote').value.trim();
+      const messageDiv = document.getElementById('editScheduleMessage');
+      
+      if (!companyName || !scheduleType || !title || !startDate || !endDate || !eventDescription) {
+        messageDiv.innerHTML = '<span style="color: #e74c3c;">필수 항목을 모두 입력해주세요.</span>';
+        return;
+      }
+      
+      if (new Date(endDate) < new Date(startDate)) {
+        messageDiv.innerHTML = '<span style="color: #e74c3c;">종료일은 시작일보다 늦어야 합니다.</span>';
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/schedules/update/${scheduleId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            company_name: companyName,
+            schedule_type: scheduleType,
+            title: title,
+            start_date: startDate,
+            end_date: endDate,
+            event_description: eventDescription,
+            request_note: requestNote || null
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          messageDiv.innerHTML = '<span style="color: #00b894;">스케쥴이 수정되었습니다.</span>';
+          setTimeout(() => {
+            closeEditScheduleModal();
+            // 목록 새로고침
+            if (typeof loadCalendarSchedules === 'function') {
+              loadCalendarSchedules();
+            }
+          }, 1000);
+        } else {
+          messageDiv.innerHTML = `<span style="color: #e74c3c;">${result.message || '스케쥴 수정에 실패했습니다.'}</span>`;
+        }
+      } catch (error) {
+        console.error('스케쥴 수정 오류:', error);
+        messageDiv.innerHTML = '<span style="color: #e74c3c;">스케쥴 수정 중 오류가 발생했습니다.</span>';
+      }
+    }
+    window.saveEditSchedule = saveEditSchedule;
+    
     // ========== 관리자 스케쥴 등록 관련 함수 ==========
     
     // 관리자 스케쥴 저장
@@ -6778,21 +7123,38 @@
           });
         }
         
-        // ID가 없으면 삭제 버튼 비활성화
-        let deleteBtn = '';
-        if (scheduleId && scheduleId !== null && scheduleId !== undefined) {
-          deleteBtn = `
-            <button class="save-btn" onclick="if(confirm('정말 삭제하시겠습니까?\\n삭제된 스케쥴은 복구할 수 없습니다.')) deleteSchedule(${scheduleId})" 
-                    style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border: none; padding: 6px 12px; font-size: 12px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 6px rgba(231, 76, 60, 0.25);">
-              🗑️ 삭제
-            </button>
-          `;
+        // 관리자 모드 확인
+        const roleNormalized = (typeof currentRole !== 'undefined' ? currentRole : '').toString().trim();
+        const isAdmin = (roleNormalized === '관리자');
+        
+        // 관리자 모드에서만 수정/삭제 버튼 표시
+        let actionButtons = '';
+        if (isAdmin) {
+          if (scheduleId && scheduleId !== null && scheduleId !== undefined) {
+            actionButtons = `
+              <div style="display: flex; gap: 6px; justify-content: center;">
+                <button class="save-btn" onclick="editSchedule(${scheduleId})" 
+                        style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; border: none; padding: 6px 12px; font-size: 12px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 6px rgba(116, 185, 255, 0.25);">
+                  ✏️ 수정
+                </button>
+                <button class="save-btn" onclick="if(confirm('정말 삭제하시겠습니까?\\n삭제된 스케쥴은 복구할 수 없습니다.')) deleteSchedule(${scheduleId})" 
+                        style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border: none; padding: 6px 12px; font-size: 12px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 6px rgba(231, 76, 60, 0.25);">
+                  🗑️ 삭제
+                </button>
+              </div>
+            `;
+          } else {
+            actionButtons = `
+              <div style="display: flex; gap: 6px; justify-content: center;">
+                <button disabled style="background: #95a5a6; color: white; border: none; padding: 6px 12px; font-size: 12px; border-radius: 8px; cursor: not-allowed; opacity: 0.6;">
+                  수정/삭제 불가 (ID 없음)
+                </button>
+              </div>
+            `;
+          }
         } else {
-          deleteBtn = `
-            <button disabled style="background: #95a5a6; color: white; border: none; padding: 6px 12px; font-size: 12px; border-radius: 8px; cursor: not-allowed; opacity: 0.6;">
-              삭제 불가 (ID 없음)
-            </button>
-          `;
+          // 화주사 모드에서는 버튼 없음
+          actionButtons = '<span style="color: #999;">-</span>';
         }
         
         // 화주사이름(타입) 형식으로 표시
@@ -6814,7 +7176,7 @@
           <td style="max-width: 300px; word-wrap: break-word;" title="${escapeHtml(eventDescription)}">${escapeHtml(eventDescriptionShort)}</td>
           <td style="max-width: 200px; word-wrap: break-word;" title="${escapeHtml(requestNote)}">${escapeHtml(requestNoteShort || '-')}</td>
           <td>${createdAt}</td>
-          <td style="text-align: center;">${deleteBtn}</td>
+          <td style="text-align: center;">${actionButtons}</td>
         `;
         
         tbody.appendChild(tr);
