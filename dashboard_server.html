@@ -1475,6 +1475,19 @@
       display: none; /* 기본적으로 숨김, JavaScript로 표시/숨김 제어 */
     }
     
+    /* 스케줄 메모 카드 스타일 */
+    .schedule-memo-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2);
+      border-color: #ffa502;
+    }
+    
+    .schedule-memo-card-empty:hover {
+      background: #fff9e6;
+      border-color: #ffa502;
+      transform: translateY(-2px);
+    }
+    
     #loginMessage {
       margin-top: 15px;
       text-align: center;
@@ -2387,7 +2400,7 @@
           </div>
         </div>
         
-        <div style="background: #ffffff; padding: 24px; border-radius: 14px; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1); margin-bottom: 20px;">
+        <div style="background: #ffffff; padding: 24px; border-radius: 14px; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1); margin-bottom: 20px; box-sizing: border-box;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h3 style="margin: 0; color: #ff6b35; font-weight: 700; font-size: 20px;">📅 전체 화주사 스케쥴</h3>
             <div style="display: flex; gap: 12px; align-items: center;">
@@ -2397,6 +2410,108 @@
           </div>
           <div id="calendarContainer" style="min-height: 500px;">
             <!-- 달력이 여기에 동적으로 생성됩니다 -->
+          </div>
+        </div>
+        
+        <!-- 스케줄 메모판 (관리자 전용) -->
+        <div id="scheduleMemoSection" class="admin-only" style="background: #ffffff; padding: 24px; border-radius: 14px; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1); margin-bottom: 20px; box-sizing: border-box;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0; color: #ff6b35; font-weight: 700; font-size: 20px;">📝 메모</h3>
+            <button class="refresh-btn" onclick="loadScheduleMemos()" style="padding: 8px 15px; font-size: 14px;">🔄 새로고침</button>
+          </div>
+          <div id="scheduleMemoGrid" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; width: 100%; max-width: 100%; box-sizing: border-box;">
+            <!-- 메모 카드들이 여기에 동적으로 생성됩니다 -->
+          </div>
+        </div>
+        
+        <!-- 메모 작성 모달 -->
+        <div id="scheduleMemoCreateModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; overflow-y: auto;">
+          <div style="max-width: 600px; margin: 50px auto; background: white; border-radius: 14px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+              <h2 style="margin: 0; color: #ff6b35; font-weight: 700;">📝 메모 작성</h2>
+              <button onclick="closeScheduleMemoCreateModal()" style="background: #e17055; color: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 18px;">×</button>
+            </div>
+            <form id="scheduleMemoCreateForm" onsubmit="event.preventDefault(); return false;">
+              <div style="margin-bottom: 20px;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">제목 *</label>
+                <input type="text" id="scheduleMemoCreateTitle" class="request-input" style="min-height: auto;" placeholder="예: 이번달 중순 입고 예정" required>
+              </div>
+              <div style="margin-bottom: 20px;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">화주사 (선택사항)</label>
+                <div class="sc-searchable-select">
+                  <input type="text" id="scheduleMemoCreateCompanyInput" class="request-input" style="min-height: auto;" placeholder="화주사를 입력하거나 선택하세요" autocomplete="off">
+                  <input type="hidden" id="scheduleMemoCreateCompanyName">
+                  <div class="sc-dropdown-list" id="scheduleMemoCreateCompanyDropdown"></div>
+                </div>
+              </div>
+              <div style="margin-bottom: 20px;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">내용 *</label>
+                <textarea id="scheduleMemoCreateContent" class="request-input" style="min-height: 150px; width: 100%; resize: vertical;" placeholder="메모 내용을 입력하세요" required></textarea>
+              </div>
+              <div style="margin-top: 20px; display: flex; gap: 12px;">
+                <button type="button" class="save-btn" onclick="saveScheduleMemoCreate()">💾 저장</button>
+                <button type="button" class="save-btn" onclick="closeScheduleMemoCreateModal()" style="background: linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%); box-shadow: 0 3px 10px rgba(178, 190, 195, 0.25);">취소</button>
+              </div>
+              <div id="scheduleMemoCreateMessage" style="margin-top: 15px; font-size: 14px;"></div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- 메모 상세보기/수정 모달 -->
+        <div id="scheduleMemoDetailModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; overflow-y: auto;">
+          <div style="max-width: 600px; margin: 50px auto; background: white; border-radius: 14px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+              <h2 style="margin: 0; color: #ff6b35; font-weight: 700;">📝 메모 상세</h2>
+              <button onclick="closeScheduleMemoDetailModal()" style="background: #e17055; color: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 18px;">×</button>
+            </div>
+            <div id="scheduleMemoDetailView" style="display: block;">
+              <div style="margin-bottom: 20px;">
+                <label style="color: #636e72; font-weight: 600; margin-bottom: 8px; display: block;">제목</label>
+                <div id="scheduleMemoDetailTitle" style="padding: 12px; background: #f8f9fa; border-radius: 8px; font-size: 16px; font-weight: 600; color: #2d3436;"></div>
+              </div>
+              <div style="margin-bottom: 20px;">
+                <label style="color: #636e72; font-weight: 600; margin-bottom: 8px; display: block;">화주사</label>
+                <div id="scheduleMemoDetailCompany" style="padding: 12px; background: #f8f9fa; border-radius: 8px; font-size: 14px; color: #2d3436;"></div>
+              </div>
+              <div style="margin-bottom: 20px;">
+                <label style="color: #636e72; font-weight: 600; margin-bottom: 8px; display: block;">내용</label>
+                <div id="scheduleMemoDetailContent" style="padding: 12px; background: #f8f9fa; border-radius: 8px; font-size: 14px; color: #2d3436; white-space: pre-wrap; min-height: 100px;"></div>
+              </div>
+              <div style="margin-bottom: 20px; padding: 12px; background: #fff9e6; border-radius: 8px; font-size: 12px; color: #999;">
+                <div id="scheduleMemoDetailInfo"></div>
+              </div>
+              <div style="margin-top: 20px; display: flex; gap: 12px;">
+                <button type="button" class="save-btn" onclick="showScheduleMemoEditForm()">✏️ 수정</button>
+                <button type="button" class="save-btn" onclick="deleteScheduleMemo()" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); box-shadow: 0 3px 10px rgba(231, 76, 60, 0.25);">🗑️ 삭제</button>
+                <button type="button" class="save-btn" onclick="closeScheduleMemoDetailModal()" style="background: linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%); box-shadow: 0 3px 10px rgba(178, 190, 195, 0.25);">닫기</button>
+              </div>
+            </div>
+            <div id="scheduleMemoEditView" style="display: none;">
+              <form id="scheduleMemoEditForm" onsubmit="event.preventDefault(); return false;">
+                <input type="hidden" id="scheduleMemoEditId">
+                <div style="margin-bottom: 20px;">
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">제목 *</label>
+                  <input type="text" id="scheduleMemoEditTitle" class="request-input" style="min-height: auto;" required>
+                </div>
+                <div style="margin-bottom: 20px;">
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">화주사 (선택사항)</label>
+                  <div class="sc-searchable-select">
+                    <input type="text" id="scheduleMemoEditCompanyInput" class="request-input" style="min-height: auto;" placeholder="화주사를 입력하거나 선택하세요" autocomplete="off">
+                    <input type="hidden" id="scheduleMemoEditCompanyName">
+                    <div class="sc-dropdown-list" id="scheduleMemoEditCompanyDropdown"></div>
+                  </div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">내용 *</label>
+                  <textarea id="scheduleMemoEditContent" class="request-input" style="min-height: 150px; width: 100%; resize: vertical;" required></textarea>
+                </div>
+                <div style="margin-top: 20px; display: flex; gap: 12px;">
+                  <button type="button" class="save-btn" onclick="saveScheduleMemoEdit()">💾 저장</button>
+                  <button type="button" class="save-btn" onclick="showScheduleMemoDetailView()" style="background: linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%); box-shadow: 0 3px 10px rgba(178, 190, 195, 0.25);">취소</button>
+                </div>
+                <div id="scheduleMemoEditMessage" style="margin-top: 15px; font-size: 14px;"></div>
+              </form>
+            </div>
           </div>
         </div>
         
@@ -5456,6 +5571,46 @@
         if (typeof loadScheduleTypes === 'function') {
           loadScheduleTypes();
         }
+        // 스케줄 메모 로드 (관리자 전용)
+        // 탭이 완전히 렌더링된 후 메모 섹션 너비를 설정
+        setTimeout(() => {
+          if (typeof loadScheduleMemos === 'function') {
+            // 캘린더 박스의 실제 너비를 참조하여 메모 섹션 너비 설정
+            // 캘린더 박스 찾기 (메모 섹션이 아닌 첫 번째 흰색 박스)
+            const calendarBox = scheduleCalendarTab.querySelector('div[style*="background: #ffffff"]:not(#scheduleMemoSection)');
+            const memoSection = document.getElementById('scheduleMemoSection');
+            const memoGrid = document.getElementById('scheduleMemoGrid');
+            
+            if (scheduleCalendarTab && scheduleCalendarTab.offsetWidth > 0) {
+              if (calendarBox && calendarBox.offsetWidth > 0 && memoSection) {
+                const calendarComputedStyle = window.getComputedStyle(calendarBox);
+                // 메모 섹션에 캘린더 박스와 동일한 너비 적용
+                memoSection.style.width = calendarComputedStyle.width;
+                memoSection.style.maxWidth = calendarComputedStyle.maxWidth || 'none';
+                memoSection.style.minWidth = '0';
+                memoSection.style.boxSizing = 'border-box';
+                // 강제로 레이아웃 재계산
+                void memoSection.offsetWidth;
+              } else if (memoSection) {
+                // 캘린더 박스를 찾을 수 없으면 탭 너비 사용
+                memoSection.style.width = scheduleCalendarTab.offsetWidth + 'px';
+                memoSection.style.maxWidth = '100%';
+                memoSection.style.boxSizing = 'border-box';
+                memoSection.style.minWidth = '0';
+                void memoSection.offsetWidth;
+              }
+            }
+            
+            if (memoGrid) {
+              memoGrid.style.width = '100%';
+              memoGrid.style.maxWidth = '100%';
+              memoGrid.style.minWidth = '0';
+              void memoGrid.offsetWidth;
+            }
+            
+            loadScheduleMemos();
+          }
+        }, 150);
       } else if (tabName === 'board') {
         const boardTab = document.getElementById('boardTab');
         if (boardTab) {
@@ -6902,6 +7057,544 @@
       }
     }
     window.loadCalendarSchedules = loadCalendarSchedules;
+    
+    // 스케줄 메모 목록 로드 함수
+    async function loadScheduleMemos() {
+      const memoSection = document.getElementById('scheduleMemoSection');
+      const memoGrid = document.getElementById('scheduleMemoGrid');
+      
+      if (!memoSection || !memoGrid) return;
+      
+      // 관리자만 메모 로드
+      const roleNormalized = (currentRole || '').toString().trim();
+      if (roleNormalized !== '관리자') {
+        memoSection.style.display = 'none';
+        return;
+      }
+      
+      memoSection.style.display = 'block';
+      
+      // 캘린더 박스의 실제 너비를 참조하여 메모 섹션 너비 설정
+      const scheduleCalendarTab = document.getElementById('scheduleCalendarTab');
+      if (scheduleCalendarTab && scheduleCalendarTab.offsetWidth > 0) {
+        // 캘린더 박스 찾기 (메모 섹션이 아닌 첫 번째 흰색 박스)
+        const calendarBox = scheduleCalendarTab.querySelector('div[style*="background: #ffffff"]:not(#scheduleMemoSection)');
+        if (calendarBox && calendarBox.offsetWidth > 0) {
+          const calendarComputedStyle = window.getComputedStyle(calendarBox);
+          // 메모 섹션에 캘린더 박스와 동일한 너비 적용
+          memoSection.style.width = calendarComputedStyle.width;
+          memoSection.style.maxWidth = calendarComputedStyle.maxWidth || 'none';
+          memoSection.style.minWidth = '0';
+          memoSection.style.boxSizing = 'border-box';
+          // 강제로 레이아웃 재계산
+          void memoSection.offsetWidth;
+        } else {
+          // 캘린더 박스를 찾을 수 없으면 탭 너비 사용
+          memoSection.style.width = scheduleCalendarTab.offsetWidth + 'px';
+          memoSection.style.maxWidth = '100%';
+          memoSection.style.boxSizing = 'border-box';
+          memoSection.style.minWidth = '0';
+          void memoSection.offsetWidth;
+        }
+      } else {
+        // 탭이 아직 렌더링되지 않았으면 기본값 사용 후 재시도
+        memoSection.style.width = '100%';
+        memoSection.style.maxWidth = '100%';
+        memoSection.style.boxSizing = 'border-box';
+        memoSection.style.minWidth = '0';
+        // 약간의 지연 후 다시 시도
+        setTimeout(() => {
+          const scheduleCalendarTab = document.getElementById('scheduleCalendarTab');
+          if (scheduleCalendarTab && scheduleCalendarTab.offsetWidth > 0) {
+            const calendarBox = scheduleCalendarTab.querySelector('div[style*="background: #ffffff"]:not(#scheduleMemoSection)');
+            if (calendarBox && calendarBox.offsetWidth > 0) {
+              const calendarComputedStyle = window.getComputedStyle(calendarBox);
+              memoSection.style.width = calendarComputedStyle.width;
+              memoSection.style.maxWidth = calendarComputedStyle.maxWidth || 'none';
+              void memoSection.offsetWidth;
+            }
+          }
+        }, 200);
+      }
+      
+      // 초기 그리드 구조 설정 (15개 빈 카드) - 처음부터 넓게 표시
+      const initialCards = [];
+      for (let i = 0; i < 15; i++) {
+        initialCards.push(`
+          <div class="schedule-memo-card-empty" onclick="openScheduleMemoCreateModal()" style="background: #f8f9fa; border: 2px dashed #ffeaa7; border-radius: 12px; padding: 10px; cursor: pointer; transition: all 0.3s ease; height: 70px; display: flex; align-items: center; justify-content: center; text-align: center; color: #999; box-sizing: border-box;">
+            <div>
+              <div style="font-size: 20px; margin-bottom: 4px;">➕</div>
+              <div style="font-size: 11px; font-weight: 600;">메모 작성</div>
+            </div>
+          </div>
+        `);
+      }
+      memoGrid.innerHTML = initialCards.join('');
+      
+      // 강제로 레이아웃 재계산 (너비가 제대로 적용되도록)
+      void memoSection.offsetWidth;
+      
+      try {
+        const headers = {
+          'X-User-Role': encodeURIComponent(currentRole || ''),
+          'X-User-Name': encodeURIComponent(currentUsername || ''),
+          'X-Company-Name': encodeURIComponent(currentCompany || '')
+        };
+        
+        const response = await fetch('/api/schedules/admin-memo', {
+          credentials: 'include',
+          headers: headers
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          renderScheduleMemoGrid(result.data || []);
+        } else {
+          memoGrid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: #e74c3c;">${result.message || '메모를 불러오는 중 오류가 발생했습니다.'}</div>`;
+        }
+      } catch (error) {
+        console.error('메모 로드 오류:', error);
+        memoGrid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: #e74c3c;">메모를 불러오는 중 오류가 발생했습니다.</div>';
+      }
+    }
+    window.loadScheduleMemos = loadScheduleMemos;
+    
+    // 스케줄 메모 그리드 렌더링 함수
+    function renderScheduleMemoGrid(memos) {
+      const memoGrid = document.getElementById('scheduleMemoGrid');
+      if (!memoGrid) return;
+      
+      const maxCards = 15; // 5x3 = 15개
+      const memoCards = [];
+      
+      // 기존 메모 카드 생성
+      memos.slice(0, maxCards).forEach(memo => {
+        const title = (memo.title || '').trim();
+        const companyName = (memo.company_name || '').trim();
+        const updatedAt = memo.updated_at ? (memo.updated_at.split(' ')[0] || '') : '';
+        
+        memoCards.push(`
+          <div class="schedule-memo-card" onclick="showScheduleMemoDetail(${memo.id})" style="background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%); border: 2px solid #ffeaa7; border-radius: 12px; padding: 10px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(255, 152, 0, 0.1); height: 70px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; box-sizing: border-box;">
+            <div style="flex: 1; overflow: hidden; min-height: 0; display: flex; align-items: center;">
+              <div style="font-weight: 700; font-size: 14px; color: #ff6b35; word-break: break-word; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; width: 100%;">${escapeHtml(title)}</div>
+            </div>
+            <div style="font-size: 9px; color: #999; flex-shrink: 0; margin-top: 4px;">${updatedAt}</div>
+          </div>
+        `);
+      });
+      
+      // 빈 카드 생성 (메모 작성 버튼)
+      for (let i = memos.length; i < maxCards; i++) {
+        memoCards.push(`
+          <div class="schedule-memo-card-empty" onclick="openScheduleMemoCreateModal()" style="background: #f8f9fa; border: 2px dashed #ffeaa7; border-radius: 12px; padding: 10px; cursor: pointer; transition: all 0.3s ease; height: 70px; display: flex; align-items: center; justify-content: center; text-align: center; color: #999; box-sizing: border-box;">
+            <div>
+              <div style="font-size: 20px; margin-bottom: 4px;">➕</div>
+              <div style="font-size: 11px; font-weight: 600;">메모 작성</div>
+            </div>
+          </div>
+        `);
+      }
+      
+      memoGrid.innerHTML = memoCards.join('');
+      
+      // 강제로 레이아웃 재계산 (너비가 제대로 적용되도록)
+      const memoSection = document.getElementById('scheduleMemoSection');
+      if (memoSection) {
+        memoSection.style.width = '100%';
+        memoSection.style.maxWidth = '100%';
+        memoSection.style.boxSizing = 'border-box';
+        memoSection.style.minWidth = '0';
+        // 강제로 레이아웃 재계산
+        void memoSection.offsetWidth;
+        void memoGrid.offsetWidth;
+        
+        // 그리드 너비도 명시적으로 설정
+        memoGrid.style.width = '100%';
+        memoGrid.style.maxWidth = '100%';
+        memoGrid.style.minWidth = '0';
+      }
+    }
+    
+    // 메모 작성 모달 열기
+    function openScheduleMemoCreateModal() {
+      const modal = document.getElementById('scheduleMemoCreateModal');
+      const form = document.getElementById('scheduleMemoCreateForm');
+      if (modal && form) {
+        form.reset();
+        document.getElementById('scheduleMemoCreateMessage').innerHTML = '';
+        initScheduleMemoCompanyDropdown('create');
+        modal.style.display = 'block';
+      }
+    }
+    window.openScheduleMemoCreateModal = openScheduleMemoCreateModal;
+    
+    // 메모 작성 모달 닫기
+    function closeScheduleMemoCreateModal() {
+      const modal = document.getElementById('scheduleMemoCreateModal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+    }
+    window.closeScheduleMemoCreateModal = closeScheduleMemoCreateModal;
+    
+    // 메모 작성 저장
+    async function saveScheduleMemoCreate() {
+      const title = document.getElementById('scheduleMemoCreateTitle')?.value.trim();
+      const companyName = document.getElementById('scheduleMemoCreateCompanyName')?.value.trim() || '';
+      const content = document.getElementById('scheduleMemoCreateContent')?.value.trim();
+      const messageEl = document.getElementById('scheduleMemoCreateMessage');
+      
+      if (!title || !content) {
+        if (messageEl) {
+          messageEl.innerHTML = '<span style="color: #e74c3c;">제목과 내용은 필수입니다.</span>';
+        }
+        return;
+      }
+      
+      if (messageEl) {
+        messageEl.innerHTML = '<span style="color: #636e72;">저장 중...</span>';
+      }
+      
+      try {
+        const headers = {
+          'Content-Type': 'application/json',
+          'X-User-Role': encodeURIComponent(currentRole || ''),
+          'X-User-Name': encodeURIComponent(currentUsername || ''),
+          'X-Company-Name': encodeURIComponent(currentCompany || '')
+        };
+        
+        const response = await fetch('/api/schedules/admin-memo', {
+          method: 'POST',
+          credentials: 'include',
+          headers: headers,
+          body: JSON.stringify({
+            title: title,
+            company_name: companyName,
+            content: content
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          if (messageEl) {
+            messageEl.innerHTML = '<span style="color: #00b894;">✅ 메모가 저장되었습니다.</span>';
+          }
+          setTimeout(() => {
+            closeScheduleMemoCreateModal();
+            loadScheduleMemos();
+          }, 500);
+        } else {
+          if (messageEl) {
+            messageEl.innerHTML = `<span style="color: #e74c3c;">❌ ${result.message || '메모 저장에 실패했습니다.'}</span>`;
+          }
+        }
+      } catch (error) {
+        console.error('메모 저장 오류:', error);
+        if (messageEl) {
+          messageEl.innerHTML = '<span style="color: #e74c3c;">❌ 메모 저장 중 오류가 발생했습니다.</span>';
+        }
+      }
+    }
+    window.saveScheduleMemoCreate = saveScheduleMemoCreate;
+    
+    // 메모 상세보기
+    async function showScheduleMemoDetail(memoId) {
+      const modal = document.getElementById('scheduleMemoDetailModal');
+      if (!modal) return;
+      
+      try {
+        const headers = {
+          'X-User-Role': encodeURIComponent(currentRole || ''),
+          'X-User-Name': encodeURIComponent(currentUsername || ''),
+          'X-Company-Name': encodeURIComponent(currentCompany || '')
+        };
+        
+        const response = await fetch(`/api/schedules/admin-memo/${memoId}`, {
+          credentials: 'include',
+          headers: headers
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const memo = result.data;
+          document.getElementById('scheduleMemoEditId').value = memo.id;
+          document.getElementById('scheduleMemoDetailTitle').textContent = memo.title || '';
+          document.getElementById('scheduleMemoDetailCompany').textContent = memo.company_name || '전체';
+          document.getElementById('scheduleMemoDetailContent').textContent = memo.content || '';
+          
+          const infoText = [];
+          if (memo.updated_at) {
+            infoText.push(`수정: ${memo.updated_at}`);
+          }
+          if (memo.updated_by) {
+            infoText.push(`작성자: ${memo.updated_by}`);
+          }
+          document.getElementById('scheduleMemoDetailInfo').textContent = infoText.join(' | ');
+          
+          showScheduleMemoDetailView();
+          modal.style.display = 'block';
+        } else {
+          alert(result.message || '메모를 불러올 수 없습니다.');
+        }
+      } catch (error) {
+        console.error('메모 상세 조회 오류:', error);
+        alert('메모를 불러오는 중 오류가 발생했습니다.');
+      }
+    }
+    window.showScheduleMemoDetail = showScheduleMemoDetail;
+    
+    // 메모 상세보기 모달 닫기
+    function closeScheduleMemoDetailModal() {
+      const modal = document.getElementById('scheduleMemoDetailModal');
+      if (modal) {
+        modal.style.display = 'none';
+        showScheduleMemoDetailView();
+      }
+    }
+    window.closeScheduleMemoDetailModal = closeScheduleMemoDetailModal;
+    
+    // 메모 상세보기 뷰 표시
+    function showScheduleMemoDetailView() {
+      document.getElementById('scheduleMemoDetailView').style.display = 'block';
+      document.getElementById('scheduleMemoEditView').style.display = 'none';
+    }
+    window.showScheduleMemoDetailView = showScheduleMemoDetailView;
+    
+    // 메모 수정 폼 표시
+    async function showScheduleMemoEditForm() {
+      const memoId = document.getElementById('scheduleMemoEditId')?.value;
+      if (!memoId) return;
+      
+      try {
+        const headers = {
+          'X-User-Role': encodeURIComponent(currentRole || ''),
+          'X-User-Name': encodeURIComponent(currentUsername || ''),
+          'X-Company-Name': encodeURIComponent(currentCompany || '')
+        };
+        
+        const response = await fetch(`/api/schedules/admin-memo/${memoId}`, {
+          credentials: 'include',
+          headers: headers
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const memo = result.data;
+          document.getElementById('scheduleMemoEditTitle').value = memo.title || '';
+          document.getElementById('scheduleMemoEditCompanyInput').value = memo.company_name || '';
+          document.getElementById('scheduleMemoEditCompanyName').value = memo.company_name || '';
+          document.getElementById('scheduleMemoEditContent').value = memo.content || '';
+          
+          initScheduleMemoCompanyDropdown('edit');
+          
+          document.getElementById('scheduleMemoDetailView').style.display = 'none';
+          document.getElementById('scheduleMemoEditView').style.display = 'block';
+        }
+      } catch (error) {
+        console.error('메모 수정 폼 로드 오류:', error);
+      }
+    }
+    window.showScheduleMemoEditForm = showScheduleMemoEditForm;
+    
+    // 메모 수정 저장
+    async function saveScheduleMemoEdit() {
+      const memoId = document.getElementById('scheduleMemoEditId')?.value;
+      const title = document.getElementById('scheduleMemoEditTitle')?.value.trim();
+      const companyName = document.getElementById('scheduleMemoEditCompanyName')?.value.trim() || '';
+      const content = document.getElementById('scheduleMemoEditContent')?.value.trim();
+      const messageEl = document.getElementById('scheduleMemoEditMessage');
+      
+      if (!memoId || !title || !content) {
+        if (messageEl) {
+          messageEl.innerHTML = '<span style="color: #e74c3c;">제목과 내용은 필수입니다.</span>';
+        }
+        return;
+      }
+      
+      if (messageEl) {
+        messageEl.innerHTML = '<span style="color: #636e72;">저장 중...</span>';
+      }
+      
+      try {
+        const headers = {
+          'Content-Type': 'application/json',
+          'X-User-Role': encodeURIComponent(currentRole || ''),
+          'X-User-Name': encodeURIComponent(currentUsername || ''),
+          'X-Company-Name': encodeURIComponent(currentCompany || '')
+        };
+        
+        const response = await fetch(`/api/schedules/admin-memo/${memoId}`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: headers,
+          body: JSON.stringify({
+            title: title,
+            company_name: companyName,
+            content: content
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          if (messageEl) {
+            messageEl.innerHTML = '<span style="color: #00b894;">✅ 메모가 수정되었습니다.</span>';
+          }
+          setTimeout(() => {
+            closeScheduleMemoDetailModal();
+            loadScheduleMemos();
+          }, 500);
+        } else {
+          if (messageEl) {
+            messageEl.innerHTML = `<span style="color: #e74c3c;">❌ ${result.message || '메모 수정에 실패했습니다.'}</span>`;
+          }
+        }
+      } catch (error) {
+        console.error('메모 수정 오류:', error);
+        if (messageEl) {
+          messageEl.innerHTML = '<span style="color: #e74c3c;">❌ 메모 수정 중 오류가 발생했습니다.</span>';
+        }
+      }
+    }
+    window.saveScheduleMemoEdit = saveScheduleMemoEdit;
+    
+    // 메모 삭제
+    async function deleteScheduleMemo() {
+      const memoId = document.getElementById('scheduleMemoEditId')?.value;
+      if (!memoId) return;
+      
+      if (!confirm('정말 이 메모를 삭제하시겠습니까?')) {
+        return;
+      }
+      
+      try {
+        const headers = {
+          'X-User-Role': encodeURIComponent(currentRole || ''),
+          'X-User-Name': encodeURIComponent(currentUsername || ''),
+          'X-Company-Name': encodeURIComponent(currentCompany || '')
+        };
+        
+        const response = await fetch(`/api/schedules/admin-memo/${memoId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: headers
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('메모가 삭제되었습니다.');
+          closeScheduleMemoDetailModal();
+          loadScheduleMemos();
+        } else {
+          alert(result.message || '메모 삭제에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('메모 삭제 오류:', error);
+        alert('메모 삭제 중 오류가 발생했습니다.');
+      }
+    }
+    window.deleteScheduleMemo = deleteScheduleMemo;
+    
+    // 화주사 드롭다운 초기화
+    async function initScheduleMemoCompanyDropdown(mode) {
+      const inputId = mode === 'create' ? 'scheduleMemoCreateCompanyInput' : 'scheduleMemoEditCompanyInput';
+      const hiddenId = mode === 'create' ? 'scheduleMemoCreateCompanyName' : 'scheduleMemoEditCompanyName';
+      const dropdownId = mode === 'create' ? 'scheduleMemoCreateCompanyDropdown' : 'scheduleMemoEditCompanyDropdown';
+      
+      try {
+        const response = await fetch('/api/auth/companies', {
+          credentials: 'include'
+        });
+        const result = await response.json();
+        
+        if (result.success && result.companies) {
+          const companies = result.companies.map(c => c.company_name).filter(c => c && c !== '관리자');
+          const input = document.getElementById(inputId);
+          const hidden = document.getElementById(hiddenId);
+          const dropdown = document.getElementById(dropdownId);
+          
+          if (input && hidden && dropdown) {
+            // 기존 이벤트 리스너 제거를 위해 요소 복제
+            const newInput = input.cloneNode(true);
+            input.parentNode.replaceChild(newInput, input);
+            const newHidden = hidden.cloneNode(true);
+            hidden.parentNode.replaceChild(newHidden, hidden);
+            
+            const currentInput = document.getElementById(inputId);
+            const currentHidden = document.getElementById(hiddenId);
+            const currentDropdown = document.getElementById(dropdownId);
+            
+            let isOpen = false;
+            let closeTimeout = null;
+            
+            const updateDropdown = (filterText = '') => {
+              const filtered = companies.filter(c => 
+                c.toLowerCase().includes(filterText.toLowerCase())
+              );
+              
+              if (filtered.length === 0) {
+                currentDropdown.innerHTML = '<div class="sc-dropdown-item" style="color: #999; cursor: default;">검색 결과가 없습니다</div>';
+              } else {
+                currentDropdown.innerHTML = filtered.map(name => 
+                  `<div class="sc-dropdown-item" data-value="${escapeHtml(name)}">${escapeHtml(name)}</div>`
+                ).join('');
+              }
+            };
+            
+            const openDropdown = () => {
+              clearTimeout(closeTimeout);
+              updateDropdown(currentInput.value);
+              currentDropdown.classList.add('show');
+              isOpen = true;
+            };
+            
+            const scheduleClose = () => {
+              clearTimeout(closeTimeout);
+              closeTimeout = setTimeout(() => {
+                currentDropdown.classList.remove('show');
+                isOpen = false;
+              }, 120);
+            };
+            
+            currentInput.addEventListener('input', (e) => {
+              currentHidden.value = e.target.value;
+              updateDropdown(e.target.value);
+              if (!isOpen) openDropdown();
+            });
+            
+            ['focus', 'click'].forEach(evt => {
+              currentInput.addEventListener(evt, () => {
+                clearTimeout(closeTimeout);
+                openDropdown();
+              });
+            });
+            
+            currentDropdown.addEventListener('click', (e) => {
+              const item = e.target.closest('.sc-dropdown-item');
+              if (!item || !item.dataset.value) return;
+              currentInput.value = item.dataset.value;
+              currentHidden.value = item.dataset.value;
+              currentDropdown.classList.remove('show');
+              isOpen = false;
+            });
+            
+            document.addEventListener('mousedown', (e) => {
+              if (!currentInput.contains(e.target) && !currentDropdown.contains(e.target)) {
+                scheduleClose();
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('화주사 목록 로드 오류:', error);
+      }
+    }
+    
     // 화주사별 색상 할당 함수
     function getCompanyColor(companyName) {
       // 다양한 색상 팔레트

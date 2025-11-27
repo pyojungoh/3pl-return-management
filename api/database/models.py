@@ -213,6 +213,43 @@ def init_db():
                 except Exception as e:
                     print(f"[경고] 기본 스케줄 타입 추가 중 오류 (무시 가능): {e}")
             
+            # PostgreSQL - 스케줄 메모 테이블 (관리자 전용)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS schedule_memos (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    company_name TEXT,
+                    content TEXT NOT NULL,
+                    updated_by TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 기존 테이블 마이그레이션 (memo_content → title, company_name, content)
+            try:
+                # title 컬럼이 없으면 추가
+                cursor.execute('ALTER TABLE schedule_memos ADD COLUMN IF NOT EXISTS title TEXT')
+                cursor.execute('ALTER TABLE schedule_memos ADD COLUMN IF NOT EXISTS company_name TEXT')
+                cursor.execute('ALTER TABLE schedule_memos ADD COLUMN IF NOT EXISTS content TEXT')
+                
+                # memo_content가 있고 content가 비어있으면 마이그레이션
+                try:
+                    cursor.execute('''
+                        UPDATE schedule_memos 
+                        SET content = COALESCE(memo_content, ''), 
+                            title = COALESCE(memo_content, '')
+                        WHERE (content IS NULL OR content = '') 
+                        AND memo_content IS NOT NULL
+                    ''')
+                except Exception:
+                    # memo_content 컬럼이 없으면 무시
+                    pass
+            except Exception as e:
+                # 컬럼이 이미 존재하거나 다른 오류인 경우 무시
+                if 'duplicate column' not in str(e).lower() and 'does not exist' not in str(e).lower():
+                    print(f"[경고] schedule_memos 테이블 마이그레이션 중 오류 (무시 가능): {e}")
+            
             conn.commit()
             
             # PostgreSQL - 게시판 카테고리 테이블
@@ -601,6 +638,62 @@ def init_db():
                     ''', (type_name, idx))
                 except Exception as e:
                     print(f"[경고] 기본 스케줄 타입 추가 중 오류 (무시 가능): {e}")
+            
+            # SQLite - 스케줄 메모 테이블 (관리자 전용)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS schedule_memos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    company_name TEXT,
+                    content TEXT NOT NULL,
+                    updated_by TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 기존 테이블 마이그레이션 (memo_content → title, company_name, content)
+            try:
+                # 기존 컬럼 확인
+                cursor.execute("PRAGMA table_info(schedule_memos)")
+                columns = [col[1] for col in cursor.fetchall()]
+                
+                # memo_content 컬럼이 있고 title이 없으면 마이그레이션
+                if 'memo_content' in columns and 'title' not in columns:
+                    print("[마이그레이션] schedule_memos 테이블 구조 업데이트 중...")
+                    # 임시 테이블 생성
+                    cursor.execute('''
+                        CREATE TABLE schedule_memos_new (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            title TEXT NOT NULL,
+                            company_name TEXT,
+                            content TEXT NOT NULL,
+                            updated_by TEXT,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    ''')
+                    # 기존 데이터 마이그레이션 (memo_content를 content로 복사, title은 빈 문자열)
+                    cursor.execute('''
+                        INSERT INTO schedule_memos_new (id, title, company_name, content, updated_by, updated_at, created_at)
+                        SELECT id, COALESCE(memo_content, '') as title, NULL as company_name, COALESCE(memo_content, '') as content, updated_by, updated_at, created_at
+                        FROM schedule_memos
+                    ''')
+                    # 기존 테이블 삭제
+                    cursor.execute('DROP TABLE schedule_memos')
+                    # 새 테이블 이름 변경
+                    cursor.execute('ALTER TABLE schedule_memos_new RENAME TO schedule_memos')
+                    print("[마이그레이션] schedule_memos 테이블 구조 업데이트 완료")
+                # title 컬럼이 없으면 추가
+                elif 'title' not in columns:
+                    cursor.execute('ALTER TABLE schedule_memos ADD COLUMN title TEXT NOT NULL DEFAULT ""')
+                    cursor.execute('ALTER TABLE schedule_memos ADD COLUMN company_name TEXT')
+                    cursor.execute('ALTER TABLE schedule_memos ADD COLUMN content TEXT NOT NULL DEFAULT ""')
+                    # 기존 memo_content를 content와 title로 복사
+                    if 'memo_content' in columns:
+                        cursor.execute('UPDATE schedule_memos SET content = COALESCE(memo_content, ""), title = COALESCE(memo_content, "") WHERE content = "" OR title = ""')
+            except Exception as e:
+                print(f"[경고] schedule_memos 테이블 마이그레이션 중 오류 (무시 가능): {e}")
             
             conn.commit()
             

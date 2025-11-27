@@ -18,6 +18,10 @@ from api.database.models import (
 )
 from api.schedule_notifications.telegram import send_schedule_notification
 from api.database.models import get_db_connection, USE_POSTGRESQL
+from urllib.parse import unquote
+
+if USE_POSTGRESQL:
+    from psycopg2.extras import RealDictCursor
 
 # Blueprint 생성
 schedules_bp = Blueprint('schedules', __name__, url_prefix='/api/schedules')
@@ -586,5 +590,411 @@ def delete_schedule_type_route(type_id):
         return jsonify({
             'success': False,
             'message': f'스케줄 타입 삭제 중 오류: {str(e)}'
+        }), 500
+
+
+# ========== 스케줄 메모 관리 API (관리자 전용) ==========
+
+def get_user_context():
+    """사용자 컨텍스트 가져오기 (헤더 또는 세션)"""
+    # 헤더에서 사용자 정보 가져오기
+    role = request.headers.get('X-User-Role', '').strip()
+    username = request.headers.get('X-User-Name', '').strip()
+    company_name = request.headers.get('X-Company-Name', '').strip()
+    
+    # URL 디코딩
+    if role:
+        role = unquote(role)
+    if username:
+        username = unquote(username)
+    if company_name:
+        company_name = unquote(company_name)
+    
+    return {
+        'role': role or '화주사',
+        'username': username,
+        'company_name': company_name
+    }
+
+
+@schedules_bp.route('/admin-memo', methods=['GET'])
+def get_schedule_memos():
+    """스케줄 메모 목록 조회 API (관리자 전용)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        
+        # 관리자만 접근 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'data': [],
+                'message': '관리자만 접근할 수 있습니다.'
+            }), 403
+        
+        conn = get_db_connection()
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
+        
+        try:
+            # 모든 메모 조회 (최신순)
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    SELECT id, title, company_name, content, updated_by, updated_at, created_at
+                    FROM schedule_memos
+                    ORDER BY updated_at DESC
+                ''')
+            else:
+                cursor.execute('''
+                    SELECT id, title, company_name, content, updated_by, updated_at, created_at
+                    FROM schedule_memos
+                    ORDER BY updated_at DESC
+                ''')
+            
+            rows = cursor.fetchall()
+            
+            memos = []
+            for row in rows:
+                if USE_POSTGRESQL:
+                    memo = dict(row)
+                else:
+                    # SQLite의 경우 - Row 객체는 dict처럼 사용 가능
+                    if hasattr(row, 'keys'):
+                        # Row 객체인 경우
+                        memo = dict(row)
+                    elif cursor.description:
+                        # description이 있는 경우
+                        memo = dict(zip([col[0] for col in cursor.description], row))
+                    else:
+                        # 수동 변환
+                        memo = {
+                            'id': row[0] if len(row) > 0 else None,
+                            'title': row[1] if len(row) > 1 else '',
+                            'company_name': row[2] if len(row) > 2 else None,
+                            'content': row[3] if len(row) > 3 else '',
+                            'updated_by': row[4] if len(row) > 4 else None,
+                            'updated_at': row[5] if len(row) > 5 else None,
+                            'created_at': row[6] if len(row) > 6 else None
+                        }
+                # datetime 객체를 문자열로 변환
+                for key, value in memo.items():
+                    if isinstance(value, datetime):
+                        memo[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+                memos.append(memo)
+            
+            return jsonify({
+                'success': True,
+                'data': memos,
+                'count': len(memos),
+                'message': f'{len(memos)}개의 메모를 조회했습니다.'
+            })
+        finally:
+            cursor.close()
+            conn.close()
+            
+    except Exception as e:
+        print(f'❌ 스케줄 메모 조회 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'data': [],
+            'message': f'메모 조회 중 오류: {str(e)}'
+        }), 500
+
+
+@schedules_bp.route('/admin-memo/<int:memo_id>', methods=['GET'])
+def get_schedule_memo_detail(memo_id):
+    """스케줄 메모 상세 조회 API (관리자 전용)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        
+        # 관리자만 접근 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'data': None,
+                'message': '관리자만 접근할 수 있습니다.'
+            }), 403
+        
+        conn = get_db_connection()
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
+        
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    SELECT id, title, company_name, content, updated_by, updated_at, created_at
+                    FROM schedule_memos
+                    WHERE id = %s
+                ''', (memo_id,))
+            else:
+                cursor.execute('''
+                    SELECT id, title, company_name, content, updated_by, updated_at, created_at
+                    FROM schedule_memos
+                    WHERE id = ?
+                ''', (memo_id,))
+            
+            row = cursor.fetchone()
+            
+            if row:
+                if USE_POSTGRESQL:
+                    memo = dict(row)
+                else:
+                    # SQLite의 경우 - Row 객체는 dict처럼 사용 가능
+                    if hasattr(row, 'keys'):
+                        # Row 객체인 경우
+                        memo = dict(row)
+                    elif cursor.description:
+                        # description이 있는 경우
+                        memo = dict(zip([col[0] for col in cursor.description], row))
+                    else:
+                        # 수동 변환
+                        memo = {
+                            'id': row[0] if len(row) > 0 else None,
+                            'title': row[1] if len(row) > 1 else '',
+                            'company_name': row[2] if len(row) > 2 else None,
+                            'content': row[3] if len(row) > 3 else '',
+                            'updated_by': row[4] if len(row) > 4 else None,
+                            'updated_at': row[5] if len(row) > 5 else None,
+                            'created_at': row[6] if len(row) > 6 else None
+                        }
+                # datetime 객체를 문자열로 변환
+                for key, value in memo.items():
+                    if isinstance(value, datetime):
+                        memo[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+                
+                return jsonify({
+                    'success': True,
+                    'data': memo,
+                    'message': '메모를 조회했습니다.'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'data': None,
+                    'message': '메모를 찾을 수 없습니다.'
+                }), 404
+        finally:
+            cursor.close()
+            conn.close()
+            
+    except Exception as e:
+        print(f'❌ 스케줄 메모 상세 조회 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'data': None,
+            'message': f'메모 조회 중 오류: {str(e)}'
+        }), 500
+
+
+@schedules_bp.route('/admin-memo', methods=['POST'])
+def create_schedule_memo():
+    """스케줄 메모 생성 API (관리자 전용)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        username = user_context['username']
+        
+        # 관리자만 접근 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 접근할 수 있습니다.'
+            }), 403
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': '요청 데이터가 없습니다.'
+            }), 400
+        
+        title = data.get('title', '').strip()
+        company_name = data.get('company_name', '').strip()
+        content = data.get('content', '').strip()
+        
+        if not title or not content:
+            return jsonify({
+                'success': False,
+                'message': '제목과 내용은 필수입니다.'
+            }), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    INSERT INTO schedule_memos (title, company_name, content, updated_by, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    RETURNING id
+                ''', (title, company_name if company_name else None, content, username))
+                memo_id = cursor.fetchone()[0]
+            else:
+                cursor.execute('''
+                    INSERT INTO schedule_memos (title, company_name, content, updated_by, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ''', (title, company_name if company_name else None, content, username))
+                memo_id = cursor.lastrowid
+            
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'id': memo_id,
+                'message': '메모가 생성되었습니다.'
+            })
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            cursor.close()
+            conn.close()
+            
+    except Exception as e:
+        print(f'❌ 스케줄 메모 생성 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'메모 생성 중 오류: {str(e)}'
+        }), 500
+
+
+@schedules_bp.route('/admin-memo/<int:memo_id>', methods=['PUT'])
+def update_schedule_memo(memo_id):
+    """스케줄 메모 수정 API (관리자 전용)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        username = user_context['username']
+        
+        # 관리자만 접근 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 접근할 수 있습니다.'
+            }), 403
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': '요청 데이터가 없습니다.'
+            }), 400
+        
+        title = data.get('title', '').strip()
+        company_name = data.get('company_name', '').strip()
+        content = data.get('content', '').strip()
+        
+        if not title or not content:
+            return jsonify({
+                'success': False,
+                'message': '제목과 내용은 필수입니다.'
+            }), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    UPDATE schedule_memos
+                    SET title = %s, company_name = %s, content = %s, updated_by = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                ''', (title, company_name if company_name else None, content, username, memo_id))
+            else:
+                cursor.execute('''
+                    UPDATE schedule_memos
+                    SET title = ?, company_name = ?, content = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (title, company_name if company_name else None, content, username, memo_id))
+            
+            if cursor.rowcount == 0:
+                return jsonify({
+                    'success': False,
+                    'message': '메모를 찾을 수 없습니다.'
+                }), 404
+            
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': '메모가 수정되었습니다.'
+            })
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            cursor.close()
+            conn.close()
+            
+    except Exception as e:
+        print(f'❌ 스케줄 메모 수정 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'메모 수정 중 오류: {str(e)}'
+        }), 500
+
+
+@schedules_bp.route('/admin-memo/<int:memo_id>', methods=['DELETE'])
+def delete_schedule_memo(memo_id):
+    """스케줄 메모 삭제 API (관리자 전용)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        
+        # 관리자만 접근 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 접근할 수 있습니다.'
+            }), 403
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute('DELETE FROM schedule_memos WHERE id = %s', (memo_id,))
+            else:
+                cursor.execute('DELETE FROM schedule_memos WHERE id = ?', (memo_id,))
+            
+            if cursor.rowcount == 0:
+                return jsonify({
+                    'success': False,
+                    'message': '메모를 찾을 수 없습니다.'
+                }), 404
+            
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': '메모가 삭제되었습니다.'
+            })
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            cursor.close()
+            conn.close()
+            
+    except Exception as e:
+        print(f'❌ 스케줄 메모 삭제 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'메모 삭제 중 오류: {str(e)}'
         }), 500
 
