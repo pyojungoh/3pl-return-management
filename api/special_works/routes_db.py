@@ -663,6 +663,10 @@ def create_works_bulk():
         entries = data.get('entries', [])
         photo_links = data.get('photo_links', '').strip()
         memo = data.get('memo', '').strip()
+        existing_batch_id = data.get('batch_id')  # 기존 배치 ID (선택사항)
+        
+        # 배치 ID 디버깅 로그
+        print(f'[SW] bulk API 호출 - 기존 배치 ID: {existing_batch_id} (타입: {type(existing_batch_id)}), company: {company_name}, date: {work_date}, entries: {len(entries) if entries else 0}')
         
         if not company_name:
             return jsonify({
@@ -775,35 +779,117 @@ def create_works_bulk():
             batch_id = None
             entry_count = len(created_ids)
             if entry_count > 0:
-                if USE_POSTGRESQL:
-                    cursor.execute('''
-                        INSERT INTO special_work_batches
-                        (company_name, work_date, total_amount, entry_count, photo_links, memo, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        RETURNING id
-                    ''', (company_name, work_date, total_amount, entry_count, photo_links, memo))
-                    batch_id = cursor.fetchone()[0]
+                # 기존 배치 ID가 제공되면 기존 배치에 추가, 없으면 새 배치 생성
+                if existing_batch_id is not None and existing_batch_id != '' and existing_batch_id != 0:
+                    try:
+                        batch_id = int(existing_batch_id)
+                        print(f'[SW] 배치 ID 변환 성공: {batch_id} (원본: {existing_batch_id}, 타입: {type(existing_batch_id)})')
+                        
+                        # 기존 배치 존재 확인
+                        if USE_POSTGRESQL:
+                            cursor.execute('SELECT id, company_name, work_date FROM special_work_batches WHERE id = %s', (batch_id,))
+                        else:
+                            cursor.execute('SELECT id, company_name, work_date FROM special_work_batches WHERE id = ?', (batch_id,))
+                        batch_exists = cursor.fetchone()
+                        
+                        if batch_exists:
+                            batch_info = dict(batch_exists) if isinstance(batch_exists, dict) else {'id': batch_exists[0], 'company_name': batch_exists[1] if len(batch_exists) > 1 else None, 'work_date': batch_exists[2] if len(batch_exists) > 2 else None}
+                            print(f'[SW] 기존 배치 발견: ID={batch_id}, 화주사={batch_info.get("company_name")}, 날짜={batch_info.get("work_date")}, 작업 {len(created_ids)}개 추가 시작')
+                            
+                            # 기존 배치에 작업 추가
+                            added_count = 0
+                            for idx, work_id in enumerate(created_ids, 1):
+                                try:
+                                    if USE_POSTGRESQL:
+                                        cursor.execute('''
+                                            INSERT INTO special_work_batch_items (batch_id, work_id, created_at)
+                                            VALUES (%s, %s, CURRENT_TIMESTAMP)
+                                        ''', (batch_id, work_id))
+                                    else:
+                                        cursor.execute('''
+                                            INSERT INTO special_work_batch_items (batch_id, work_id, created_at)
+                                            VALUES (?, ?, CURRENT_TIMESTAMP)
+                                        ''', (batch_id, work_id))
+                                    added_count += 1
+                                    print(f'[SW] 작업 {work_id}를 배치 {batch_id}에 추가 완료 ({added_count}/{len(created_ids)})')
+                                except Exception as e:
+                                    print(f'[SW] 작업 {work_id} 배치 추가 오류: {e}')
+                                    import traceback
+                                    traceback.print_exc()
+                                    raise
+                            
+                            print(f'[SW] 총 {added_count}개 작업을 배치 {batch_id}에 추가 완료')
+                            
+                            # 배치 요약 정보 재계산
+                            recalculate_batch_summary(cursor, batch_id)
+                            print(f'[SW] 배치 요약 정보 재계산 완료: {batch_id}')
+                            
+                            # 커밋 전 배치 아이템 확인
+                            if USE_POSTGRESQL:
+                                cursor.execute('SELECT COUNT(*) FROM special_work_batch_items WHERE batch_id = %s', (batch_id,))
+                            else:
+                                cursor.execute('SELECT COUNT(*) FROM special_work_batch_items WHERE batch_id = ?', (batch_id,))
+                            item_count = cursor.fetchone()[0]
+                            print(f'[SW] 배치 {batch_id}의 총 작업 항목 수: {item_count}')
+                            
+                            # 배치 ID를 반환값에 포함 (기존 배치 사용)
+                            print(f'[SW] ✅ 기존 배치 {batch_id}에 작업 추가 완료, 커밋 대기')
+                        else:
+                            print(f'[SW] ❌ 배치가 존재하지 않음: {batch_id}, 새 배치 생성')
+                            batch_id = None
+                    except (ValueError, TypeError) as e:
+                        print(f'[SW] ❌ 배치 ID 변환 오류: {existing_batch_id} -> {e}, 새 배치 생성')
+                        import traceback
+                        traceback.print_exc()
+                        batch_id = None
                 else:
-                    cursor.execute('''
-                        INSERT INTO special_work_batches
-                        (company_name, work_date, total_amount, entry_count, photo_links, memo, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    ''', (company_name, work_date, total_amount, entry_count, photo_links, memo))
-                    batch_id = cursor.lastrowid
+                    # 배치 ID가 제공되지 않았거나 유효하지 않음 - 새 배치 생성
+                    print(f'[SW] 배치 ID가 제공되지 않음 (값: {existing_batch_id}, 타입: {type(existing_batch_id)}), 새 배치 생성')
+                    batch_id = None
                 
-                for work_id in created_ids:
+                # 배치 ID가 None이면 새 배치 생성
+                if batch_id is None:
+                    print(f'[SW] 새 배치 생성 (batch_id 없음)')
                     if USE_POSTGRESQL:
                         cursor.execute('''
-                            INSERT INTO special_work_batch_items (batch_id, work_id, created_at)
-                            VALUES (%s, %s, CURRENT_TIMESTAMP)
-                        ''', (batch_id, work_id))
+                            INSERT INTO special_work_batches
+                            (company_name, work_date, total_amount, entry_count, photo_links, memo, created_at, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                            RETURNING id
+                        ''', (company_name, work_date, total_amount, entry_count, photo_links, memo))
+                        batch_id = cursor.fetchone()[0]
                     else:
                         cursor.execute('''
-                            INSERT INTO special_work_batch_items (batch_id, work_id, created_at)
-                            VALUES (?, ?, CURRENT_TIMESTAMP)
-                        ''', (batch_id, work_id))
+                            INSERT INTO special_work_batches
+                            (company_name, work_date, total_amount, entry_count, photo_links, memo, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        ''', (company_name, work_date, total_amount, entry_count, photo_links, memo))
+                        batch_id = cursor.lastrowid
+                    
+                    for work_id in created_ids:
+                        if USE_POSTGRESQL:
+                            cursor.execute('''
+                                INSERT INTO special_work_batch_items (batch_id, work_id, created_at)
+                                VALUES (%s, %s, CURRENT_TIMESTAMP)
+                            ''', (batch_id, work_id))
+                        else:
+                            cursor.execute('''
+                                INSERT INTO special_work_batch_items (batch_id, work_id, created_at)
+                                VALUES (?, ?, CURRENT_TIMESTAMP)
+                            ''', (batch_id, work_id))
+            
+            # 커밋 전 최종 확인
+            if batch_id:
+                if USE_POSTGRESQL:
+                    cursor.execute('SELECT COUNT(*) FROM special_work_batch_items WHERE batch_id = %s', (batch_id,))
+                else:
+                    cursor.execute('SELECT COUNT(*) FROM special_work_batch_items WHERE batch_id = ?', (batch_id,))
+                final_count = cursor.fetchone()[0]
+                print(f'[SW] 커밋 전 최종 확인: 배치 {batch_id}의 작업 항목 수 = {final_count}')
             
             conn.commit()
+            print(f'[SW] 커밋 완료: 작업 {len(created_ids)}개, 배치 ID = {batch_id}')
+            
             return jsonify({
                 'success': True,
                 'message': f'{entry_count}개의 작업이 등록되었습니다.',
@@ -845,6 +931,7 @@ def get_work_batches():
         end_date = request.args.get('end_date', '').strip()
         work_type_id = request.args.get('work_type_id', '').strip()
         filter_company_name = request.args.get('company_name', '').strip()
+        batch_id_filter = request.args.get('batch_id', '').strip()
         
         conn = get_db_connection()
         if USE_POSTGRESQL:
@@ -875,6 +962,17 @@ def get_work_batches():
             orphan_clauses = []
             orphan_params = []
             
+            # 배치 ID 필터 (특정 배치만 조회)
+            if batch_id_filter:
+                try:
+                    batch_id_int = int(batch_id_filter)
+                    clause = 'b.id = %s' if USE_POSTGRESQL else 'b.id = ?'
+                    batch_clauses.append(clause)
+                    batch_params.append(batch_id_int)
+                    print(f'[SW] 배치 ID 필터 적용: {batch_id_int}')
+                except ValueError:
+                    pass
+            
             if start_date:
                 clause = 'b.work_date >= %s' if USE_POSTGRESQL else 'b.work_date >= ?'
                 batch_clauses.append(clause)
@@ -899,15 +997,37 @@ def get_work_batches():
                 orphan_clauses.append(clause_orphan)
                 orphan_params.append(filter_company_name)
             
-            if work_type_filter is not None:
-                clause = 'sw.work_type_id = %s' if USE_POSTGRESQL else 'sw.work_type_id = ?'
-                batch_clauses.append(clause)
-                batch_params.append(work_type_filter)
-                orphan_clauses.append(clause)
-                orphan_params.append(work_type_filter)
+            # 작업 종류 필터는 배치 레벨이 아닌 작업 항목 레벨에서 적용하지 않음
+            # 배치에 속한 모든 작업 항목을 가져와야 함
+            # 작업 종류 필터는 프론트엔드에서 렌더링 시 적용
             
             batch_where_sql = ' AND '.join(batch_clauses) if batch_clauses else '1=1'
             orphan_where_sql = ' AND '.join(orphan_clauses) if orphan_clauses else '1=1'
+            
+            # 작업 종류 필터는 orphan 작업에만 적용 (배치에 속하지 않은 작업)
+            if work_type_filter is not None:
+                orphan_clauses.append('sw.work_type_id = %s' if USE_POSTGRESQL else 'sw.work_type_id = ?')
+                orphan_params.append(work_type_filter)
+                orphan_where_sql = ' AND '.join(orphan_clauses) if orphan_clauses else '1=1'
+            
+            # 배치 조회 전에 모든 고아 레코드 정리 (special_works에 없는 배치 아이템 삭제)
+            print(f'[SW] 배치 조회 전 고아 레코드 정리 시작')
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    DELETE FROM special_work_batch_items bi
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM special_works sw WHERE sw.id = bi.work_id
+                    )
+                ''')
+            else:
+                cursor.execute('''
+                    DELETE FROM special_work_batch_items
+                    WHERE work_id NOT IN (SELECT id FROM special_works)
+                ''')
+            orphan_deleted_count = cursor.rowcount
+            if orphan_deleted_count > 0:
+                print(f'[SW] 고아 배치 아이템 {orphan_deleted_count}개 삭제 완료')
+                conn.commit()  # 고아 레코드 삭제 커밋
             
             batch_query = f'''
                 SELECT 
@@ -929,26 +1049,86 @@ def get_work_batches():
                     sw.memo AS work_memo,
                     swt.name AS work_type_name
                 FROM special_work_batches b
-                JOIN special_work_batch_items bi ON b.id = bi.batch_id
-                JOIN special_works sw ON bi.work_id = sw.id
+                INNER JOIN special_work_batch_items bi ON b.id = bi.batch_id
+                INNER JOIN special_works sw ON bi.work_id = sw.id
                 LEFT JOIN special_work_types swt ON sw.work_type_id = swt.id
                 WHERE {batch_where_sql}
                 ORDER BY b.work_date DESC, b.created_at DESC, sw.id ASC
             '''
+            print(f'[SW] 배치 조회 쿼리 실행: batch_where_sql={batch_where_sql}, params={batch_params}')
             cursor.execute(batch_query, batch_params)
             batch_rows = cursor.fetchall()
             batch_dicts = cursor_rows_to_dicts(cursor, batch_rows)
+            print(f'[SW] 배치 조회 결과: {len(batch_dicts)}개 행')
+            
+            # 배치별 실제 아이템 수 확인 (디버깅용)
+            if batch_dicts:
+                batch_ids_in_query = set(row.get('batch_id') for row in batch_dicts)
+                print(f'[SW] 조회된 배치 ID 목록: {sorted(batch_ids_in_query)}')
+                for bid in sorted(batch_ids_in_query):
+                    if USE_POSTGRESQL:
+                        cursor.execute('SELECT COUNT(*) FROM special_work_batch_items WHERE batch_id = %s', (bid,))
+                    else:
+                        cursor.execute('SELECT COUNT(*) FROM special_work_batch_items WHERE batch_id = ?', (bid,))
+                    actual_item_count = cursor.fetchone()[0]
+                    query_item_count = len([r for r in batch_dicts if r.get('batch_id') == bid])
+                    print(f'[SW] 배치 {bid}: DB 아이템 수={actual_item_count}, 쿼리 결과 행 수={query_item_count}')
+                    if actual_item_count != query_item_count:
+                        print(f'[SW] ⚠️ 배치 {bid} 불일치 감지! DB에는 {actual_item_count}개, 쿼리 결과는 {query_item_count}개')
+                        # 누락된 작업 ID 확인
+                        if USE_POSTGRESQL:
+                            cursor.execute('''
+                                SELECT bi.work_id 
+                                FROM special_work_batch_items bi
+                                LEFT JOIN special_works sw ON bi.work_id = sw.id
+                                WHERE bi.batch_id = %s AND sw.id IS NULL
+                            ''', (bid,))
+                        else:
+                            cursor.execute('''
+                                SELECT bi.work_id 
+                                FROM special_work_batch_items bi
+                                LEFT JOIN special_works sw ON bi.work_id = sw.id
+                                WHERE bi.batch_id = ? AND sw.id IS NULL
+                            ''', (bid,))
+                        orphan_items = cursor.fetchall()
+                        if orphan_items:
+                            orphan_work_ids = [row[0] if not isinstance(row, dict) else row['work_id'] for row in orphan_items]
+                            print(f'[SW] 배치 {bid}의 누락된 작업 ID (special_works에 없음): {orphan_work_ids}')
+                        # 존재하는 작업 ID 확인
+                        if USE_POSTGRESQL:
+                            cursor.execute('''
+                                SELECT bi.work_id 
+                                FROM special_work_batch_items bi
+                                INNER JOIN special_works sw ON bi.work_id = sw.id
+                                WHERE bi.batch_id = %s
+                            ''', (bid,))
+                        else:
+                            cursor.execute('''
+                                SELECT bi.work_id 
+                                FROM special_work_batch_items bi
+                                INNER JOIN special_works sw ON bi.work_id = sw.id
+                                WHERE bi.batch_id = ?
+                            ''', (bid,))
+                        existing_work_ids = cursor.fetchall()
+                        existing_ids = [row[0] if not isinstance(row, dict) else row['work_id'] for row in existing_work_ids]
+                        query_work_ids = [r.get('work_id') for r in batch_dicts if r.get('batch_id') == bid]
+                        missing_in_query = set(existing_ids) - set(query_work_ids)
+                        if missing_in_query:
+                            print(f'[SW] 배치 {bid}의 쿼리 결과에서 누락된 작업 ID: {missing_in_query}')
             
             batch_map = {}
             for row in batch_dicts:
                 batch_id = row.get('batch_id')
+                work_id = row.get('work_id')
+                work_type_name = row.get('work_type_name')
+                print(f'[SW] 배치 행: batch_id={batch_id}, work_id={work_id}, work_type={work_type_name}, total_price={row.get("total_price")}')
                 if batch_id not in batch_map:
                     batch_map[batch_id] = {
                         'batch_id': batch_id,
                         'company_name': row.get('batch_company_name'),
                         'work_date': row.get('batch_work_date'),
-                        'total_amount': row.get('batch_total_amount') or 0,
-                        'entry_count': row.get('batch_entry_count') or 0,
+                        'total_amount': row.get('batch_total_amount') or 0,  # 초기값은 저장된 값 사용
+                        'entry_count': row.get('batch_entry_count') or 0,  # 초기값은 저장된 값 사용
                         'photo_links': row.get('batch_photo_links'),
                         'memo': row.get('batch_memo'),
                         'created_at': row.get('batch_created_at'),
@@ -956,16 +1136,72 @@ def get_work_batches():
                         'entries': [],
                         'is_legacy': False
                     }
-                batch_map[batch_id]['entries'].append({
-                    'work_id': row.get('work_id'),
+                    print(f'[SW] 배치 {batch_id} 초기화: 저장된 entry_count={batch_map[batch_id]["entry_count"]}, 저장된 total_amount={batch_map[batch_id]["total_amount"]}')
+                entry = {
+                    'work_id': work_id,
                     'work_type_id': row.get('work_type_id'),
-                    'work_type_name': row.get('work_type_name') or '',
+                    'work_type_name': work_type_name or '',
                     'quantity': row.get('quantity'),
                     'unit_price': row.get('unit_price'),
                     'total_price': row.get('total_price'),
                     'memo': row.get('work_memo'),
                     'photo_links': row.get('work_photo_links')
-                })
+                }
+                batch_map[batch_id]['entries'].append(entry)
+                print(f'[SW] 배치 {batch_id}에 작업 {work_id} 추가됨: 현재 항목 수={len(batch_map[batch_id]["entries"])}, 현재 총액={sum(int(e.get("total_price") or 0) for e in batch_map[batch_id]["entries"])}')
+            
+            # 배치 요약 정보를 실제 항목 기준으로 재계산
+            for batch_id, batch_data in batch_map.items():
+                # 실제 항목들의 총액과 개수 계산
+                actual_entry_count = len(batch_data['entries'])
+                actual_total_amount = sum(int(entry.get('total_price') or 0) for entry in batch_data['entries'])
+                
+                # 배치 테이블의 요약 정보와 실제 항목 정보가 다르면 업데이트
+                stored_entry_count = batch_data.get('entry_count', 0)
+                stored_total_amount = batch_data.get('total_amount', 0)
+                
+                print(f'[SW] 배치 {batch_id} 요약 정보 비교: 저장된(entry_count={stored_entry_count}, total_amount={stored_total_amount}) vs 실제(entry_count={actual_entry_count}, total_amount={actual_total_amount})')
+                
+                if actual_entry_count != stored_entry_count or actual_total_amount != stored_total_amount:
+                    print(f'[SW] ⚠️ 배치 {batch_id} 요약 정보 불일치 감지! 저장된 값 업데이트 중...')
+                    # 실제 항목 기준으로 업데이트
+                    batch_data['entry_count'] = actual_entry_count
+                    batch_data['total_amount'] = actual_total_amount
+                    
+                    # 배치 테이블의 요약 정보도 업데이트 (다음 조회를 위해)
+                    if USE_POSTGRESQL:
+                        cursor.execute('''
+                            UPDATE special_work_batches
+                            SET entry_count = %s,
+                                total_amount = %s,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                        ''', (actual_entry_count, actual_total_amount, batch_id))
+                    else:
+                        cursor.execute('''
+                            UPDATE special_work_batches
+                            SET entry_count = ?,
+                                total_amount = ?,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = ?
+                        ''', (actual_entry_count, actual_total_amount, batch_id))
+                    print(f'[SW] ✅ 배치 {batch_id} 요약 정보 업데이트 완료: entry_count={actual_entry_count}, total_amount={actual_total_amount}')
+                else:
+                    print(f'[SW] ✓ 배치 {batch_id} 요약 정보 일치')
+            
+            # 변경사항이 있으면 커밋
+            updated_batches = [bid for bid, data in batch_map.items() 
+                              if len(data['entries']) != data.get('entry_count', 0) 
+                              or sum(int(e.get('total_price') or 0) for e in data['entries']) != data.get('total_amount', 0)]
+            if updated_batches:
+                try:
+                    conn.commit()
+                    print(f'[SW] 배치 요약 정보 업데이트 커밋 완료: {len(updated_batches)}개 배치 업데이트됨')
+                except Exception as e:
+                    print(f'[SW] ⚠️ 배치 요약 정보 업데이트 커밋 실패: {e}')
+                    conn.rollback() if USE_POSTGRESQL else None
+            else:
+                print(f'[SW] 배치 요약 정보 업데이트 불필요 (모든 배치 일치)')
             
             orphan_batches = []
             orphan_query = f'''
@@ -1409,23 +1645,35 @@ def delete_work(work_id):
         batch_id = batch_row[0] if batch_row else None
         
         try:
+            # 먼저 배치 아이템에서 삭제 (외래 키 제약 조건 때문에)
+            if USE_POSTGRESQL:
+                cursor.execute('DELETE FROM special_work_batch_items WHERE work_id = %s', (work_id,))
+            else:
+                cursor.execute('DELETE FROM special_work_batch_items WHERE work_id = ?', (work_id,))
+            batch_item_deleted = cursor.rowcount
+            print(f'[SW] 작업 {work_id} 삭제: 배치 아이템 {batch_item_deleted}개 삭제됨')
+            
+            # 그 다음 작업 삭제
             if USE_POSTGRESQL:
                 cursor.execute('DELETE FROM special_works WHERE id = %s', (work_id,))
             else:
                 cursor.execute('DELETE FROM special_works WHERE id = ?', (work_id,))
+            work_deleted = cursor.rowcount
+            print(f'[SW] 작업 {work_id} 삭제: 작업 {work_deleted}개 삭제됨')
             
-            conn.commit()
-            
-            if cursor.rowcount > 0:
+            if work_deleted > 0:
                 if batch_id:
                     recalculate_batch_summary(cursor, batch_id)
+                    print(f'[SW] 작업 {work_id} 삭제: 배치 {batch_id} 요약 정보 재계산 완료')
                 conn.commit()
+                print(f'[SW] 작업 {work_id} 삭제 완료 및 커밋')
                 return jsonify({
                     'success': True,
                     'message': '작업이 삭제되었습니다.'
                 })
             else:
                 conn.commit()
+                print(f'[SW] 작업 {work_id} 삭제 실패: 작업을 찾을 수 없음')
                 return jsonify({
                     'success': False,
                     'message': '작업을 찾을 수 없습니다.'
