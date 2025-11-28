@@ -137,6 +137,17 @@ def cursor_rows_to_dicts(cursor, rows):
     return dict_rows
 
 
+def get_first_value(row, default=None):
+    if row is None:
+        return default
+    if isinstance(row, dict):
+        # 반환된 dict의 첫 번째 값을 사용
+        for value in row.values():
+            return value
+        return default
+    return row[0] if len(row) > 0 else default
+
+
 def format_datetime_value(value):
     if isinstance(value, datetime):
         return value.strftime('%Y-%m-%d %H:%M:%S')
@@ -247,7 +258,8 @@ def create_work_type():
                     VALUES (%s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     RETURNING id
                 ''', (name, default_unit_price, display_order))
-                work_type_id = cursor.fetchone()[0]
+                work_type_row = cursor.fetchone()
+                work_type_id = get_first_value(work_type_row)
             else:
                 cursor.execute('''
                     INSERT INTO special_work_types (name, default_unit_price, display_order, created_at, updated_at)
@@ -390,7 +402,8 @@ def delete_work_type(type_id):
             else:
                 cursor.execute('SELECT COUNT(*) FROM special_works WHERE work_type_id = ?', (type_id,))
             
-            count = cursor.fetchone()[0]
+            count_row = cursor.fetchone()
+            count = get_first_value(count_row, 0)
             if count > 0:
                 return jsonify({
                     'success': False,
@@ -767,7 +780,8 @@ def create_works_bulk():
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         RETURNING id
                     ''', params)
-                    created_ids.append(cursor.fetchone()[0])
+                    new_row = cursor.fetchone()
+                    created_ids.append(get_first_value(new_row))
                 else:
                     cursor.execute('''
                         INSERT INTO special_works 
@@ -829,7 +843,8 @@ def create_works_bulk():
                                 cursor.execute('SELECT COUNT(*) FROM special_work_batch_items WHERE batch_id = %s', (batch_id,))
                             else:
                                 cursor.execute('SELECT COUNT(*) FROM special_work_batch_items WHERE batch_id = ?', (batch_id,))
-                            item_count = cursor.fetchone()[0]
+                            item_row = cursor.fetchone()
+                            item_count = get_first_value(item_row, 0)
                             print(f'[SW] 배치 {batch_id}의 총 작업 항목 수: {item_count}')
                             
                             # 배치 ID를 반환값에 포함 (기존 배치 사용)
@@ -857,7 +872,8 @@ def create_works_bulk():
                             VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                             RETURNING id
                         ''', (company_name, work_date, total_amount, entry_count, photo_links, memo))
-                        batch_id = cursor.fetchone()[0]
+                        new_batch_row = cursor.fetchone()
+                        batch_id = get_first_value(new_batch_row)
                     else:
                         cursor.execute('''
                             INSERT INTO special_work_batches
@@ -884,7 +900,8 @@ def create_works_bulk():
                     cursor.execute('SELECT COUNT(*) FROM special_work_batch_items WHERE batch_id = %s', (batch_id,))
                 else:
                     cursor.execute('SELECT COUNT(*) FROM special_work_batch_items WHERE batch_id = ?', (batch_id,))
-                final_count = cursor.fetchone()[0]
+                final_row = cursor.fetchone()
+                final_count = get_first_value(final_row, 0)
                 print(f'[SW] 커밋 전 최종 확인: 배치 {batch_id}의 작업 항목 수 = {final_count}')
             
             conn.commit()
@@ -1066,7 +1083,8 @@ def get_work_batches():
                         cursor.execute('SELECT COUNT(*) FROM special_work_batch_items WHERE batch_id = %s', (bid,))
                     else:
                         cursor.execute('SELECT COUNT(*) FROM special_work_batch_items WHERE batch_id = ?', (bid,))
-                    actual_item_count = cursor.fetchone()[0]
+                    count_row = cursor.fetchone()
+                    actual_item_count = get_first_value(count_row, 0)
                     query_item_count = len([r for r in batch_dicts if r.get('batch_id') == bid])
                     print(f'[SW] 배치 {bid}: DB 아이템 수={actual_item_count}, 쿼리 결과 행 수={query_item_count}')
                     if actual_item_count != query_item_count:
@@ -1416,7 +1434,8 @@ def create_work():
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     RETURNING id
                 ''', (company_name, work_type_id, work_date, quantity, unit_price, total_price, photo_links, memo))
-                work_id = cursor.fetchone()[0]
+                work_row = cursor.fetchone()
+                work_id = get_first_value(work_row)
             else:
                 cursor.execute('''
                     INSERT INTO special_works 
@@ -1433,7 +1452,8 @@ def create_work():
                     VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     RETURNING id
                 ''', (company_name, work_date, total_price, 1, photo_links, memo))
-                batch_id = cursor.fetchone()[0]
+                batch_row = cursor.fetchone()
+                batch_id = get_first_value(batch_row)
                 cursor.execute('''
                     INSERT INTO special_work_batch_items (batch_id, work_id, created_at)
                     VALUES (%s, %s, CURRENT_TIMESTAMP)
