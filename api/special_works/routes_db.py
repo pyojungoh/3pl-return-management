@@ -1010,24 +1010,20 @@ def get_work_batches():
                 orphan_params.append(work_type_filter)
                 orphan_where_sql = ' AND '.join(orphan_clauses) if orphan_clauses else '1=1'
             
-            # 배치 조회 전에 모든 고아 레코드 정리 (special_works에 없는 배치 아이템 삭제)
-            print(f'[SW] 배치 조회 전 고아 레코드 정리 시작')
-            if USE_POSTGRESQL:
-                cursor.execute('''
-                    DELETE FROM special_work_batch_items bi
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM special_works sw WHERE sw.id = bi.work_id
-                    )
-                ''')
-            else:
+            # 배치 조회 전에 모든 고아 레코드 정리 (SQLite에서만 실행)
+            orphan_deleted_count = 0
+            if not USE_POSTGRESQL:
+                print(f'[SW] (SQLite) 배치 조회 전 고아 레코드 정리 시작')
                 cursor.execute('''
                     DELETE FROM special_work_batch_items
                     WHERE work_id NOT IN (SELECT id FROM special_works)
                 ''')
-            orphan_deleted_count = cursor.rowcount
-            if orphan_deleted_count > 0:
-                print(f'[SW] 고아 배치 아이템 {orphan_deleted_count}개 삭제 완료')
-                conn.commit()  # 고아 레코드 삭제 커밋
+                orphan_deleted_count = cursor.rowcount
+                if orphan_deleted_count > 0:
+                    print(f'[SW] (SQLite) 고아 배치 아이템 {orphan_deleted_count}개 삭제 완료')
+                    conn.commit()  # 고아 레코드 삭제 커밋
+            else:
+                print('[SW] (PostgreSQL) 고아 레코드 정리는 배치 수정 시 처리됨 - 사전 정리 생략')
             
             batch_query = f'''
                 SELECT 
