@@ -647,10 +647,12 @@
           </select>
         </div>
         <div class="sw-filter-group">
-          <label for="swAdminFilterCompany">화주사</label>
-          <select id="swAdminFilterCompany">
-            <option value="">전체 화주사</option>
-          </select>
+          <label for="swAdminFilterCompanyInput">화주사</label>
+          <div class="sw-searchable-select">
+            <input type="text" id="swAdminFilterCompanyInput" class="sw-form-input" placeholder="화주사를 검색하거나 선택하세요" autocomplete="off">
+            <input type="hidden" id="swAdminFilterCompanyHidden">
+            <div id="swAdminFilterCompanyDropdown" class="sw-dropdown-list"></div>
+          </div>
         </div>
         <button class="sw-btn" onclick="swAdminLoadWorks()">조회</button>
       </div>
@@ -1165,6 +1167,184 @@
     // ========== 관리자 함수 ==========
     
     /**
+     * 화주사용 검색 가능한 드롭다운 초기화
+     */
+    function swInitCompanySearchDropdown(container, config = {}) {
+      if (!container) return;
+      const {
+        inputSelector,
+        hiddenSelector,
+        dropdownSelector,
+        companies = [],
+        allowEmptyOption = false,
+        emptyLabel = '전체 선택',
+        onSelect
+      } = config;
+      
+      if (!inputSelector || !hiddenSelector || !dropdownSelector) return;
+      
+      const inputEl = container.querySelector(inputSelector);
+      const hiddenEl = container.querySelector(hiddenSelector);
+      const dropdownEl = container.querySelector(dropdownSelector);
+      if (!inputEl || !hiddenEl || !dropdownEl || !inputEl.parentNode || !hiddenEl.parentNode) return;
+      
+      const companyNames = companies
+        .map(company => company?.company_name || '')
+        .filter(name => !!name);
+      
+      // 기존 이벤트 제거를 위해 노드 교체
+      const clonedInput = inputEl.cloneNode(true);
+      clonedInput.value = inputEl.value || '';
+      inputEl.parentNode.replaceChild(clonedInput, inputEl);
+      
+      const clonedHidden = hiddenEl.cloneNode(true);
+      clonedHidden.value = hiddenEl.value || '';
+      hiddenEl.parentNode.replaceChild(clonedHidden, hiddenEl);
+      
+      const currentInput = container.querySelector(inputSelector);
+      const currentHidden = container.querySelector(hiddenSelector);
+      const currentDropdown = container.querySelector(dropdownSelector);
+      if (!currentInput || !currentHidden || !currentDropdown) return;
+      
+      let isDropdownOpen = false;
+      let dropdownTimeout = null;
+      
+      const getFilteredNames = (filterText = '') => {
+        const lowered = (filterText || '').toLowerCase();
+        return lowered
+          ? companyNames.filter(name => name.toLowerCase().includes(lowered))
+          : companyNames;
+      };
+      
+      const renderDropdownItems = (filterText = '') => {
+        const filteredNames = getFilteredNames(filterText);
+        
+        const items = [];
+        if (allowEmptyOption) {
+          items.push(`<div class="sw-dropdown-item" data-value="">${swEscapeHtml(emptyLabel)}</div>`);
+        }
+        
+        if (filteredNames.length === 0) {
+          items.push('<div class="sw-dropdown-item" style="color:#999; cursor: default;">검색 결과가 없습니다</div>');
+        } else {
+          items.push(...filteredNames.map(name => 
+            `<div class="sw-dropdown-item" data-value="${swEscapeHtml(name)}">${swEscapeHtml(name)}</div>`
+          ));
+        }
+        currentDropdown.innerHTML = items.join('');
+      };
+      
+      const openDropdown = () => {
+        if (dropdownTimeout) {
+          clearTimeout(dropdownTimeout);
+          dropdownTimeout = null;
+        }
+        renderDropdownItems(currentInput.value);
+        currentDropdown.classList.add('show');
+        isDropdownOpen = true;
+      };
+      
+      const closeDropdown = () => {
+        if (dropdownTimeout) {
+          clearTimeout(dropdownTimeout);
+          dropdownTimeout = null;
+        }
+        currentDropdown.classList.remove('show');
+        isDropdownOpen = false;
+      };
+      
+      const selectValue = (value) => {
+        currentInput.value = value;
+        currentHidden.value = value;
+        closeDropdown();
+        if (typeof onSelect === 'function') {
+          onSelect(value);
+        }
+      };
+      
+      currentInput.addEventListener('input', (e) => {
+        const value = e.target.value;
+        currentHidden.value = value;
+        renderDropdownItems(value);
+        if (!isDropdownOpen) {
+          openDropdown();
+        }
+      });
+      
+      const delayedOpen = () => {
+        if (dropdownTimeout) {
+          clearTimeout(dropdownTimeout);
+        }
+        dropdownTimeout = setTimeout(() => {
+          openDropdown();
+        }, 100);
+      };
+      
+      currentInput.addEventListener('focus', (e) => {
+        e.stopPropagation();
+        delayedOpen();
+      });
+      
+      currentInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+        delayedOpen();
+      });
+      
+      currentInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (!isDropdownOpen) {
+            openDropdown();
+          }
+          const currentText = currentInput.value.trim();
+          const filteredNames = getFilteredNames(currentText);
+          if (filteredNames.length > 0) {
+            selectValue(filteredNames[0]);
+            return;
+          }
+          // 일치 항목이 없으면 현재 입력값 유지
+          selectValue(currentText);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          closeDropdown();
+        }
+      });
+      
+      currentDropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const item = e.target.closest('.sw-dropdown-item');
+        if (item && typeof item.dataset.value !== 'undefined') {
+          const value = item.dataset.value;
+          selectValue(value);
+        }
+      });
+      
+      const handleDocumentClick = (e) => {
+        if (!currentInput.contains(e.target) && !currentDropdown.contains(e.target)) {
+          setTimeout(() => {
+            if (document.activeElement !== currentInput) {
+              closeDropdown();
+            }
+          }, 150);
+        }
+      };
+      
+      if (currentDropdown._closeHandler) {
+        document.removeEventListener('mousedown', currentDropdown._closeHandler);
+      }
+      currentDropdown._closeHandler = handleDocumentClick;
+      document.addEventListener('mousedown', handleDocumentClick);
+      
+      currentInput.addEventListener('blur', () => {
+        if (!currentInput.value.trim()) {
+          currentHidden.value = '';
+        }
+      });
+      
+      renderDropdownItems();
+    }
+    
+    /**
      * 관리자 모드 초기화 함수
      * 관리자 전용 기능만 초기화
      */
@@ -1211,175 +1391,25 @@
             const container = document.getElementById('swContainer');
             if (!container) return;
             
-            const workCompanyInput = container.querySelector('#swAdminWorkCompanyInput');
-            const workCompanyHidden = container.querySelector('#swAdminWorkCompanySelect');
-            const workCompanyDropdown = container.querySelector('#swAdminWorkCompanyDropdown');
-            const filterCompanySelect = container.querySelector('#swAdminFilterCompany');
+            const companies = data.companies || [];
+            swInitCompanySearchDropdown(container, {
+              inputSelector: '#swAdminWorkCompanyInput',
+              hiddenSelector: '#swAdminWorkCompanySelect',
+              dropdownSelector: '#swAdminWorkCompanyDropdown',
+              companies
+            });
             
-            // 검색 가능한 드롭다운 초기화
-            if (workCompanyInput && workCompanyHidden && workCompanyDropdown) {
-              const companies = data.companies || [];
-              
-              // 드롭다운 아이템 생성 함수
-              function updateDropdown(filterText = '') {
-                const filtered = companies.filter(company => 
-                  company.company_name.toLowerCase().includes(filterText.toLowerCase())
-                );
-                
-                if (filtered.length === 0) {
-                  workCompanyDropdown.innerHTML = '<div class="sw-dropdown-item" style="color: #999; cursor: default;">검색 결과가 없습니다</div>';
-                } else {
-                  workCompanyDropdown.innerHTML = filtered.map(company => 
-                    `<div class="sw-dropdown-item" data-value="${swEscapeHtml(company.company_name)}">${swEscapeHtml(company.company_name)}</div>`
-                  ).join('');
-                }
+            swInitCompanySearchDropdown(container, {
+              inputSelector: '#swAdminFilterCompanyInput',
+              hiddenSelector: '#swAdminFilterCompanyHidden',
+              dropdownSelector: '#swAdminFilterCompanyDropdown',
+              companies,
+              allowEmptyOption: true,
+              emptyLabel: '전체 화주사 (전체)',
+              onSelect: () => {
+                swAdminLoadWorks();
               }
-              
-              // 초기 드롭다운 생성
-              updateDropdown();
-              
-              // 기존 이벤트 리스너 제거 (중복 방지)
-              const newInput = workCompanyInput.cloneNode(true);
-              workCompanyInput.parentNode.replaceChild(newInput, workCompanyInput);
-              const newHidden = workCompanyHidden.cloneNode(true);
-              workCompanyHidden.parentNode.replaceChild(newHidden, workCompanyHidden);
-              
-              // 새로운 이벤트 리스너 추가
-              const currentInput = container.querySelector('#swAdminWorkCompanyInput');
-              const currentHidden = container.querySelector('#swAdminWorkCompanySelect');
-              const currentDropdown = container.querySelector('#swAdminWorkCompanyDropdown');
-              
-              // 드롭다운 열기/닫기 상태 추적
-              let isDropdownOpen = false;
-              let dropdownTimeout = null;
-              
-              // 드롭다운 열기 함수
-              const openDropdown = () => {
-                if (dropdownTimeout) {
-                  clearTimeout(dropdownTimeout);
-                  dropdownTimeout = null;
-                }
-                updateDropdown(currentInput.value);
-                currentDropdown.classList.add('show');
-                isDropdownOpen = true;
-              };
-              
-              // 드롭다운 닫기 함수
-              const closeDropdown = () => {
-                if (dropdownTimeout) {
-                  clearTimeout(dropdownTimeout);
-                  dropdownTimeout = null;
-                }
-                currentDropdown.classList.remove('show');
-                isDropdownOpen = false;
-              };
-              
-              currentInput.addEventListener('input', (e) => {
-                const value = e.target.value;
-                currentHidden.value = value; // 입력된 값도 hidden에 저장
-                updateDropdown(value);
-                if (!isDropdownOpen) {
-                  openDropdown();
-                }
-              });
-              
-              currentInput.addEventListener('focus', (e) => {
-                e.stopPropagation(); // 이벤트 전파 방지
-                // 약간의 지연을 두어 다른 이벤트가 먼저 처리되도록
-                if (dropdownTimeout) {
-                  clearTimeout(dropdownTimeout);
-                }
-                dropdownTimeout = setTimeout(() => {
-                  openDropdown();
-                }, 100);
-              });
-              
-              currentInput.addEventListener('click', (e) => {
-                e.stopPropagation(); // 이벤트 전파 방지
-                if (dropdownTimeout) {
-                  clearTimeout(dropdownTimeout);
-                }
-                dropdownTimeout = setTimeout(() => {
-                  openDropdown();
-                }, 100);
-              });
-              
-              // 엔터 키 처리: 드롭다운에서 선택만 하고 폼 제출 방지
-              currentInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault(); // 폼 제출 방지
-                  
-                  // 드롭다운이 열려있고 항목이 있으면 첫 번째 항목 선택
-                  if (isDropdownOpen && currentDropdown.children.length > 0) {
-                    const firstItem = currentDropdown.querySelector('.sw-dropdown-item[data-value]');
-                    if (firstItem && firstItem.dataset.value) {
-                      currentInput.value = firstItem.dataset.value;
-                      currentHidden.value = firstItem.dataset.value;
-                      closeDropdown();
-                      return;
-                    }
-                  }
-                  
-                  // 드롭다운이 닫혀있거나 항목이 없으면 입력값과 일치하는 항목 찾기
-                  const inputValue = currentInput.value.trim().toLowerCase();
-                  if (inputValue) {
-                    const matchedItem = Array.from(currentDropdown.querySelectorAll('.sw-dropdown-item[data-value]'))
-                      .find(item => item.dataset.value.toLowerCase() === inputValue || 
-                                    item.dataset.value.toLowerCase().includes(inputValue));
-                    if (matchedItem && matchedItem.dataset.value) {
-                      currentInput.value = matchedItem.dataset.value;
-                      currentHidden.value = matchedItem.dataset.value;
-                      closeDropdown();
-                      return;
-                    }
-                  }
-                  
-                  // 일치하는 항목이 없으면 드롭다운 열기
-                  if (!isDropdownOpen) {
-                    openDropdown();
-                  }
-                }
-              });
-              
-              // 드롭다운 아이템 클릭
-              currentDropdown.addEventListener('click', (e) => {
-                e.stopPropagation(); // 이벤트 전파 방지
-                const item = e.target.closest('.sw-dropdown-item');
-                if (item && item.dataset.value) {
-                  currentInput.value = item.dataset.value;
-                  currentHidden.value = item.dataset.value;
-                  closeDropdown();
-                }
-              });
-              
-              // 외부 클릭 시 드롭다운 닫기 (mousedown 이벤트 사용)
-              const handleDocumentClick = (e) => {
-                // input이나 dropdown 내부가 아닌 경우에만 닫기
-                if (!currentInput.contains(e.target) && !currentDropdown.contains(e.target)) {
-                  // 약간의 지연을 두어 input의 focus 이벤트가 먼저 처리되도록
-                  setTimeout(() => {
-                    if (!currentInput.contains(document.activeElement)) {
-                      closeDropdown();
-                    }
-                  }, 150);
-                }
-              };
-              
-              // 기존 리스너 제거를 위해 함수 참조 저장
-              if (window.swCompanyDropdownCloseHandler) {
-                document.removeEventListener('mousedown', window.swCompanyDropdownCloseHandler);
-              }
-              window.swCompanyDropdownCloseHandler = handleDocumentClick;
-              // mousedown 이벤트를 사용하여 더 빠르게 처리하되, capture phase는 사용하지 않음
-              document.addEventListener('mousedown', handleDocumentClick);
-            }
-            
-            if (filterCompanySelect) {
-              filterCompanySelect.innerHTML = '<option value="">전체 화주사</option>' + 
-                data.companies.map(company => 
-                  `<option value="${swEscapeHtml(company.company_name)}">${swEscapeHtml(company.company_name)}</option>`
-                ).join('');
-            }
+            });
           }
         })
         .catch(error => {
@@ -1794,14 +1824,17 @@
      * 관리자 작업 목록 로드
      * 관리자 필터 기준으로 데이터 조회
      */
-    function swAdminLoadWorks() {
+    function swAdminLoadWorks(options = {}) {
       const container = document.getElementById('swContainer');
       if (!container) return;
       
       // 1. 월 필터 값 수집
       const monthValue = container.querySelector('#swAdminFilterMonth')?.value || '';
       const workTypeId = container.querySelector('#swAdminFilterWorkType')?.value || '';
-      const companyName = container.querySelector('#swAdminFilterCompany')?.value || '';
+      const companyName = container.querySelector('#swAdminFilterCompanyHidden')?.value 
+        || container.querySelector('#swAdminFilterCompanyInput')?.value 
+        || '';
+      const { ignoreFilters = false } = options || {};
       
       // 2. 월을 날짜 범위로 변환
       let startDate = '';
@@ -1822,9 +1855,10 @@
       // 날짜 필터는 유지 (같은 월의 데이터만 조회)
       if (startDate) url += `start_date=${startDate}&`;
       if (endDate) url += `end_date=${endDate}&`;
-      // 작업 종류와 화주사 필터는 제거 (수정 후에는 전체 조회)
-      // if (workTypeId) url += `work_type_id=${workTypeId}&`;
-      // if (companyName) url += `company_name=${encodeURIComponent(companyName)}&`;
+      if (!ignoreFilters) {
+        if (workTypeId) url += `work_type_id=${encodeURIComponent(workTypeId)}&`;
+        if (companyName) url += `company_name=${encodeURIComponent(companyName)}&`;
+      }
       
       // 4. 로딩 표시
       const tbody = container.querySelector('#swTableBody');
