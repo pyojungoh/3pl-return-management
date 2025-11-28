@@ -1604,6 +1604,32 @@ def update_work(work_id):
             
             if batch_id:
                 recalculate_batch_summary(cursor, batch_id)
+                
+                # 배치의 기본 정보(화주사, 작업 일자)도 함께 업데이트
+                batch_updates = []
+                batch_params = []
+                if company_name is not None:
+                    batch_updates.append('company_name = %s' if USE_POSTGRESQL else 'company_name = ?')
+                    batch_params.append(company_name.strip())
+                if work_date is not None:
+                    batch_updates.append('work_date = %s' if USE_POSTGRESQL else 'work_date = ?')
+                    batch_params.append(work_date.strip())
+                
+                if batch_updates:
+                    batch_updates.append('updated_at = CURRENT_TIMESTAMP')
+                    batch_params.append(batch_id)
+                    if USE_POSTGRESQL:
+                        cursor.execute(f'''
+                            UPDATE special_work_batches
+                            SET {', '.join(batch_updates)}
+                            WHERE id = %s
+                        ''', batch_params)
+                    else:
+                        cursor.execute(f'''
+                            UPDATE special_work_batches
+                            SET {', '.join(batch_updates)}
+                            WHERE id = ?
+                        ''', batch_params)
             
             conn.commit()
             
