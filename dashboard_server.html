@@ -11313,10 +11313,10 @@
             hbStartBannerCarousel();
           } else {
             // 배너가 하나일 때는 첫 번째 배너만 표시
-            const firstBanner = banners[0];
-            if (firstBanner) {
-              firstBanner.style.transform = 'translateY(0)';
-              firstBanner.style.opacity = '1';
+            const firstBannerElement = wrapper.querySelector('.hb-banner-item');
+            if (firstBannerElement) {
+              firstBannerElement.style.transform = 'translateY(0)';
+              firstBannerElement.style.opacity = '1';
             }
           }
         } else {
@@ -11355,6 +11355,12 @@
         const currentBanner = banners[hbCurrentBannerIndex];
         const nextIndex = (hbCurrentBannerIndex + 1) % banners.length;
         const nextBanner = banners[nextIndex];
+        
+        // 배너 요소가 존재하는지 확인
+        if (!currentBanner || !nextBanner) {
+          console.warn('배너 요소를 찾을 수 없습니다.');
+          return;
+        }
         
         // 현재 배너를 위로 올라가게
         currentBanner.style.transition = 'transform 0.5s ease-in-out, opacity 0.5s ease-in-out';
