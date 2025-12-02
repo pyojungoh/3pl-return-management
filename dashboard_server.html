@@ -11231,21 +11231,23 @@
               const textWidth = textLength * 12; // 대략적인 텍스트 너비 계산 (폰트 크기 18px + 여백)
               const animationDuration = Math.max(10, (textWidth / 50)); // 최소 10초
               
-              // 마퀴 효과를 위해 텍스트를 한 번만 표시 (무한 루프 없이 한 번만)
+              // 마퀴 효과를 위해 텍스트를 중복시켜 무한 루프 생성
               const marqueeContainer = document.createElement('div');
               marqueeContainer.style.cssText = `
                 display: flex;
                 align-items: center;
                 height: 100%;
-                width: 100%;
+                width: 200%;
                 position: relative;
                 z-index: 2;
+                animation: hbMarqueeLeft ${animationDuration}s linear infinite;
               `;
               
-              const textSpan = document.createElement('span');
-              textSpan.className = 'hb-banner-text';
-              textSpan.textContent = banner.text || '';
-              textSpan.style.cssText = `
+              // 텍스트를 두 번 복제하여 무한 루프 효과 생성
+              const text1 = document.createElement('span');
+              text1.className = 'hb-banner-text';
+              text1.textContent = banner.text || '';
+              text1.style.cssText = `
                 display: inline-block;
                 font-weight: 800;
                 font-size: 18px;
@@ -11253,11 +11255,27 @@
                 color: ${textColor};
                 white-space: nowrap;
                 padding: 0 30px;
-                animation: hbBlink 3s ease-in-out infinite, hbMarqueeLeftOnce ${animationDuration}s linear;
-                animation-fill-mode: forwards;
+                animation: hbBlink 3s ease-in-out infinite;
+                flex-shrink: 0;
               `;
               
-              marqueeContainer.appendChild(textSpan);
+              const text2 = document.createElement('span');
+              text2.className = 'hb-banner-text';
+              text2.textContent = banner.text || '';
+              text2.style.cssText = `
+                display: inline-block;
+                font-weight: 800;
+                font-size: 18px;
+                letter-spacing: 1px;
+                color: ${textColor};
+                white-space: nowrap;
+                padding: 0 30px;
+                animation: hbBlink 3s ease-in-out infinite;
+                flex-shrink: 0;
+              `;
+              
+              marqueeContainer.appendChild(text1);
+              marqueeContainer.appendChild(text2);
               bannerItem.appendChild(marqueeContainer);
               
               // 애니메이션 완료 시간을 배너 아이템에 저장
