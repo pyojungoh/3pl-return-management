@@ -11384,6 +11384,20 @@
         nextBanner.style.transform = 'translateX(0)';
         nextBanner.style.opacity = '1';
         
+        // 다음 배너의 텍스트 애니메이션 재시작
+        setTimeout(() => {
+          const nextBannerText = nextBanner.querySelector('.hb-banner-text');
+          if (nextBannerText) {
+            // 애니메이션 재시작을 위해 잠시 제거 후 다시 추가
+            const animation = nextBannerText.style.animation;
+            nextBannerText.style.animation = 'none';
+            // 강제로 리플로우 발생
+            void nextBannerText.offsetWidth;
+            // 애니메이션 복원
+            nextBannerText.style.animation = animation;
+          }
+        }, 50);
+        
         hbCurrentBannerIndex = nextIndex;
         
         // 다음 배너의 애니메이션 시간 확인
