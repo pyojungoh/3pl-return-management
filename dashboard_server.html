@@ -11346,10 +11346,24 @@
           banner.style.transform = 'translateX(0)';
           banner.style.opacity = '1';
           banner.style.transition = 'none';
+          // 첫 번째 배너의 텍스트 애니메이션 초기화
+          const firstBannerText = banner.querySelector('.hb-banner-text');
+          if (firstBannerText) {
+            firstBannerText.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+              firstBannerText.style.transform = '';
+            }, 10);
+          }
         } else {
           banner.style.transform = 'translateX(100%)';
           banner.style.opacity = '0';
           banner.style.transition = 'none';
+          // 숨겨진 배너의 텍스트 애니메이션 일시정지
+          const hiddenBannerText = banner.querySelector('.hb-banner-text');
+          if (hiddenBannerText) {
+            hiddenBannerText.style.animationPlayState = 'paused';
+            hiddenBannerText.style.transform = 'translateX(100%)';
+          }
         }
       });
       
@@ -11384,19 +11398,23 @@
         nextBanner.style.transform = 'translateX(0)';
         nextBanner.style.opacity = '1';
         
-        // 다음 배너의 텍스트 애니메이션 재시작
-        setTimeout(() => {
-          const nextBannerText = nextBanner.querySelector('.hb-banner-text');
-          if (nextBannerText) {
-            // 애니메이션 재시작을 위해 잠시 제거 후 다시 추가
-            const animation = nextBannerText.style.animation;
-            nextBannerText.style.animation = 'none';
-            // 강제로 리플로우 발생
-            void nextBannerText.offsetWidth;
-            // 애니메이션 복원
-            nextBannerText.style.animation = animation;
-          }
-        }, 50);
+        // 다음 배너의 텍스트 애니메이션 완전히 재시작
+        const nextBannerText = nextBanner.querySelector('.hb-banner-text');
+        if (nextBannerText) {
+          // 텍스트의 transform 초기화
+          nextBannerText.style.transform = 'translateX(100%)';
+          // 애니메이션 재시작을 위해 잠시 제거 후 다시 추가
+          const animation = nextBannerText.style.animation;
+          nextBannerText.style.animation = 'none';
+          // 강제로 리플로우 발생
+          void nextBannerText.offsetWidth;
+          // 애니메이션 복원
+          nextBannerText.style.animation = animation;
+          // transform 초기화 제거 (애니메이션이 다시 시작되도록)
+          setTimeout(() => {
+            nextBannerText.style.transform = '';
+          }, 10);
+        }
         
         hbCurrentBannerIndex = nextIndex;
         
