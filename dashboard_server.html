@@ -5995,6 +5995,11 @@
       const container = document.getElementById('consignorCalendarContainer');
       if (!container) return;
       
+      // 전역 변수 초기화 (메모리 누수 방지)
+      if (!window.scheduleModalData) {
+        window.scheduleModalData = {};
+      }
+      
       // 월 설정
       let currentDate;
       if (month) {
@@ -6062,18 +6067,20 @@
         const daySchedules = schedulesByDate[dateKey] || [];
         const isToday = new Date().toDateString() === new Date(year, monthNum, day).toDateString();
         
-        const schedulesJson = JSON.stringify(daySchedules).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
+        // 스케쥴 데이터를 전역 변수에 저장 (모달에서 사용)
+        window.scheduleModalData[dateKey] = daySchedules;
+        
         html += `
           <div style="min-height: 100px; background: ${isToday ? '#fff9e6' : '#ffffff'}; border: 2px solid ${isToday ? '#ff6b35' : '#ffeaa7'}; border-radius: 8px; padding: 8px; cursor: pointer; transition: all 0.2s;" 
-               onclick="showScheduleModal('${dateKey}', '${schedulesJson}')">
+               onclick="showScheduleModal('${dateKey}', '')">
             <div style="font-weight: 700; margin-bottom: 6px; color: ${isToday ? '#ff6b35' : '#2d3436'};">
               ${day}
             </div>
             <div style="display: flex; flex-direction: column; gap: 4px;">
         `;
         
-        // 스케쥴 표시 (최대 3개) - 화주사 모드: 색상 없이 검정색 텍스트로 "- 타입" 형식
-        daySchedules.slice(0, 3).forEach((schedule, idx) => {
+        // 스케쥴 표시 (최대 5개) - 화주사 모드: 색상 없이 검정색 텍스트로 "- 타입" 형식
+        daySchedules.slice(0, 5).forEach((schedule, idx) => {
           let scheduleType = escapeHtml(schedule.schedule_type || '');
           const title = escapeHtml(schedule.title || '');
           
@@ -6092,8 +6099,8 @@
           `;
         });
         
-        if (daySchedules.length > 3) {
-          html += `<div style="font-size: 10px; color: #636e72; text-align: center;">+${daySchedules.length - 3}개</div>`;
+        if (daySchedules.length > 5) {
+          html += `<div style="font-size: 10px; color: #636e72; text-align: center;">+${daySchedules.length - 5}개</div>`;
         }
         
         html += `
@@ -7633,6 +7640,11 @@
       const container = document.getElementById('calendarContainer');
       if (!container) return;
       
+      // 전역 변수 초기화 (메모리 누수 방지)
+      if (!window.scheduleModalData) {
+        window.scheduleModalData = {};
+      }
+      
       // 월 설정
       let currentDate;
       if (month) {
@@ -7728,18 +7740,20 @@
         const daySchedules = schedulesByDate[dateKey] || [];
         const isToday = new Date().toDateString() === new Date(year, monthNum, day).toDateString();
         
-        const schedulesJson = JSON.stringify(daySchedules).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
+        // 스케쥴 데이터를 전역 변수에 저장 (모달에서 사용)
+        window.scheduleModalData[dateKey] = daySchedules;
+        
         html += `
           <div style="min-height: 100px; background: ${isToday ? '#fff9e6' : '#ffffff'}; border: 2px solid ${isToday ? '#ff6b35' : '#ffeaa7'}; border-radius: 8px; padding: 8px; cursor: pointer; transition: all 0.2s;" 
-               onclick="showScheduleModal('${dateKey}', '${schedulesJson}')">
+               onclick="showScheduleModal('${dateKey}', '')">
             <div style="font-weight: 700; margin-bottom: 6px; color: ${isToday ? '#ff6b35' : '#2d3436'};">
               ${day}
             </div>
             <div style="display: flex; flex-direction: column; gap: 4px;">
         `;
         
-        // 스케쥴 표시 (최대 3개)
-        daySchedules.slice(0, 3).forEach((schedule, idx) => {
+        // 스케쥴 표시 (최대 5개)
+        daySchedules.slice(0, 5).forEach((schedule, idx) => {
           const companyName = escapeHtml(schedule.company_name || '');
           let scheduleType = escapeHtml(schedule.schedule_type || '');
           const title = escapeHtml(schedule.title || '');
@@ -7760,8 +7774,8 @@
           `;
         });
         
-        if (daySchedules.length > 3) {
-          html += `<div style="font-size: 10px; color: #636e72; text-align: center;">+${daySchedules.length - 3}개</div>`;
+        if (daySchedules.length > 5) {
+          html += `<div style="font-size: 10px; color: #636e72; text-align: center;">+${daySchedules.length - 5}개</div>`;
         }
         
         html += `
@@ -7920,18 +7934,25 @@
     }
     window.renderScheduleListTable = renderScheduleListTable;
     
+    // 스케쥴 데이터 저장용 전역 변수 (날짜별 스케쥴 저장)
+    window.scheduleModalData = {};
+    
     // 스케쥴 모달 표시
     function showScheduleModal(date, schedulesJson) {
       const dateObj = new Date(date);
       const dateStr = `${dateObj.getFullYear()}년 ${dateObj.getMonth() + 1}월 ${dateObj.getDate()}일`;
       
-      // JSON 문자열을 파싱
-      let schedules = [];
-      try {
-        schedules = JSON.parse(schedulesJson.replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
-      } catch (e) {
-        console.error('스케쥴 파싱 오류:', e);
-        schedules = [];
+      // 전역 변수에서 스케쥴 데이터 가져오기 (더 안전한 방법)
+      let schedules = window.scheduleModalData[date] || [];
+      
+      // 전역 변수에 데이터가 없으면 JSON 파싱 시도 (하위 호환성)
+      if (schedules.length === 0 && schedulesJson) {
+        try {
+          schedules = JSON.parse(schedulesJson.replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
+        } catch (e) {
+          console.error('스케쥴 파싱 오류:', e);
+          schedules = [];
+        }
       }
       
       let modalHtml = `
