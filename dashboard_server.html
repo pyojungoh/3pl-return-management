@@ -11213,12 +11213,12 @@
               transition: transform 0.5s ease-in-out, opacity 0.5s ease-in-out;
             `;
             
-            // 첫 번째 배너는 즉시 표시, 나머지는 아래에서 위로 올라오는 애니메이션
+            // 첫 번째 배너는 즉시 표시, 나머지는 오른쪽에 숨김
             if (index === 0) {
-              bannerItem.style.transform = 'translateY(0)';
+              bannerItem.style.transform = 'translateX(0)';
               bannerItem.style.opacity = '1';
             } else {
-              bannerItem.style.transform = 'translateY(100%)';
+              bannerItem.style.transform = 'translateX(100%)';
               bannerItem.style.opacity = '0';
             }
             
@@ -11227,27 +11227,26 @@
             const needsMarquee = textLength > 25;
             
             if (needsMarquee) {
-              // 텍스트 길이에 따라 애니메이션 시간 계산 (1초에 약 50px 이동)
+              // 텍스트 길이에 따라 애니메이션 시간 계산 (1초에 약 30px 이동 - 더 느리게)
               const textWidth = textLength * 12; // 대략적인 텍스트 너비 계산 (폰트 크기 18px + 여백)
-              const animationDuration = Math.max(10, (textWidth / 50)); // 최소 10초
+              const animationDuration = Math.max(15, (textWidth / 30)); // 최소 15초, 더 느리게
               
-              // 마퀴 효과를 위해 텍스트를 중복시켜 무한 루프 생성
+              // 마퀴 효과를 위해 텍스트를 한 번만 흐르게 (무한 반복 없음)
               const marqueeContainer = document.createElement('div');
               marqueeContainer.style.cssText = `
                 display: flex;
                 align-items: center;
                 height: 100%;
-                width: 200%;
+                width: 100%;
                 position: relative;
                 z-index: 2;
-                animation: hbMarqueeLeft ${animationDuration}s linear infinite;
+                overflow: hidden;
               `;
               
-              // 텍스트를 두 번 복제하여 무한 루프 효과 생성
-              const text1 = document.createElement('span');
-              text1.className = 'hb-banner-text';
-              text1.textContent = banner.text || '';
-              text1.style.cssText = `
+              const textSpan = document.createElement('span');
+              textSpan.className = 'hb-banner-text';
+              textSpan.textContent = banner.text || '';
+              textSpan.style.cssText = `
                 display: inline-block;
                 font-weight: 800;
                 font-size: 18px;
@@ -11255,31 +11254,15 @@
                 color: ${textColor};
                 white-space: nowrap;
                 padding: 0 30px;
-                animation: hbBlink 3s ease-in-out infinite;
-                flex-shrink: 0;
+                animation: hbBlink 3s ease-in-out infinite, hbMarqueeLeftOnce ${animationDuration}s linear forwards;
               `;
               
-              const text2 = document.createElement('span');
-              text2.className = 'hb-banner-text';
-              text2.textContent = banner.text || '';
-              text2.style.cssText = `
-                display: inline-block;
-                font-weight: 800;
-                font-size: 18px;
-                letter-spacing: 1px;
-                color: ${textColor};
-                white-space: nowrap;
-                padding: 0 30px;
-                animation: hbBlink 3s ease-in-out infinite;
-                flex-shrink: 0;
-              `;
-              
-              marqueeContainer.appendChild(text1);
-              marqueeContainer.appendChild(text2);
+              marqueeContainer.appendChild(textSpan);
               bannerItem.appendChild(marqueeContainer);
               
               // 애니메이션 완료 시간을 배너 아이템에 저장
               bannerItem.dataset.animationDuration = animationDuration;
+              bannerItem.dataset.needsMarquee = 'true';
             } else {
               // 짧은 텍스트는 중앙 정렬
               const textSpan = document.createElement('span');
@@ -11333,7 +11316,7 @@
             // 배너가 하나일 때는 첫 번째 배너만 표시
             const firstBannerElement = wrapper.querySelector('.hb-banner-item');
             if (firstBannerElement) {
-              firstBannerElement.style.transform = 'translateY(0)';
+              firstBannerElement.style.transform = 'translateX(0)';
               firstBannerElement.style.opacity = '1';
             }
           }
@@ -11357,14 +11340,16 @@
       const banners = wrapper.querySelectorAll('.hb-banner-item');
       if (banners.length <= 1) return;
       
-      // 초기 위치 설정 - 첫 번째 배너만 표시
+      // 초기 위치 설정 - 첫 번째 배너만 표시 (왼쪽에서 시작)
       banners.forEach((banner, index) => {
         if (index === 0) {
-          banner.style.transform = 'translateY(0)';
+          banner.style.transform = 'translateX(0)';
           banner.style.opacity = '1';
+          banner.style.transition = 'none';
         } else {
-          banner.style.transform = 'translateY(100%)';
+          banner.style.transform = 'translateX(100%)';
           banner.style.opacity = '0';
+          banner.style.transition = 'none';
         }
       });
       
@@ -11380,14 +11365,14 @@
           return;
         }
         
-        // 현재 배너를 위로 올라가게
-        currentBanner.style.transition = 'transform 0.5s ease-in-out, opacity 0.5s ease-in-out';
-        currentBanner.style.transform = 'translateY(-100%)';
+        // 현재 배너를 왼쪽으로 사라지게
+        currentBanner.style.transition = 'transform 0.3s ease-in-out, opacity 0.3s ease-in-out';
+        currentBanner.style.transform = 'translateX(-100%)';
         currentBanner.style.opacity = '0';
         
-        // 다음 배너를 아래에서 위로 올라오게
-        nextBanner.style.transition = 'transform 0.5s ease-in-out, opacity 0.5s ease-in-out';
-        nextBanner.style.transform = 'translateY(0)';
+        // 다음 배너를 오른쪽에서 왼쪽으로 나오게
+        nextBanner.style.transition = 'transform 0.3s ease-in-out, opacity 0.3s ease-in-out';
+        nextBanner.style.transform = 'translateX(0)';
         nextBanner.style.opacity = '1';
         
         hbCurrentBannerIndex = nextIndex;
@@ -11398,9 +11383,9 @@
         const needsMarquee = nextTextLength > 25;
         
         if (needsMarquee) {
-          // 긴 텍스트인 경우 애니메이션 시간 계산
+          // 긴 텍스트인 경우 애니메이션 시간 계산 (더 느리게)
           const textWidth = nextTextLength * 12;
-          const animationDuration = Math.max(10, (textWidth / 50)) * 1000; // 밀리초로 변환
+          const animationDuration = Math.max(15, (textWidth / 30)) * 1000; // 밀리초로 변환, 더 느리게
           // 애니메이션이 끝난 후 다음 배너로 전환
           setTimeout(switchToNextBanner, animationDuration);
         } else {
@@ -11416,9 +11401,9 @@
       const firstNeedsMarquee = firstTextLength > 25;
       
       if (firstNeedsMarquee) {
-        // 긴 텍스트인 경우 애니메이션 시간 계산
+        // 긴 텍스트인 경우 애니메이션 시간 계산 (더 느리게)
         const textWidth = firstTextLength * 12;
-        const animationDuration = Math.max(10, (textWidth / 50)) * 1000; // 밀리초로 변환
+        const animationDuration = Math.max(15, (textWidth / 30)) * 1000; // 밀리초로 변환, 더 느리게
         // 애니메이션이 끝난 후 다음 배너로 전환
         setTimeout(switchToNextBanner, animationDuration);
       } else {
