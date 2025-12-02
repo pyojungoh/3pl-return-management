@@ -11377,35 +11377,31 @@
         
         hbCurrentBannerIndex = nextIndex;
         
-        // 다음 배너의 텍스트 길이 확인
-        const nextBannerText = nextBanner.querySelector('.hb-banner-text');
-        const nextTextLength = nextBannerText ? (nextBannerText.textContent || '').length : 0;
-        const needsMarquee = nextTextLength > 25;
+        // 다음 배너의 애니메이션 시간 확인
+        const nextNeedsMarquee = nextBanner.dataset.needsMarquee === 'true';
         
-        if (needsMarquee) {
-          // 긴 텍스트인 경우 애니메이션 시간 계산 (더 느리게)
-          const textWidth = nextTextLength * 12;
-          const animationDuration = Math.max(15, (textWidth / 30)) * 1000; // 밀리초로 변환, 더 느리게
+        if (nextNeedsMarquee) {
+          // 긴 텍스트인 경우 저장된 애니메이션 시간 사용
+          const animationDuration = parseFloat(nextBanner.dataset.animationDuration) || 15;
+          const animationDurationMs = animationDuration * 1000; // 밀리초로 변환
           // 애니메이션이 끝난 후 다음 배너로 전환
-          setTimeout(switchToNextBanner, animationDuration);
+          setTimeout(switchToNextBanner, animationDurationMs);
         } else {
           // 짧은 텍스트인 경우 5초 후 다음 배너로 전환
           setTimeout(switchToNextBanner, 5000);
         }
       }
       
-      // 첫 번째 배너의 텍스트 길이 확인
+      // 첫 번째 배너의 애니메이션 시간 확인
       const firstBanner = banners[0];
-      const firstBannerText = firstBanner.querySelector('.hb-banner-text');
-      const firstTextLength = firstBannerText ? (firstBannerText.textContent || '').length : 0;
-      const firstNeedsMarquee = firstTextLength > 25;
+      const firstNeedsMarquee = firstBanner.dataset.needsMarquee === 'true';
       
       if (firstNeedsMarquee) {
-        // 긴 텍스트인 경우 애니메이션 시간 계산 (더 느리게)
-        const textWidth = firstTextLength * 12;
-        const animationDuration = Math.max(15, (textWidth / 30)) * 1000; // 밀리초로 변환, 더 느리게
+        // 긴 텍스트인 경우 저장된 애니메이션 시간 사용
+        const animationDuration = parseFloat(firstBanner.dataset.animationDuration) || 15;
+        const animationDurationMs = animationDuration * 1000; // 밀리초로 변환
         // 애니메이션이 끝난 후 다음 배너로 전환
-        setTimeout(switchToNextBanner, animationDuration);
+        setTimeout(switchToNextBanner, animationDurationMs);
       } else {
         // 짧은 텍스트인 경우 5초 후 다음 배너로 전환
         setTimeout(switchToNextBanner, 5000);
