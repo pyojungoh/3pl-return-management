@@ -74,6 +74,7 @@ from api.admin.routes import admin_bp
 from api.schedules.routes_db import schedules_bp
 from api.board.routes_db import board_bp
 from api.popups.routes_db import popups_bp
+from api.header_banners.routes_db import header_banners_bp
 from api.cs.routes_db import cs_bp
 from api.cs.scheduler import start_cs_notification_scheduler
 from api.special_works.routes_db import special_works_bp
@@ -88,6 +89,8 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(schedules_bp)
 app.register_blueprint(board_bp)
 app.register_blueprint(popups_bp)
+app.register_blueprint(header_banners_bp)
+print("[앱 시작] 헤더 배너 Blueprint 등록 완료")
 app.register_blueprint(cs_bp)
 app.register_blueprint(special_works_bp)
 app.register_blueprint(schedule_notifications_bp)
