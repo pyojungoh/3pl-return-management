@@ -63,6 +63,64 @@
       to { transform: rotate(360deg); }
     }
     
+    @keyframes hbMarquee {
+      0% {
+        transform: translateX(100%);
+      }
+      100% {
+        transform: translateX(-100%);
+      }
+    }
+    
+    @keyframes hbMarqueeLeft {
+      0% {
+        transform: translateX(100%);
+      }
+      100% {
+        transform: translateX(-50%);
+      }
+    }
+    
+    @keyframes hbMarqueeLeftOnce {
+      0% {
+        transform: translateX(100%);
+      }
+      100% {
+        transform: translateX(-100%);
+      }
+    }
+    
+    @keyframes hbBlink {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.3;
+      }
+    }
+    
+    @keyframes hbSlideUp {
+      0% {
+        transform: translateY(100%);
+        opacity: 0;
+      }
+      100% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes hbSparkle {
+      0%, 100% {
+        opacity: 0.3;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.1);
+      }
+    }
+    
     @keyframes blink {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
@@ -412,9 +470,14 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       gap: 10px;
-      position: relative;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
       z-index: 1;
+      width: auto;
     }
     
     .company-info {
@@ -1762,9 +1825,16 @@
           </div>
         </div>
         <div class="header-center">
-          <div class="company-info" id="companyInfo"></div>
+          <!-- 헤더 배너 영역 (중앙에 크게 배치) -->
+          <div id="hbBannerContainer" style="display: none; width: 600px; max-width: 800px; min-width: 500px; overflow: hidden; position: relative; height: 48px; border-radius: 12px; background: #fff9e6; border: 3px solid #ffa502; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); margin: 0;">
+            <div id="hbBannerWrapper" style="display: block; height: 100%; position: relative; overflow: hidden;">
+              <!-- 배너 아이템들이 여기에 동적으로 추가됨 -->
+            </div>
+          </div>
         </div>
         <div class="header-right">
+          <!-- 사용자 정보 -->
+          <div class="company-info" id="companyInfo"></div>
           <button class="logout-btn" onclick="logout()">로그아웃</button>
         </div>
       </div>
@@ -2826,6 +2896,90 @@
               </tbody>
             </table>
           </div>
+          
+          <!-- 헤더 배너 관리 섹션 -->
+          <div style="margin-top: 40px; padding-top: 30px; border-top: 3px solid #ffeaa7;">
+            <h3 style="margin-bottom: 20px; color: #ff6b35; font-weight: 700;">📢 헤더 배너 관리</h3>
+            <p style="color: #636e72; font-size: 14px; margin-bottom: 20px;">헤더 상단에 표시될 배너 메시지를 관리합니다. 여러 개의 배너를 추가하면 자동으로 순환 표시됩니다.</p>
+            
+            <!-- 배너 등록 폼 (접이식) -->
+            <div style="margin-bottom: 20px;">
+              <button id="hbAddBannerBtn" class="refresh-btn" onclick="hbToggleBannerForm()" style="background: linear-gradient(135deg, #ffffff 0%, #fffef9 100%); width: 100%; text-align: left; padding: 16px 24px; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; border-radius: 14px; border: 2px solid #ffeaa7; color: #ff6b35; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(255, 152, 0, 0.1);">
+                <span>➕ 배너 추가</span>
+                <span id="hbAddBannerIcon" style="font-size: 14px; transition: transform 0.3s ease;">▼</span>
+              </button>
+              
+              <div id="hbBannerForm" style="display: none; background: #ffffff; padding: 24px; border-radius: 0 0 14px 14px; border: 2px solid #ffeaa7; border-top: none; margin-top: -2px; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1);">
+                <input type="hidden" id="hbBannerId">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                  <div style="grid-column: 1 / -1;">
+                    <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">배너 문구 *</label>
+                    <input type="text" id="hbBannerText" class="request-input" style="min-height: auto;" placeholder="배너에 표시할 문구를 입력하세요" required>
+                  </div>
+                  <div>
+                    <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">링크 타입</label>
+                    <select id="hbBannerLinkType" class="request-input" style="min-height: auto;" onchange="hbToggleBoardPostSelect()">
+                      <option value="none">링크 없음</option>
+                      <option value="board_post">게시글 링크</option>
+                    </select>
+                  </div>
+                  <div id="hbBoardPostSelectWrapper" style="display: none;">
+                    <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">게시글 선택</label>
+                    <select id="hbBoardPostSelect" class="request-input" style="min-height: auto;">
+                      <option value="">로딩 중...</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">표시 순서</label>
+                    <input type="number" id="hbBannerDisplayOrder" class="request-input" style="min-height: auto;" placeholder="0" value="0" min="0">
+                    <small style="color: #636e72; font-size: 12px;">숫자가 작을수록 먼저 표시됩니다</small>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-top: 24px;">
+                    <input type="checkbox" id="hbBannerIsActive" style="width: 18px; height: 18px; cursor: pointer;" checked>
+                    <label for="hbBannerIsActive" style="color: #2d3436; font-weight: 600; cursor: pointer;">활성화</label>
+                  </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                  <div>
+                    <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">텍스트 색상</label>
+                    <input type="color" id="hbBannerTextColor" class="request-input" style="min-height: auto; height: 40px; padding: 4px;" value="#2d3436">
+                  </div>
+                  <div>
+                    <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">배경 색상</label>
+                    <input type="color" id="hbBannerBgColor" class="request-input" style="min-height: auto; height: 40px; padding: 4px;" value="#fff9e6">
+                  </div>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                  <button class="save-btn" onclick="hbSaveBanner()">저장</button>
+                  <button class="save-btn" onclick="hbToggleBannerForm()" style="background: linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%); box-shadow: 0 3px 10px rgba(178, 190, 195, 0.25);">취소</button>
+                </div>
+                <div id="hbBannerMessage" style="margin-top: 15px;"></div>
+              </div>
+            </div>
+            
+            <!-- 배너 목록 -->
+            <div class="table-container">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h4 style="color: #333; font-size: 16px; font-weight: 600;">등록된 배너 목록</h4>
+                <button class="refresh-btn" onclick="hbLoadBanners()" style="padding: 8px 15px; font-size: 14px;">🔄 새로고침</button>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>순서</th>
+                    <th>배너 문구</th>
+                    <th>링크</th>
+                    <th>상태</th>
+                    <th>생성일</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody id="hbBannerListTableBody">
+                  <tr><td colspan="6" class="no-data">로딩 중...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <!-- 팝업 관리 탭 끝 -->
@@ -3138,6 +3292,10 @@
             showDashboard();
             // 로그인 후 활성 팝업 확인
             checkAndShowPopup();
+            // 헤더 배너 로드
+            if (typeof hbLoadHeaderBanner === 'function') {
+              hbLoadHeaderBanner();
+            }
           }, 500);
         } else {
           showLoginMessage('❌ ' + (result.message || '로그인 실패'), 'error');
@@ -3306,6 +3464,13 @@
           checkAndShowBusinessInfoBanner();
         }, 500);
       }
+      
+      // 헤더 배너 로드
+      setTimeout(() => {
+        if (typeof hbLoadHeaderBanner === 'function') {
+          hbLoadHeaderBanner();
+        }
+      }, 300);
     }
     
     // 사업자 정보 확인 및 배너 표시
@@ -5638,6 +5803,10 @@
         // 팝업 목록 로드
         if (typeof loadPopups === 'function') {
           loadPopups();
+        }
+        // 배너 목록 로드
+        if (typeof hbLoadBanners === 'function') {
+          hbLoadBanners();
         }
       } else if (tabName === 'register') {
         const registerTab = document.getElementById('registerTab');
@@ -10726,6 +10895,523 @@
       }
     }
     window.deletePopup = deletePopup;
+    
+    /* ========== 헤더 배너 관리 관련 함수 (관리자 모드) ========== */
+    
+    // 배너 목록 로드
+    async function hbLoadBanners() {
+      const tbody = document.getElementById('hbBannerListTableBody');
+      if (!tbody) return;
+      
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data">로딩 중...</td></tr>';
+      
+      try {
+        const response = await fetch('/api/header-banners/');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          if (result.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="no-data">등록된 배너가 없습니다.</td></tr>';
+            return;
+          }
+          
+          tbody.innerHTML = '';
+          result.data.forEach(banner => {
+            const row = document.createElement('tr');
+            const isActive = typeof banner.is_active === 'boolean' ? banner.is_active : banner.is_active === 1;
+            const statusText = isActive ? '활성' : '비활성';
+            const statusClass = isActive ? 'success' : 'error';
+            const createdDate = banner.created_at ? banner.created_at.split('T')[0] : '';
+            let linkText = '없음';
+            if (banner.link_type === 'board_post' && banner.board_post_id) {
+              linkText = `게시글 #${banner.board_post_id}`;
+            }
+            
+            row.innerHTML = `
+              <td style="text-align: center;">${banner.display_order || 0}</td>
+              <td>${escapeHtml(banner.text || '')}</td>
+              <td>${linkText}</td>
+              <td><span class="${statusClass}">${statusText}</span></td>
+              <td>${createdDate}</td>
+              <td>
+                <button class="edit-btn" onclick="hbEditBanner(${banner.id})" style="margin-right: 8px;">수정</button>
+                <button class="delete-btn" onclick="hbDeleteBanner(${banner.id})">삭제</button>
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+        } else {
+          tbody.innerHTML = '<tr><td colspan="6" class="no-data">배너를 불러오는 중 오류가 발생했습니다.</td></tr>';
+        }
+      } catch (error) {
+        console.error('배너 목록 로드 오류:', error);
+        tbody.innerHTML = '<tr><td colspan="6" class="no-data">배너를 불러오는 중 오류가 발생했습니다.</td></tr>';
+      }
+    }
+    window.hbLoadBanners = hbLoadBanners;
+    
+    // 배너 폼 접기/펼치기
+    function hbToggleBannerForm() {
+      const form = document.getElementById('hbBannerForm');
+      const icon = document.getElementById('hbAddBannerIcon');
+      if (form && icon) {
+        const isHidden = form.style.display === 'none' || !form.style.display;
+        form.style.display = isHidden ? 'block' : 'none';
+        icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+        
+        if (isHidden) {
+          hbResetBannerForm();
+          hbLoadBoardPostsForSelect();
+        }
+      }
+    }
+    window.hbToggleBannerForm = hbToggleBannerForm;
+    
+    // 게시글 목록 로드 (배너 링크용)
+    async function hbLoadBoardPostsForSelect() {
+      const select = document.getElementById('hbBoardPostSelect');
+      if (!select) return;
+      
+      try {
+        const response = await fetch('/api/board/posts');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          select.innerHTML = '<option value="">게시글 선택</option>';
+          result.data.forEach(post => {
+            const option = document.createElement('option');
+            option.value = post.id;
+            option.textContent = `${escapeHtml(post.title || '')} (${post.created_at ? post.created_at.split('T')[0] : ''})`;
+            select.appendChild(option);
+          });
+        }
+      } catch (error) {
+        console.error('게시글 목록 로드 오류:', error);
+        select.innerHTML = '<option value="">게시글 로드 실패</option>';
+      }
+    }
+    window.hbLoadBoardPostsForSelect = hbLoadBoardPostsForSelect;
+    
+    // 링크 타입 변경 시 게시글 선택 필드 표시/숨김
+    function hbToggleBoardPostSelect() {
+      const linkType = document.getElementById('hbBannerLinkType').value;
+      const wrapper = document.getElementById('hbBoardPostSelectWrapper');
+      if (wrapper) {
+        wrapper.style.display = linkType === 'board_post' ? 'block' : 'none';
+      }
+    }
+    window.hbToggleBoardPostSelect = hbToggleBoardPostSelect;
+    
+    // 배너 폼 초기화
+    function hbResetBannerForm() {
+      document.getElementById('hbBannerId').value = '';
+      document.getElementById('hbBannerText').value = '';
+      document.getElementById('hbBannerLinkType').value = 'none';
+      document.getElementById('hbBoardPostSelect').value = '';
+      document.getElementById('hbBannerDisplayOrder').value = '0';
+      document.getElementById('hbBannerIsActive').checked = true;
+      document.getElementById('hbBannerTextColor').value = '#2d3436';
+      document.getElementById('hbBannerBgColor').value = '#fff9e6';
+      hbToggleBoardPostSelect();
+      const message = document.getElementById('hbBannerMessage');
+      if (message) {
+        message.textContent = '';
+        message.className = '';
+      }
+    }
+    window.hbResetBannerForm = hbResetBannerForm;
+    
+    // 배너 저장
+    async function hbSaveBanner() {
+      const bannerId = document.getElementById('hbBannerId').value;
+      const text = document.getElementById('hbBannerText').value.trim();
+      const linkType = document.getElementById('hbBannerLinkType').value;
+      const boardPostId = document.getElementById('hbBoardPostSelect').value;
+      const displayOrder = parseInt(document.getElementById('hbBannerDisplayOrder').value) || 0;
+      const isActive = document.getElementById('hbBannerIsActive').checked;
+      const textColor = document.getElementById('hbBannerTextColor').value;
+      const bgColor = document.getElementById('hbBannerBgColor').value;
+      
+      if (!text) {
+        alert('배너 문구를 입력해주세요.');
+        return;
+      }
+      
+      const messageEl = document.getElementById('hbBannerMessage');
+      if (messageEl) {
+        messageEl.innerHTML = '<span style="color: #636e72;">저장 중...</span>';
+      }
+      
+      try {
+        const bannerData = {
+          text: text,
+          link_type: linkType,
+          board_post_id: linkType === 'board_post' && boardPostId ? parseInt(boardPostId) : null,
+          display_order: displayOrder,
+          is_active: isActive,
+          text_color: textColor,
+          bg_color: bgColor
+        };
+        
+        let response;
+        if (bannerId) {
+          // 수정
+          response = await fetch(`/api/header-banners/${bannerId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(bannerData)
+          });
+        } else {
+          // 생성
+          response = await fetch('/api/header-banners/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(bannerData)
+          });
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          if (messageEl) {
+            messageEl.innerHTML = '<span style="color: #00b894;">✅ 배너가 저장되었습니다.</span>';
+          }
+          hbLoadBanners();
+          hbLoadHeaderBanner(); // 헤더 배너 새로고침
+          setTimeout(() => {
+            hbToggleBannerForm();
+          }, 1000);
+        } else {
+          if (messageEl) {
+            messageEl.innerHTML = `<span style="color: #e74c3c;">❌ ${result.message || '배너 저장에 실패했습니다.'}</span>`;
+          }
+        }
+      } catch (error) {
+        console.error('배너 저장 오류:', error);
+        if (messageEl) {
+          messageEl.innerHTML = '<span style="color: #e74c3c;">❌ 배너 저장 중 오류가 발생했습니다.</span>';
+        }
+      }
+    }
+    window.hbSaveBanner = hbSaveBanner;
+    
+    // 배너 수정
+    async function hbEditBanner(bannerId) {
+      try {
+        const response = await fetch(`/api/header-banners/${bannerId}`);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const banner = result.data;
+          document.getElementById('hbBannerId').value = banner.id;
+          document.getElementById('hbBannerText').value = banner.text || '';
+          document.getElementById('hbBannerLinkType').value = banner.link_type || 'none';
+          document.getElementById('hbBoardPostSelect').value = banner.board_post_id || '';
+          document.getElementById('hbBannerDisplayOrder').value = banner.display_order || 0;
+          const isActive = typeof banner.is_active === 'boolean' ? banner.is_active : banner.is_active === 1;
+          document.getElementById('hbBannerIsActive').checked = isActive;
+          document.getElementById('hbBannerTextColor').value = banner.text_color || '#2d3436';
+          document.getElementById('hbBannerBgColor').value = banner.bg_color || '#fff9e6';
+          
+          hbToggleBoardPostSelect();
+          
+          // 폼 열기
+          const form = document.getElementById('hbBannerForm');
+          const icon = document.getElementById('hbAddBannerIcon');
+          if (form && icon) {
+            form.style.display = 'block';
+            icon.style.transform = 'rotate(180deg)';
+          }
+          
+          // 게시글 목록 로드
+          hbLoadBoardPostsForSelect();
+        } else {
+          alert('배너 정보를 불러오는 중 오류가 발생했습니다.');
+        }
+      } catch (error) {
+        console.error('배너 수정 오류:', error);
+        alert('배너 정보를 불러오는 중 오류가 발생했습니다.');
+      }
+    }
+    window.hbEditBanner = hbEditBanner;
+    
+    // 배너 삭제
+    async function hbDeleteBanner(bannerId) {
+      if (!confirm('정말로 이 배너를 삭제하시겠습니까?')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/header-banners/${bannerId}`, {
+          method: 'DELETE'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('배너가 삭제되었습니다.');
+          hbLoadBanners();
+          hbLoadHeaderBanner(); // 헤더 배너 새로고침
+        } else {
+          alert(result.message || '배너 삭제에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('배너 삭제 오류:', error);
+        alert('❌ 배너 삭제 중 오류가 발생했습니다.');
+      }
+    }
+    window.hbDeleteBanner = hbDeleteBanner;
+    
+    /* ========== 헤더 배너 표시 관련 함수 (사용자용) ========== */
+    
+    // 헤더 배너 로드 및 표시
+    let hbCurrentBannerIndex = 0;
+    let hbBannerInterval = null;
+    
+    async function hbLoadHeaderBanner() {
+      const container = document.getElementById('hbBannerContainer');
+      const wrapper = document.getElementById('hbBannerWrapper');
+      if (!container || !wrapper) return;
+      
+      try {
+        const response = await fetch('/api/header-banners/active');
+        const result = await response.json();
+        
+        if (result.success && result.data && result.data.length > 0) {
+          const banners = result.data;
+          container.style.display = 'block';
+          
+          // 기존 배너 제거
+          wrapper.innerHTML = '';
+          hbCurrentBannerIndex = 0;
+          
+          // 배너 아이템 생성
+          banners.forEach((banner, index) => {
+            const bannerItem = document.createElement('div');
+            bannerItem.className = 'hb-banner-item';
+            bannerItem.dataset.index = index;
+            const bgColor = banner.bg_color || '#fff9e6';
+            const textColor = banner.text_color || '#ff6b35';
+            bannerItem.style.cssText = `
+              min-width: 100%;
+              height: 100%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: 0 24px;
+              background: ${bgColor};
+              cursor: ${banner.link_type === 'board_post' && banner.board_post_id ? 'pointer' : 'default'};
+              white-space: nowrap;
+              overflow: hidden;
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 100%;
+              transition: transform 0.5s ease-in-out, opacity 0.5s ease-in-out;
+            `;
+            
+            // 첫 번째 배너는 즉시 표시, 나머지는 아래에서 위로 올라오는 애니메이션
+            if (index === 0) {
+              bannerItem.style.transform = 'translateY(0)';
+              bannerItem.style.opacity = '1';
+            } else {
+              bannerItem.style.transform = 'translateY(100%)';
+              bannerItem.style.opacity = '0';
+            }
+            
+            // 텍스트가 길면 흐르는 효과, 짧으면 중앙 정렬
+            const textLength = (banner.text || '').length;
+            const needsMarquee = textLength > 25;
+            
+            if (needsMarquee) {
+              // 텍스트 길이에 따라 애니메이션 시간 계산 (1초에 약 50px 이동)
+              const textWidth = textLength * 12; // 대략적인 텍스트 너비 계산 (폰트 크기 18px + 여백)
+              const animationDuration = Math.max(10, (textWidth / 50)); // 최소 10초
+              
+              // 마퀴 효과를 위해 텍스트를 한 번만 표시 (무한 루프 없이 한 번만)
+              const marqueeContainer = document.createElement('div');
+              marqueeContainer.style.cssText = `
+                display: flex;
+                align-items: center;
+                height: 100%;
+                width: 100%;
+                position: relative;
+                z-index: 2;
+              `;
+              
+              const textSpan = document.createElement('span');
+              textSpan.className = 'hb-banner-text';
+              textSpan.textContent = banner.text || '';
+              textSpan.style.cssText = `
+                display: inline-block;
+                font-weight: 800;
+                font-size: 18px;
+                letter-spacing: 1px;
+                color: ${textColor};
+                white-space: nowrap;
+                padding: 0 30px;
+                animation: hbBlink 3s ease-in-out infinite, hbMarqueeLeftOnce ${animationDuration}s linear;
+                animation-fill-mode: forwards;
+              `;
+              
+              marqueeContainer.appendChild(textSpan);
+              bannerItem.appendChild(marqueeContainer);
+              
+              // 애니메이션 완료 시간을 배너 아이템에 저장
+              bannerItem.dataset.animationDuration = animationDuration;
+            } else {
+              // 짧은 텍스트는 중앙 정렬
+              const textSpan = document.createElement('span');
+              textSpan.className = 'hb-banner-text';
+              textSpan.textContent = banner.text || '';
+              textSpan.style.cssText = `
+                display: inline-block;
+                font-weight: 800;
+                font-size: 18px;
+                letter-spacing: 1px;
+                color: ${textColor};
+                white-space: nowrap;
+                position: relative;
+                z-index: 2;
+                animation: hbBlink 3s ease-in-out infinite;
+              `;
+              bannerItem.appendChild(textSpan);
+            }
+            
+            // 클릭 이벤트 (게시글 링크)
+            if (banner.link_type === 'board_post' && banner.board_post_id) {
+              bannerItem.onclick = () => {
+                // 게시판 탭으로 전환하고 해당 게시글 표시
+                if (currentRole === '관리자') {
+                  switchAdminTab('board');
+                  setTimeout(() => {
+                    // 게시글 상세보기 함수 호출 (게시판 API에 따라 수정 필요)
+                    if (typeof showBoardDetail === 'function') {
+                      showBoardDetail(banner.board_post_id);
+                    }
+                  }, 500);
+                } else {
+                  switchMenu('board');
+                  setTimeout(() => {
+                    if (typeof showBoardDetail === 'function') {
+                      showBoardDetail(banner.board_post_id);
+                    }
+                  }, 500);
+                }
+              };
+              bannerItem.style.textDecoration = 'underline';
+            }
+            
+            wrapper.appendChild(bannerItem);
+          });
+          
+          // 배너가 1개 이상이면 카루셀 시작
+          if (banners.length > 1) {
+            hbStartBannerCarousel();
+          } else {
+            // 배너가 하나일 때는 첫 번째 배너만 표시
+            const firstBanner = banners[0];
+            if (firstBanner) {
+              firstBanner.style.transform = 'translateY(0)';
+              firstBanner.style.opacity = '1';
+            }
+          }
+        } else {
+          container.style.display = 'none';
+          hbStopBannerCarousel();
+        }
+      } catch (error) {
+        console.error('헤더 배너 로드 오류:', error);
+        container.style.display = 'none';
+      }
+    }
+    window.hbLoadHeaderBanner = hbLoadHeaderBanner;
+    
+    // 배너 카루셀 시작
+    function hbStartBannerCarousel() {
+      hbStopBannerCarousel();
+      const wrapper = document.getElementById('hbBannerWrapper');
+      if (!wrapper) return;
+      
+      const banners = wrapper.querySelectorAll('.hb-banner-item');
+      if (banners.length <= 1) return;
+      
+      // 초기 위치 설정 - 첫 번째 배너만 표시
+      banners.forEach((banner, index) => {
+        if (index === 0) {
+          banner.style.transform = 'translateY(0)';
+          banner.style.opacity = '1';
+        } else {
+          banner.style.transform = 'translateY(100%)';
+          banner.style.opacity = '0';
+        }
+      });
+      
+      // 다음 배너로 전환하는 함수
+      function switchToNextBanner() {
+        const currentBanner = banners[hbCurrentBannerIndex];
+        const nextIndex = (hbCurrentBannerIndex + 1) % banners.length;
+        const nextBanner = banners[nextIndex];
+        
+        // 현재 배너를 위로 올라가게
+        currentBanner.style.transition = 'transform 0.5s ease-in-out, opacity 0.5s ease-in-out';
+        currentBanner.style.transform = 'translateY(-100%)';
+        currentBanner.style.opacity = '0';
+        
+        // 다음 배너를 아래에서 위로 올라오게
+        nextBanner.style.transition = 'transform 0.5s ease-in-out, opacity 0.5s ease-in-out';
+        nextBanner.style.transform = 'translateY(0)';
+        nextBanner.style.opacity = '1';
+        
+        hbCurrentBannerIndex = nextIndex;
+        
+        // 다음 배너의 텍스트 길이 확인
+        const nextBannerText = nextBanner.querySelector('.hb-banner-text');
+        const nextTextLength = nextBannerText ? (nextBannerText.textContent || '').length : 0;
+        const needsMarquee = nextTextLength > 25;
+        
+        if (needsMarquee) {
+          // 긴 텍스트인 경우 애니메이션 시간 계산
+          const textWidth = nextTextLength * 12;
+          const animationDuration = Math.max(10, (textWidth / 50)) * 1000; // 밀리초로 변환
+          // 애니메이션이 끝난 후 다음 배너로 전환
+          setTimeout(switchToNextBanner, animationDuration);
+        } else {
+          // 짧은 텍스트인 경우 5초 후 다음 배너로 전환
+          setTimeout(switchToNextBanner, 5000);
+        }
+      }
+      
+      // 첫 번째 배너의 텍스트 길이 확인
+      const firstBanner = banners[0];
+      const firstBannerText = firstBanner.querySelector('.hb-banner-text');
+      const firstTextLength = firstBannerText ? (firstBannerText.textContent || '').length : 0;
+      const firstNeedsMarquee = firstTextLength > 25;
+      
+      if (firstNeedsMarquee) {
+        // 긴 텍스트인 경우 애니메이션 시간 계산
+        const textWidth = firstTextLength * 12;
+        const animationDuration = Math.max(10, (textWidth / 50)) * 1000; // 밀리초로 변환
+        // 애니메이션이 끝난 후 다음 배너로 전환
+        setTimeout(switchToNextBanner, animationDuration);
+      } else {
+        // 짧은 텍스트인 경우 5초 후 다음 배너로 전환
+        setTimeout(switchToNextBanner, 5000);
+      }
+    }
+    window.hbStartBannerCarousel = hbStartBannerCarousel;
+    
+    // 배너 카루셀 중지
+    function hbStopBannerCarousel() {
+      if (hbBannerInterval) {
+        clearInterval(hbBannerInterval);
+        hbBannerInterval = null;
+      }
+    }
+    window.hbStopBannerCarousel = hbStopBannerCarousel;
     
     /* ========== 팝업 표시 관련 함수 (사용자용) ========== */
     

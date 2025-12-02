@@ -60,6 +60,8 @@ def get_db_connection():
         # SQLite 연결
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
+        # SQLite에서 FOREIGN KEY 활성화 (연결마다 필요)
+        conn.execute('PRAGMA foreign_keys = ON')
         return conn
 
 
@@ -184,22 +186,50 @@ def init_db():
             ]
             for col in notification_columns:
                 try:
-                    cursor.execute(f'ALTER TABLE schedules ADD COLUMN {col} BOOLEAN DEFAULT FALSE')
+                    cursor.execute(f'ALTER TABLE schedules ADD COLUMN IF NOT EXISTS {col} BOOLEAN DEFAULT FALSE')
                     print(f"[성공] schedules 테이블에 {col} 컬럼이 추가되었습니다.")
                 except Exception as e:
-                    if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
+                    error_msg = str(e).lower()
+                    if 'duplicate column' not in error_msg and 'already exists' not in error_msg:
                         print(f"[경고] {col} 컬럼 추가 중 오류 (무시 가능): {e}")
+                        # 트랜잭션 오류인 경우 rollback 후 계속 진행
+                        if 'aborted' in error_msg or 'transaction' in error_msg:
+                            try:
+                                conn.rollback()
+                                print(f"[복구] 트랜잭션 rollback 후 계속 진행")
+                            except:
+                                pass
             
             # PostgreSQL - 스케줄 타입 테이블
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS schedule_types (
-                    id SERIAL PRIMARY KEY,
-                    name TEXT NOT NULL UNIQUE,
-                    display_order INTEGER DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
+            try:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS schedule_types (
+                        id SERIAL PRIMARY KEY,
+                        name TEXT NOT NULL UNIQUE,
+                        display_order INTEGER DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+            except Exception as e:
+                error_msg = str(e).lower()
+                if 'aborted' in error_msg or 'transaction' in error_msg:
+                    try:
+                        conn.rollback()
+                        print(f"[복구] 트랜잭션 rollback 후 schedule_types 테이블 생성 재시도")
+                        cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS schedule_types (
+                                id SERIAL PRIMARY KEY,
+                                name TEXT NOT NULL UNIQUE,
+                                display_order INTEGER DEFAULT 0,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                    except Exception as e2:
+                        print(f"[경고] schedule_types 테이블 생성 중 오류: {e2}")
+                else:
+                    print(f"[경고] schedule_types 테이블 생성 중 오류: {e}")
             
             # 기본 스케줄 타입 추가 (없는 경우에만)
             default_types = ['입고', '출고', '행사', '연휴', '기타']
@@ -343,6 +373,58 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_popups_dates 
                 ON popups(start_date, end_date, is_active)
             ''')
+            
+            # PostgreSQL - 헤더 배너 테이블
+            try:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS header_banners (
+                        id SERIAL PRIMARY KEY,
+                        text TEXT NOT NULL,
+                        link_type TEXT DEFAULT 'none',
+                        board_post_id INTEGER,
+                        is_active BOOLEAN DEFAULT TRUE,
+                        display_order INTEGER DEFAULT 0,
+                        text_color TEXT DEFAULT '#2d3436',
+                        bg_color TEXT DEFAULT '#fff9e6',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_header_banners_active_order 
+                    ON header_banners(is_active, display_order)
+                ''')
+                print("[성공] header_banners 테이블 생성 완료")
+            except Exception as e:
+                error_msg = str(e).lower()
+                if 'aborted' in error_msg or 'transaction' in error_msg:
+                    try:
+                        conn.rollback()
+                        print(f"[복구] 트랜잭션 rollback 후 header_banners 테이블 생성 재시도")
+                        cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS header_banners (
+                                id SERIAL PRIMARY KEY,
+                                text TEXT NOT NULL,
+                                link_type TEXT DEFAULT 'none',
+                                board_post_id INTEGER,
+                                is_active BOOLEAN DEFAULT TRUE,
+                                display_order INTEGER DEFAULT 0,
+                                text_color TEXT DEFAULT '#2d3436',
+                                bg_color TEXT DEFAULT '#fff9e6',
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        cursor.execute('''
+                            CREATE INDEX IF NOT EXISTS idx_header_banners_active_order 
+                            ON header_banners(is_active, display_order)
+                        ''')
+                        print("[성공] header_banners 테이블 생성 완료 (재시도)")
+                    except Exception as e2:
+                        print(f"[경고] header_banners 테이블 생성 중 오류: {e2}")
+                else:
+                    print(f"[경고] header_banners 테이블 생성 중 오류 (무시 가능): {e}")
             
             # PostgreSQL - C/S 접수 테이블
             cursor.execute('''
@@ -795,6 +877,27 @@ def init_db():
                 ON popups(start_date, end_date, is_active)
             ''')
             
+            # SQLite - 헤더 배너 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS header_banners (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    text TEXT NOT NULL,
+                    link_type TEXT DEFAULT 'none',
+                    board_post_id INTEGER,
+                    is_active INTEGER DEFAULT 1,
+                    display_order INTEGER DEFAULT 0,
+                    text_color TEXT DEFAULT '#2d3436',
+                    bg_color TEXT DEFAULT '#fff9e6',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_header_banners_active_order 
+                ON header_banners(is_active, display_order)
+            ''')
+            
             # SQLite - C/S 접수 테이블
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS customer_service (
@@ -920,7 +1023,43 @@ def init_db():
         print(f"데이터베이스 초기화 오류: {e}")
         import traceback
         traceback.print_exc()
-        conn.rollback()
+        try:
+            conn.rollback()
+            print("[복구] 트랜잭션 rollback 완료")
+            
+            # rollback 후 header_banners 테이블이 없으면 생성 시도
+            if USE_POSTGRESQL:
+                try:
+                    cursor.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'header_banners')")
+                    table_exists = cursor.fetchone()[0]
+                    if not table_exists:
+                        print("[복구] header_banners 테이블이 없어서 생성 시도")
+                        cursor.execute('''
+                            CREATE TABLE header_banners (
+                                id SERIAL PRIMARY KEY,
+                                text TEXT NOT NULL,
+                                link_type TEXT DEFAULT 'none',
+                                board_post_id INTEGER,
+                                is_active BOOLEAN DEFAULT TRUE,
+                                display_order INTEGER DEFAULT 0,
+                                text_color TEXT DEFAULT '#2d3436',
+                                bg_color TEXT DEFAULT '#fff9e6',
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        cursor.execute('''
+                            CREATE INDEX IF NOT EXISTS idx_header_banners_active_order 
+                            ON header_banners(is_active, display_order)
+                        ''')
+                        conn.commit()
+                        print("[성공] header_banners 테이블 생성 완료 (복구)")
+                except Exception as e2:
+                    print(f"[경고] header_banners 테이블 복구 중 오류: {e2}")
+                    import traceback
+                    traceback.print_exc()
+        except Exception as rollback_error:
+            print(f"[경고] rollback 중 오류: {rollback_error}")
     finally:
         cursor.close()
         conn.close()
@@ -4286,6 +4425,325 @@ def delete_popup(popup_id: int) -> bool:
             return cursor.rowcount > 0
         except Exception as e:
             print(f"팝업 삭제 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+# ========== 헤더 배너 관리 관련 함수 ==========
+
+def create_header_banner(banner_data: Dict) -> int:
+    """헤더 배너 아이템 생성"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            insert_data = (
+                banner_data.get('text', ''),
+                banner_data.get('link_type', 'none'),
+                banner_data.get('board_post_id'),
+                banner_data.get('is_active', True),
+                banner_data.get('display_order', 0),
+                banner_data.get('text_color', '#2d3436'),
+                banner_data.get('bg_color', '#fff9e6')
+            )
+            
+            print(f"[헤더 배너 생성] PostgreSQL - 입력 데이터: {insert_data}")
+            
+            cursor.execute('''
+                INSERT INTO header_banners (text, link_type, board_post_id, is_active, display_order, text_color, bg_color)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            ''', insert_data)
+            
+            banner_id = cursor.fetchone()[0]
+            conn.commit()
+            print(f"[헤더 배너 생성] PostgreSQL - 생성된 ID: {banner_id}")
+            return banner_id
+        except Exception as e:
+            import traceback
+            print(f"❌ 헤더 배너 생성 오류: {e}")
+            print(f"상세 오류: {traceback.format_exc()}")
+            conn.rollback()
+            return 0
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            # SQLite에서 FOREIGN KEY 활성화 (연결마다 필요)
+            cursor.execute('PRAGMA foreign_keys = ON')
+            
+            cursor.execute('''
+                INSERT INTO header_banners (text, link_type, board_post_id, is_active, display_order, text_color, bg_color)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                banner_data.get('text', ''),
+                banner_data.get('link_type', 'none'),
+                banner_data.get('board_post_id'),
+                1 if banner_data.get('is_active', True) else 0,
+                banner_data.get('display_order', 0),
+                banner_data.get('text_color', '#2d3436'),
+                banner_data.get('bg_color', '#fff9e6')
+            ))
+            conn.commit()
+            banner_id = cursor.lastrowid
+            print(f"[헤더 배너 생성] SQLite - 생성된 ID: {banner_id}")
+            return banner_id
+        except Exception as e:
+            import traceback
+            print(f"❌ 헤더 배너 생성 오류: {e}")
+            print(f"상세 오류: {traceback.format_exc()}")
+            try:
+                conn.rollback()
+            except:
+                pass
+            return 0
+        finally:
+            conn.close()
+
+
+def get_all_header_banners() -> List[Dict]:
+    """모든 헤더 배너 조회"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT * FROM header_banners 
+                ORDER BY display_order ASC, created_at ASC
+            ''')
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT * FROM header_banners 
+                ORDER BY display_order ASC, created_at ASC
+            ''')
+            rows = cursor.fetchall()
+            result = []
+            for row in rows:
+                if hasattr(row, 'keys'):
+                    row_dict = dict(row)
+                    # SQLite는 BOOLEAN을 INTEGER로 저장하므로 변환
+                    if 'is_active' in row_dict:
+                        row_dict['is_active'] = bool(row_dict['is_active'])
+                    result.append(row_dict)
+                else:
+                    result.append({
+                        'id': row[0],
+                        'text': row[1],
+                        'link_type': row[2],
+                        'board_post_id': row[3],
+                        'is_active': bool(row[4]),
+                        'display_order': row[5],
+                        'text_color': row[6],
+                        'bg_color': row[7],
+                        'created_at': row[8],
+                        'updated_at': row[9]
+                    })
+            return result
+        finally:
+            conn.close()
+
+
+def get_active_header_banners() -> List[Dict]:
+    """활성화된 헤더 배너만 조회"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT * FROM header_banners 
+                WHERE is_active = TRUE
+                ORDER BY display_order ASC, created_at ASC
+            ''')
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT * FROM header_banners 
+                WHERE is_active = 1
+                ORDER BY display_order ASC, created_at ASC
+            ''')
+            rows = cursor.fetchall()
+            result = []
+            for row in rows:
+                if hasattr(row, 'keys'):
+                    row_dict = dict(row)
+                    row_dict['is_active'] = bool(row_dict['is_active'])
+                    result.append(row_dict)
+                else:
+                    result.append({
+                        'id': row[0],
+                        'text': row[1],
+                        'link_type': row[2],
+                        'board_post_id': row[3],
+                        'is_active': True,
+                        'display_order': row[5],
+                        'text_color': row[6],
+                        'bg_color': row[7],
+                        'created_at': row[8],
+                        'updated_at': row[9]
+                    })
+            return result
+        finally:
+            conn.close()
+
+
+def get_header_banner_by_id(banner_id: int) -> Optional[Dict]:
+    """헤더 배너 ID로 조회"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('SELECT * FROM header_banners WHERE id = %s', (banner_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('SELECT * FROM header_banners WHERE id = ?', (banner_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            if hasattr(row, 'keys'):
+                row_dict = dict(row)
+                row_dict['is_active'] = bool(row_dict['is_active'])
+                return row_dict
+            else:
+                return {
+                    'id': row[0],
+                    'text': row[1],
+                    'link_type': row[2],
+                    'board_post_id': row[3],
+                    'is_active': bool(row[4]),
+                    'display_order': row[5],
+                    'text_color': row[6],
+                    'bg_color': row[7],
+                    'created_at': row[8],
+                    'updated_at': row[9]
+                }
+        finally:
+            conn.close()
+
+
+def update_header_banner(banner_id: int, banner_data: Dict) -> bool:
+    """헤더 배너 수정"""
+    conn = get_db_connection()
+    
+    updates = []
+    params = []
+    
+    if 'text' in banner_data:
+        updates.append('text = %s' if USE_POSTGRESQL else 'text = ?')
+        params.append(banner_data['text'])
+    if 'link_type' in banner_data:
+        updates.append('link_type = %s' if USE_POSTGRESQL else 'link_type = ?')
+        params.append(banner_data['link_type'])
+    if 'board_post_id' in banner_data:
+        updates.append('board_post_id = %s' if USE_POSTGRESQL else 'board_post_id = ?')
+        params.append(banner_data['board_post_id'])
+    if 'is_active' in banner_data:
+        if USE_POSTGRESQL:
+            updates.append('is_active = %s')
+            params.append(banner_data['is_active'])
+        else:
+            updates.append('is_active = ?')
+            params.append(1 if banner_data['is_active'] else 0)
+    if 'display_order' in banner_data:
+        updates.append('display_order = %s' if USE_POSTGRESQL else 'display_order = ?')
+        params.append(banner_data['display_order'])
+    if 'text_color' in banner_data:
+        updates.append('text_color = %s' if USE_POSTGRESQL else 'text_color = ?')
+        params.append(banner_data['text_color'])
+    if 'bg_color' in banner_data:
+        updates.append('bg_color = %s' if USE_POSTGRESQL else 'bg_color = ?')
+        params.append(banner_data['bg_color'])
+    
+    if not updates:
+        return False
+    
+    updates.append('updated_at = CURRENT_TIMESTAMP')
+    params.append(banner_id)
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f'''
+                UPDATE header_banners 
+                SET {', '.join(updates)}
+                WHERE id = %s
+            ''', params)
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"헤더 배너 수정 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f'''
+                UPDATE header_banners 
+                SET {', '.join(updates)}
+                WHERE id = ?
+            ''', params)
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"헤더 배너 수정 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+def delete_header_banner(banner_id: int) -> bool:
+    """헤더 배너 삭제"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM header_banners WHERE id = %s', (banner_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"헤더 배너 삭제 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM header_banners WHERE id = ?', (banner_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"헤더 배너 삭제 오류: {e}")
             return False
         finally:
             conn.close()
