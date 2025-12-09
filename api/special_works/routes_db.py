@@ -418,6 +418,114 @@ def get_works():
         }), 500
 
 
+@special_works_bp.route('/works/batch', methods=['POST'])
+def create_works_batch():
+    """작업 배치 등록 (여러 작업을 한 번에 등록)"""
+    try:
+        user_context = get_user_context()
+        if user_context['role'] != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 작업을 등록할 수 있습니다.'
+            }), 403
+        
+        data = request.get_json()
+        company_name = data.get('company_name', '').strip()
+        work_date = data.get('work_date', '').strip()
+        work_entries = data.get('work_entries', [])  # 작업 항목 배열
+        photo_links = data.get('photo_links', '').strip()
+        memo = data.get('memo', '').strip()
+        
+        # 유효성 검사
+        if not company_name:
+            return jsonify({
+                'success': False,
+                'message': '화주사명은 필수입니다.'
+            }), 400
+        
+        if not work_date:
+            return jsonify({
+                'success': False,
+                'message': '작업 일자는 필수입니다.'
+            }), 400
+        
+        if not work_entries or len(work_entries) == 0:
+            return jsonify({
+                'success': False,
+                'message': '최소 1개 이상의 작업 항목이 필요합니다.'
+            }), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            created_ids = []
+            created_at = datetime.now()
+            
+            # 각 작업 항목을 개별 레코드로 저장하되, 같은 날짜/화주사/메모/사진으로 묶음
+            for entry in work_entries:
+                work_type_id = entry.get('work_type_id')
+                quantity = entry.get('quantity')
+                unit_price = entry.get('unit_price')
+                
+                if not work_type_id:
+                    continue
+                
+                if quantity is None or quantity <= 0:
+                    continue
+                
+                if unit_price is None or unit_price < 0:
+                    continue
+                
+                total_price = quantity * unit_price
+                
+                if USE_POSTGRESQL:
+                    cursor.execute('''
+                        INSERT INTO special_works 
+                        (company_name, work_type_id, work_date, quantity, unit_price, total_price, photo_links, memo, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                    ''', (company_name, work_type_id, work_date, quantity, unit_price, total_price, photo_links, memo, created_at, created_at))
+                    work_id = cursor.fetchone()[0]
+                else:
+                    cursor.execute('''
+                        INSERT INTO special_works 
+                        (company_name, work_type_id, work_date, quantity, unit_price, total_price, photo_links, memo, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (company_name, work_type_id, work_date, quantity, unit_price, total_price, photo_links, memo, created_at, created_at))
+                    work_id = cursor.lastrowid
+                
+                created_ids.append(work_id)
+            
+            conn.commit()
+            return jsonify({
+                'success': True,
+                'message': f'{len(created_ids)}개의 작업이 등록되었습니다.',
+                'ids': created_ids,
+                'count': len(created_ids)
+            })
+        except Exception as e:
+            conn.rollback() if USE_POSTGRESQL else None
+            print(f'[오류] 작업 배치 등록 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'작업 등록 중 오류: {str(e)}'
+            }), 500
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f'❌ 작업 배치 등록 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'작업 등록 중 오류: {str(e)}'
+        }), 500
+
+
 @special_works_bp.route('/works/<int:work_id>', methods=['GET'])
 def get_work(work_id):
     """작업 상세 조회"""
