@@ -438,6 +438,7 @@ def init_db():
                     content TEXT NOT NULL,
                     management_number TEXT,
                     generated_management_number TEXT,
+                    customer_name TEXT,
                     status TEXT DEFAULT '접수',
                     admin_message TEXT,
                     processor TEXT,
@@ -459,6 +460,11 @@ def init_db():
             try:
                 cursor.execute('ALTER TABLE customer_service ADD COLUMN IF NOT EXISTS management_number TEXT')
             except Exception:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN IF NOT EXISTS customer_name TEXT')
+            except Exception:
+                pass
                 pass
             try:
                 cursor.execute('ALTER TABLE customer_service ADD COLUMN IF NOT EXISTS generated_management_number TEXT')
@@ -910,6 +916,7 @@ def init_db():
                     content TEXT NOT NULL,
                     management_number TEXT,
                     generated_management_number TEXT,
+                    customer_name TEXT,
                     status TEXT DEFAULT '접수',
                     admin_message TEXT,
                     processor TEXT,
@@ -931,6 +938,11 @@ def init_db():
             try:
                 cursor.execute('ALTER TABLE customer_service ADD COLUMN management_number TEXT')
             except OperationalError:
+                pass
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN customer_name TEXT')
+            except OperationalError:
+                pass
                 pass
             try:
                 cursor.execute('ALTER TABLE customer_service ADD COLUMN generated_management_number TEXT')

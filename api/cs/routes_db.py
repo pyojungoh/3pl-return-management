@@ -34,7 +34,7 @@ if USE_POSTGRESQL:
     from psycopg2.extras import RealDictCursor
 
 
-def create_cs_request(company_name: str, username: str, date: str, month: str, issue_type: str, content: str, management_number: str = None) -> int:
+def create_cs_request(company_name: str, username: str, date: str, month: str, issue_type: str, content: str, management_number: str = None, customer_name: str = None) -> int:
     """C/S 접수 생성"""
     conn = get_db_connection()
     
@@ -45,10 +45,10 @@ def create_cs_request(company_name: str, username: str, date: str, month: str, i
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                INSERT INTO customer_service (company_name, username, date, month, issue_type, content, management_number, status, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, '접수', %s, %s)
+                INSERT INTO customer_service (company_name, username, date, month, issue_type, content, management_number, customer_name, status, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, '접수', %s, %s)
                 RETURNING id
-            ''', (company_name, username, date, month, issue_type, content, management_number, kst_now, kst_now))
+            ''', (company_name, username, date, month, issue_type, content, management_number, customer_name, kst_now, kst_now))
             cs_id = cursor.fetchone()[0]
             conn.commit()
             print(f"✅ C/S 접수 생성 성공: ID {cs_id}, 화주사: {company_name}, 유형: {issue_type}")
@@ -64,9 +64,9 @@ def create_cs_request(company_name: str, username: str, date: str, month: str, i
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                INSERT INTO customer_service (company_name, username, date, month, issue_type, content, management_number, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, '접수', ?, ?)
-            ''', (company_name, username, date, month, issue_type, content, management_number, kst_now, kst_now))
+                INSERT INTO customer_service (company_name, username, date, month, issue_type, content, management_number, customer_name, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, '접수', ?, ?)
+            ''', (company_name, username, date, month, issue_type, content, management_number, customer_name, kst_now, kst_now))
             cs_id = cursor.lastrowid
             conn.commit()
             print(f"✅ C/S 접수 생성 성공: ID {cs_id}, 화주사: {company_name}, 유형: {issue_type}")
@@ -143,7 +143,7 @@ def get_cs_requests(company_name: str = None, role: str = '화주사', month: st
                     if month:
                         cursor.execute('''
                             SELECT id, company_name, username, date, month, issue_type, content, 
-                                   management_number, generated_management_number, status, 
+                                   management_number, generated_management_number, customer_name, status, 
                                    admin_message, processor, processed_at, created_at, updated_at
                             FROM customer_service
                             WHERE company_name = ? AND month = ?
@@ -152,7 +152,7 @@ def get_cs_requests(company_name: str = None, role: str = '화주사', month: st
                     else:
                         cursor.execute('''
                             SELECT id, company_name, username, date, month, issue_type, content, 
-                                   management_number, generated_management_number, status, 
+                                   management_number, generated_management_number, customer_name, status, 
                                    admin_message, processor, processed_at, created_at, updated_at
                             FROM customer_service
                             WHERE company_name = ?
@@ -163,7 +163,7 @@ def get_cs_requests(company_name: str = None, role: str = '화주사', month: st
                     if month:
                         cursor.execute('''
                             SELECT id, company_name, username, date, month, issue_type, content, 
-                                   management_number, generated_management_number, status, 
+                                   management_number, generated_management_number, customer_name, status, 
                                    admin_message, processor, processed_at, created_at, updated_at
                             FROM customer_service
                             WHERE month = ?
@@ -172,7 +172,7 @@ def get_cs_requests(company_name: str = None, role: str = '화주사', month: st
                     else:
                         cursor.execute('''
                             SELECT id, company_name, username, date, month, issue_type, content, 
-                                   management_number, generated_management_number, status, 
+                                   management_number, generated_management_number, customer_name, status, 
                                    admin_message, processor, processed_at, created_at, updated_at
                             FROM customer_service
                             ORDER BY created_at DESC
@@ -181,7 +181,7 @@ def get_cs_requests(company_name: str = None, role: str = '화주사', month: st
                 if month:
                     cursor.execute('''
                         SELECT id, company_name, username, date, month, issue_type, content, 
-                               management_number, generated_management_number, status, 
+                               management_number, generated_management_number, customer_name, status, 
                                admin_message, processor, processed_at, created_at, updated_at
                         FROM customer_service
                         WHERE company_name = ? AND month = ?
@@ -190,7 +190,7 @@ def get_cs_requests(company_name: str = None, role: str = '화주사', month: st
                 else:
                     cursor.execute('''
                         SELECT id, company_name, username, date, month, issue_type, content, 
-                               management_number, generated_management_number, status, 
+                               management_number, generated_management_number, customer_name, status, 
                                admin_message, processor, processed_at, created_at, updated_at
                         FROM customer_service
                         WHERE company_name = ?
@@ -210,6 +210,7 @@ def get_cs_requests(company_name: str = None, role: str = '화주사', month: st
                     'content': row['content'] or '',
                     'management_number': row['management_number'] or '',
                     'generated_management_number': row['generated_management_number'] or '',
+                    'customer_name': row.get('customer_name') or '',
                     'status': row['status'] or '접수',
                     'admin_message': row['admin_message'] or '',
                     'processor': row['processor'] or '',
@@ -372,6 +373,47 @@ def update_generated_management_number(cs_id: int, generated_management_number: 
             conn.close()
 
 
+def update_customer_name(cs_id: int, customer_name: str) -> bool:
+    """C/S 접수 고객명 업데이트 (관리자용)"""
+    conn = get_db_connection()
+    
+    # 한국 시간으로 업데이트 시간 저장
+    updated_at = get_kst_now()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE customer_service
+                SET customer_name = %s, updated_at = %s
+                WHERE id = %s
+            ''', (customer_name, updated_at, cs_id))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ C/S 고객명 업데이트 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE customer_service
+                SET customer_name = ?, updated_at = ?
+                WHERE id = ?
+            ''', (customer_name, updated_at, cs_id))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ C/S 고객명 업데이트 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
 def get_pending_cs_requests() -> list:
     """미처리 C/S 접수 목록 조회 (알림용)"""
     conn = get_db_connection()
@@ -396,7 +438,7 @@ def get_pending_cs_requests() -> list:
         try:
             cursor.execute('''
                 SELECT id, company_name, username, date, month, issue_type, content, 
-                       management_number, generated_management_number, status, 
+                       management_number, generated_management_number, customer_name, status, 
                        admin_message, processor, processed_at, created_at, updated_at
                 FROM customer_service
                 WHERE status = '접수'
@@ -415,6 +457,7 @@ def get_pending_cs_requests() -> list:
                     'content': row['content'] or '',
                     'management_number': row['management_number'] or '',
                     'generated_management_number': row['generated_management_number'] or '',
+                    'customer_name': row.get('customer_name') or '',
                     'status': row['status'] or '접수',
                     'admin_message': row['admin_message'] or '',
                     'processor': row['processor'] or '',
@@ -459,7 +502,7 @@ def get_pending_cs_requests_by_issue_type(issue_type: str = None) -> list:
             if issue_type:
                 cursor.execute('''
                     SELECT id, company_name, username, date, month, issue_type, content, 
-                           management_number, generated_management_number, status, 
+                           management_number, generated_management_number, customer_name, status, 
                            admin_message, processor, processed_at, created_at, updated_at
                     FROM customer_service
                     WHERE status = '접수' AND issue_type = ?
@@ -468,7 +511,7 @@ def get_pending_cs_requests_by_issue_type(issue_type: str = None) -> list:
             else:
                 cursor.execute('''
                     SELECT id, company_name, username, date, month, issue_type, content, 
-                           management_number, generated_management_number, status, 
+                           management_number, generated_management_number, customer_name, status, 
                            admin_message, processor, processed_at, created_at, updated_at
                     FROM customer_service
                     WHERE status = '접수'
@@ -487,6 +530,7 @@ def get_pending_cs_requests_by_issue_type(issue_type: str = None) -> list:
                     'content': row['content'] or '',
                     'management_number': row['management_number'] or '',
                     'generated_management_number': row['generated_management_number'] or '',
+                    'customer_name': row.get('customer_name') or '',
                     'status': row['status'] or '접수',
                     'admin_message': row['admin_message'] or '',
                     'processor': row['processor'] or '',
@@ -510,6 +554,7 @@ def create_cs():
         issue_type = data.get('issue_type', '').strip()
         content = data.get('content', '').strip()
         management_number = data.get('management_number', '').strip() if data.get('management_number') else None
+        customer_name = data.get('customer_name', '').strip() if data.get('customer_name') else None
         
         if not company_name or not username or not date or not issue_type or not content or not management_number:
             return jsonify({
@@ -526,7 +571,7 @@ def create_cs():
             month = date if '년' in date and '월' in date else f"{datetime.now().year}년{datetime.now().month}월"
         
         # C/S 접수 생성
-        cs_id = create_cs_request(company_name, username, date, month, issue_type, content, management_number)
+        cs_id = create_cs_request(company_name, username, date, month, issue_type, content, management_number, customer_name)
         
         if cs_id:
             # 텔레그램 알림 전송
@@ -772,6 +817,36 @@ def update_generated_management_number_route(cs_id):
         }), 500
 
 
+@cs_bp.route('/<int:cs_id>/customer-name', methods=['PUT'])
+def update_customer_name_route(cs_id):
+    """C/S 접수 고객명 업데이트 (관리자용)"""
+    try:
+        data = request.get_json()
+        customer_name = data.get('customer_name', '').strip() if data.get('customer_name') else None
+        
+        success = update_customer_name(cs_id, customer_name)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '고객명이 업데이트되었습니다.'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '고객명 업데이트에 실패했습니다.'
+            }), 500
+            
+    except Exception as e:
+        print(f'❌ C/S 고객명 업데이트 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'고객명 업데이트 중 오류: {str(e)}'
+        }), 500
+
+
 @cs_bp.route('/test-telegram', methods=['POST'])
 def test_telegram():
     """텔레그램 알림 테스트 (관리자용)"""
@@ -972,13 +1047,14 @@ def export_cs():
         writer = csv.writer(output)
         
         # 한글 헤더
-        writer.writerow(['날짜', '관리번호', '생성된 관리번호', '화주사명', 'C/S 종류', 'C/S 내용', '처리여부', '처리자', '관리자 메시지', '접수일시'])
+        writer.writerow(['날짜', '관리번호', '생성된 관리번호', '화주사명', '고객명', 'C/S 종류', 'C/S 내용', '처리여부', '처리자', '관리자 메시지', '접수일시'])
         
         for cs in cs_list:
             date = cs.get('date', '')
             management_number = cs.get('management_number', '') or ''
             generated_management_number = cs.get('generated_management_number', '') or ''
             company = cs.get('company_name', '')
+            customer_name = cs.get('customer_name', '') or ''
             issue_type = cs.get('issue_type', '')
             content = cs.get('content', '')
             status = cs.get('status', '접수')
@@ -991,6 +1067,7 @@ def export_cs():
                 management_number,
                 generated_management_number,
                 company,
+                customer_name,
                 issue_type,
                 content,
                 status,

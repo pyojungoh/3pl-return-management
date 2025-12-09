@@ -2193,6 +2193,11 @@
                 </div>
                 
                 <div>
+                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">고객명</label>
+                  <input type="text" id="csCustomerName" class="request-input" style="min-height: auto;" placeholder="고객명을 입력하세요 (선택사항)">
+                </div>
+                
+                <div>
                   <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">C/S 종류 *</label>
                   <select id="csIssueType" class="request-input" style="min-height: auto;" required>
                     <option value="">선택하세요</option>
@@ -2228,9 +2233,10 @@
                 <tr style="background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white;">
                   <th style="padding: 12px; text-align: center; font-weight: 600;">순번</th>
                   <th style="padding: 12px; text-align: center; font-weight: 600;">날짜</th>
-                  <th style="padding: 12px; text-align: center; font-weight: 600;">관리번호</th>
-                  <th style="padding: 12px; text-align: center; font-weight: 600;">생성된 관리번호</th>
+                  <th style="padding: 12px; text-align: center; font-weight: 600; width: 100px; min-width: 100px; max-width: 100px;">관리번호</th>
+                  <th style="padding: 12px; text-align: center; font-weight: 600; width: 100px; min-width: 100px; max-width: 100px;">생성된 관리번호</th>
                   <th style="padding: 12px; text-align: center; font-weight: 600;">화주사명</th>
+                  <th style="padding: 12px; text-align: center; font-weight: 600;">고객명</th>
                   <th style="padding: 12px; text-align: center; font-weight: 600;">C/S 종류</th>
                   <th style="padding: 12px; text-align: center; font-weight: 600;">C/S 내용</th>
                   <th style="padding: 12px; text-align: center; font-weight: 600;">처리여부</th>
@@ -8281,6 +8287,7 @@
       const day = String(today.getDate()).padStart(2, '0');
       document.getElementById('csDate').value = `${year}-${month}-${day}`;
       document.getElementById('csManagementNumber').value = '';
+      document.getElementById('csCustomerName').value = '';
       document.getElementById('csIssueType').value = '';
       document.getElementById('csContent').value = '';
       document.getElementById('csFormMessage').innerHTML = '';
@@ -8304,6 +8311,7 @@
       
       const date = document.getElementById('csDate').value;
       const managementNumber = document.getElementById('csManagementNumber').value.trim();
+      const customerName = document.getElementById('csCustomerName').value.trim();
       const issueType = document.getElementById('csIssueType').value.trim();
       const content = document.getElementById('csContent').value.trim();
       
@@ -8339,6 +8347,7 @@
             username: username,
             date: date,
             management_number: managementNumber,
+            customer_name: customerName || null,
             issue_type: issueType,
             content: content
           })
@@ -8589,8 +8598,8 @@
         filteredList = filteredList.filter(cs => cs.issue_type === currentCsTypeFilter);
       }
       
-      if (!filteredList || filteredList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" class="no-data">등록된 C/S 접수가 없습니다.</td></tr>';
+        if (!filteredList || filteredList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="13" class="no-data">등록된 C/S 접수가 없습니다.</td></tr>';
         // 관리자 열 표시/숨김
         const adminHeader = document.getElementById('csAdminActionsHeader');
         if (adminHeader) {
@@ -8662,6 +8671,7 @@
         const managementNumber = cs.management_number || '';
         const generatedManagementNumber = cs.generated_management_number || '';
         const companyName = escapeHtml(cs.company_name || '');
+        const customerName = escapeHtml(cs.customer_name || '');
         const issueType = escapeHtml(cs.issue_type || '');
         const content = escapeHtml(cs.content || '');
         const status = cs.status || '접수';
@@ -8706,7 +8716,7 @@
         if (isAdmin) {
           manageHtml = `
             <div style="display: flex; gap: 5px; flex-wrap: nowrap; align-items: center;">
-              <button class="save-btn" onclick="updateCsGeneratedManagementNumber(${cs.id}, '${escapeHtml(generatedManagementNumber)}')" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(116, 185, 255, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">생성된 관리번호</button>
+              <button class="save-btn" onclick="updateCsGeneratedManagementNumber(${cs.id}, '${escapeHtml(generatedManagementNumber)}', '${escapeHtml(customerName || '')}')" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(116, 185, 255, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">관리번호</button>
               <button class="save-btn" onclick="processCsComplete(${cs.id})" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 184, 148, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">처리완료</button>
               <button class="save-btn" onclick="processCsImpossible(${cs.id})" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(231, 76, 60, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">처리불가</button>
               <button class="save-btn" onclick="deleteCs(${cs.id})" style="background: linear-gradient(135deg, #b2bec3 0%, #636e72 100%); color: white; border: none; padding: 5px 8px; font-size: 11px; border-radius: 6px; box-shadow: 0 2px 4px rgba(99, 110, 114, 0.25); transition: all 0.3s ease; white-space: nowrap; flex-shrink: 1;">삭제</button>
@@ -8717,9 +8727,10 @@
         tr.innerHTML = `
           <td style="white-space: nowrap; text-align: center; font-weight: 600;">${rowNumber}</td>
           <td style="white-space: nowrap; text-align: center;">${date}</td>
-          <td style="white-space: nowrap; text-align: center;">${managementNumber || '-'}</td>
-          <td style="white-space: nowrap; text-align: center;">${generatedManagementNumber || '-'}</td>
+          <td style="white-space: nowrap; text-align: center; width: 100px; min-width: 100px; max-width: 100px; overflow: hidden; text-overflow: ellipsis;">${managementNumber || '-'}</td>
+          <td style="white-space: nowrap; text-align: center; width: 100px; min-width: 100px; max-width: 100px; overflow: hidden; text-overflow: ellipsis;">${generatedManagementNumber || '-'}</td>
           <td style="white-space: nowrap; text-align: center;">${companyName}</td>
+          <td style="white-space: nowrap; text-align: center;">${customerName || '-'}</td>
           <td style="white-space: nowrap; text-align: center;">
             ${issueType ? `<span style="display: inline-block; padding: 4px 10px; border-radius: 6px; background: ${issueTypeBg}; color: ${issueTypeColor}; font-weight: 600; font-size: 11px; border: 1px solid ${issueTypeColor};">${issueType}</span>` : '-'}
           </td>
@@ -8950,7 +8961,7 @@
     window.testTelegram = testTelegram;
     
     // 생성된 관리번호 업데이트 (관리자용 - 반품내역 비고 입력 방식과 동일)
-    function updateCsGeneratedManagementNumber(csId, currentNumber) {
+    function updateCsGeneratedManagementNumber(csId, currentNumber, currentCustomerName) {
       // 기존 모달 제거
       const existingModal = document.getElementById('csGeneratedManagementNumberModal');
       if (existingModal) {
@@ -8961,12 +8972,16 @@
         <div id="csGeneratedManagementNumberModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;" onclick="closeCsGeneratedManagementNumberModal(event)">
           <div style="background: white; border-radius: 16px; padding: 30px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);" onclick="event.stopPropagation()">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-              <h3 style="margin: 0; color: #ff6b35; font-size: 22px; font-weight: 700;">생성된 관리번호 입력</h3>
+              <h3 style="margin: 0; color: #ff6b35; font-size: 22px; font-weight: 700;">관리번호 및 고객명 입력</h3>
               <button onclick="closeCsGeneratedManagementNumberModal()" style="background: #e74c3c; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;">×</button>
             </div>
             <div style="margin-bottom: 20px;">
               <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">생성된 관리번호</label>
               <input type="text" id="csGeneratedManagementNumberInput" class="request-input" style="min-height: auto;" value="${escapeHtml(currentNumber || '')}" placeholder="생성된 관리번호를 입력하세요">
+            </div>
+            <div style="margin-bottom: 20px;">
+              <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">고객명</label>
+              <input type="text" id="csCustomerNameInput" class="request-input" style="min-height: auto;" value="${escapeHtml(currentCustomerName || '')}" placeholder="고객명을 입력하세요 (선택사항)">
             </div>
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
               <button onclick="closeCsGeneratedManagementNumberModal()" class="save-btn" style="background: linear-gradient(135deg, #636e72 0%, #2d3436 100%);">취소</button>
@@ -8996,25 +9011,36 @@
     // 생성된 관리번호 저장
     function saveCsGeneratedManagementNumber(csId) {
       const newNumber = document.getElementById('csGeneratedManagementNumberInput').value.trim();
+      const customerName = document.getElementById('csCustomerNameInput').value.trim();
       
-      fetch(`/api/cs/${csId}/generated-management-number`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ generated_management_number: newNumber || null })
-      })
-      .then(response => response.json())
-      .then(result => {
-        if (result.success) {
-          showMessage('✅ 생성된 관리번호가 업데이트되었습니다.', 'success');
+      // 관리번호와 고객명을 함께 업데이트
+      Promise.all([
+        fetch(`/api/cs/${csId}/generated-management-number`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ generated_management_number: newNumber || null })
+        }),
+        fetch(`/api/cs/${csId}/customer-name`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customer_name: customerName || null })
+        })
+      ])
+      .then(responses => Promise.all(responses.map(r => r.json())))
+      .then(results => {
+        const success = results.every(r => r.success);
+        if (success) {
+          showMessage('✅ 관리번호와 고객명이 업데이트되었습니다.', 'success');
           closeCsGeneratedManagementNumberModal();
           refreshCsData();
         } else {
-          showMessage('❌ ' + (result.message || '업데이트 실패'), 'error');
+          const errorMessages = results.filter(r => !r.success).map(r => r.message).join(', ');
+          showMessage('❌ ' + (errorMessages || '업데이트 실패'), 'error');
         }
       })
       .catch(error => {
-        console.error('생성된 관리번호 업데이트 오류:', error);
-        showMessage('❌ 생성된 관리번호 업데이트 중 오류: ' + error.message, 'error');
+        console.error('관리번호 및 고객명 업데이트 오류:', error);
+        showMessage('❌ 업데이트 중 오류: ' + error.message, 'error');
       });
     }
     window.saveCsGeneratedManagementNumber = saveCsGeneratedManagementNumber;
