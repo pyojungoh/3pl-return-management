@@ -132,35 +132,37 @@
     
     .sw-stat-box {
       text-align: center;
-      padding: 20px 24px;
-      border-radius: 14px;
-      min-width: 140px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      min-width: 120px;
+      max-width: 140px;
       cursor: pointer;
       transition: all 0.3s ease;
       border: 2px solid #ffeaa7;
       background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%);
-      box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+      box-shadow: 0 2px 8px rgba(255, 152, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
     }
     
     .sw-stat-box:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 6px 20px rgba(255, 152, 0, 0.2);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(255, 152, 0, 0.15);
       border-color: #ffa502;
     }
     
     .sw-stat-box.selected {
       background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
       border-color: #ff6b35;
-      box-shadow: 0 6px 20px rgba(255, 107, 53, 0.3);
-      transform: translateY(-3px);
+      box-shadow: 0 4px 14px rgba(255, 107, 53, 0.25);
+      transform: translateY(-2px);
     }
     
     .sw-stat-box-name {
-      font-size: 16px;
+      font-size: 13px;
       font-weight: 700;
       color: #2d3436;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       user-select: none;
+      line-height: 1.3;
     }
     
     .sw-stat-box.selected .sw-stat-box-name {
@@ -168,10 +170,10 @@
     }
     
     .sw-stat-box-count {
-      font-size: 24px;
+      font-size: 18px;
       font-weight: 800;
       color: #ff6b35;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
       user-select: none;
     }
     
@@ -180,7 +182,7 @@
     }
     
     .sw-stat-box-total {
-      font-size: 14px;
+      font-size: 11px;
       color: #636e72;
       user-select: none;
     }
@@ -244,6 +246,34 @@
       text-align: center;
       font-size: 14px;
       border-bottom: 1px solid #f0f0f0;
+      vertical-align: middle;
+    }
+    
+    .sw-table td.sw-admin-only {
+      min-width: 80px;
+      width: 80px;
+      padding: 12px;
+      vertical-align: middle;
+      text-align: center;
+      box-sizing: border-box;
+    }
+    
+    /* 사진 썸네일 높이(80px) + border(4px) + 셀 padding(24px) + 여유(2px) = 110px에 맞춤 */
+    .sw-table tbody tr td.sw-admin-only {
+      min-height: 110px;
+      height: 110px;
+    }
+    
+    .sw-table td.sw-admin-only > div {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      padding: 0;
+      height: 86px;
+      box-sizing: border-box;
     }
     
     .sw-table tbody tr:hover {
@@ -417,21 +447,32 @@
     }
     
     .sw-btn-action {
-      padding: 6px 12px;
-      font-size: 14px;
+      padding: 0;
+      font-size: 11px;
       border: none;
-      border-radius: 6px;
+      border-radius: 4px;
       cursor: pointer;
-      margin-left: 8px;
-      display: inline-block;
       white-space: nowrap;
+      width: 65px;
+      height: 35px;
+      line-height: 35px;
+      margin: 0;
+      display: block;
+      box-sizing: border-box;
+      flex-shrink: 0;
+      text-align: center;
     }
     
     .sw-btn-action-container {
       display: flex;
-      gap: 8px;
+      gap: 4px;
       align-items: center;
       justify-content: center;
+      width: 100%;
+      padding: 0;
+      margin: 0;
+      box-sizing: border-box;
+      vertical-align: middle;
     }
     
     .sw-btn-edit {
@@ -442,6 +483,54 @@
     .sw-btn-delete {
       background: #e17055;
       color: white;
+    }
+    
+    /* 작업 항목 스타일 */
+    .sw-work-entry {
+      background: #f8f9fa;
+      border: 2px solid #ffeaa7;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 15px;
+      position: relative;
+    }
+    
+    .sw-work-entry-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #ffeaa7;
+    }
+    
+    .sw-work-entry-title {
+      font-weight: 700;
+      color: #ff6b35;
+      font-size: 16px;
+    }
+    
+    .sw-work-entry-remove {
+      background: #e17055;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+    
+    .sw-work-entry-remove:hover {
+      background: #c0392b;
+      transform: translateY(-1px);
+    }
+    
+    .sw-work-entry-fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
     }
     
     /* 메모 툴팁 스타일 */
@@ -542,7 +631,7 @@
             <h3 style="margin: 0 0 20px 0; color: #ff6b35; font-weight: 700;">작업 등록</h3>
           </div>
           <form id="swAdminWorkForm" onsubmit="swAdminHandleWorkSubmit(event)">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">
               <div class="sw-form-group">
                 <label class="sw-form-label">화주사 *</label>
                 <div class="sw-searchable-select">
@@ -552,26 +641,28 @@
                 </div>
               </div>
               <div class="sw-form-group">
-                <label class="sw-form-label">작업 종류 *</label>
-                <select id="swAdminWorkTypeSelect" class="sw-form-select" required onchange="swAdminUpdateUnitPrice()">
-                  <option value="">선택하세요</option>
-                </select>
-              </div>
-              <div class="sw-form-group">
                 <label class="sw-form-label">작업 일자 *</label>
                 <input type="date" id="swAdminWorkDate" class="sw-form-input" required>
               </div>
-              <div class="sw-form-group">
-                <label class="sw-form-label">수량 *</label>
-                <input type="number" id="swAdminWorkQuantity" class="sw-form-input" value="1" min="0.01" step="0.01" required onchange="swAdminCalculateTotalPrice()">
-              </div>
-              <div class="sw-form-group">
-                <label class="sw-form-label">단가 (원) *</label>
-                <input type="number" id="swAdminWorkUnitPrice" class="sw-form-input" min="0" step="1" required onchange="swAdminCalculateTotalPrice()">
-              </div>
-              <div class="sw-form-group">
-                <label class="sw-form-label">총액 (원)</label>
-                <input type="number" id="swAdminWorkTotalPrice" class="sw-form-input" readonly>
+            </div>
+            
+            <!-- 작업 항목 목록 -->
+            <div id="swAdminWorkEntriesContainer" style="margin-bottom: 20px;">
+              <!-- 작업 항목들이 여기에 동적으로 추가됩니다 -->
+            </div>
+            
+            <!-- 작업 항목 추가 버튼 -->
+            <div style="margin-bottom: 20px;">
+              <button type="button" class="sw-btn" onclick="swAdminAddWorkEntry()" style="width: 100%;">
+                ➕ 작업 항목 추가
+              </button>
+            </div>
+            
+            <!-- 전체 총액 표시 -->
+            <div class="sw-form-group" style="background: #fffef9; padding: 15px; border-radius: 8px; border: 2px solid #ffeaa7; margin-bottom: 20px;">
+              <label class="sw-form-label" style="font-weight: 700; color: #ff6b35; font-size: 16px;">전체 총액</label>
+              <div style="font-size: 24px; font-weight: 800; color: #ff6b35; text-align: right;">
+                <span id="swAdminTotalAllPrice">0</span>원
               </div>
             </div>
             <div class="sw-form-group">
@@ -627,6 +718,11 @@
         </div>
         <button class="sw-btn" onclick="swConsignorLoadWorks()">조회</button>
       </div>
+    </div>
+    
+    <!-- 관리자 전용 화주사별 통계 섹션 -->
+    <div id="swAdminCompanyStatsSection" class="sw-admin-only sw-section">
+      <div class="sw-stats-container" id="swAdminCompanyStatsContainer"></div>
     </div>
     
     <!-- 공통 작업 종류별 통계 섹션 (관리자/화주사 모두 사용) -->
@@ -687,9 +783,12 @@
           </div>
           <div class="sw-form-group">
             <label class="sw-form-label">작업 종류 *</label>
-            <select id="swEditWorkTypeSelect" class="sw-form-select" required onchange="swAdminUpdateEditUnitPrice()">
-              <option value="">선택하세요</option>
-            </select>
+            <div style="display: flex; gap: 8px; align-items: flex-start;">
+              <select id="swEditWorkTypeSelect" class="sw-form-select" required onchange="swAdminUpdateEditUnitPrice()" style="flex: 1;">
+                <option value="">선택하세요</option>
+              </select>
+              <button type="button" class="sw-btn" onclick="swAdminShowAddWorkTypeModalFromForm()" style="white-space: nowrap; padding: 10px 16px; margin-top: 0;" title="작업 종류 추가">➕</button>
+            </div>
           </div>
           <div class="sw-form-group">
             <label class="sw-form-label">작업 일자 *</label>
@@ -735,10 +834,12 @@
     var swCurrentUsername = '';
     var swWorkTypes = [];
     var swSelectedWorkType = null;
+    var swSelectedCompany = null; // 선택된 화주사 필터
     var swSelectedPhotos = [];
     var swEditSelectedPhotos = []; // 수정 모달용 사진
     var swEditExistingPhotos = []; // 수정 모달용 기존 사진
     var swInitialized = false;
+    var swWorkEntryCounter = 0; // 작업 항목 카운터
     
     // 공통 초기화 함수
     function swCommonInit() {
@@ -887,9 +988,10 @@
     /**
      * 작업 종류 목록 로드 (공통)
      * 관리자와 화주사 모두 사용
+     * Promise를 반환하여 추가 후 선택 가능하도록 함
      */
     function swCommonLoadWorkTypes() {
-      fetch('/api/special-works/types', {
+      return fetch('/api/special-works/types', {
         credentials: 'include',
         headers: swGetUserHeaders()
       })
@@ -903,10 +1005,13 @@
               swAdminUpdateWorkTypeSelects(swWorkTypes);
             }
             // 화주사 모드는 필터만 업데이트 (없음)
+            return swWorkTypes;
           }
+          return [];
         })
         .catch(error => {
           console.error('[SW] 작업 종류 로드 오류:', error);
+          return [];
         });
     }
     
@@ -924,19 +1029,22 @@
         swSelectedWorkType = workTypeName;
       }
       
-      // 통계 박스 선택 상태 업데이트
-      const statsBoxes = container.querySelectorAll('.sw-stat-box');
-      statsBoxes.forEach(box => {
-        if (box.textContent.includes(workTypeName)) {
-          if (swSelectedWorkType === workTypeName) {
-            box.classList.add('selected');
+      // 작업 종류 통계 박스 선택 상태 업데이트 (작업 종류 통계 섹션만)
+      const workTypeStatsContainer = container.querySelector('#swCommonStatsContainer');
+      if (workTypeStatsContainer) {
+        const statsBoxes = workTypeStatsContainer.querySelectorAll('.sw-stat-box');
+        statsBoxes.forEach(box => {
+          if (box.textContent.includes(workTypeName)) {
+            if (swSelectedWorkType === workTypeName) {
+              box.classList.add('selected');
+            } else {
+              box.classList.remove('selected');
+            }
           } else {
             box.classList.remove('selected');
           }
-        } else {
-          box.classList.remove('selected');
-        }
-      });
+        });
+      }
       
       // 현재 모드에 따라 다시 로드
       if (swCurrentRole === '관리자') {
@@ -1232,7 +1340,132 @@
     }
     
     /**
-     * 관리자 단가 업데이트
+     * 작업 항목 추가
+     */
+    function swAdminAddWorkEntry() {
+      const container = document.getElementById('swContainer');
+      if (!container) return;
+      
+      const entriesContainer = container.querySelector('#swAdminWorkEntriesContainer');
+      if (!entriesContainer) return;
+      
+      swWorkEntryCounter++;
+      const entryId = `swWorkEntry_${swWorkEntryCounter}`;
+      
+      // 작업 종류 옵션 생성
+      const workTypeOptions = swWorkTypes.map(type => 
+        `<option value="${type.id}" data-price="${type.default_unit_price}">${swEscapeHtml(type.name)}</option>`
+      ).join('');
+      
+      const entryHtml = `
+        <div class="sw-work-entry" id="${entryId}">
+          <div class="sw-work-entry-header">
+            <div class="sw-work-entry-title">작업 항목 ${swWorkEntryCounter}</div>
+            <button type="button" class="sw-work-entry-remove" onclick="swAdminRemoveWorkEntry('${entryId}')">🗑️ 삭제</button>
+          </div>
+          <div class="sw-work-entry-fields">
+            <div class="sw-form-group">
+              <label class="sw-form-label">작업 종류 *</label>
+              <div style="display: flex; gap: 8px; align-items: flex-start;">
+                <select class="sw-form-select sw-work-entry-type" required onchange="swAdminUpdateEntryPrice('${entryId}')" style="flex: 1;">
+                  <option value="">선택하세요</option>
+                  ${workTypeOptions}
+                </select>
+                <button type="button" class="sw-btn" onclick="swAdminShowAddWorkTypeModalFromForm()" style="white-space: nowrap; padding: 10px 16px; margin-top: 0;" title="작업 종류 추가">➕</button>
+              </div>
+            </div>
+            <div class="sw-form-group">
+              <label class="sw-form-label">수량 *</label>
+              <input type="number" class="sw-form-input sw-work-entry-quantity" value="1" min="0.01" step="0.01" required onchange="swAdminUpdateEntryTotal('${entryId}'); swAdminUpdateAllTotal();">
+            </div>
+            <div class="sw-form-group">
+              <label class="sw-form-label">단가 (원) *</label>
+              <input type="number" class="sw-form-input sw-work-entry-unit-price" min="0" step="1" required onchange="swAdminUpdateEntryTotal('${entryId}'); swAdminUpdateAllTotal();">
+            </div>
+            <div class="sw-form-group">
+              <label class="sw-form-label">총액 (원)</label>
+              <input type="number" class="sw-form-input sw-work-entry-total-price" readonly style="background: #f0f0f0;">
+            </div>
+          </div>
+        </div>
+      `;
+      
+      entriesContainer.insertAdjacentHTML('beforeend', entryHtml);
+      swAdminUpdateAllTotal();
+    }
+    
+    /**
+     * 작업 항목 제거
+     */
+    function swAdminRemoveWorkEntry(entryId) {
+      const entry = document.getElementById(entryId);
+      if (entry) {
+        entry.remove();
+        swAdminUpdateAllTotal();
+      }
+    }
+    
+    /**
+     * 작업 항목 단가 업데이트 (작업 종류 선택 시)
+     */
+    function swAdminUpdateEntryPrice(entryId) {
+      const entry = document.getElementById(entryId);
+      if (!entry) return;
+      
+      const typeSelect = entry.querySelector('.sw-work-entry-type');
+      const unitPriceInput = entry.querySelector('.sw-work-entry-unit-price');
+      
+      if (typeSelect && unitPriceInput) {
+        const selectedOption = typeSelect.options[typeSelect.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+          const price = selectedOption.getAttribute('data-price') || '0';
+          unitPriceInput.value = price;
+          swAdminUpdateEntryTotal(entryId);
+          swAdminUpdateAllTotal();
+        }
+      }
+    }
+    
+    /**
+     * 작업 항목 총액 계산
+     */
+    function swAdminUpdateEntryTotal(entryId) {
+      const entry = document.getElementById(entryId);
+      if (!entry) return;
+      
+      const quantity = parseFloat(entry.querySelector('.sw-work-entry-quantity')?.value) || 0;
+      const unitPrice = parseFloat(entry.querySelector('.sw-work-entry-unit-price')?.value) || 0;
+      const totalPrice = quantity * unitPrice;
+      
+      const totalPriceInput = entry.querySelector('.sw-work-entry-total-price');
+      if (totalPriceInput) {
+        totalPriceInput.value = Math.round(totalPrice);
+      }
+    }
+    
+    /**
+     * 전체 총액 계산 및 업데이트
+     */
+    function swAdminUpdateAllTotal() {
+      const container = document.getElementById('swContainer');
+      if (!container) return;
+      
+      const entries = container.querySelectorAll('.sw-work-entry');
+      let totalAll = 0;
+      
+      entries.forEach(entry => {
+        const totalPrice = parseFloat(entry.querySelector('.sw-work-entry-total-price')?.value) || 0;
+        totalAll += totalPrice;
+      });
+      
+      const totalAllElement = container.querySelector('#swAdminTotalAllPrice');
+      if (totalAllElement) {
+        totalAllElement.textContent = swFormatNumber(Math.round(totalAll));
+      }
+    }
+    
+    /**
+     * 관리자 단가 업데이트 (레거시 함수 - 호환성 유지)
      */
     function swAdminUpdateUnitPrice() {
       const container = document.getElementById('swContainer');
@@ -1382,6 +1615,16 @@
       const form = container.querySelector('#swAdminWorkForm');
       if (form) form.reset();
       
+      // 작업 항목 초기화
+      const entriesContainer = container.querySelector('#swAdminWorkEntriesContainer');
+      if (entriesContainer) {
+        entriesContainer.innerHTML = '';
+      }
+      swWorkEntryCounter = 0;
+      
+      // 첫 번째 작업 항목 자동 추가
+      swAdminAddWorkEntry();
+      
       swSelectedPhotos = [];
       swAdminRenderPhotoPreviews();
       
@@ -1389,15 +1632,11 @@
       const workDate = container.querySelector('#swAdminWorkDate');
       if (workDate) workDate.value = today;
       
-      const quantity = container.querySelector('#swAdminWorkQuantity');
-      if (quantity) quantity.value = '1';
-      
-      const totalPrice = container.querySelector('#swAdminWorkTotalPrice');
-      if (totalPrice) totalPrice.value = '0';
+      swAdminUpdateAllTotal();
     }
     
     /**
-     * 관리자 작업 등록 처리
+     * 관리자 작업 등록 처리 (여러 작업 항목을 한 번에 저장)
      */
     async function swAdminHandleWorkSubmit(event) {
       event.preventDefault();
@@ -1419,12 +1658,64 @@
         companyHidden.value = inputValue;
       }
       
+      // 작업 일자 확인
+      const workDate = container.querySelector('#swAdminWorkDate')?.value;
+      if (!workDate) {
+        alert('작업 일자를 선택해주세요.');
+        return;
+      }
+      
+      // 작업 항목 수집
+      const entries = container.querySelectorAll('.sw-work-entry');
+      if (entries.length === 0) {
+        alert('최소 1개 이상의 작업 항목을 추가해주세요.');
+        return;
+      }
+      
+      const workEntries = [];
+      let hasError = false;
+      
+      entries.forEach((entry, index) => {
+        const workTypeSelect = entry.querySelector('.sw-work-entry-type');
+        const quantityInput = entry.querySelector('.sw-work-entry-quantity');
+        const unitPriceInput = entry.querySelector('.sw-work-entry-unit-price');
+        
+        if (!workTypeSelect || !workTypeSelect.value) {
+          alert(`작업 항목 ${index + 1}: 작업 종류를 선택해주세요.`);
+          hasError = true;
+          return;
+        }
+        
+        const quantity = parseFloat(quantityInput?.value) || 0;
+        const unitPrice = parseFloat(unitPriceInput?.value) || 0;
+        
+        if (quantity <= 0) {
+          alert(`작업 항목 ${index + 1}: 수량은 0보다 큰 값이어야 합니다.`);
+          hasError = true;
+          return;
+        }
+        
+        if (unitPrice < 0) {
+          alert(`작업 항목 ${index + 1}: 단가는 0 이상이어야 합니다.`);
+          hasError = true;
+          return;
+        }
+        
+        workEntries.push({
+          work_type_id: parseInt(workTypeSelect.value),
+          quantity: quantity,
+          unit_price: unitPrice
+        });
+      });
+      
+      if (hasError) return;
+      
       // 사진 업로드
       let photoLinks = '';
       if (swSelectedPhotos.length > 0) {
         try {
           const imageDataList = swSelectedPhotos.map(photo => photo.url);
-          const trackingIdentifier = `special_${(container.querySelector('#swAdminWorkCompanySelect')?.value || container.querySelector('#swAdminWorkCompanyInput')?.value || 'unknown')
+          const trackingIdentifier = `special_${(companyHidden?.value || companyInput?.value || 'unknown')
             .replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`;
           
           const uploadResponse = await fetch('/api/uploads/upload-images', {
@@ -1480,20 +1771,21 @@
         }
       }
       
-      // 작업 데이터 전송
+      const memo = container.querySelector('#swAdminWorkMemo')?.value || '';
+      const companyName = companyHidden?.value || companyInput?.value;
+      
+      // 여러 작업 데이터 전송 (배치 등록)
       const workData = {
-        company_name: container.querySelector('#swAdminWorkCompanySelect')?.value || container.querySelector('#swAdminWorkCompanyInput')?.value,
-        work_type_id: parseInt(container.querySelector('#swAdminWorkTypeSelect')?.value),
-        work_date: container.querySelector('#swAdminWorkDate')?.value,
-        quantity: parseFloat(container.querySelector('#swAdminWorkQuantity')?.value),
-        unit_price: parseFloat(container.querySelector('#swAdminWorkUnitPrice')?.value),
+        company_name: companyName,
+        work_date: workDate,
+        work_entries: workEntries, // 여러 작업 항목 배열
         photo_links: photoLinks,
-        memo: container.querySelector('#swAdminWorkMemo')?.value || ''
+        memo: memo
       };
       
-      console.log('[SW] 작업 등록 요청:', workData);
+      console.log('[SW] 작업 등록 요청 (배치):', workData);
       
-      fetch('/api/special-works/works', {
+      fetch('/api/special-works/works/batch', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1506,7 +1798,7 @@
         .then(data => {
           console.log('[SW] 작업 등록 응답:', data);
           if (data.success) {
-            alert('작업이 등록되었습니다.');
+            alert(`${workEntries.length}개의 작업이 등록되었습니다.`);
             swAdminResetWorkForm();
             swAdminLoadWorks();
             swAdminToggleWorkRegistration(); // 폼 닫기
@@ -1572,6 +1864,8 @@
             swAdminRenderWorks(works);
             // 공통 통계 업데이트
             swUpdateStats(works);
+            // 화주사별 통계 업데이트 (관리자 전용)
+            swUpdateCompanyStats(works);
           } else {
             if (tbody) tbody.innerHTML = `<tr><td colspan="10" class="no-data">${data.message || '작업 목록을 불러오는 중 오류가 발생했습니다.'}</td></tr>`;
           }
@@ -1585,6 +1879,7 @@
     /**
      * 관리자 모드 작업 목록 렌더링
      * 관리 컬럼 포함
+     * 같은 날짜/화주사/메모/사진을 가진 작업들을 하나의 행으로 묶어서 표시
      */
     function swAdminRenderWorks(works) {
       const container = document.getElementById('swContainer');
@@ -1596,7 +1891,12 @@
       // 작업 종류 필터 적용
       let filteredWorks = works;
       if (swSelectedWorkType) {
-        filteredWorks = works.filter(work => work.work_type_name === swSelectedWorkType);
+        filteredWorks = filteredWorks.filter(work => work.work_type_name === swSelectedWorkType);
+      }
+      
+      // 화주사 필터 적용 (관리자 모드)
+      if (swSelectedCompany) {
+        filteredWorks = filteredWorks.filter(work => work.company_name === swSelectedCompany);
       }
       
       if (filteredWorks.length === 0) {
@@ -1604,38 +1904,84 @@
         return;
       }
       
+      // 작업 그룹화: 같은 날짜/화주사/메모/사진을 가진 작업들을 묶음
+      const workGroups = {};
+      filteredWorks.forEach(work => {
+        // 그룹 키 생성 (날짜 + 화주사 + 메모 + 사진)
+        const groupKey = `${work.work_date || ''}_${work.company_name || ''}_${work.memo || ''}_${work.photo_links || ''}`;
+        
+        if (!workGroups[groupKey]) {
+          workGroups[groupKey] = {
+            work_date: work.work_date,
+            company_name: work.company_name,
+            memo: work.memo,
+            photo_links: work.photo_links,
+            works: [],
+            totalAllPrice: 0,
+            ids: [] // 삭제를 위한 ID 목록
+          };
+        }
+        
+        workGroups[groupKey].works.push(work);
+        workGroups[groupKey].totalAllPrice += work.total_price || 0;
+        workGroups[groupKey].ids.push(work.id);
+      });
+      
+      // 그룹을 배열로 변환하고 날짜 내림차순 정렬
+      const groupedArray = Object.values(workGroups);
+      groupedArray.sort((a, b) => new Date(b.work_date) - new Date(a.work_date));
+      
       // HTML 생성 (관리 컬럼 포함)
       // 순번: 오래된 작업이 1번, 최신 작업이 마지막 번호
-      const html = filteredWorks.map((work, index) => {
-        const photos = work.photo_links ? work.photo_links.split(',').map(url => url.trim()).filter(url => url) : [];
+      const html = groupedArray.map((group, index) => {
+        const photos = group.photo_links ? group.photo_links.split(',').map(url => url.trim()).filter(url => url) : [];
         const photoThumbnails = photos.slice(0, 3).map(url => 
           `<img src="${swEscapeHtml(url)}" class="sw-photo-thumbnail" onclick="swViewPhoto('${swEscapeHtml(url)}')" alt="사진" style="cursor: pointer; margin-right: 5px;">`
         ).join('');
         const morePhotos = photos.length > 3 ? `<span style="margin-left: 5px; color: #636e72;">+${photos.length - 3}</span>` : '';
         
         // 순번 계산: 오래된 작업이 1번이 되도록 역순
-        const rowNumber = filteredWorks.length - index;
-        const memoText = work.memo || '';
+        const rowNumber = groupedArray.length - index;
+        const memoText = group.memo || '';
         const memoDisplay = memoText || '(메모 없음)';
+        
+        // 작업 종류들을 묶어서 표시 (여러 개인 경우)
+        const workTypesHtml = group.works.map(w => 
+          `<div style="margin: 2px 0;">${swEscapeHtml(w.work_type_name || '')}</div>`
+        ).join('');
+        
+        // 수량들을 묶어서 표시
+        const quantitiesHtml = group.works.map(w => 
+          `<div style="margin: 2px 0;">${w.quantity || 0}</div>`
+        ).join('');
+        
+        // 단가들을 묶어서 표시
+        const unitPricesHtml = group.works.map(w => 
+          `<div style="margin: 2px 0;">${swFormatNumber(w.unit_price || 0)}원</div>`
+        ).join('');
+        
+        // 첫 번째 작업의 ID를 사용 (수정/삭제 시)
+        const firstWorkId = group.works[0]?.id || 0;
+        const allWorkIds = group.ids.join(',');
         
         return `
           <tr>
             <td>${rowNumber}</td>
-            <td>${swEscapeHtml(work.work_date || '')}</td>
-            <td>${swEscapeHtml(work.company_name || '')}</td>
-            <td>${swEscapeHtml(work.work_type_name || '')}</td>
-            <td>${work.quantity || 0}</td>
-            <td>${swFormatNumber(work.unit_price || 0)}원</td>
-            <td style="font-weight: 600; color: #ff6b35;">${swFormatNumber(work.total_price || 0)}원</td>
+            <td>${swEscapeHtml(group.work_date || '')}</td>
+            <td>${swEscapeHtml(group.company_name || '')}</td>
+            <td style="text-align: left; padding-left: 12px;">${workTypesHtml}</td>
+            <td>${quantitiesHtml}</td>
+            <td style="text-align: left; padding-left: 12px;">${unitPricesHtml}</td>
+            <td style="font-weight: 600; color: #ff6b35;">${swFormatNumber(Math.round(group.totalAllPrice))}원</td>
             <td>${photoThumbnails || '<span style="color: #999;">사진 없음</span>'}${morePhotos}</td>
             <td class="sw-memo-cell">
               <span>${swEscapeHtml(memoDisplay)}</span>
               ${memoText ? `<div class="sw-memo-tooltip">${swEscapeHtml(memoText)}</div>` : ''}
             </td>
             <td class="sw-admin-only">
-              <div class="sw-btn-action-container">
-                <button class="sw-btn-action sw-btn-edit" onclick="swAdminEditWork(${work.id || 0})">수정</button>
-                <button class="sw-btn-action sw-btn-delete" onclick="swAdminDeleteWork(${work.id || 0})">삭제</button>
+              <div>
+                <button class="sw-btn-action sw-btn-edit" onclick="swAdminEditWorkGroup('${allWorkIds}')" title="그룹 수정">수정</button>
+                <button class="sw-btn-action sw-btn-delete" onclick="swAdminDeleteWorkGroup('${allWorkIds}')" title="그룹 삭제">삭제</button>
               </div>
             </td>
           </tr>
@@ -1646,6 +1992,47 @@
       
       // 가시성 제어 (관리 컬럼 표시)
       swApplyVisibility();
+    }
+    
+    /**
+     * 작업 그룹 수정 (첫 번째 작업만 수정 모달 열기)
+     */
+    function swAdminEditWorkGroup(workIdsStr) {
+      const workIds = workIdsStr.split(',').map(id => parseInt(id.trim())).filter(id => id);
+      if (workIds.length > 0) {
+        swAdminEditWork(workIds[0]);
+      }
+    }
+    
+    /**
+     * 작업 그룹 삭제 (모든 작업 삭제)
+     */
+    function swAdminDeleteWorkGroup(workIdsStr) {
+      if (!confirm('이 작업 그룹의 모든 작업을 삭제하시겠습니까?')) return;
+      
+      const workIds = workIdsStr.split(',').map(id => parseInt(id.trim())).filter(id => id);
+      if (workIds.length === 0) return;
+      
+      // 모든 작업 삭제 (순차적으로)
+      Promise.all(workIds.map(workId => 
+        fetch(`/api/special-works/works/${workId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: swGetUserHeaders()
+        }).then(response => response.json())
+      )).then(results => {
+        const successCount = results.filter(r => r.success).length;
+        if (successCount === workIds.length) {
+          alert(`${successCount}개의 작업이 삭제되었습니다.`);
+          swAdminLoadWorks();
+        } else {
+          alert(`일부 작업 삭제에 실패했습니다. (성공: ${successCount}/${workIds.length})`);
+          swAdminLoadWorks();
+        }
+      }).catch(error => {
+        console.error('[SW] 작업 그룹 삭제 오류:', error);
+        alert('작업 삭제 중 오류가 발생했습니다.');
+      });
     }
     
     /**
@@ -1680,6 +2067,53 @@
         return `
           <div class="sw-stat-box ${isSelected ? 'selected' : ''}" onclick="swFilterByWorkType('${swEscapeHtml(typeName)}')">
             <div class="sw-stat-box-name">${swEscapeHtml(typeName)}</div>
+            <div class="sw-stat-box-count">${data.count}건</div>
+            <div class="sw-stat-box-total">합계: ${swFormatNumber(data.total)}원</div>
+          </div>
+        `;
+      }).join('');
+      
+      statsContainer.innerHTML = html;
+      statsContainer.style.display = 'flex';
+    }
+    
+    /**
+     * 화주사별 통계 업데이트 (관리자 전용)
+     */
+    function swUpdateCompanyStats(works) {
+      const container = document.getElementById('swContainer');
+      if (!container) return;
+      
+      // 관리자 모드가 아니면 표시하지 않음
+      const roleNormalized = (swCurrentRole || '').toString().trim();
+      const isAdmin = (roleNormalized === '관리자');
+      if (!isAdmin) return;
+      
+      const statsContainer = container.querySelector('#swAdminCompanyStatsContainer');
+      if (!statsContainer) return;
+      
+      // 화주사별 그룹화
+      const stats = {};
+      works.forEach(work => {
+        const companyName = work.company_name || '기타';
+        if (!stats[companyName]) {
+          stats[companyName] = { count: 0, total: 0 };
+        }
+        stats[companyName].count++;
+        stats[companyName].total += work.total_price || 0;
+      });
+      
+      if (Object.keys(stats).length === 0) {
+        statsContainer.innerHTML = '';
+        return;
+      }
+      
+      // HTML 생성 (작업 종류 통계와 동일한 스타일)
+      const html = Object.entries(stats).map(([companyName, data]) => {
+        const isSelected = swSelectedCompany === companyName;
+        return `
+          <div class="sw-stat-box ${isSelected ? 'selected' : ''}" onclick="swFilterByCompany('${swEscapeHtml(companyName)}')">
+            <div class="sw-stat-box-name">${swEscapeHtml(companyName)}</div>
             <div class="sw-stat-box-count">${data.count}건</div>
             <div class="sw-stat-box-total">합계: ${swFormatNumber(data.total)}원</div>
           </div>
@@ -2180,6 +2614,106 @@
     }
     
     /**
+     * 작업 등록 폼에서 작업 종류 추가 (폼 내부에서 호출)
+     * 추가 후 자동으로 드롭다운에 선택됨
+     */
+    function swAdminShowAddWorkTypeModalFromForm() {
+      const name = prompt('작업 종류명을 입력하세요:');
+      if (!name || !name.trim()) return;
+      
+      const priceStr = prompt('기본 단가를 입력하세요 (원):', '0');
+      if (priceStr === null) return;
+      const price = parseFloat(priceStr) || 0;
+      
+      fetch('/api/special-works/types', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...swGetUserHeaders()
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: name.trim(),
+          default_unit_price: price,
+          display_order: 0
+        })
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert('작업 종류가 추가되었습니다.');
+            // 작업 종류 목록 새로고침
+            swCommonLoadWorkTypes().then(() => {
+              // 새로 추가된 작업 종류를 모든 작업 항목의 드롭다운에 업데이트
+              const container = document.getElementById('swContainer');
+              if (!container) return;
+              
+              // 모든 작업 항목의 드롭다운 업데이트
+              const workEntries = container.querySelectorAll('.sw-work-entry');
+              workEntries.forEach(entry => {
+                const workTypeSelect = entry.querySelector('.sw-work-entry-type');
+                if (workTypeSelect) {
+                  // 기존 선택값 저장
+                  const currentValue = workTypeSelect.value;
+                  
+                  // 드롭다운 옵션 재생성
+                  const workTypeOptions = swWorkTypes.map(type => 
+                    `<option value="${type.id}" data-price="${type.default_unit_price}">${swEscapeHtml(type.name)}</option>`
+                  ).join('');
+                  workTypeSelect.innerHTML = '<option value="">선택하세요</option>' + workTypeOptions;
+                  
+                  // 새로 추가된 작업 종류 선택
+                  const newOption = Array.from(workTypeSelect.options).find(opt => opt.textContent.trim() === name.trim());
+                  if (newOption) {
+                    workTypeSelect.value = newOption.value;
+                    const entryId = entry.id;
+                    swAdminUpdateEntryPrice(entryId);
+                  } else if (currentValue) {
+                    // 기존 선택값 복원
+                    workTypeSelect.value = currentValue;
+                  }
+                }
+              });
+              
+              // 수정 모달의 드롭다운도 확인
+              const editWorkTypeSelect = document.getElementById('swEditWorkTypeSelect');
+              if (editWorkTypeSelect) {
+                // 수정 모달이 열려있는 경우에만 업데이트
+                const editModal = document.getElementById('swEditWorkModal');
+                if (editModal && editModal.style.display !== 'none') {
+                  // 기존 선택값 저장
+                  const currentEditValue = editWorkTypeSelect.value;
+                  
+                  // 드롭다운 옵션 재생성
+                  const workTypeOptions = swWorkTypes.map(type => 
+                    `<option value="${type.id}" data-price="${type.default_unit_price}">${swEscapeHtml(type.name)}</option>`
+                  ).join('');
+                  editWorkTypeSelect.innerHTML = '<option value="">선택하세요</option>' + workTypeOptions;
+                  
+                  // 새로 추가된 작업 종류 선택
+                  const newEditOption = Array.from(editWorkTypeSelect.options).find(opt => opt.textContent.trim() === name.trim());
+                  if (newEditOption) {
+                    editWorkTypeSelect.value = newEditOption.value;
+                    swAdminUpdateEditUnitPrice();
+                  } else if (currentEditValue) {
+                    // 기존 선택값 복원
+                    editWorkTypeSelect.value = currentEditValue;
+                    swAdminUpdateEditUnitPrice();
+                  }
+                }
+              }
+            });
+          } else {
+            alert(data.message || '작업 종류 추가에 실패했습니다.');
+          }
+        })
+        .catch(error => {
+          console.error('[SW] 작업 종류 추가 오류:', error);
+          alert('작업 종류 추가 중 오류가 발생했습니다.');
+        });
+    }
+    
+    /**
      * 관리자 작업 종류 수정
      */
     function swAdminEditWorkType(workTypeId) {
@@ -2359,36 +2893,77 @@
       // 작업 종류 필터 적용
       let filteredWorks = works;
       if (swSelectedWorkType) {
-        filteredWorks = works.filter(work => work.work_type_name === swSelectedWorkType);
+        filteredWorks = filteredWorks.filter(work => work.work_type_name === swSelectedWorkType);
       }
+      
+      // 화주사 필터는 화주사 모드에서는 적용하지 않음 (본인 것만 보므로)
       
       if (filteredWorks.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="no-data">등록된 작업이 없습니다.</td></tr>';
         return;
       }
       
+      // 작업 그룹화: 같은 날짜/메모/사진을 가진 작업들을 묶음
+      const workGroups = {};
+      filteredWorks.forEach(work => {
+        // 그룹 키 생성 (날짜 + 메모 + 사진)
+        const groupKey = `${work.work_date || ''}_${work.memo || ''}_${work.photo_links || ''}`;
+        
+        if (!workGroups[groupKey]) {
+          workGroups[groupKey] = {
+            work_date: work.work_date,
+            memo: work.memo,
+            photo_links: work.photo_links,
+            works: [],
+            totalAllPrice: 0
+          };
+        }
+        
+        workGroups[groupKey].works.push(work);
+        workGroups[groupKey].totalAllPrice += work.total_price || 0;
+      });
+      
+      // 그룹을 배열로 변환하고 날짜 내림차순 정렬
+      const groupedArray = Object.values(workGroups);
+      groupedArray.sort((a, b) => new Date(b.work_date) - new Date(a.work_date));
+      
       // HTML 생성 (관리 컬럼 제외)
       // 순번: 오래된 작업이 1번, 최신 작업이 마지막 번호
-      const html = filteredWorks.map((work, index) => {
-        const photos = work.photo_links ? work.photo_links.split(',').map(url => url.trim()).filter(url => url) : [];
+      const html = groupedArray.map((group, index) => {
+        const photos = group.photo_links ? group.photo_links.split(',').map(url => url.trim()).filter(url => url) : [];
         const photoThumbnails = photos.slice(0, 3).map(url => 
           `<img src="${swEscapeHtml(url)}" class="sw-photo-thumbnail" onclick="swViewPhoto('${swEscapeHtml(url)}')" alt="사진" style="cursor: pointer; margin-right: 5px;">`
         ).join('');
         const morePhotos = photos.length > 3 ? `<span style="margin-left: 5px; color: #636e72;">+${photos.length - 3}</span>` : '';
         
         // 순번 계산: 오래된 작업이 1번이 되도록 역순
-        const rowNumber = filteredWorks.length - index;
-        const memoText = work.memo || '';
+        const rowNumber = groupedArray.length - index;
+        const memoText = group.memo || '';
         const memoDisplay = memoText || '(메모 없음)';
+        
+        // 작업 종류들을 묶어서 표시 (여러 개인 경우)
+        const workTypesHtml = group.works.map(w => 
+          `<div style="margin: 2px 0;">${swEscapeHtml(w.work_type_name || '')}</div>`
+        ).join('');
+        
+        // 수량들을 묶어서 표시
+        const quantitiesHtml = group.works.map(w => 
+          `<div style="margin: 2px 0;">${w.quantity || 0}</div>`
+        ).join('');
+        
+        // 단가들을 묶어서 표시
+        const unitPricesHtml = group.works.map(w => 
+          `<div style="margin: 2px 0;">${swFormatNumber(w.unit_price || 0)}원</div>`
+        ).join('');
         
         return `
           <tr>
             <td>${rowNumber}</td>
-            <td>${swEscapeHtml(work.work_date || '')}</td>
-            <td>${swEscapeHtml(work.work_type_name || '')}</td>
-            <td>${work.quantity || 0}</td>
-            <td>${swFormatNumber(work.unit_price || 0)}원</td>
-            <td style="font-weight: 600; color: #ff6b35;">${swFormatNumber(work.total_price || 0)}원</td>
+            <td>${swEscapeHtml(group.work_date || '')}</td>
+            <td style="text-align: left; padding-left: 12px;">${workTypesHtml}</td>
+            <td>${quantitiesHtml}</td>
+            <td style="text-align: left; padding-left: 12px;">${unitPricesHtml}</td>
+            <td style="font-weight: 600; color: #ff6b35;">${swFormatNumber(Math.round(group.totalAllPrice))}원</td>
             <td>${photoThumbnails || '<span style="color: #999;">사진 없음</span>'}${morePhotos}</td>
             <td class="sw-memo-cell">
               <span>${swEscapeHtml(memoDisplay)}</span>
