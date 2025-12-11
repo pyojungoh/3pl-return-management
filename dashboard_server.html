@@ -2133,6 +2133,13 @@
           <button class="refresh-btn" onclick="testTelegram()" id="testTelegramBtn" style="display:none; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">📱 텔레그램 테스트</button>
         </div>
         
+        <!-- 화주사별 통계 (관리자 전용) -->
+        <div id="csAdminCompanyStatsSection" class="admin-only-btn" style="display: none; margin-bottom: 20px;">
+          <div class="stats" id="csAdminCompanyStatsContainer" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <!-- 화주사별 통계 박스들이 여기에 동적으로 생성됩니다 -->
+          </div>
+        </div>
+        
         <!-- 통계 -->
         <div class="stats" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
           <span id="csFilterAll" onclick="filterCsByStatus('all')" onmouseover="if(!this.classList.contains('active')) this.style.transform='scale(1.05)'" onmouseout="if(!this.classList.contains('active')) this.style.transform='scale(1)'" style="padding: 8px 12px; border-radius: 8px; background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white; cursor: pointer; font-size: 13px; font-weight: 600; border: 2px solid #ff6b35; transition: all 0.3s ease; white-space: nowrap;">
@@ -5593,6 +5600,11 @@
         if (csRegisterSection) {
           csRegisterSection.style.display = 'block';
         }
+        // 화주사별 통계 섹션 표시 (관리자 모드에서만)
+        const csAdminCompanyStatsSection = document.getElementById('csAdminCompanyStatsSection');
+        if (csAdminCompanyStatsSection) {
+          csAdminCompanyStatsSection.style.display = (currentRole === '관리자') ? 'block' : 'none';
+        }
         // C/S 월 목록 로드 및 데이터 로드
         loadCsAvailableMonths();
         loadCsIssueTypesForForm(); // C/S 종류 목록 로드
@@ -5720,6 +5732,11 @@
         const csIssueTypesManagerBtn = document.getElementById('csIssueTypesManagerBtn');
         if (csIssueTypesManagerBtn) {
           csIssueTypesManagerBtn.style.display = (currentRole === '관리자') ? 'inline-block' : 'none';
+        }
+        // 화주사별 통계 섹션 표시 (관리자 모드에서만)
+        const csAdminCompanyStatsSection = document.getElementById('csAdminCompanyStatsSection');
+        if (csAdminCompanyStatsSection) {
+          csAdminCompanyStatsSection.style.display = (currentRole === '관리자') ? 'block' : 'none';
         }
         // C/S 월 목록 로드 및 데이터 로드
         loadCsAvailableMonths();
@@ -8795,8 +8812,89 @@
       if (returnCountEl) returnCountEl.textContent = returnType;
       if (cancelCountEl) cancelCountEl.textContent = cancel;
       if (otherCountEl) otherCountEl.textContent = other;
+      
+      // 화주사별 통계 업데이트 (관리자 전용)
+      if (currentRole === '관리자') {
+        updateCsCompanyStats(csList);
+      }
     }
     window.updateCsStats = updateCsStats;
+    
+    // C/S 화주사별 통계 업데이트 (관리자 전용)
+    function updateCsCompanyStats(csList) {
+      const statsSection = document.getElementById('csAdminCompanyStatsSection');
+      const statsContainer = document.getElementById('csAdminCompanyStatsContainer');
+      
+      if (!statsSection || !statsContainer) return;
+      
+      // 관리자 모드가 아니면 숨김
+      if (currentRole !== '관리자') {
+        statsSection.style.display = 'none';
+        return;
+      }
+      
+      // 화주사별 그룹화
+      const stats = {};
+      csList.forEach(cs => {
+        const companyName = cs.company_name || '기타';
+        if (!stats[companyName]) {
+          stats[companyName] = {
+            total: 0,
+            completed: 0,
+            pending: 0
+          };
+        }
+        stats[companyName].total++;
+        if (cs.status === '처리완료' || cs.status === '처리불가') {
+          stats[companyName].completed++;
+        } else if (cs.status === '접수') {
+          stats[companyName].pending++;
+        }
+      });
+      
+      if (Object.keys(stats).length === 0) {
+        statsContainer.innerHTML = '';
+        statsSection.style.display = 'none';
+        return;
+      }
+      
+      // 현재 선택된 화주사 확인
+      const selectedCompany = document.getElementById('csCompanySelect')?.value || '';
+      
+      // HTML 생성
+      const html = Object.entries(stats)
+        .sort((a, b) => b[1].total - a[1].total) // 총 건수로 정렬
+        .map(([companyName, data]) => {
+          const isSelected = selectedCompany === companyName;
+          return `
+            <div onclick="filterCsByCompany('${escapeHtml(companyName)}')" 
+                 style="padding: 12px 16px; border-radius: 10px; background: ${isSelected ? 'linear-gradient(135deg, #ff6b35 0%, #feca57 100%)' : 'linear-gradient(135deg, #fffef9 0%, #ffffff 100%)'}; 
+                        color: ${isSelected ? 'white' : '#636e72'}; cursor: pointer; font-size: 13px; font-weight: 600; 
+                        border: 2px solid ${isSelected ? '#ff6b35' : '#ffeaa7'}; transition: all 0.3s ease; 
+                        white-space: nowrap; min-width: 150px; text-align: center; box-shadow: ${isSelected ? '0 4px 12px rgba(255, 107, 53, 0.3)' : '0 2px 6px rgba(0, 0, 0, 0.1)'};"
+                 onmouseover="if('${escapeHtml(companyName)}' !== '${selectedCompany}') { this.style.transform='scale(1.05)'; this.style.borderColor='#ffa502'; }"
+                 onmouseout="if('${escapeHtml(companyName)}' !== '${selectedCompany}') { this.style.transform='scale(1)'; this.style.borderColor='#ffeaa7'; }">
+              <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">${escapeHtml(companyName)}</div>
+              <div style="font-size: 12px; opacity: 0.9;">총 <strong>${data.total}</strong>건</div>
+              <div style="font-size: 11px; opacity: 0.8; margin-top: 2px;">처리완료: ${data.completed} | 미처리: ${data.pending}</div>
+            </div>
+          `;
+        }).join('');
+      
+      statsContainer.innerHTML = html;
+      statsSection.style.display = 'block';
+    }
+    window.updateCsCompanyStats = updateCsCompanyStats;
+    
+    // 화주사별 C/S 필터링
+    function filterCsByCompany(companyName) {
+      const companySelect = document.getElementById('csCompanySelect');
+      if (companySelect) {
+        companySelect.value = companyName;
+        loadCsData();
+      }
+    }
+    window.filterCsByCompany = filterCsByCompany;
     
     // C/S 상태별 필터링
     function filterCsByStatus(filter) {
