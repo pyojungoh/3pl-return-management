@@ -2129,6 +2129,7 @@
           </select>
           <button class="refresh-btn" onclick="refreshCsData()" id="refreshCsBtn">🔄 새로고침</button>
           <button class="refresh-btn" onclick="exportCsData()" id="exportCsBtn" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);">📥 엑셀 다운로드</button>
+          <button class="refresh-btn admin-only-btn" onclick="openCsIssueTypesManager()" id="csIssueTypesManagerBtn" style="display: none; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">⚙️ C/S 종류 관리</button>
           <button class="refresh-btn" onclick="testTelegram()" id="testTelegramBtn" style="display:none; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">📱 텔레그램 테스트</button>
         </div>
         
@@ -2200,13 +2201,7 @@
                 <div>
                   <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">C/S 종류 *</label>
                   <select id="csIssueType" class="request-input" style="min-height: auto;" required>
-                    <option value="">선택하세요</option>
-                    <option value="오배송">오배송</option>
-                    <option value="누락">누락</option>
-                    <option value="교환">교환</option>
-                    <option value="반품">반품</option>
-                    <option value="취소">취소</option>
-                    <option value="기타">기타</option>
+                    <option value="">로딩 중...</option>
                   </select>
                 </div>
                 
@@ -5600,6 +5595,7 @@
         }
         // C/S 월 목록 로드 및 데이터 로드
         loadCsAvailableMonths();
+        loadCsIssueTypesForForm(); // C/S 종류 목록 로드
       } else if (menuName === 'schedule') {
         // 모든 화주사 모드 탭 숨기기
         consignorTabIds.forEach(tabId => {
@@ -5720,8 +5716,14 @@
         if (typeof loadCompaniesForCs === 'function') {
           loadCompaniesForCs();
         }
+        // C/S 종류 관리 버튼 표시 (관리자 모드에서만)
+        const csIssueTypesManagerBtn = document.getElementById('csIssueTypesManagerBtn');
+        if (csIssueTypesManagerBtn) {
+          csIssueTypesManagerBtn.style.display = (currentRole === '관리자') ? 'inline-block' : 'none';
+        }
         // C/S 월 목록 로드 및 데이터 로드
         loadCsAvailableMonths();
+        loadCsIssueTypesForForm(); // C/S 종류 목록 로드
       } else if (tabName === 'scheduleCalendar') {
         const scheduleCalendarTab = document.getElementById('scheduleCalendarTab');
         if (scheduleCalendarTab) {
@@ -8236,6 +8238,9 @@
           if (currentRole === '관리자') {
             loadCsCompanyList();
           }
+          
+          // C/S 종류 목록 로드
+          loadCsIssueTypesForForm();
         }
       }
     }
@@ -9161,6 +9166,380 @@
       }
     }
     window.resendCsNotification = resendCsNotification;
+    
+    // ========== C/S 종류 관리 함수 ==========
+    
+    // C/S 종류 관리 모달 열기
+    function openCsIssueTypesManager() {
+      // 기존 모달 제거
+      const existingModal = document.getElementById('csIssueTypesManagerModal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+      
+      const modalHtml = `
+        <div id="csIssueTypesManagerModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;" onclick="closeCsIssueTypesManager(event)">
+          <div style="background: white; border-radius: 16px; padding: 30px; max-width: 900px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.3);" onclick="event.stopPropagation()">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <h3 style="margin: 0; color: #ff6b35; font-size: 24px; font-weight: 700;">⚙️ C/S 종류 관리</h3>
+              <button onclick="closeCsIssueTypesManager()" style="background: #e74c3c; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;">×</button>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+              <button onclick="openAddCsIssueTypeModal()" class="save-btn" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);">➕ 종류 추가</button>
+            </div>
+            
+            <div id="csIssueTypesList" style="margin-top: 20px;">
+              <div style="text-align: center; padding: 20px; color: #636e72;">로딩 중...</div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      loadCsIssueTypes();
+    }
+    window.openCsIssueTypesManager = openCsIssueTypesManager;
+    
+    // C/S 종류 관리 모달 닫기
+    function closeCsIssueTypesManager(event) {
+      if (event && event.target.id !== 'csIssueTypesManagerModal' && !event.target.closest('#csIssueTypesManagerModal > div')) {
+        return;
+      }
+      const modal = document.getElementById('csIssueTypesManagerModal');
+      if (modal) {
+        modal.remove();
+      }
+    }
+    window.closeCsIssueTypesManager = closeCsIssueTypesManager;
+    
+    // C/S 종류 목록 로드
+    async function loadCsIssueTypes() {
+      const listDiv = document.getElementById('csIssueTypesList');
+      if (!listDiv) return;
+      
+      try {
+        const response = await fetch('/api/cs/issue-types');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const types = result.data;
+          
+          if (types.length === 0) {
+            listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #636e72;">등록된 종류가 없습니다.</div>';
+            return;
+          }
+          
+          let html = '<table style="width: 100%; border-collapse: collapse;">';
+          html += '<thead><tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">';
+          html += '<th style="padding: 12px; text-align: left; font-weight: 600;">순서</th>';
+          html += '<th style="padding: 12px; text-align: left; font-weight: 600;">종류명</th>';
+          html += '<th style="padding: 12px; text-align: left; font-weight: 600;">색상</th>';
+          html += '<th style="padding: 12px; text-align: left; font-weight: 600;">상태</th>';
+          html += '<th style="padding: 12px; text-align: center; font-weight: 600;">관리</th>';
+          html += '</tr></thead><tbody>';
+          
+          types.forEach(type => {
+            const statusText = type.is_active ? '활성' : '비활성';
+            const statusColor = type.is_active ? '#00b894' : '#636e72';
+            html += `<tr style="border-bottom: 1px solid #dee2e6;">`;
+            html += `<td style="padding: 12px;">${type.display_order || 0}</td>`;
+            html += `<td style="padding: 12px;">
+              <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; background: ${type.bg_color || '#ecf0f1'}; color: ${type.color || '#636e72'}; font-weight: 600; font-size: 12px; border: 1px solid ${type.color || '#636e72'};">
+                ${escapeHtml(type.name)}
+              </span>
+            </td>`;
+            html += `<td style="padding: 12px;">
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <div style="width: 30px; height: 20px; background: ${type.color || '#636e72'}; border-radius: 4px; border: 1px solid #ddd;"></div>
+                <span style="font-size: 12px; color: #636e72;">${type.color || '#636e72'}</span>
+              </div>
+            </td>`;
+            html += `<td style="padding: 12px;">
+              <span style="color: ${statusColor}; font-weight: 600;">${statusText}</span>
+            </td>`;
+            html += `<td style="padding: 12px; text-align: center;">
+              <button onclick="openEditCsIssueTypeModal(${type.id}, '${escapeHtml(type.name)}', '${escapeHtml(type.color || '')}', '${escapeHtml(type.bg_color || '')}', ${type.display_order || 0}, ${type.is_active})" 
+                      class="save-btn" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%); padding: 5px 10px; font-size: 12px; margin-right: 5px;">수정</button>
+              <button onclick="deleteCsIssueType(${type.id}, '${escapeHtml(type.name)}')" 
+                      class="save-btn" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); padding: 5px 10px; font-size: 12px;">삭제</button>
+            </td>`;
+            html += `</tr>`;
+          });
+          
+          html += '</tbody></table>';
+          listDiv.innerHTML = html;
+        } else {
+          listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #e74c3c;">종류 목록을 불러올 수 없습니다.</div>';
+        }
+      } catch (error) {
+        console.error('C/S 종류 목록 로드 오류:', error);
+        listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #e74c3c;">오류가 발생했습니다: ' + error.message + '</div>';
+      }
+    }
+    window.loadCsIssueTypes = loadCsIssueTypes;
+    
+    // C/S 종류 추가 모달 열기
+    function openAddCsIssueTypeModal() {
+      const existingModal = document.getElementById('addCsIssueTypeModal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+      
+      const modalHtml = `
+        <div id="addCsIssueTypeModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; display: flex; align-items: center; justify-content: center;" onclick="closeAddCsIssueTypeModal(event)">
+          <div style="background: white; border-radius: 16px; padding: 30px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);" onclick="event.stopPropagation()">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <h3 style="margin: 0; color: #ff6b35; font-size: 20px; font-weight: 700;">➕ C/S 종류 추가</h3>
+              <button onclick="closeAddCsIssueTypeModal()" style="background: #e74c3c; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 20px; cursor: pointer;">×</button>
+            </div>
+            <form onsubmit="saveCsIssueType(event); return false;">
+              <div style="margin-bottom: 15px;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">종류명 *</label>
+                <input type="text" id="newCsIssueTypeName" class="request-input" style="min-height: auto;" placeholder="예: 오배송" required>
+              </div>
+              <div style="margin-bottom: 15px;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">텍스트 색상</label>
+                <input type="color" id="newCsIssueTypeColor" class="request-input" style="min-height: auto; height: 40px;" value="#636e72">
+              </div>
+              <div style="margin-bottom: 15px;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">배경 색상</label>
+                <input type="color" id="newCsIssueTypeBgColor" class="request-input" style="min-height: auto; height: 40px;" value="#ecf0f1">
+              </div>
+              <div style="margin-bottom: 15px;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">표시 순서</label>
+                <input type="number" id="newCsIssueTypeOrder" class="request-input" style="min-height: auto;" value="0" min="0">
+              </div>
+              <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button type="button" onclick="closeAddCsIssueTypeModal()" class="save-btn" style="background: linear-gradient(135deg, #636e72 0%, #2d3436 100%);">취소</button>
+                <button type="submit" class="save-btn">💾 저장</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
+      
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      document.getElementById('newCsIssueTypeName').focus();
+    }
+    window.openAddCsIssueTypeModal = openAddCsIssueTypeModal;
+    
+    // C/S 종류 추가 모달 닫기
+    function closeAddCsIssueTypeModal(event) {
+      if (event && event.target.id !== 'addCsIssueTypeModal' && !event.target.closest('#addCsIssueTypeModal > div')) {
+        return;
+      }
+      const modal = document.getElementById('addCsIssueTypeModal');
+      if (modal) {
+        modal.remove();
+      }
+    }
+    window.closeAddCsIssueTypeModal = closeAddCsIssueTypeModal;
+    
+    // C/S 종류 저장
+    async function saveCsIssueType(event) {
+      event.preventDefault();
+      
+      const name = document.getElementById('newCsIssueTypeName').value.trim();
+      const color = document.getElementById('newCsIssueTypeColor').value;
+      const bgColor = document.getElementById('newCsIssueTypeBgColor').value;
+      const displayOrder = parseInt(document.getElementById('newCsIssueTypeOrder').value) || 0;
+      
+      if (!name) {
+        showMessage('❌ 종류명을 입력해주세요.', 'error');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/cs/issue-types?role=${encodeURIComponent(currentRole)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name,
+            color: color,
+            bg_color: bgColor,
+            display_order: displayOrder
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showMessage('✅ C/S 종류가 추가되었습니다.', 'success');
+          closeAddCsIssueTypeModal();
+          loadCsIssueTypes();
+          loadCsIssueTypesForForm(); // 폼의 종류 목록도 업데이트
+        } else {
+          showMessage('❌ ' + (result.message || '추가 실패'), 'error');
+        }
+      } catch (error) {
+        console.error('C/S 종류 추가 오류:', error);
+        showMessage('❌ 추가 중 오류: ' + error.message, 'error');
+      }
+    }
+    window.saveCsIssueType = saveCsIssueType;
+    
+    // C/S 종류 수정 모달 열기
+    function openEditCsIssueTypeModal(id, name, color, bgColor, displayOrder, isActive) {
+      const existingModal = document.getElementById('editCsIssueTypeModal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+      
+      const modalHtml = `
+        <div id="editCsIssueTypeModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; display: flex; align-items: center; justify-content: center;" onclick="closeEditCsIssueTypeModal(event)">
+          <div style="background: white; border-radius: 16px; padding: 30px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);" onclick="event.stopPropagation()">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <h3 style="margin: 0; color: #ff6b35; font-size: 20px; font-weight: 700;">✏️ C/S 종류 수정</h3>
+              <button onclick="closeEditCsIssueTypeModal()" style="background: #e74c3c; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 20px; cursor: pointer;">×</button>
+            </div>
+            <form onsubmit="updateCsIssueType(event, ${id}); return false;">
+              <div style="margin-bottom: 15px;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">종류명 *</label>
+                <input type="text" id="editCsIssueTypeName" class="request-input" style="min-height: auto;" value="${escapeHtml(name)}" required>
+              </div>
+              <div style="margin-bottom: 15px;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">텍스트 색상</label>
+                <input type="color" id="editCsIssueTypeColor" class="request-input" style="min-height: auto; height: 40px;" value="${color || '#636e72'}">
+              </div>
+              <div style="margin-bottom: 15px;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">배경 색상</label>
+                <input type="color" id="editCsIssueTypeBgColor" class="request-input" style="min-height: auto; height: 40px;" value="${bgColor || '#ecf0f1'}">
+              </div>
+              <div style="margin-bottom: 15px;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">표시 순서</label>
+                <input type="number" id="editCsIssueTypeOrder" class="request-input" style="min-height: auto;" value="${displayOrder || 0}" min="0">
+              </div>
+              <div style="margin-bottom: 15px;">
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">
+                  <input type="checkbox" id="editCsIssueTypeActive" ${isActive ? 'checked' : ''} style="margin-right: 8px;">
+                  활성화
+                </label>
+              </div>
+              <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button type="button" onclick="closeEditCsIssueTypeModal()" class="save-btn" style="background: linear-gradient(135deg, #636e72 0%, #2d3436 100%);">취소</button>
+                <button type="submit" class="save-btn">💾 저장</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
+      
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      document.getElementById('editCsIssueTypeName').focus();
+    }
+    window.openEditCsIssueTypeModal = openEditCsIssueTypeModal;
+    
+    // C/S 종류 수정 모달 닫기
+    function closeEditCsIssueTypeModal(event) {
+      if (event && event.target.id !== 'editCsIssueTypeModal' && !event.target.closest('#editCsIssueTypeModal > div')) {
+        return;
+      }
+      const modal = document.getElementById('editCsIssueTypeModal');
+      if (modal) {
+        modal.remove();
+      }
+    }
+    window.closeEditCsIssueTypeModal = closeEditCsIssueTypeModal;
+    
+    // C/S 종류 업데이트
+    async function updateCsIssueType(event, id) {
+      event.preventDefault();
+      
+      const name = document.getElementById('editCsIssueTypeName').value.trim();
+      const color = document.getElementById('editCsIssueTypeColor').value;
+      const bgColor = document.getElementById('editCsIssueTypeBgColor').value;
+      const displayOrder = parseInt(document.getElementById('editCsIssueTypeOrder').value) || 0;
+      const isActive = document.getElementById('editCsIssueTypeActive').checked;
+      
+      if (!name) {
+        showMessage('❌ 종류명을 입력해주세요.', 'error');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/cs/issue-types/${id}?role=${encodeURIComponent(currentRole)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name,
+            color: color,
+            bg_color: bgColor,
+            display_order: displayOrder,
+            is_active: isActive
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showMessage('✅ C/S 종류가 수정되었습니다.', 'success');
+          closeEditCsIssueTypeModal();
+          loadCsIssueTypes();
+          loadCsIssueTypesForForm(); // 폼의 종류 목록도 업데이트
+        } else {
+          showMessage('❌ ' + (result.message || '수정 실패'), 'error');
+        }
+      } catch (error) {
+        console.error('C/S 종류 수정 오류:', error);
+        showMessage('❌ 수정 중 오류: ' + error.message, 'error');
+      }
+    }
+    window.updateCsIssueType = updateCsIssueType;
+    
+    // C/S 종류 삭제
+    async function deleteCsIssueType(id, name) {
+      if (!confirm(`"${name}" 종류를 삭제하시겠습니까?`)) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/cs/issue-types/${id}?role=${encodeURIComponent(currentRole)}`, {
+          method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showMessage('✅ C/S 종류가 삭제되었습니다.', 'success');
+          loadCsIssueTypes();
+          loadCsIssueTypesForForm(); // 폼의 종류 목록도 업데이트
+        } else {
+          showMessage('❌ ' + (result.message || '삭제 실패'), 'error');
+        }
+      } catch (error) {
+        console.error('C/S 종류 삭제 오류:', error);
+        showMessage('❌ 삭제 중 오류: ' + error.message, 'error');
+      }
+    }
+    window.deleteCsIssueType = deleteCsIssueType;
+    
+    // C/S 등록 폼용 종류 목록 로드
+    async function loadCsIssueTypesForForm() {
+      try {
+        const response = await fetch('/api/cs/issue-types');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const select = document.getElementById('csIssueType');
+          if (!select) return;
+          
+          const activeTypes = result.data.filter(type => type.is_active !== false);
+          activeTypes.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+          
+          select.innerHTML = '<option value="">선택하세요</option>';
+          activeTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type.name;
+            option.textContent = type.name;
+            select.appendChild(option);
+          });
+        }
+      } catch (error) {
+        console.error('C/S 종류 목록 로드 오류:', error);
+      }
+    }
+    window.loadCsIssueTypesForForm = loadCsIssueTypesForForm;
     
     // ========== 화주사 정보 관련 함수 ==========
     // 사업자 정보 필수 팝업 모달 표시

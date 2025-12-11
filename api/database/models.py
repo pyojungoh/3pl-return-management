@@ -510,6 +510,45 @@ def init_db():
                 ON customer_service(month, created_at)
             ''')
 
+            # PostgreSQL - C/S 종류 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS cs_issue_types (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL UNIQUE,
+                    color TEXT DEFAULT '#636e72',
+                    bg_color TEXT DEFAULT '#ecf0f1',
+                    display_order INTEGER DEFAULT 0,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # C/S 종류 초기 데이터 삽입 (없는 경우만)
+            default_issue_types = [
+                ('오배송', '#e74c3c', '#ffe5e5', 1),
+                ('누락', '#f39c12', '#fff5e5', 2),
+                ('교환', '#3498db', '#e5f3ff', 3),
+                ('반품', '#9b59b6', '#f0e5ff', 4),
+                ('취소', '#e74c3c', '#ffe5e5', 5),
+                ('기타', '#95a5a6', '#f5f5f5', 6)
+            ]
+            
+            for name, color, bg_color, display_order in default_issue_types:
+                try:
+                    cursor.execute('''
+                        INSERT INTO cs_issue_types (name, color, bg_color, display_order)
+                        SELECT %s, %s, %s, %s
+                        WHERE NOT EXISTS (SELECT 1 FROM cs_issue_types WHERE name = %s)
+                    ''', (name, color, bg_color, display_order, name))
+                except Exception:
+                    pass
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_cs_issue_types_active_order 
+                ON cs_issue_types(is_active, display_order)
+            ''')
+
             # PostgreSQL - 특수작업 작업 종류 테이블
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS special_work_types (
@@ -986,6 +1025,45 @@ def init_db():
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_cs_month 
                 ON customer_service(month, created_at)
+            ''')
+
+            # SQLite - C/S 종류 테이블
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS cs_issue_types (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    color TEXT DEFAULT '#636e72',
+                    bg_color TEXT DEFAULT '#ecf0f1',
+                    display_order INTEGER DEFAULT 0,
+                    is_active BOOLEAN DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # C/S 종류 초기 데이터 삽입 (없는 경우만)
+            default_issue_types = [
+                ('오배송', '#e74c3c', '#ffe5e5', 1),
+                ('누락', '#f39c12', '#fff5e5', 2),
+                ('교환', '#3498db', '#e5f3ff', 3),
+                ('반품', '#9b59b6', '#f0e5ff', 4),
+                ('취소', '#e74c3c', '#ffe5e5', 5),
+                ('기타', '#95a5a6', '#f5f5f5', 6)
+            ]
+            
+            for name, color, bg_color, display_order in default_issue_types:
+                try:
+                    cursor.execute('''
+                        INSERT INTO cs_issue_types (name, color, bg_color, display_order)
+                        SELECT ?, ?, ?, ?
+                        WHERE NOT EXISTS (SELECT 1 FROM cs_issue_types WHERE name = ?)
+                    ''', (name, color, bg_color, display_order, name))
+                except Exception:
+                    pass
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_cs_issue_types_active_order 
+                ON cs_issue_types(is_active, display_order)
             ''')
 
             # SQLite - 특수작업 작업 종류 테이블

@@ -1100,3 +1100,348 @@ def export_cs():
             'success': False,
             'message': f'엑셀 다운로드 중 오류: {str(e)}'
         }), 500
+
+
+# ========== C/S 종류 관리 API ==========
+
+def get_cs_issue_types() -> list:
+    """C/S 종류 목록 조회"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cursor.execute('''
+                SELECT * FROM cs_issue_types
+                ORDER BY display_order ASC, id ASC
+            ''')
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        import sqlite3
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT id, name, color, bg_color, display_order, is_active, created_at, updated_at
+                FROM cs_issue_types
+                ORDER BY display_order ASC, id ASC
+            ''')
+            rows = cursor.fetchall()
+            result = []
+            for row in rows:
+                result.append({
+                    'id': row['id'],
+                    'name': row['name'],
+                    'color': row['color'] or '#636e72',
+                    'bg_color': row['bg_color'] or '#ecf0f1',
+                    'display_order': row['display_order'] or 0,
+                    'is_active': bool(row['is_active']),
+                    'created_at': str(row['created_at']) if row['created_at'] else '',
+                    'updated_at': str(row['updated_at']) if row['updated_at'] else ''
+                })
+            return result
+        finally:
+            conn.close()
+
+
+def create_cs_issue_type(name: str, color: str = None, bg_color: str = None, display_order: int = None) -> int:
+    """C/S 종류 생성"""
+    conn = get_db_connection()
+    
+    kst_now = get_kst_now()
+    color = color or '#636e72'
+    bg_color = bg_color or '#ecf0f1'
+    
+    # display_order가 없으면 최대값 + 1
+    if display_order is None:
+        if USE_POSTGRESQL:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('SELECT COALESCE(MAX(display_order), 0) + 1 FROM cs_issue_types')
+                display_order = cursor.fetchone()[0] or 1
+            finally:
+                cursor.close()
+        else:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('SELECT COALESCE(MAX(display_order), 0) + 1 FROM cs_issue_types')
+                row = cursor.fetchone()
+                display_order = row[0] if row and row[0] else 1
+            finally:
+                pass
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO cs_issue_types (name, color, bg_color, display_order, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+            ''', (name, color, bg_color, display_order, kst_now, kst_now))
+            cs_type_id = cursor.fetchone()[0]
+            conn.commit()
+            print(f"✅ C/S 종류 생성 성공: ID {cs_type_id}, 이름: {name}")
+            return cs_type_id
+        except Exception as e:
+            print(f"❌ C/S 종류 생성 오류: {e}")
+            conn.rollback()
+            return None
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO cs_issue_types (name, color, bg_color, display_order, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (name, color, bg_color, display_order, kst_now, kst_now))
+            cs_type_id = cursor.lastrowid
+            conn.commit()
+            print(f"✅ C/S 종류 생성 성공: ID {cs_type_id}, 이름: {name}")
+            return cs_type_id
+        except Exception as e:
+            print(f"❌ C/S 종류 생성 오류: {e}")
+            conn.rollback()
+            return None
+        finally:
+            conn.close()
+
+
+def update_cs_issue_type(type_id: int, name: str = None, color: str = None, bg_color: str = None, display_order: int = None, is_active: bool = None) -> bool:
+    """C/S 종류 업데이트"""
+    conn = get_db_connection()
+    
+    kst_now = get_kst_now()
+    
+    # 업데이트할 필드만 동적으로 구성
+    updates = []
+    params = []
+    
+    if name is not None:
+        updates.append('name = %s' if USE_POSTGRESQL else 'name = ?')
+        params.append(name)
+    if color is not None:
+        updates.append('color = %s' if USE_POSTGRESQL else 'color = ?')
+        params.append(color)
+    if bg_color is not None:
+        updates.append('bg_color = %s' if USE_POSTGRESQL else 'bg_color = ?')
+        params.append(bg_color)
+    if display_order is not None:
+        updates.append('display_order = %s' if USE_POSTGRESQL else 'display_order = ?')
+        params.append(display_order)
+    if is_active is not None:
+        updates.append('is_active = %s' if USE_POSTGRESQL else 'is_active = ?')
+        params.append(is_active)
+    
+    if not updates:
+        return False
+    
+    updates.append('updated_at = %s' if USE_POSTGRESQL else 'updated_at = ?')
+    params.append(kst_now)
+    params.append(type_id)
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            query = f'UPDATE cs_issue_types SET {", ".join(updates)} WHERE id = %s'
+            cursor.execute(query, params)
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ C/S 종류 업데이트 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            query = f'UPDATE cs_issue_types SET {", ".join(updates)} WHERE id = ?'
+            cursor.execute(query, params)
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ C/S 종류 업데이트 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+def delete_cs_issue_type(type_id: int) -> bool:
+    """C/S 종류 삭제"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM cs_issue_types WHERE id = %s', (type_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ C/S 종류 삭제 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM cs_issue_types WHERE id = ?', (type_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ C/S 종류 삭제 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+@cs_bp.route('/issue-types', methods=['GET'])
+def get_cs_issue_types_route():
+    """C/S 종류 목록 조회"""
+    try:
+        issue_types = get_cs_issue_types()
+        return jsonify({
+            'success': True,
+            'data': issue_types
+        })
+    except Exception as e:
+        print(f'❌ C/S 종류 목록 조회 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'data': [],
+            'message': f'C/S 종류 목록 조회 중 오류: {str(e)}'
+        }), 500
+
+
+@cs_bp.route('/issue-types', methods=['POST'])
+def create_cs_issue_type_route():
+    """C/S 종류 생성 (관리자용)"""
+    try:
+        data = request.get_json()
+        role = request.args.get('role', '').strip()
+        
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 C/S 종류를 생성할 수 있습니다.'
+            }), 403
+        
+        name = data.get('name', '').strip()
+        color = data.get('color', '').strip() if data.get('color') else None
+        bg_color = data.get('bg_color', '').strip() if data.get('bg_color') else None
+        display_order = data.get('display_order')
+        
+        if not name:
+            return jsonify({
+                'success': False,
+                'message': '종류명을 입력해주세요.'
+            }), 400
+        
+        cs_type_id = create_cs_issue_type(name, color, bg_color, display_order)
+        
+        if cs_type_id:
+            return jsonify({
+                'success': True,
+                'message': 'C/S 종류가 생성되었습니다.',
+                'id': cs_type_id
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'C/S 종류 생성에 실패했습니다. (이미 존재하는 이름일 수 있습니다)'
+            }), 500
+            
+    except Exception as e:
+        print(f'❌ C/S 종류 생성 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'C/S 종류 생성 중 오류: {str(e)}'
+        }), 500
+
+
+@cs_bp.route('/issue-types/<int:type_id>', methods=['PUT'])
+def update_cs_issue_type_route(type_id):
+    """C/S 종류 업데이트 (관리자용)"""
+    try:
+        data = request.get_json()
+        role = request.args.get('role', '').strip()
+        
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 C/S 종류를 수정할 수 있습니다.'
+            }), 403
+        
+        name = data.get('name', '').strip() if data.get('name') else None
+        color = data.get('color', '').strip() if data.get('color') else None
+        bg_color = data.get('bg_color', '').strip() if data.get('bg_color') else None
+        display_order = data.get('display_order')
+        is_active = data.get('is_active')
+        
+        success = update_cs_issue_type(type_id, name, color, bg_color, display_order, is_active)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'C/S 종류가 업데이트되었습니다.'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'C/S 종류 업데이트에 실패했습니다.'
+            }), 500
+            
+    except Exception as e:
+        print(f'❌ C/S 종류 업데이트 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'C/S 종류 업데이트 중 오류: {str(e)}'
+        }), 500
+
+
+@cs_bp.route('/issue-types/<int:type_id>', methods=['DELETE'])
+def delete_cs_issue_type_route(type_id):
+    """C/S 종류 삭제 (관리자용)"""
+    try:
+        role = request.args.get('role', '').strip()
+        
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 C/S 종류를 삭제할 수 있습니다.'
+            }), 403
+        
+        success = delete_cs_issue_type(type_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'C/S 종류가 삭제되었습니다.'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'C/S 종류를 찾을 수 없거나 삭제에 실패했습니다.'
+            }), 404
+    except Exception as e:
+        print(f'❌ C/S 종류 삭제 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'C/S 종류 삭제 중 오류: {str(e)}'
+        }), 500
