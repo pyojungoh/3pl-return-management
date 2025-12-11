@@ -3118,6 +3118,7 @@
     let currentData = [];
     let currentFilter = 'all'; // 'all', 'completed', 'pending'
     let currentCsData = [];
+    let allCsDataForStats = []; // 화주사별 통계용 전체 데이터
     let currentCsFilter = 'all'; // 'all', 'completed', 'pending'
     let currentCsTypeFilter = null; // '누락', '오배송', '교환', '반품', '취소', '기타' 또는 null
     
@@ -8535,6 +8536,22 @@
             renderCsTable(currentCsData);
             updateCsStats(currentCsData);
             filterCsByStatus(currentCsFilter);
+            
+            // 관리자 모드에서 화주사별 통계를 위해 전체 데이터 로드 (필터 없이)
+            if (currentRole === '관리자') {
+              const allDataUrl = `${API_BASE_URL}/api/cs/?company=&month=${encodeURIComponent(selectedMonth)}&role=${encodeURIComponent(currentRole)}`;
+              fetch(allDataUrl)
+                .then(response => response.json())
+                .then(allResult => {
+                  if (allResult.success) {
+                    allCsDataForStats = allResult.data || [];
+                    updateCsCompanyStats(allCsDataForStats);
+                  }
+                })
+                .catch(error => {
+                  console.error('전체 C/S 데이터 로드 오류:', error);
+                });
+            }
           } else {
             showMessage('❌ ' + (result.message || 'C/S 목록 로드 실패'), 'error');
             document.getElementById('csTableBody').innerHTML = 
@@ -8813,9 +8830,10 @@
       if (cancelCountEl) cancelCountEl.textContent = cancel;
       if (otherCountEl) otherCountEl.textContent = other;
       
-      // 화주사별 통계 업데이트 (관리자 전용)
+      // 화주사별 통계 업데이트 (관리자 전용) - 전체 데이터 사용
       if (currentRole === '관리자') {
-        updateCsCompanyStats(csList);
+        // 전체 데이터가 있으면 사용, 없으면 현재 데이터 사용
+        updateCsCompanyStats(allCsDataForStats.length > 0 ? allCsDataForStats : csList);
       }
     }
     window.updateCsStats = updateCsStats;
@@ -8832,6 +8850,13 @@
         statsSection.style.display = 'none';
         return;
       }
+      
+      // 전체 통계 계산
+      const allStats = {
+        total: csList.length,
+        completed: csList.filter(cs => cs.status === '처리완료' || cs.status === '처리불가').length,
+        pending: csList.filter(cs => cs.status === '접수').length
+      };
       
       // 화주사별 그룹화
       const stats = {};
@@ -8852,7 +8877,7 @@
         }
       });
       
-      if (Object.keys(stats).length === 0) {
+      if (Object.keys(stats).length === 0 && allStats.total === 0) {
         statsContainer.innerHTML = '';
         statsSection.style.display = 'none';
         return;
@@ -8861,8 +8886,27 @@
       // 현재 선택된 화주사 확인
       const selectedCompany = document.getElementById('csCompanySelect')?.value || '';
       
-      // HTML 생성
-      const html = Object.entries(stats)
+      // HTML 생성 - 전체 옵션을 맨 왼쪽에 추가
+      let html = '';
+      
+      // 전체 옵션 (맨 왼쪽)
+      const isAllSelected = !selectedCompany || selectedCompany === '';
+      html += `
+        <div onclick="filterCsByCompany('')" 
+             style="padding: 12px 16px; border-radius: 10px; background: ${isAllSelected ? 'linear-gradient(135deg, #ff6b35 0%, #feca57 100%)' : 'linear-gradient(135deg, #fffef9 0%, #ffffff 100%)'}; 
+                    color: ${isAllSelected ? 'white' : '#636e72'}; cursor: pointer; font-size: 13px; font-weight: 600; 
+                    border: 2px solid ${isAllSelected ? '#ff6b35' : '#ffeaa7'}; transition: all 0.3s ease; 
+                    white-space: nowrap; min-width: 150px; box-shadow: ${isAllSelected ? '0 4px 12px rgba(255, 107, 53, 0.3)' : '0 2px 6px rgba(0, 0, 0, 0.1)'};"
+             onmouseover="if('' !== '${selectedCompany}') { this.style.transform='scale(1.05)'; this.style.borderColor='#ffa502'; }"
+             onmouseout="if('' !== '${selectedCompany}') { this.style.transform='scale(1)'; this.style.borderColor='#ffeaa7'; }">
+          <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px; text-align: left;">전체</div>
+          <div style="font-size: 12px; opacity: 0.9; text-align: left;">총 <strong>${allStats.total}</strong>건</div>
+          <div style="font-size: 11px; opacity: 0.8; margin-top: 2px; text-align: left;">처리완료: ${allStats.completed} | 미처리: ${allStats.pending}</div>
+        </div>
+      `;
+      
+      // 화주사별 통계 박스들
+      html += Object.entries(stats)
         .sort((a, b) => b[1].total - a[1].total) // 총 건수로 정렬
         .map(([companyName, data]) => {
           const isSelected = selectedCompany === companyName;
@@ -8871,12 +8915,12 @@
                  style="padding: 12px 16px; border-radius: 10px; background: ${isSelected ? 'linear-gradient(135deg, #ff6b35 0%, #feca57 100%)' : 'linear-gradient(135deg, #fffef9 0%, #ffffff 100%)'}; 
                         color: ${isSelected ? 'white' : '#636e72'}; cursor: pointer; font-size: 13px; font-weight: 600; 
                         border: 2px solid ${isSelected ? '#ff6b35' : '#ffeaa7'}; transition: all 0.3s ease; 
-                        white-space: nowrap; min-width: 150px; text-align: center; box-shadow: ${isSelected ? '0 4px 12px rgba(255, 107, 53, 0.3)' : '0 2px 6px rgba(0, 0, 0, 0.1)'};"
+                        white-space: nowrap; min-width: 150px; box-shadow: ${isSelected ? '0 4px 12px rgba(255, 107, 53, 0.3)' : '0 2px 6px rgba(0, 0, 0, 0.1)'};"
                  onmouseover="if('${escapeHtml(companyName)}' !== '${selectedCompany}') { this.style.transform='scale(1.05)'; this.style.borderColor='#ffa502'; }"
                  onmouseout="if('${escapeHtml(companyName)}' !== '${selectedCompany}') { this.style.transform='scale(1)'; this.style.borderColor='#ffeaa7'; }">
-              <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">${escapeHtml(companyName)}</div>
-              <div style="font-size: 12px; opacity: 0.9;">총 <strong>${data.total}</strong>건</div>
-              <div style="font-size: 11px; opacity: 0.8; margin-top: 2px;">처리완료: ${data.completed} | 미처리: ${data.pending}</div>
+              <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px; text-align: left;">${escapeHtml(companyName)}</div>
+              <div style="font-size: 12px; opacity: 0.9; text-align: left;">총 <strong>${data.total}</strong>건</div>
+              <div style="font-size: 11px; opacity: 0.8; margin-top: 2px; text-align: left;">처리완료: ${data.completed} | 미처리: ${data.pending}</div>
             </div>
           `;
         }).join('');
@@ -8890,7 +8934,7 @@
     function filterCsByCompany(companyName) {
       const companySelect = document.getElementById('csCompanySelect');
       if (companySelect) {
-        companySelect.value = companyName;
+        companySelect.value = companyName || '';
         loadCsData();
       }
     }
