@@ -1809,7 +1809,7 @@
       <!-- 헤더 -->
       <div class="header">
         <div class="header-left">
-          <div class="header-logo">
+          <div class="header-logo" onclick="goToHome()" style="cursor: pointer;">
             <img id="headerLogo" src="https://res.cloudinary.com/dokk81rjh/image/upload/v1762922695/logo_srff9i.png" alt="JJAY Logo" style="width: 50px; height: 50px; object-fit: contain; margin-right: 12px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
             <div class="logo-container" style="display: none;">
               <div class="logo-letters">
@@ -1819,7 +1819,7 @@
             </div>
             <div class="logo-text" style="display: none;">JAY JAY</div>
           </div>
-          <div class="header-info">
+          <div class="header-info" onclick="goToHome()" style="cursor: pointer;">
             <div class="subtitle">통합 관리 시스템</div>
             <div class="creator">Developed by pyojungoh</div>
           </div>
@@ -3391,11 +3391,8 @@
         menuBar.style.display = isAdmin ? 'none' : 'flex';
         // 화주사 모드일 때 저장된 메뉴 복원 또는 기본값
         if (!isAdmin) {
-          const savedMenu = localStorage.getItem('activeConsignorMenu') || 'returns';
-          // 약간의 지연을 두고 메뉴 전환 (DOM이 완전히 로드된 후)
-          setTimeout(() => {
-            switchMenu(savedMenu);
-          }, 100);
+          // 화주사 정보 확인 후 메뉴 결정
+          checkCompanyInfoAndNavigate();
         }
       }
       
@@ -6043,6 +6040,53 @@
       console.log('관리자 탭 전환:', tabName);
     }
     window.switchAdminTab = switchAdminTab;
+    
+    // ========== 홈 버튼 함수 ==========
+    function goToHome() {
+      const roleNormalized = (currentRole || '').toString().trim();
+      const isAdmin = (roleNormalized === '관리자');
+      
+      if (isAdmin) {
+        switchAdminTab('board');
+      } else {
+        switchMenu('board');
+      }
+    }
+    window.goToHome = goToHome;
+    
+    // ========== 화주사 정보 확인 및 초기 메뉴 결정 함수 ==========
+    async function checkCompanyInfoAndNavigate() {
+      try {
+        const response = await fetch(`/api/auth/my-info?username=${encodeURIComponent(currentUsername)}`);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const data = result.data;
+          const hasBusinessInfo = !!(data.business_number && data.business_name && data.business_address && data.business_tel && data.business_email);
+          
+          if (!hasBusinessInfo) {
+            localStorage.setItem('activeConsignorMenu', 'companyInfo');
+            setTimeout(() => switchMenu('companyInfo'), 100);
+          } else {
+            const savedMenu = localStorage.getItem('activeConsignorMenu');
+            if (!savedMenu || savedMenu === 'returns') {
+              localStorage.setItem('activeConsignorMenu', 'board');
+              setTimeout(() => switchMenu('board'), 100);
+            } else {
+              setTimeout(() => switchMenu(savedMenu), 100);
+            }
+          }
+        } else {
+          localStorage.setItem('activeConsignorMenu', 'board');
+          setTimeout(() => switchMenu('board'), 100);
+        }
+      } catch (error) {
+        console.error('화주사 정보 확인 오류:', error);
+        localStorage.setItem('activeConsignorMenu', 'board');
+        setTimeout(() => switchMenu('board'), 100);
+      }
+    }
+    window.checkCompanyInfoAndNavigate = checkCompanyInfoAndNavigate;
     
     // ========== 특수작업 관련 함수 ==========
     
@@ -10221,6 +10265,12 @@
           // 사업자 정보 배너 업데이트
           updateBusinessInfoBanner(data);
           
+          // 화주사 정보 입력 여부 확인 (사업자번호, 대표명, 주소, 전화번호, 이메일 모두 확인)
+          const hasBusinessInfo = !!(data.business_number && data.business_name && data.business_address && data.business_tel && data.business_email);
+          
+          // 화주사 정보 미입력 여부를 전역 변수에 저장 (초기 메뉴 결정용)
+          window.hasCompanyInfo = hasBusinessInfo;
+          
           if (messageDiv) {
             messageDiv.innerHTML = '';
           }
@@ -11282,6 +11332,9 @@
     
     // 카테고리 선택 함수
     function selectBoardCategory(categoryId) {
+      // categoryId를 문자열로 변환 (빈 문자열도 허용)
+      const categoryIdStr = categoryId === null || categoryId === undefined ? '' : String(categoryId);
+      
       // 모든 버튼의 active 클래스 제거 및 스타일 초기화
       const allButtons = document.querySelectorAll('.category-menu-btn');
       allButtons.forEach(btn => {
@@ -11294,7 +11347,7 @@
       });
       
       // 선택된 버튼에 active 클래스 추가 및 스타일 적용
-      const selectedBtn = document.querySelector(`.category-menu-btn[data-category-id="${categoryId}"]`);
+      const selectedBtn = document.querySelector(`.category-menu-btn[data-category-id="${categoryIdStr}"]`);
       if (selectedBtn) {
         selectedBtn.classList.add('active');
         selectedBtn.style.background = 'linear-gradient(135deg, #ff6b35 0%, #feca57 100%)';
@@ -11303,8 +11356,8 @@
         selectedBtn.style.boxShadow = '0 3px 10px rgba(255, 107, 53, 0.25)';
       }
       
-      // 게시글 로드
-      loadBoardPostsByCategoryFilter(categoryId);
+      // 게시글 로드 (categoryId를 문자열로 전달)
+      loadBoardPostsByCategoryFilter(categoryIdStr);
     }
     window.selectBoardCategory = selectBoardCategory;
     
@@ -12321,12 +12374,19 @@
       
       try {
         let url = '/api/board/posts';
-        if (categoryId) {
-          url += `?category_id=${categoryId}`;
+        // categoryId가 빈 문자열이 아니고 유효한 숫자인 경우에만 추가
+        if (categoryId && categoryId !== '' && !isNaN(parseInt(categoryId))) {
+          const categoryIdNum = parseInt(categoryId);
+          url += `?category_id=${categoryIdNum}`;
+          console.log('🔍 카테고리 필터링:', { categoryId, categoryIdNum, url });
+        } else {
+          console.log('🔍 전체 게시글 조회:', { categoryId, url });
         }
         
         const response = await fetch(url);
         const result = await response.json();
+        
+        console.log('🔍 API 응답:', { success: result.success, count: result.count, dataLength: result.data ? result.data.length : 0 });
         
         if (result.success && result.data) {
           if (result.data.length === 0) {

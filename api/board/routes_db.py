@@ -149,18 +149,32 @@ def delete_category(category_id):
 def get_posts():
     """게시글 목록 조회"""
     try:
-        category_id = request.args.get('category_id', type=int)
+        category_id_str = request.args.get('category_id', '')
+        category_id = None
         
-        if category_id:
+        # category_id가 제공된 경우 정수로 변환
+        if category_id_str and category_id_str.strip():
+            try:
+                category_id = int(category_id_str)
+            except (ValueError, TypeError):
+                category_id = None
+        
+        print(f"🔍 게시글 조회 요청 - category_id_str: '{category_id_str}', category_id: {category_id}")
+        
+        if category_id is not None:
             posts = get_boards_by_category(category_id)
+            print(f"🔍 카테고리별 게시글 조회 결과 - category_id: {category_id}, count: {len(posts)}")
         else:
             posts = get_all_boards()
+            print(f"🔍 전체 게시글 조회 결과 - count: {len(posts)}")
         
         # 디버깅: 첫 번째 게시글의 키 확인
         if posts and len(posts) > 0:
             first_post = posts[0]
             print(f"🔍 API 응답 - 첫 번째 게시글 키: {list(first_post.keys()) if isinstance(first_post, dict) else 'not dict'}")
             print(f"🔍 API 응답 - 첫 번째 게시글 id: {first_post.get('id') if isinstance(first_post, dict) else 'N/A'}")
+            print(f"🔍 API 응답 - 첫 번째 게시글 category_id: {first_post.get('category_id') if isinstance(first_post, dict) else 'N/A'}")
+            print(f"🔍 API 응답 - 첫 번째 게시글 category_name: {first_post.get('category_name') if isinstance(first_post, dict) else 'N/A'}")
         
         return jsonify({
             'success': True,
