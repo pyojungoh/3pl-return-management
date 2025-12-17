@@ -1957,6 +1957,39 @@
               <textarea id="newMemo" class="request-input" style="min-height: 60px;" placeholder="비고"></textarea>
             </div>
           </div>
+          
+          <!-- 외부 택배 착불 정보 (선택사항) -->
+          <div style="margin-top: 20px; padding: 20px; background: #fff9e6; border-radius: 12px; border: 2px solid #ffeaa7;">
+            <h4 style="margin: 0 0 15px 0; color: #ff6b35; font-weight: 600; font-size: 15px;">🚚 외부 택배 착불 정보 (선택사항)</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+            <div>
+              <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">택배사:</label>
+                <select id="newOtherCourier" class="request-input" style="min-height: auto;" onchange="toggleCourierCustomInput()">
+                  <option value="한진택배" selected>한진택배</option>
+                  <option value="CJ대한통운">CJ대한통운</option>
+                  <option value="로젠택배">로젠택배</option>
+                  <option value="롯데택배">롯데택배</option>
+                  <option value="쿠팡">쿠팡</option>
+                  <option value="네이버">네이버</option>
+                  <option value="기타">기타 (직접입력)</option>
+                </select>
+                <input type="text" id="newOtherCourierCustom" class="request-input" style="min-height: auto; margin-top: 8px; display: none;" placeholder="택배사명을 직접 입력하세요">
+              </div>
+              <div>
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">금액 타입:</label>
+                <select id="newShippingFeeType" class="request-input" style="min-height: auto;">
+                  <option value="신용" selected>신용</option>
+                  <option value="착불">착불</option>
+                  <option value="없음">없음</option>
+                </select>
+              </div>
+              <div>
+                <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">금액 (원):</label>
+                <input type="number" id="newShippingFee" class="request-input" style="min-height: auto;" placeholder="금액 입력 (선택사항)" min="0" step="100">
+              </div>
+            </div>
+          </div>
+          
           <div class="form-action-row">
             <button class="save-btn" onclick="addReturn()">저장</button>
             <button class="save-btn secondary-action" onclick="toggleAddForm()">취소</button>
@@ -4003,6 +4036,29 @@
         `;
         const trackingNumber = row['송장번호'] ? row['송장번호'].toString().trim() : '';
         const trackingNumberSafe = escapeHtml(trackingNumber).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        
+        // 외부 택배 착불 정보 확인
+        const otherCourier = row['다른외부택배사'] || '';
+        const shippingFee = row['배송비'] || '';
+        const hasCourierInfo = otherCourier && otherCourier.trim() !== '';
+        const hasShippingInfo = shippingFee && shippingFee.trim() !== '' && shippingFee.trim() !== '없음';
+        
+        // 착불 아이콘 및 툴팁 생성
+        let courierIcon = '';
+        let courierTooltip = '';
+        if (hasCourierInfo || hasShippingInfo) {
+          let tooltipText = '';
+          if (hasCourierInfo) {
+            tooltipText += `택배사: ${escapeHtml(otherCourier)}`;
+          }
+          if (hasShippingInfo) {
+            if (tooltipText) tooltipText += '\n';
+            tooltipText += `배송비: ${escapeHtml(shippingFee)}`;
+          }
+          courierTooltip = tooltipText;
+          courierIcon = `<span class="courier-icon" style="margin-left: 5px; cursor: help; font-size: 14px;" title="${escapeHtml(tooltipText)}" onmouseenter="showCourierTooltip(event, '${escapeHtml(otherCourier).replace(/'/g, "\\'")}', '${escapeHtml(shippingFee).replace(/'/g, "\\'")}')" onmouseleave="hideCourierTooltip()">🚚</span>`;
+        }
+        
         const qrCell = `
           <td class="admin-only" style="text-align: center; min-width: 70px;">
             ${trackingNumber ? 
@@ -4096,7 +4152,10 @@
           ${companyCell}
           ${productCell}
           <td>${row['고객명'] || ''}</td>
-          <td>${row['송장번호'] || ''}</td>
+          <td style="position: relative;">
+            ${row['송장번호'] || ''}
+            ${courierIcon}
+          </td>
           ${returnTypeCell}
           ${stockStatusCell}
           <td>${statusHtml}</td>
@@ -5123,14 +5182,115 @@
         btn.style.borderRadius = '12px';
         // 폼 초기화
         document.getElementById('addReturnForm').querySelectorAll('input, textarea, select').forEach(el => {
-          if (el.id !== 'newReturnDate') el.value = '';
+          if (el.id !== 'newReturnDate' && el.id !== 'newOtherCourier' && el.id !== 'newShippingFeeType') {
+            el.value = '';
+          }
         });
+        // 외부 택배 필드 초기화
+        const otherCourierSelect = document.getElementById('newOtherCourier');
+        if (otherCourierSelect) {
+          otherCourierSelect.value = '한진택배';
+          toggleCourierCustomInput();
+        }
+        const shippingFeeTypeSelect = document.getElementById('newShippingFeeType');
+        if (shippingFeeTypeSelect) {
+          shippingFeeTypeSelect.value = '신용';
+        }
         // 날짜는 오늘 일자로 다시 설정
         const today = new Date().getDate();
         document.getElementById('newReturnDate').value = today;
       }
     }
     window.toggleAddForm = toggleAddForm;
+    
+    // 택배사 "기타" 선택 시 직접 입력 필드 표시/숨김
+    function toggleCourierCustomInput() {
+      const courierSelect = document.getElementById('newOtherCourier');
+      const courierCustom = document.getElementById('newOtherCourierCustom');
+      if (courierSelect && courierCustom) {
+        if (courierSelect.value === '기타') {
+          courierCustom.style.display = 'block';
+          courierCustom.required = false;
+        } else {
+          courierCustom.style.display = 'none';
+          courierCustom.value = '';
+        }
+      }
+    }
+    window.toggleCourierCustomInput = toggleCourierCustomInput;
+    
+    // 외부 택배 착불 툴팁 표시
+    function showCourierTooltip(event, courier, shippingFee) {
+      if (!courier && !shippingFee) return;
+      
+      // 기존 툴팁 제거
+      const existingTooltip = document.getElementById('courierTooltip');
+      if (existingTooltip) {
+        existingTooltip.remove();
+      }
+      
+      let tooltipText = '';
+      if (courier && courier.trim() !== '') {
+        tooltipText += `택배사: ${courier}`;
+      }
+      if (shippingFee && shippingFee.trim() !== '' && shippingFee.trim() !== '없음') {
+        if (tooltipText) tooltipText += '\n';
+        tooltipText += `배송비: ${shippingFee}`;
+      }
+      
+      if (!tooltipText) return;
+      
+      const tooltip = document.createElement('div');
+      tooltip.id = 'courierTooltip';
+      tooltip.style.cssText = `
+        position: fixed;
+        background: #2d3436;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        white-space: pre-line;
+        z-index: 10000;
+        pointer-events: none;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        max-width: 200px;
+      `;
+      tooltip.textContent = tooltipText;
+      document.body.appendChild(tooltip);
+      
+      // 툴팁 위치 설정
+      const x = event.clientX + 10;
+      const y = event.clientY + 10;
+      tooltip.style.left = x + 'px';
+      tooltip.style.top = y + 'px';
+      
+      // 화면 밖으로 나가지 않도록 조정
+      setTimeout(() => {
+        const rect = tooltip.getBoundingClientRect();
+        if (rect.right > window.innerWidth - 10) {
+          tooltip.style.left = (event.clientX - rect.width - 15) + 'px';
+        }
+        if (rect.bottom > window.innerHeight - 10) {
+          tooltip.style.top = (event.clientY - rect.height - 15) + 'px';
+        }
+        if (rect.left < 10) {
+          tooltip.style.left = '15px';
+        }
+        if (rect.top < 10) {
+          tooltip.style.top = '15px';
+        }
+      }, 10);
+    }
+    window.showCourierTooltip = showCourierTooltip;
+    
+    // 외부 택배 착불 툴팁 숨기기
+    function hideCourierTooltip() {
+      const tooltip = document.getElementById('courierTooltip');
+      if (tooltip) {
+        tooltip.remove();
+      }
+    }
+    window.hideCourierTooltip = hideCourierTooltip;
 
     const COMPANY_DROPDOWN_LIMIT = 200;
     let returnCompanyOptionsCache = [];
@@ -5462,6 +5622,34 @@
         return;
       }
       
+      // 외부 택배 착불 정보 수집
+      const otherCourierSelect = document.getElementById('newOtherCourier');
+      const otherCourierCustom = document.getElementById('newOtherCourierCustom');
+      let otherCourier = '';
+      if (otherCourierSelect) {
+        const selectedCourier = otherCourierSelect.value;
+        if (selectedCourier === '기타' && otherCourierCustom && otherCourierCustom.value.trim()) {
+          otherCourier = otherCourierCustom.value.trim();
+        } else if (selectedCourier !== '기타') {
+          otherCourier = selectedCourier;
+        }
+      }
+      
+      const shippingFeeTypeSelect = document.getElementById('newShippingFeeType');
+      const shippingFeeInput = document.getElementById('newShippingFee');
+      let shippingFee = '';
+      if (shippingFeeTypeSelect) {
+        const feeType = shippingFeeTypeSelect.value;
+        const feeAmount = shippingFeeInput ? shippingFeeInput.value.trim() : '';
+        if (feeType === '없음') {
+          shippingFee = '없음';
+        } else if (feeAmount) {
+          shippingFee = `${feeType} ${feeAmount}`;
+        } else {
+          shippingFee = feeType; // 금액이 없어도 타입만 저장
+        }
+      }
+      
       // 일자만 저장 (문자열로 저장하여 정렬이 잘 되도록)
       const returnData = {
         return_date: String(day),  // 일자만 저장
@@ -5475,8 +5663,8 @@
         completed: '',
         memo: document.getElementById('newMemo').value.trim(),
         photo_links: '',
-        other_courier: '',  // 다른외부택배사 제거
-        shipping_fee: '',  // 배송비 제거
+        other_courier: otherCourier,
+        shipping_fee: shippingFee,
         client_request: '',
         client_confirmed: '',
         month: selectedMonth
