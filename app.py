@@ -37,33 +37,46 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # 데이터베이스 초기화
 from api.database.models import init_db, get_company_by_username, create_company, fix_missing_return_ids
-init_db()
+
+# NOTE:
+# - Vercel(Serverless)에서는 import 시점에 예외가 발생하면 함수 자체가 크래시하여 사이트 접속이 불가해집니다.
+# - DB(Neon) 과금/쿼터/네트워크 이슈 등으로 연결이 실패하더라도, 최소한 HTML은 서빙되도록 부팅을 계속합니다.
+DB_READY = True
+try:
+    init_db()
+except Exception as e:
+    DB_READY = False
+    print(f"[오류] DB 초기화 실패 (부팅은 계속 진행): {e}")
+    import traceback
+    traceback.print_exc()
 
 # 기존 반품 데이터에 ID가 없는 경우 ID 생성
-try:
-    fix_missing_return_ids()
-except Exception as e:
-    print(f"[경고] 반품 ID 생성 중 오류 발생 (무시하고 계속 진행): {e}")
+if DB_READY:
+    try:
+        fix_missing_return_ids()
+    except Exception as e:
+        print(f"[경고] 반품 ID 생성 중 오류 발생 (무시하고 계속 진행): {e}")
 
 # 초기 관리자 계정 자동 생성 (없는 경우에만)
-try:
-    admin_user = get_company_by_username('admin')
-    if not admin_user:
-        print("[정보] 초기 관리자 계정이 없습니다. 생성 중...")
-        create_company(
-            company_name='관리자',
-            username='admin',
-            password='admin123',  # [주의] 배포 후 비밀번호 변경 권장
-            role='관리자'
-        )
-        print("[성공] 초기 관리자 계정이 생성되었습니다.")
-        print("   아이디: admin")
-        print("   비밀번호: admin123")
-        print("   [주의] 보안을 위해 배포 후 비밀번호를 변경하세요!")
-    else:
-        print("[성공] 관리자 계정이 이미 존재합니다.")
-except Exception as e:
-    print(f"[경고] 초기 관리자 계정 생성 중 오류 (무시 가능): {e}")
+if DB_READY:
+    try:
+        admin_user = get_company_by_username('admin')
+        if not admin_user:
+            print("[정보] 초기 관리자 계정이 없습니다. 생성 중...")
+            create_company(
+                company_name='관리자',
+                username='admin',
+                password='admin123',  # [주의] 배포 후 비밀번호 변경 권장
+                role='관리자'
+            )
+            print("[성공] 초기 관리자 계정이 생성되었습니다.")
+            print("   아이디: admin")
+            print("   비밀번호: admin123")
+            print("   [주의] 보안을 위해 배포 후 비밀번호를 변경하세요!")
+        else:
+            print("[성공] 관리자 계정이 이미 존재합니다.")
+    except Exception as e:
+        print(f"[경고] 초기 관리자 계정 생성 중 오류 (무시 가능): {e}")
 
 # API 블루프린트 등록 (데이터베이스 기반)
 from api.auth.routes_db import auth_bp
@@ -99,8 +112,12 @@ app.register_blueprint(schedule_notifications_bp)
 print("[정보] [앱 시작] C/S 알림 스케줄러 시작 시도...")
 print("[정보] [앱 시작] 배포 시간: 2025-11-17 15:30") # Force Vercel deployment trigger
 try:
-    start_cs_notification_scheduler()
-    print("[성공] [앱 시작] C/S 알림 스케줄러 시작 완료")
+    # DB가 준비되지 않은 경우(예: Neon 쿼터 초과), 서버리스 부팅 안정성을 위해 스케줄러는 시작하지 않습니다.
+    if DB_READY:
+        start_cs_notification_scheduler()
+        print("[성공] [앱 시작] C/S 알림 스케줄러 시작 완료")
+    else:
+        print("[경고] [앱 시작] DB 미가용 상태로 스케줄러 시작 스킵")
 except Exception as e:
     print(f"[오류] [앱 시작] C/S 알림 스케줄러 시작 중 오류: {e}")
     import traceback
@@ -109,12 +126,24 @@ except Exception as e:
 # 스케쥴 알림 스케줄러 시작
 print("[정보] [앱 시작] 스케쥴 알림 스케줄러 시작 시도...")
 try:
-    start_schedule_notification_scheduler()
-    print("[성공] [앱 시작] 스케쥴 알림 스케줄러 시작 완료")
+    if DB_READY:
+        start_schedule_notification_scheduler()
+        print("[성공] [앱 시작] 스케쥴 알림 스케줄러 시작 완료")
+    else:
+        print("[경고] [앱 시작] DB 미가용 상태로 스케줄러 시작 스킵")
 except Exception as e:
     print(f"[오류] [앱 시작] 스케쥴 알림 스케줄러 시작 중 오류: {e}")
     import traceback
     traceback.print_exc()
+
+
+@app.route('/api/health', methods=['GET'])
+def health():
+    """헬스체크 (서버리스 부팅/DB 상태 확인용)"""
+    return jsonify({
+        'success': True,
+        'db_ready': DB_READY
+    })
 
 
 # 메인 페이지 라우트 (화주사 대시보드)
