@@ -1162,8 +1162,10 @@
       const container = document.getElementById('swContainer');
       if (!container) return;
       
-      // 같은 작업 종류를 다시 클릭하면 필터 해제
-      if (swSelectedWorkType === workTypeName) {
+      // null이면 전체 선택, 같은 작업 종류를 다시 클릭하면 필터 해제
+      if (workTypeName === null) {
+        swSelectedWorkType = null;
+      } else if (swSelectedWorkType === workTypeName) {
         swSelectedWorkType = null;
       } else {
         swSelectedWorkType = workTypeName;
@@ -1173,15 +1175,22 @@
       const workTypeStatsContainer = container.querySelector('#swCommonStatsContainer');
       if (workTypeStatsContainer) {
         const statsBoxes = workTypeStatsContainer.querySelectorAll('.sw-stat-box');
-        statsBoxes.forEach(box => {
-          if (box.textContent.includes(workTypeName)) {
-            if (swSelectedWorkType === workTypeName) {
+        statsBoxes.forEach((box, index) => {
+          // 첫 번째 박스는 "전체"
+          if (index === 0) {
+            if (swSelectedWorkType === null) {
               box.classList.add('selected');
             } else {
               box.classList.remove('selected');
             }
           } else {
-            box.classList.remove('selected');
+            // 나머지는 작업 종류별 박스
+            const boxTypeName = box.querySelector('.sw-stat-box-name')?.textContent || '';
+            if (swSelectedWorkType === boxTypeName) {
+              box.classList.add('selected');
+            } else {
+              box.classList.remove('selected');
+            }
           }
         });
       }
@@ -2028,9 +2037,9 @@
       const tbody = container.querySelector('#swTableBody');
       if (!tbody) return;
       
-      // 작업 종류 필터 적용
+      // 작업 종류 필터 적용 (null이면 전체, 아니면 해당 작업 종류만)
       let filteredWorks = works;
-      if (swSelectedWorkType) {
+      if (swSelectedWorkType !== null && swSelectedWorkType !== undefined) {
         filteredWorks = filteredWorks.filter(work => work.work_type_name === swSelectedWorkType);
       }
       
@@ -2135,12 +2144,13 @@
     }
     
     /**
-     * 작업 그룹 수정 (첫 번째 작업만 수정 모달 열기)
+     * 작업 그룹 수정 (모든 작업 항목을 수정 모달에 표시)
      */
     function swAdminEditWorkGroup(workIdsStr) {
       const workIds = workIdsStr.split(',').map(id => parseInt(id.trim())).filter(id => id);
       if (workIds.length > 0) {
-        swAdminEditWork(workIds[0]);
+        // 모든 작업 ID를 직접 전달하여 모든 작업 항목을 모달에 표시
+        swAdminEditWorkGroupData(workIds);
       }
     }
     
@@ -2201,8 +2211,27 @@
         return;
       }
       
+      // 전체 통계 계산
+      let totalCount = 0;
+      let totalAmount = 0;
+      Object.values(stats).forEach(data => {
+        totalCount += data.count;
+        totalAmount += data.total;
+      });
+      
       // HTML 생성 (반품내역 스타일처럼 큰 네모 박스)
-      const html = Object.entries(stats).map(([typeName, data]) => {
+      // 전체 통계 박스를 맨 앞에 추가
+      const allSelected = swSelectedWorkType === null;
+      let html = `
+        <div class="sw-stat-box ${allSelected ? 'selected' : ''}" onclick="swFilterByWorkType(null)">
+          <div class="sw-stat-box-name">전체</div>
+          <div class="sw-stat-box-count">${totalCount}건</div>
+          <div class="sw-stat-box-total">합계: ${swFormatNumber(totalAmount)}원</div>
+        </div>
+      `;
+      
+      // 작업 종류별 통계 박스 추가
+      html += Object.entries(stats).map(([typeName, data]) => {
         const isSelected = swSelectedWorkType === typeName;
         return `
           <div class="sw-stat-box ${isSelected ? 'selected' : ''}" onclick="swFilterByWorkType('${swEscapeHtml(typeName)}')">
@@ -3145,9 +3174,9 @@
       const tbody = container.querySelector('#swTableBody');
       if (!tbody) return;
       
-      // 작업 종류 필터 적용
+      // 작업 종류 필터 적용 (null이면 전체, 아니면 해당 작업 종류만)
       let filteredWorks = works;
-      if (swSelectedWorkType) {
+      if (swSelectedWorkType !== null && swSelectedWorkType !== undefined) {
         filteredWorks = filteredWorks.filter(work => work.work_type_name === swSelectedWorkType);
       }
       
