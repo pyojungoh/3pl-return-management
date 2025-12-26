@@ -81,10 +81,20 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
     if pallet_id is None:
         pallet_id = generate_pallet_id(in_date)
     
+    # 디버깅: 요청받은 pallet_id 로깅
+    print(f"[DEBUG] create_pallet 호출 - pallet_id: {pallet_id}, company_name: {company_name}")
+    
+    # 중복 체크 (INSERT 전에 미리 확인)
+    existing_pallet = get_pallet_by_id(pallet_id)
+    if existing_pallet:
+        print(f"[DEBUG] 중복 체크 실패 - pallet_id {pallet_id}가 이미 존재함")
+        return False, f"파레트 ID가 이미 존재합니다: {pallet_id}", None
+    
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
+        print(f"[DEBUG] INSERT 시도 - pallet_id: {pallet_id}")
         if USE_POSTGRESQL:
             cursor.execute('''
                 INSERT INTO pallets (
@@ -127,13 +137,20 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
         # 생성된 파레트 정보 조회
         pallet = get_pallet_by_id(pallet_id)
         
+        print(f"[DEBUG] INSERT 성공 - pallet_id: {pallet_id}")
         return True, "파레트 입고 완료", pallet
     except Exception as e:
         conn.rollback() if USE_POSTGRESQL else None
-        error_msg = str(e).lower()
-        if 'unique' in error_msg or 'duplicate' in error_msg:
+        error_msg = str(e)
+        error_msg_lower = error_msg.lower()
+        print(f"[DEBUG] INSERT 실패 - pallet_id: {pallet_id}, 오류: {error_msg}")
+        
+        if 'unique' in error_msg_lower or 'duplicate' in error_msg_lower:
+            # 요청한 pallet_id를 명확히 사용 (데이터베이스 오류 메시지의 ID가 아닌)
+            print(f"[DEBUG] UNIQUE 제약 조건 위반 - 요청한 pallet_id: {pallet_id}")
             return False, f"파레트 ID가 이미 존재합니다: {pallet_id}", None
-        return False, f"파레트 입고 실패: {str(e)}", None
+        print(f"[DEBUG] 기타 오류 - pallet_id: {pallet_id}, 오류: {error_msg}")
+        return False, f"파레트 입고 실패: {error_msg}", None
     finally:
         cursor.close()
         conn.close()

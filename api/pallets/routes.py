@@ -59,6 +59,10 @@ def pallet_inbound():
         role, company_name, username = get_user_context()
         data = request.get_json() or {}
         
+        # 디버깅: 요청 데이터 로깅
+        print(f"[DEBUG] pallet_inbound 요청 - data: {data}")
+        print(f"[DEBUG] pallet_inbound 요청 - pallet_id: {data.get('pallet_id')}")
+        
         # Google Apps Script 등 외부 호출 시 username이 없으면 기본값 설정
         if not username:
             username = 'Google Forms Sync'
@@ -86,6 +90,7 @@ def pallet_inbound():
                     pallet_data['company_name'] = company_name
                 
                 success, message, pallet = create_pallet(
+                    pallet_id=pallet_data.get('pallet_id'),  # pallet_id 전달
                     company_name=pallet_data.get('company_name'),
                     product_name=pallet_data.get('product_name'),
                     in_date=pallet_data.get('in_date'),
@@ -116,7 +121,11 @@ def pallet_inbound():
                 }), 400
         else:
             # 단일 입고
+            request_pallet_id = data.get('pallet_id')
+            print(f"[DEBUG] 단일 입고 - request_pallet_id: {request_pallet_id}")
+            
             success, message, pallet = create_pallet(
+                pallet_id=request_pallet_id,  # Google Apps Script에서 보낸 pallet_id 사용
                 company_name=data.get('company_name'),
                 product_name=data.get('product_name'),
                 in_date=data.get('in_date'),
@@ -126,6 +135,8 @@ def pallet_inbound():
                 notes=data.get('notes'),
                 created_by=username
             )
+            
+            print(f"[DEBUG] create_pallet 결과 - success: {success}, message: {message}")
             
             if success:
                 return jsonify({
