@@ -1,0 +1,37 @@
+<div style="text-align:center; font-family:Arial, sans-serif;">
+  <p>✅ 라벨 문서 생성 완료!</p>
+  <? for (let i = 0; i < docUrls.length; i++) { ?>
+    <p><a href="<?= docUrls[i] ?>" target="_blank">📄 라벨 문서 <?= i + 1 ?></a></p>
+  <? } ?>
+  <br>
+  <button onclick="handlePrintComplete()">✅ 출력 완료 처리</button>
+  <button onclick="handlePrintSkip()">❌ 출력하지 않음</button>
+</div>
+
+<script>
+function handlePrintComplete() {
+  google.script.run
+    .withSuccessHandler(() => {
+      console.log('출력 완료 처리됨');
+      google.script.host.close();
+    })
+    .withFailureHandler((error) => {
+      console.error('출력 완료 처리 실패:', error);
+      alert('출력 완료 처리 중 오류가 발생했습니다: ' + error);
+    })
+    .confirmPrintStatus();
+}
+
+function handlePrintSkip() {
+  google.script.run
+    .withSuccessHandler(() => {
+      console.log('출력 취소됨');
+      google.script.host.close();
+    })
+    .withFailureHandler((error) => {
+      console.error('출력 취소 실패:', error);
+      google.script.host.close();
+    })
+    .skipPrintStatus();
+}
+</script>

@@ -589,6 +589,147 @@ def init_db():
                 ON special_works(work_type_id)
             ''')
             
+            # ========================================
+            # 파레트 보관료 관리 시스템 테이블 (PostgreSQL)
+            # ========================================
+            
+            # pallets 테이블 (파레트 기본 정보)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pallets (
+                    id SERIAL PRIMARY KEY,
+                    pallet_id TEXT NOT NULL UNIQUE,
+                    company_name TEXT NOT NULL,
+                    product_name TEXT,
+                    status TEXT NOT NULL DEFAULT '입고됨',
+                    in_date DATE NOT NULL,
+                    out_date DATE,
+                    storage_location TEXT,
+                    quantity INTEGER DEFAULT 1,
+                    is_service INTEGER DEFAULT 0,
+                    notes TEXT,
+                    created_by TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # pallets 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_company 
+                ON pallets(company_name)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_status 
+                ON pallets(status)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_in_date 
+                ON pallets(in_date)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_out_date 
+                ON pallets(out_date)
+            ''')
+            
+            # pallet_fees 테이블 (화주사별 보관료 설정)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pallet_fees (
+                    id SERIAL PRIMARY KEY,
+                    company_name TEXT NOT NULL UNIQUE,
+                    monthly_fee INTEGER NOT NULL,
+                    daily_fee REAL NOT NULL,
+                    effective_from DATE NOT NULL,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # pallet_fees 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallet_fees_company 
+                ON pallet_fees(company_name)
+            ''')
+            
+            # pallet_transactions 테이블 (입고/출고 이력)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pallet_transactions (
+                    id SERIAL PRIMARY KEY,
+                    pallet_id TEXT NOT NULL,
+                    transaction_type TEXT NOT NULL,
+                    quantity INTEGER DEFAULT 1,
+                    transaction_date TIMESTAMP NOT NULL,
+                    processed_by TEXT,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (pallet_id) REFERENCES pallets(pallet_id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # pallet_transactions 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_transactions_pallet 
+                ON pallet_transactions(pallet_id)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_transactions_date 
+                ON pallet_transactions(transaction_date)
+            ''')
+            
+            # pallet_monthly_settlements 테이블 (월별 정산 내역)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pallet_monthly_settlements (
+                    id SERIAL PRIMARY KEY,
+                    company_name TEXT NOT NULL,
+                    settlement_month TEXT NOT NULL,
+                    total_pallets INTEGER DEFAULT 0,
+                    total_storage_days INTEGER DEFAULT 0,
+                    total_fee INTEGER DEFAULT 0,
+                    status TEXT DEFAULT '대기',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(company_name, settlement_month)
+                )
+            ''')
+            
+            # pallet_monthly_settlements 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlements_company 
+                ON pallet_monthly_settlements(company_name)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlements_month 
+                ON pallet_monthly_settlements(settlement_month)
+            ''')
+            
+            # pallet_fee_calculations 테이블 (파레트별 보관료 상세)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pallet_fee_calculations (
+                    id SERIAL PRIMARY KEY,
+                    pallet_id TEXT NOT NULL,
+                    settlement_month TEXT NOT NULL,
+                    storage_days INTEGER NOT NULL,
+                    daily_fee REAL NOT NULL,
+                    calculated_fee REAL NOT NULL,
+                    rounded_fee INTEGER NOT NULL,
+                    is_service INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (pallet_id) REFERENCES pallets(pallet_id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # pallet_fee_calculations 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_calculations_pallet 
+                ON pallet_fee_calculations(pallet_id)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_calculations_month 
+                ON pallet_fee_calculations(settlement_month)
+            ''')
+            
+            print("[성공] 파레트 보관료 관리 시스템 테이블 생성 완료 (PostgreSQL)")
+            
         else:
             # SQLite 테이블 생성 (기존 코드)
             # 화주사 계정 테이블
@@ -1105,6 +1246,147 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_special_works_type 
                 ON special_works(work_type_id)
             ''')
+            
+            # ========================================
+            # 파레트 보관료 관리 시스템 테이블 (SQLite)
+            # ========================================
+            
+            # pallets 테이블 (파레트 기본 정보)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pallets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pallet_id TEXT NOT NULL UNIQUE,
+                    company_name TEXT NOT NULL,
+                    product_name TEXT,
+                    status TEXT NOT NULL DEFAULT '입고됨',
+                    in_date DATE NOT NULL,
+                    out_date DATE,
+                    storage_location TEXT,
+                    quantity INTEGER DEFAULT 1,
+                    is_service INTEGER DEFAULT 0,
+                    notes TEXT,
+                    created_by TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # pallets 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_company 
+                ON pallets(company_name)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_status 
+                ON pallets(status)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_in_date 
+                ON pallets(in_date)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_out_date 
+                ON pallets(out_date)
+            ''')
+            
+            # pallet_fees 테이블 (화주사별 보관료 설정)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pallet_fees (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    company_name TEXT NOT NULL UNIQUE,
+                    monthly_fee INTEGER NOT NULL,
+                    daily_fee REAL NOT NULL,
+                    effective_from DATE NOT NULL,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # pallet_fees 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallet_fees_company 
+                ON pallet_fees(company_name)
+            ''')
+            
+            # pallet_transactions 테이블 (입고/출고 이력)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pallet_transactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pallet_id TEXT NOT NULL,
+                    transaction_type TEXT NOT NULL,
+                    quantity INTEGER DEFAULT 1,
+                    transaction_date TIMESTAMP NOT NULL,
+                    processed_by TEXT,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (pallet_id) REFERENCES pallets(pallet_id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # pallet_transactions 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_transactions_pallet 
+                ON pallet_transactions(pallet_id)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_transactions_date 
+                ON pallet_transactions(transaction_date)
+            ''')
+            
+            # pallet_monthly_settlements 테이블 (월별 정산 내역)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pallet_monthly_settlements (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    company_name TEXT NOT NULL,
+                    settlement_month TEXT NOT NULL,
+                    total_pallets INTEGER DEFAULT 0,
+                    total_storage_days INTEGER DEFAULT 0,
+                    total_fee INTEGER DEFAULT 0,
+                    status TEXT DEFAULT '대기',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(company_name, settlement_month)
+                )
+            ''')
+            
+            # pallet_monthly_settlements 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlements_company 
+                ON pallet_monthly_settlements(company_name)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlements_month 
+                ON pallet_monthly_settlements(settlement_month)
+            ''')
+            
+            # pallet_fee_calculations 테이블 (파레트별 보관료 상세)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pallet_fee_calculations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pallet_id TEXT NOT NULL,
+                    settlement_month TEXT NOT NULL,
+                    storage_days INTEGER NOT NULL,
+                    daily_fee REAL NOT NULL,
+                    calculated_fee REAL NOT NULL,
+                    rounded_fee INTEGER NOT NULL,
+                    is_service INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (pallet_id) REFERENCES pallets(pallet_id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # pallet_fee_calculations 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_calculations_pallet 
+                ON pallet_fee_calculations(pallet_id)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_calculations_month 
+                ON pallet_fee_calculations(settlement_month)
+            ''')
+            
+            print("[성공] 파레트 보관료 관리 시스템 테이블 생성 완료 (SQLite)")
         
         conn.commit()
         print("데이터베이스 초기화 완료")

@@ -277,157 +277,37 @@
 </head>
 <body>
   <div class="container">
-    <h2>관리자 페이지</h2>
+    <h2>파레트 관리</h2>
 
-    <!-- 탭 메뉴 -->
-    <div class="tabs" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #ddd;">
-      <button type="button" class="tab-btn active" onclick="switchTab('return')" style="flex: 1; padding: 12px; border: none; background: transparent; border-bottom: 2px solid #4CAF50; color: #4CAF50; font-weight: 700; font-size: 16px; cursor: pointer;">📦 반품 등록</button>
-      <button type="button" class="tab-btn" onclick="switchTab('register')" style="flex: 1; padding: 12px; border: none; background: transparent; border-bottom: 2px solid transparent; color: #666; font-weight: 600; font-size: 16px; cursor: pointer;">🏢 화주사 등록</button>
-      <button type="button" class="tab-btn" onclick="switchTab('password')" style="flex: 1; padding: 12px; border: none; background: transparent; border-bottom: 2px solid transparent; color: #666; font-weight: 600; font-size: 16px; cursor: pointer;">🔒 비밀번호 변경</button>
+    <!-- 파레트 출고 -->
+    <div id="palletTab" class="tab-content">
+      <h3 style="margin: 0 0 20px; font-size: 20px; color: #222;">파레트 보관종료 (QR 스캔)</h3>
+      
+      <!-- QR 스캔 섹션 -->
+      <div class="form-group">
+        <label>📷 파레트 QR 코드 스캔</label>
+        <button type="button" class="scan-btn" onclick="startPalletQRScan()" id="palletQrScanBtn">📷 QR 코드 스캔</button>
+        <div id="palletQrStatus" class="qr-status">파레트 QR 코드를 스캔하거나 파레트 ID를 직접 입력하세요.</div>
+        <div id="palletQrScanner" style="display:none; margin-top: 10px; text-align: center;">
+          <video id="palletQrVideo" autoplay playsinline webkit-playsinline style="width: 240px; max-width: 240px; height: 240px; border-radius: 8px; background: #000; object-fit: cover; margin: 0 auto; display: block;"></video>
+          <button type="button" class="cancel-btn" onclick="stopPalletQRScan()" style="margin-top: 10px; width: 240px; max-width: 100%;">⏹️ 스캔 중단</button>
+        </div>
+      </div>
+
+      <!-- 파레트 ID 직접 입력 -->
+      <div class="form-group">
+        <label>파레트 ID</label>
+        <input type="text" id="palletIdInput" placeholder="QR 스캔 또는 파레트 ID 직접 입력" style="text-transform: uppercase;">
+        <button type="button" class="scan-btn" onclick="processPalletOutbound()" id="palletOutboundBtn">✅ 보관종료 처리</button>
+      </div>
+
+      <!-- 처리 결과 -->
+      <div id="palletResult" style="display:none; margin-top: 20px; padding: 15px; border-radius: 8px; background: #f8f9fa; border: 2px solid #ddd;">
+        <h4 style="margin: 0 0 10px; font-size: 18px; color: #222;">처리 결과</h4>
+        <div id="palletResultContent" style="font-size: 16px; line-height: 1.6;"></div>
+      </div>
     </div>
 
-    <!-- 반품 등록 탭 -->
-    <div id="returnTab" class="tab-content">
-    <form id="returnForm">
-      <!-- 월 선택 -->
-      <div class="form-group">
-        <label>📅 검색할 월</label>
-        <select id="monthSelector" class="month-selector" required>
-          <option value="">월 정보를 불러오는 중...</option>
-        </select>
-        <button type="button" class="refresh-btn" onclick="loadAvailableSheets()">🔄 월 목록 새로고침</button>
-      </div>
-
-      <!-- QR 검색 안내 -->
-      <div class="form-group">
-        <label>📷 QR 코드 스캔</label>
-        <button type="button" class="scan-btn" onclick="startQRScan()" id="qrScanBtn">📷 QR 코드 스캔</button>
-        <div id="qrStatus" class="qr-status">QR 코드를 스캔하거나 송장번호를 직접 입력하세요.</div>
-        <div id="qrScanner" style="display:none; margin-top: 10px; text-align: center;">
-          <video id="qrVideo" autoplay playsinline webkit-playsinline style="width: 240px; max-width: 240px; height: 240px; border-radius: 8px; background: #000; object-fit: cover; margin: 0 auto; display: block;"></video>
-          <button type="button" class="cancel-btn" onclick="stopQRScan()" style="margin-top: 10px; width: 240px; max-width: 100%;">⏹️ 스캔 중단</button>
-        </div>
-      </div>
-
-      <!-- 송장번호 검색 -->
-      <div class="form-group">
-        <label>송장번호</label>
-        <input type="text" id="trackingNumber" placeholder="QR 스캔 또는 송장번호 직접 입력" required>
-        <button type="button" class="scan-btn" onclick="searchByTracking()">🔍 검색</button>
-      </div>
-
-      <!-- 검색 결과 확인 -->
-      <div class="form-group">
-        <label>화주명</label>
-        <div class="company-selector">
-          <input type="text" id="company" placeholder="화주명을 검색하거나 선택하세요" list="companySuggestionList" autocomplete="off">
-          <select id="companyDropdown">
-            <option value="">드롭다운에서 선택</option>
-          </select>
-        </div>
-        <datalist id="companySuggestionList"></datalist>
-        <span class="company-hint">검색 입력 또는 드롭다운으로 화주사를 빠르게 선택하세요.</span>
-      </div>
-      <div class="form-group">
-        <label>제품</label>
-        <input type="text" id="product" placeholder="검색 후 자동 입력됩니다" readonly>
-      </div>
-      <div class="form-group">
-        <label>고객명 (확인)</label>
-        <input type="text" id="customer" placeholder="검색 후 자동 입력됩니다" readonly>
-      </div>
-
-      <!-- 사진 업로드 -->
-      <div class="form-group">
-        <label>사진 (여러 장 가능)</label>
-        <input type="file" id="photos" accept="image/*" multiple capture="camera" style="display:none;">
-        <button type="button" class="photo-btn" onclick="document.getElementById('photos').click()">📷 사진 찍기</button>
-        <div id="photoPreview" class="preview"></div>
-        <div id="photoCount" style="margin-top: 10px; color:#666; text-align:center; font-size: 16px;"></div>
-      </div>
-
-      <!-- 제출 -->
-      <button type="submit" id="submitBtn">등록하기</button>
-      <button type="button" onclick="testConnection()" class="test-btn">🔧 연결 테스트</button>
-    </form>
-
-    <!-- 상태 메시지 -->
-    <div id="statusMessage" style="display:none;"></div>
-    </div>
-
-    <!-- 화주사 등록 탭 -->
-    <div id="registerTab" class="tab-content" style="display:none;">
-      <h3 style="margin: 0 0 20px; font-size: 20px; color: #222;">화주사 등록</h3>
-      <form id="registerForm">
-        <!-- 필수 정보 -->
-        <div class="form-group">
-          <label>화주사명 *</label>
-          <input type="text" id="regCompanyName" placeholder="화주사명을 입력하세요" required>
-        </div>
-        <div class="form-group">
-          <label>아이디 *</label>
-          <input type="text" id="regUsername" placeholder="아이디를 입력하세요" required>
-        </div>
-        <div class="form-group">
-          <label>비밀번호 *</label>
-          <input type="password" id="regPassword" placeholder="비밀번호를 입력하세요" required>
-        </div>
-
-        <!-- 사업자 정보 (선택) -->
-        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
-          <h4 style="margin: 0 0 15px; font-size: 16px; color: #666;">사업자 정보 (선택사항)</h4>
-          <div class="form-group">
-            <label>사업자번호</label>
-            <input type="text" id="regBusinessNumber" placeholder="사업자번호를 입력하세요">
-          </div>
-          <div class="form-group">
-            <label>사업자명</label>
-            <input type="text" id="regBusinessName" placeholder="사업자명을 입력하세요">
-          </div>
-          <div class="form-group">
-            <label>주소</label>
-            <input type="text" id="regBusinessAddress" placeholder="주소를 입력하세요">
-          </div>
-          <div class="form-group">
-            <label>전화번호</label>
-            <input type="tel" id="regBusinessTel" placeholder="전화번호를 입력하세요">
-          </div>
-          <div class="form-group">
-            <label>이메일</label>
-            <input type="email" id="regBusinessEmail" placeholder="이메일을 입력하세요">
-          </div>
-        </div>
-
-        <button type="submit" id="registerBtn">등록하기</button>
-        <div id="registerStatus" style="display:none; margin-top: 10px;"></div>
-      </form>
-    </div>
-
-    <!-- 비밀번호 변경 탭 -->
-    <div id="passwordTab" class="tab-content" style="display:none;">
-      <h3 style="margin: 0 0 20px; font-size: 20px; color: #222;">비밀번호 변경</h3>
-      <form id="passwordForm">
-        <div class="form-group">
-          <label>아이디 *</label>
-          <input type="text" id="pwdUsername" placeholder="아이디를 입력하세요" required>
-        </div>
-        <div class="form-group">
-          <label>기존 비밀번호 *</label>
-          <input type="password" id="pwdOldPassword" placeholder="기존 비밀번호를 입력하세요" required>
-        </div>
-        <div class="form-group">
-          <label>새 비밀번호 *</label>
-          <input type="password" id="pwdNewPassword" placeholder="새 비밀번호를 입력하세요" required>
-        </div>
-        <div class="form-group">
-          <label>새 비밀번호 확인 *</label>
-          <input type="password" id="pwdNewPasswordConfirm" placeholder="새 비밀번호를 다시 입력하세요" required>
-        </div>
-
-        <button type="submit" id="passwordBtn">비밀번호 변경</button>
-        <div id="passwordStatus" style="display:none; margin-top: 10px;"></div>
-      </form>
-    </div>
   </div>
 
   <!-- 업로드/저장 진행 오버레이 -->
@@ -448,57 +328,16 @@
     let companyOptions = [];
 
     document.addEventListener('DOMContentLoaded', function () {
-      loadAvailableSheets();
-
-      document.getElementById('photos').addEventListener('change', function(e){
-        handleImageSelection(e.target.files);
-      });
-
-      document.getElementById('returnForm').addEventListener('submit', function(e){
-        e.preventDefault();
-        submitForm();
-      });
-
-      // 화주사 등록 폼
-      document.getElementById('registerForm').addEventListener('submit', function(e){
-        e.preventDefault();
-        registerCompany();
-      });
-
-      // 비밀번호 변경 폼
-      document.getElementById('passwordForm').addEventListener('submit', function(e){
-        e.preventDefault();
-        changePassword();
-      });
-      
-      // 엔터키로 검색
-      document.getElementById('trackingNumber').addEventListener('keypress', function(e){
-        if (e.key === 'Enter'){
-          e.preventDefault();
-          searchByTracking();
-        }
-      });
-
-      const companyInput = document.getElementById('company');
-      if (companyInput) {
-        companyInput.addEventListener('input', handleCompanyInput);
-        companyInput.addEventListener('keydown', function(e){
-          if (e.key === 'Enter') {
-            const match = findMatchingCompany(companyInput.value.trim());
-            if (match) {
-              e.preventDefault();
-              setCompanySelection(match);
-            }
+      // 파레트 ID 입력란에서 Enter 키로 보관종료 처리
+      const palletIdInput = document.getElementById('palletIdInput');
+      if (palletIdInput) {
+        palletIdInput.addEventListener('keypress', function(e){
+          if (e.key === 'Enter'){
+            e.preventDefault();
+            processPalletOutbound();
           }
         });
       }
-
-      const companyDropdown = document.getElementById('companyDropdown');
-      if (companyDropdown) {
-        companyDropdown.addEventListener('change', handleCompanyDropdownChange);
-      }
-
-      loadCompanyOptions();
     });
 
     function loadCompanyOptions(){
@@ -589,38 +428,10 @@
       return companyOptions.find(name => name.toLowerCase().startsWith(lower)) || '';
     }
 
-    /* ========== 탭 전환 ========== */
+    /* ========== 탭 전환 (모바일 페이지에서는 파레트만 사용) ========== */
     function switchTab(tabName){
-      // 모든 탭 콘텐츠 숨기기
-      document.getElementById('returnTab').style.display = 'none';
-      document.getElementById('registerTab').style.display = 'none';
-      document.getElementById('passwordTab').style.display = 'none';
-
-      // 모든 탭 버튼 비활성화
-      const tabButtons = document.querySelectorAll('.tab-btn');
-      tabButtons.forEach(btn => {
-        btn.style.borderBottom = '2px solid transparent';
-        btn.style.color = '#666';
-        btn.style.fontWeight = '600';
-      });
-
-      // 선택된 탭 표시
-      if (tabName === 'return') {
-        document.getElementById('returnTab').style.display = 'block';
-        tabButtons[0].style.borderBottom = '2px solid #4CAF50';
-        tabButtons[0].style.color = '#4CAF50';
-        tabButtons[0].style.fontWeight = '700';
-      } else if (tabName === 'register') {
-        document.getElementById('registerTab').style.display = 'block';
-        tabButtons[1].style.borderBottom = '2px solid #4CAF50';
-        tabButtons[1].style.color = '#4CAF50';
-        tabButtons[1].style.fontWeight = '700';
-      } else if (tabName === 'password') {
-        document.getElementById('passwordTab').style.display = 'block';
-        tabButtons[2].style.borderBottom = '2px solid #4CAF50';
-        tabButtons[2].style.color = '#4CAF50';
-        tabButtons[2].style.fontWeight = '700';
-      }
+      // 파레트 탭만 표시 (다른 탭은 제거됨)
+      // 이 함수는 호환성을 위해 남겨두지만 실제로는 사용되지 않음
     }
 
     /* ========== 화주사 등록 ========== */
@@ -1315,6 +1126,247 @@
           showStatus('월 목록을 불러오는 중입니다. 잠시 후 검색 버튼을 눌러주세요.', 'error');
         }
       }, 100);
+    }
+    
+    // ========== 파레트 QR 스캔 관련 변수 ==========
+    let palletQrStream = null;
+    let palletQrScanInterval = null;
+    
+    // 파레트 QR 스캔 시작
+    async function startPalletQRScan(){
+      const palletQrStatus = document.getElementById('palletQrStatus');
+      const palletQrScanner = document.getElementById('palletQrScanner');
+      const palletQrVideo = document.getElementById('palletQrVideo');
+      const palletQrScanBtn = document.getElementById('palletQrScanBtn');
+      
+      // HTTPS 체크
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        palletQrStatus.textContent = '⚠️ 카메라 사용을 위해 HTTPS가 필요합니다.';
+        palletQrStatus.style.background = '#fff3cd';
+        palletQrStatus.style.color = '#856404';
+        return;
+      }
+      
+      // 미디어 디바이스 지원 확인
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        palletQrStatus.textContent = '⚠️ 이 브라우저는 카메라를 지원하지 않습니다. 파레트 ID를 직접 입력해주세요.';
+        palletQrStatus.style.background = '#f8d7da';
+        palletQrStatus.style.color = '#721c24';
+        return;
+      }
+      
+      // jsQR 라이브러리 확인
+      if (typeof jsQR === 'undefined') {
+        palletQrStatus.textContent = '⚠️ QR 스캔 라이브러리를 로드할 수 없습니다. 파레트 ID를 직접 입력해주세요.';
+        palletQrStatus.style.background = '#f8d7da';
+        palletQrStatus.style.color = '#721c24';
+        return;
+      }
+      
+      try {
+        palletQrStatus.textContent = '카메라 권한을 요청하는 중...';
+        palletQrStatus.style.background = '#d1ecf1';
+        palletQrStatus.style.color = '#0c5460';
+        
+        const constraints = {
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 640, max: 1280 },
+            height: { ideal: 480, max: 720 }
+          }
+        };
+        
+        palletQrStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        palletQrVideo.srcObject = palletQrStream;
+        palletQrVideo.setAttribute('playsinline', 'true');
+        palletQrVideo.setAttribute('webkit-playsinline', 'true');
+        
+        palletQrScanner.style.display = 'block';
+        palletQrScanBtn.style.display = 'none';
+        palletQrStatus.textContent = '파레트 QR 코드를 카메라에 비춰주세요.';
+        palletQrStatus.style.background = '#d1ecf1';
+        palletQrStatus.style.color = '#0c5460';
+        
+        await palletQrVideo.play();
+        
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        
+        palletQrVideo.addEventListener('loadedmetadata', function(){
+          canvas.width = palletQrVideo.videoWidth;
+          canvas.height = palletQrVideo.videoHeight;
+        }, { once: true });
+        
+        let scanAttempts = 0;
+        palletQrScanInterval = setInterval(function(){
+          if (palletQrVideo.readyState === palletQrVideo.HAVE_ENOUGH_DATA && canvas.width > 0 && canvas.height > 0) {
+            try {
+              context.drawImage(palletQrVideo, 0, 0, canvas.width, canvas.height);
+              const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+              
+              const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'attemptBoth',
+              });
+              
+              if (code) {
+                console.log('[파레트] QR 코드 감지됨:', code.data);
+                stopPalletQRScan();
+                
+                // 파레트 ID 입력란에 값 설정
+                document.getElementById('palletIdInput').value = code.data.toUpperCase();
+                
+                palletQrStatus.textContent = '✅ QR 코드 인식 완료! 보관종료 처리 중...';
+                palletQrStatus.style.background = '#d4edda';
+                palletQrStatus.style.color = '#155724';
+                
+                // 자동으로 보관종료 처리
+                setTimeout(function(){
+                  processPalletOutbound();
+                }, 500);
+              }
+              
+              scanAttempts++;
+            } catch (err) {
+              console.error('[파레트] QR 스캔 오류:', err);
+            }
+          }
+        }, 150);
+        
+      } catch (error) {
+        console.error('[파레트] 카메라 오류:', error);
+        stopPalletQRScan();
+        
+        let errorMessage = '카메라를 사용할 수 없습니다.';
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+          errorMessage = '카메라 권한이 거부되었습니다.';
+        } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+          errorMessage = '카메라를 찾을 수 없습니다.';
+        } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+          errorMessage = '카메라가 다른 애플리케이션에서 사용 중입니다.';
+        }
+        
+        palletQrStatus.textContent = '⚠️ ' + errorMessage + ' 파레트 ID를 직접 입력해주세요.';
+        palletQrStatus.style.background = '#f8d7da';
+        palletQrStatus.style.color = '#721c24';
+      }
+    }
+    
+    // 파레트 QR 스캔 중단
+    function stopPalletQRScan(){
+      console.log('[파레트] QR 스캔 중단');
+      
+      if (palletQrScanInterval) {
+        clearInterval(palletQrScanInterval);
+        palletQrScanInterval = null;
+      }
+      
+      if (palletQrStream) {
+        palletQrStream.getTracks().forEach(track => {
+          track.stop();
+        });
+        palletQrStream = null;
+      }
+      
+      const palletQrVideo = document.getElementById('palletQrVideo');
+      if (palletQrVideo) {
+        palletQrVideo.srcObject = null;
+      }
+      
+      const palletQrScanner = document.getElementById('palletQrScanner');
+      const palletQrScanBtn = document.getElementById('palletQrScanBtn');
+      if (palletQrScanner) palletQrScanner.style.display = 'none';
+      if (palletQrScanBtn) palletQrScanBtn.style.display = 'block';
+    }
+    
+    // 파레트 보관종료 처리
+    async function processPalletOutbound(){
+      const palletId = document.getElementById('palletIdInput').value.trim().toUpperCase();
+      const palletResult = document.getElementById('palletResult');
+      const palletResultContent = document.getElementById('palletResultContent');
+      const palletOutboundBtn = document.getElementById('palletOutboundBtn');
+      const palletQrStatus = document.getElementById('palletQrStatus');
+      
+      if (!palletId) {
+        alert('파레트 ID를 입력하거나 QR 코드를 스캔해주세요.');
+        return;
+      }
+      
+      // 버튼 비활성화
+      palletOutboundBtn.disabled = true;
+      palletOutboundBtn.textContent = '처리 중...';
+      palletResult.style.display = 'none';
+      
+      try {
+        const response = await fetch('/api/pallets/outbound', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            pallet_id: palletId,
+            out_date: new Date().toISOString().split('T')[0] // 오늘 날짜
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          palletResultContent.innerHTML = `
+            <div style="color: #155724; font-weight: 600; margin-bottom: 10px;">✅ 보관종료 처리 완료</div>
+            <div style="margin-bottom: 8px;"><strong>파레트 ID:</strong> ${data.data.pallet_id || palletId}</div>
+            <div style="margin-bottom: 8px;"><strong>화주사:</strong> ${data.data.company_name || '-'}</div>
+            <div style="margin-bottom: 8px;"><strong>보관일수:</strong> ${data.data.storage_days || 0}일</div>
+            <div style="margin-bottom: 8px;"><strong>보관료:</strong> ${(data.data.fee || 0).toLocaleString()}원</div>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd; color: #666; font-size: 14px;">
+              ${data.message || '처리가 완료되었습니다.'}
+            </div>
+          `;
+          palletResult.style.display = 'block';
+          palletResult.style.background = '#d4edda';
+          palletResult.style.borderColor = '#c3e6cb';
+          
+          palletQrStatus.textContent = '✅ 보관종료 처리 완료!';
+          palletQrStatus.style.background = '#d4edda';
+          palletQrStatus.style.color = '#155724';
+          
+          // 입력란 초기화
+          document.getElementById('palletIdInput').value = '';
+          
+          // 2초 후 결과 숨기기 (선택사항)
+          setTimeout(function(){
+            palletResult.style.display = 'none';
+          }, 5000);
+        } else {
+          palletResultContent.innerHTML = `
+            <div style="color: #721c24; font-weight: 600; margin-bottom: 10px;">❌ 처리 실패</div>
+            <div style="color: #721c24;">${data.message || '보관종료 처리에 실패했습니다.'}</div>
+          `;
+          palletResult.style.display = 'block';
+          palletResult.style.background = '#f8d7da';
+          palletResult.style.borderColor = '#f5c6cb';
+          
+          palletQrStatus.textContent = '❌ ' + (data.message || '처리 실패');
+          palletQrStatus.style.background = '#f8d7da';
+          palletQrStatus.style.color = '#721c24';
+        }
+      } catch (error) {
+        console.error('[파레트] 보관종료 처리 오류:', error);
+        palletResultContent.innerHTML = `
+          <div style="color: #721c24; font-weight: 600; margin-bottom: 10px;">❌ 오류 발생</div>
+          <div style="color: #721c24;">서버와의 통신 중 오류가 발생했습니다: ${error.message}</div>
+        `;
+        palletResult.style.display = 'block';
+        palletResult.style.background = '#f8d7da';
+        palletResult.style.borderColor = '#f5c6cb';
+        
+        palletQrStatus.textContent = '❌ 통신 오류 발생';
+        palletQrStatus.style.background = '#f8d7da';
+        palletQrStatus.style.color = '#721c24';
+      } finally {
+        palletOutboundBtn.disabled = false;
+        palletOutboundBtn.textContent = '✅ 보관종료 처리';
+      }
     }
     
     // QR 스캔 중단

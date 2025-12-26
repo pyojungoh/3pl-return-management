@@ -1,0 +1,2694 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>파레트 보관료 관리</title>
+  <style>
+    /* body 스타일 제거 (dashboard_server.html에 통합되므로) */
+    body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+    }
+    /* 파레트 관리 메뉴 전용 스타일 */
+    #palContainer {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 0;
+      max-width: 100%;
+      margin: 0;
+    }
+    
+    /* 하위 메뉴바 스타일 */
+    #palSubMenuBar {
+      background: linear-gradient(135deg, #ffffff 0%, #fffef9 100%);
+      border-bottom: 2px solid #ffeaa7;
+      padding: 0;
+      display: flex;
+      gap: 0;
+      box-shadow: 0 2px 8px rgba(255, 152, 0, 0.1);
+      z-index: 10;
+      flex-shrink: 0;
+    }
+    
+    .pal-sub-menu-btn {
+      flex: 1;
+      padding: 16px 20px;
+      background: transparent;
+      border: none;
+      border-right: 1px solid #ffeaa7;
+      color: #636e72;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      text-align: center;
+    }
+    
+    .pal-sub-menu-btn:last-child {
+      border-right: none;
+    }
+    
+    .pal-sub-menu-btn:hover {
+      background: #fff9e6;
+      color: #ff6b35;
+    }
+    
+    .pal-sub-menu-btn.active {
+      background: linear-gradient(135deg, #fff9e6 0%, #ffeaa7 100%);
+      color: #ff6b35;
+      font-weight: 700;
+    }
+    
+    .pal-sub-menu-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: #ff6b35;
+    }
+    
+    /* 콘텐츠 영역 스타일 */
+    #palContentArea {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      background: transparent;
+    }
+    
+    .pal-content-page {
+      display: none !important;
+    }
+    
+    .pal-content-page.active {
+      display: block !important;
+    }
+    
+    /* 관리자 전용 섹션 (기본 숨김) */
+    .pal-admin-only {
+      display: none;
+    }
+    
+    /* 관리자일 때 관리자 전용 섹션 표시 (하지만 페이지는 active 클래스로만 제어) */
+    .pal-admin-only.pal-content-page.active {
+      display: block !important;
+    }
+    
+    /* 화주사 전용 섹션 (기본 숨김) */
+    .pal-consignor-only {
+      display: none;
+    }
+    
+    /* 공통 스타일 */
+    .pal-section {
+      margin-bottom: 20px;
+    }
+    
+    .pal-toggle-btn {
+      background: linear-gradient(135deg, #ffffff 0%, #fffef9 100%);
+      width: 100%;
+      text-align: left;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-radius: 14px;
+      border: 2px solid #ffeaa7;
+      color: #ff6b35;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(255, 152, 0, 0.1);
+    }
+    
+    .pal-toggle-btn:hover {
+      background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%);
+      box-shadow: 0 6px 16px rgba(255, 152, 0, 0.15);
+    }
+    
+    .pal-toggle-content {
+      display: none;
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 0 0 14px 14px;
+      border: 2px solid #ffeaa7;
+      border-top: none;
+      margin-top: -2px;
+      box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1);
+    }
+    
+    .pal-filters {
+      display: flex;
+      gap: 15px;
+      align-items: flex-end;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .pal-filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    
+    .pal-filter-group label {
+      color: #2d3436;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    .pal-filter-group input,
+    .pal-filter-group select {
+      padding: 10px 14px;
+      border: 2px solid #ffeaa7;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #ffffff;
+      color: #2d3436;
+    }
+    
+    .pal-filter-group input:focus,
+    .pal-filter-group select:focus {
+      outline: none;
+      border-color: #ff6b35;
+      box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+    }
+    
+    .pal-btn {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
+    }
+    
+    .pal-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(255, 107, 53, 0.35);
+    }
+    
+    .pal-btn-secondary {
+      background: linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%);
+      box-shadow: 0 4px 12px rgba(178, 190, 195, 0.25);
+    }
+    
+    .pal-btn-secondary:hover {
+      box-shadow: 0 6px 16px rgba(178, 190, 195, 0.35);
+    }
+    
+    .pal-table-container {
+      margin-top: 20px;
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1);
+      border: 2px solid #ffeaa7;
+      overflow: hidden;
+    }
+    
+    .pal-table-header {
+      padding: 15px 20px 10px 20px;
+      border-bottom: 2px solid #ffeaa7;
+      background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%);
+    }
+    
+    .pal-table-header h3 {
+      margin: 0;
+      color: #ff6b35;
+      font-weight: 700;
+      font-size: 18px;
+    }
+    
+    .pal-table-scroll-wrapper {
+      overflow-x: auto;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    
+    .pal-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1200px;
+    }
+    
+    .pal-table thead {
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      color: white;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    
+    .pal-table th {
+      padding: 12px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    .pal-table td {
+      padding: 12px;
+      text-align: center;
+      font-size: 14px;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: middle;
+    }
+    
+    .pal-table tbody tr:hover {
+      background: #fffef9;
+    }
+    
+    .pal-table .no-data {
+      text-align: center;
+      padding: 40px;
+      color: #636e72;
+    }
+    
+    .pal-form-group {
+      margin-bottom: 15px;
+    }
+    
+    .pal-form-label {
+      color: #2d3436;
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: block;
+      font-size: 14px;
+    }
+    
+    .pal-form-input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 2px solid #ffeaa7;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #ffffff;
+      color: #2d3436;
+    }
+    
+    .pal-form-input:focus {
+      outline: none;
+      border-color: #ff6b35;
+      box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+    }
+    
+    .pal-searchable-select {
+      position: relative;
+      width: 100%;
+    }
+    
+    .pal-searchable-select input[type="text"] {
+      width: 100%;
+      padding-right: 32px;
+    }
+    
+    .pal-dropdown-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #ffffff;
+      border: 2px solid #ffeaa7;
+      border-radius: 10px;
+      max-height: 220px;
+      overflow-y: auto;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+      z-index: 50;
+      display: none;
+      margin-top: 4px;
+    }
+    
+    .pal-dropdown-list.show {
+      display: block;
+    }
+    
+    .pal-dropdown-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #f5f5f5;
+      transition: background-color 0.2s ease;
+    }
+    
+    .pal-dropdown-item:last-child {
+      border-bottom: none;
+    }
+    
+    .pal-dropdown-item:hover {
+      background: #fff9e6;
+    }
+    
+    .pal-message {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    
+    .pal-message.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .pal-message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    
+    .pal-message.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    
+    /* QR 스캔 영역 */
+    .pal-qr-scanner {
+      position: relative;
+      width: 100%;
+      max-width: 500px;
+      margin: 0 auto;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    
+    .pal-qr-video {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    
+    .pal-qr-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 250px;
+      height: 250px;
+      border: 3px solid #ff6b35;
+      border-radius: 12px;
+      pointer-events: none;
+    }
+    
+    .pal-qr-overlay::before,
+    .pal-qr-overlay::after {
+      content: '';
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border: 3px solid #ff6b35;
+    }
+    
+    .pal-qr-overlay::before {
+      top: -3px;
+      left: -3px;
+      border-right: none;
+      border-bottom: none;
+    }
+    
+    .pal-qr-overlay::after {
+      bottom: -3px;
+      right: -3px;
+      border-left: none;
+      border-top: none;
+    }
+    
+    /* 통계 박스 */
+    .pal-stats-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .pal-stat-box {
+      flex: 1;
+      min-width: 200px;
+      background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%);
+      padding: 20px;
+      border-radius: 12px;
+      border: 2px solid #ffeaa7;
+      box-shadow: 0 2px 8px rgba(255, 152, 0, 0.1);
+    }
+    
+    .pal-stat-box-title {
+      font-size: 14px;
+      color: #636e72;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .pal-stat-box-value {
+      font-size: 24px;
+      color: #ff6b35;
+      font-weight: 700;
+    }
+    
+    /* 모달 스타일 */
+    .pal-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 10000;
+      overflow-y: auto;
+    }
+    
+    .pal-modal-content {
+      max-width: 800px;
+      margin: 50px auto;
+      background: white;
+      border-radius: 14px;
+      padding: 30px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+    
+    .pal-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    
+    .pal-modal-header h2 {
+      margin: 0;
+      color: #ff6b35;
+      font-weight: 700;
+    }
+    
+    .pal-modal-close {
+      background: #e17055;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .pal-modal-close:hover {
+      background: #d63031;
+    }
+  </style>
+</head>
+<body>
+  <div id="palContainer">
+    <!-- 하위 메뉴바 -->
+    <div id="palSubMenuBar">
+      <button class="pal-sub-menu-btn active" onclick="palSwitchSubMenu('list')">📋 월별 화주사별 리스트</button>
+      <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('inbound')">📦 파레트 관리</button>
+      <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('status')">📊 파레트 현황</button>
+      <button class="pal-sub-menu-btn pal-admin-only" onclick="palSwitchSubMenu('fee')">💰 보관료 설정</button>
+    </div>
+    
+    <!-- 콘텐츠 영역 -->
+    <div id="palContentArea">
+      <!-- 월별 화주사별 리스트 페이지 -->
+      <div id="palPageList" class="pal-content-page active">
+        <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 20px;">📋 월별 화주사별 리스트</h2>
+        
+        <!-- 기간 설정 -->
+        <div class="pal-filters" style="margin-bottom: 20px;">
+          <div class="pal-filter-group">
+            <label>정산월 (비워두면 전체)</label>
+            <input type="month" id="palSettlementMonth" class="pal-form-input" onchange="palLoadCompanyList()">
+          </div>
+          <div class="pal-filter-group pal-admin-only">
+            <button class="pal-btn" onclick="palGenerateSettlement()" style="height: 40px;">정산 생성</button>
+          </div>
+        </div>
+        
+        <!-- 왼쪽: 화주사 목록, 오른쪽: 정산 내역 -->
+        <div style="display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: start;">
+          <!-- 왼쪽: 화주사 목록 -->
+          <div class="pal-table-container" style="height: calc(100vh - 300px); min-height: 500px; display: flex; flex-direction: column;">
+            <div class="pal-table-header" style="flex-shrink: 0;">
+              <h3>화주사 목록 <span id="palCompaniesCount" style="font-size: 14px; color: #636e72;">(0개)</span></h3>
+            </div>
+            <div style="flex: 1; overflow-y: auto; padding: 10px;">
+              <div id="palCompaniesList" style="display: flex; flex-direction: column; gap: 8px;">
+                <!-- 화주사 목록이 여기에 동적으로 추가됨 -->
+              </div>
+            </div>
+          </div>
+          
+          <!-- 오른쪽: 정산 내역 -->
+          <div class="pal-table-container" style="height: calc(100vh - 300px); min-height: 500px; display: flex; flex-direction: column;">
+            <div class="pal-table-header" style="flex-shrink: 0;">
+              <h3>정산 내역 <span id="palSettlementsCount" style="font-size: 14px; color: #636e72;">(0개)</span></h3>
+            </div>
+            <div style="flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px;">
+              <div id="palSettlementsList">
+                <div style="padding: 20px; text-align: center; color: #636e72;">화주사를 선택하세요.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 파레트 관리 페이지 -->
+      <div id="palPageInbound" class="pal-content-page">
+        <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 20px;">📦 파레트 관리</h2>
+        
+        <!-- 파레트 출고 섹션 - 접이식 -->
+        <div class="pal-section">
+          <button class="pal-toggle-btn" onclick="palToggleSection('palOutboundSection')">
+            <span>📤 파레트 출고</span>
+            <span id="palOutboundIcon">▼</span>
+          </button>
+          <div class="pal-toggle-content" id="palOutboundSection" style="display: none;">
+            <!-- 파레트 검색/필터 -->
+            <div class="pal-filters" style="margin-bottom: 20px;">
+              <div class="pal-filter-group">
+                <label>파레트 ID 검색</label>
+                <input type="text" id="palOutboundSearchId" class="pal-form-input" placeholder="파레트 ID를 입력하세요" onkeyup="palSearchPalletsForOutbound()">
+              </div>
+              <div class="pal-filter-group pal-admin-only">
+                <label>화주사</label>
+                <div class="pal-searchable-select">
+                  <input type="text" id="palOutboundCompanyInput" class="pal-form-input" placeholder="화주사를 입력하거나 선택하세요" autocomplete="off" onchange="palSearchPalletsForOutbound()">
+                  <input type="hidden" id="palOutboundCompanyName">
+                  <div class="pal-dropdown-list" id="palOutboundCompanyDropdown"></div>
+                </div>
+              </div>
+              <div class="pal-filter-group">
+                <label>품목명</label>
+                <input type="text" id="palOutboundProductName" class="pal-form-input" placeholder="품목명을 입력하세요" onkeyup="palSearchPalletsForOutbound()">
+              </div>
+              <div class="pal-filter-group">
+                <button class="pal-btn" onclick="palSearchPalletsForOutbound()" style="height: 40px;">조회</button>
+              </div>
+            </div>
+            
+            <!-- 보관중인 파레트 목록 -->
+            <div class="pal-table-container" style="margin-bottom: 20px;">
+              <div class="pal-table-header">
+                <h3>보관중인 파레트 목록 <span id="palOutboundPalletsCount" style="font-size: 14px; color: #636e72;">(0개)</span></h3>
+              </div>
+              <div class="pal-table-scroll-wrapper" style="max-height: 400px;">
+                <table class="pal-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px;">선택</th>
+                      <th>파레트 ID</th>
+                      <th>화주사</th>
+                      <th>품목명</th>
+                      <th>입고일</th>
+                      <th>보관일수</th>
+                      <th>보관 위치</th>
+                    </tr>
+                  </thead>
+                  <tbody id="palOutboundPalletsTableBody">
+                    <tr>
+                      <td colspan="7" class="no-data">검색 조건을 입력하고 조회 버튼을 클릭하세요.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <!-- 선택한 파레트 정보 및 보관종료 처리 -->
+            <div id="palOutboundSelectedInfo" style="display: none; background: #fff9e6; padding: 20px; border-radius: 12px; border: 2px solid #ffeaa7; margin-bottom: 20px;">
+              <h3 style="color: #ff6b35; margin-bottom: 15px;">선택한 파레트 정보</h3>
+              <div id="palOutboundSelectedContent"></div>
+              <div class="pal-form-group" style="margin-top: 15px;">
+                <label class="pal-form-label">보관종료일 (선택사항, 기본값: 오늘)</label>
+                <input type="date" id="palOutboundDate" class="pal-form-input">
+              </div>
+              <div class="pal-form-group">
+                <label class="pal-form-label">비고</label>
+                <textarea id="palOutboundNotes" class="pal-form-input" style="min-height: 80px;" placeholder="비고를 입력하세요"></textarea>
+              </div>
+              <button class="pal-btn" onclick="palConfirmOutbound()" style="width: 100%;">보관종료 처리</button>
+              <button class="pal-btn pal-btn-secondary" onclick="palCancelOutbound()" style="width: 100%; margin-top: 10px;">취소</button>
+            </div>
+            
+            <div id="palOutboundMessage" style="margin-top: 15px;"></div>
+          </div>
+        </div>
+        
+        <!-- 파레트 입고 섹션 - 접이식 (항상 펼침) -->
+        <div class="pal-section" style="margin-top: 20px;">
+          <button class="pal-toggle-btn" onclick="palToggleSection('palInboundSection')">
+            <span>📥 파레트 입고</span>
+            <span id="palInboundIcon">▲</span>
+          </button>
+          <div class="pal-toggle-content" id="palInboundSection" style="display: block;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <!-- 단일 입고 -->
+          <div>
+            <h3 style="color: #ff6b35; margin-bottom: 15px;">단일 입고</h3>
+            <form id="palInboundForm" onsubmit="event.preventDefault(); palInbound();">
+              <div class="pal-form-group">
+                <label class="pal-form-label">파레트 ID (자동 생성)</label>
+                <input type="text" id="palInboundPalletId" class="pal-form-input" placeholder="비워두면 자동 생성">
+              </div>
+              <div class="pal-form-group">
+                <label class="pal-form-label">화주사 *</label>
+                <div class="pal-searchable-select">
+                  <input type="text" id="palInboundCompanyInput" class="pal-form-input" placeholder="화주사를 입력하거나 선택하세요" autocomplete="off">
+                  <input type="hidden" id="palInboundCompanyName">
+                  <div class="pal-dropdown-list" id="palInboundCompanyDropdown"></div>
+                </div>
+              </div>
+              <div class="pal-form-group">
+                <label class="pal-form-label">품목명</label>
+                <input type="text" id="palInboundProductName" class="pal-form-input" placeholder="품목명을 입력하세요">
+              </div>
+              <div class="pal-form-group">
+                <label class="pal-form-label">입고일 *</label>
+                <input type="date" id="palInboundDate" class="pal-form-input" required>
+              </div>
+              <div class="pal-form-group">
+                <label class="pal-form-label">보관 위치</label>
+                <input type="text" id="palInboundLocation" class="pal-form-input" placeholder="예: A-01">
+              </div>
+              <div class="pal-form-group">
+                <label class="pal-form-label">수량</label>
+                <input type="number" id="palInboundQuantity" class="pal-form-input" value="1" min="1">
+              </div>
+              <div class="pal-form-group">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                  <input type="checkbox" id="palInboundIsService" style="width: 18px; height: 18px;">
+                  <span class="pal-form-label" style="margin: 0;">서비스 파레트 (보관료 면제)</span>
+                </label>
+              </div>
+              <div class="pal-form-group">
+                <label class="pal-form-label">비고</label>
+                <textarea id="palInboundNotes" class="pal-form-input" style="min-height: 80px;" placeholder="비고를 입력하세요"></textarea>
+              </div>
+              <button type="submit" class="pal-btn" style="width: 100%;">입고 처리</button>
+              <div id="palInboundMessage" style="margin-top: 15px;"></div>
+            </form>
+          </div>
+          
+          <!-- 대량 입고 -->
+          <div>
+            <h3 style="color: #ff6b35; margin-bottom: 15px;">대량 입고</h3>
+            <div style="background: #fff9e6; padding: 20px; border-radius: 12px; border: 2px solid #ffeaa7; margin-bottom: 15px;">
+              <h4 style="margin: 0 0 10px 0; color: #ff6b35; font-size: 14px;">📋 파일 형식 안내</h4>
+              <p style="margin: 0; font-size: 13px; color: #636e72; line-height: 1.6;">
+                CSV 또는 Excel 파일을 업로드하세요.<br>
+                필수 컬럼: 화주사, 품목명, 입고일 (YYYY-MM-DD)<br>
+                선택 컬럼: 파레트 ID, 보관 위치, 수량, 서비스 여부, 비고
+              </p>
+            </div>
+            <div class="pal-form-group">
+              <label class="pal-form-label">파일 선택</label>
+              <input type="file" id="palBulkFileInput" class="pal-form-input" accept=".csv,.xlsx,.xls">
+            </div>
+            <button type="button" class="pal-btn" onclick="palBulkInbound()" style="width: 100%;">대량 입고 처리</button>
+            <div id="palBulkMessage" style="margin-top: 15px;"></div>
+          </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 파레트 현황 페이지 -->
+      <div id="palPageStatus" class="pal-content-page">
+        <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 20px;">📊 파레트 현황</h2>
+        
+        <!-- 통계 섹션 -->
+        <div class="pal-stats-container">
+          <div class="pal-stat-box">
+            <div class="pal-stat-box-title">전체 파레트</div>
+            <div class="pal-stat-box-value" id="palTotalPallets">0</div>
+          </div>
+          <div class="pal-stat-box">
+            <div class="pal-stat-box-title">보관중</div>
+            <div class="pal-stat-box-value" id="palStoragePallets">0</div>
+          </div>
+          <div class="pal-stat-box">
+            <div class="pal-stat-box-title">보관종료</div>
+            <div class="pal-stat-box-value" id="palCompletedPallets">0</div>
+          </div>
+          <div class="pal-stat-box">
+            <div class="pal-stat-box-title">이번달 보관료</div>
+            <div class="pal-stat-box-value" id="palMonthlyFee">0원</div>
+          </div>
+        </div>
+        
+        <div class="pal-filters">
+          <div class="pal-filter-group pal-admin-only">
+            <label>화주사</label>
+            <div class="pal-searchable-select">
+              <input type="text" id="palFilterCompanyInput" class="pal-form-input" placeholder="화주사를 입력하거나 선택하세요" autocomplete="off">
+              <input type="hidden" id="palFilterCompanyName">
+              <div class="pal-dropdown-list" id="palFilterCompanyDropdown"></div>
+            </div>
+          </div>
+          <div class="pal-filter-group">
+            <label>상태</label>
+            <select id="palFilterStatus" class="pal-form-input">
+              <option value="전체">전체</option>
+              <option value="입고됨">입고됨</option>
+              <option value="보관종료">보관종료</option>
+              <option value="서비스">서비스</option>
+            </select>
+          </div>
+          <div class="pal-filter-group">
+            <label>파레트 ID 검색</label>
+            <input type="text" id="palFilterPalletId" class="pal-form-input" placeholder="파레트 ID 입력">
+          </div>
+          <div class="pal-filter-group">
+            <label>월 필터</label>
+            <input type="month" id="palFilterMonth" class="pal-form-input">
+          </div>
+          <div class="pal-filter-group">
+            <button class="pal-btn" onclick="palLoadPallets()" style="height: 40px;">조회</button>
+          </div>
+          <div class="pal-filter-group">
+            <button class="pal-btn pal-btn-secondary" onclick="palLoadPallets()" style="height: 40px;">🔄 새로고침</button>
+          </div>
+        </div>
+        
+        <div class="pal-table-container">
+          <div class="pal-table-header">
+            <h3>파레트 목록 <span id="palPalletsCount" style="font-size: 14px; color: #636e72;">(0개)</span></h3>
+          </div>
+          <div class="pal-table-scroll-wrapper">
+            <table class="pal-table">
+              <thead>
+                <tr>
+                  <th>파레트 ID</th>
+                  <th>화주사</th>
+                  <th>품목명</th>
+                  <th>상태</th>
+                  <th>입고일</th>
+                  <th>갱신일</th>
+                  <th>보관종료일</th>
+                  <th>보관일수</th>
+                  <th>보관료</th>
+                  <th class="pal-admin-only">관리</th>
+                  <th>작업</th>
+                </tr>
+              </thead>
+              <tbody id="palPalletsTableBody">
+                <tr>
+                  <td colspan="11" class="no-data">데이터를 불러오는 중...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 보관료 설정 페이지 (관리자 전용) -->
+      <div id="palPageFee" class="pal-content-page pal-admin-only">
+        <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 20px;">💰 보관료 설정</h2>
+        
+        <div style="display: grid; grid-template-columns: 300px 1fr; gap: 20px;">
+          <!-- 왼쪽: 화주사 리스트 -->
+          <div class="pal-table-container" style="max-height: 600px; overflow-y: auto;">
+            <div class="pal-table-header">
+              <h3>화주사 목록</h3>
+            </div>
+            <div style="padding: 10px;">
+              <div id="palFeeCompanyList" style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="padding: 12px; background: #fff9e6; border-radius: 8px; border: 2px solid #ffeaa7; cursor: pointer; transition: all 0.2s;" 
+                     class="pal-fee-company-item" 
+                     onclick="palSelectFeeCompany('')"
+                     data-company="">
+                  <div style="font-weight: 600; color: #ff6b35;">전체 화주사</div>
+                </div>
+                <!-- 화주사 목록이 여기에 동적으로 추가됨 -->
+              </div>
+            </div>
+          </div>
+          
+          <!-- 오른쪽: 보관료 설정 폼 -->
+          <div>
+            <form id="palFeeSettingsForm" onsubmit="event.preventDefault(); palSaveFeeSettings();">
+              <div class="pal-form-group">
+                <label class="pal-form-label">화주사 *</label>
+                <input type="text" id="palFeeCompanyDisplay" class="pal-form-input" readonly style="background: #f5f5f5;" placeholder="왼쪽에서 화주사를 선택하세요">
+                <input type="hidden" id="palFeeCompanyName">
+              </div>
+              <div class="pal-form-group">
+                <label class="pal-form-label">월 보관료 (원) *</label>
+                <input type="number" id="palFeeMonthlyFee" class="pal-form-input" placeholder="예: 16000" min="0" required oninput="palCalculateDailyFee()">
+              </div>
+              <div class="pal-form-group">
+                <label class="pal-form-label">일일 보관료 (자동 계산)</label>
+                <input type="text" id="palFeeDailyFee" class="pal-form-input" readonly style="background: #f5f5f5;" placeholder="월 보관료를 입력하면 자동 계산됩니다">
+              </div>
+              <div class="pal-form-group">
+                <label class="pal-form-label">적용 시작일</label>
+                <input type="date" id="palFeeEffectiveFrom" class="pal-form-input">
+              </div>
+              <div class="pal-form-group">
+                <label class="pal-form-label">비고</label>
+                <textarea id="palFeeNotes" class="pal-form-input" style="min-height: 80px;" placeholder="비고를 입력하세요"></textarea>
+              </div>
+              <button type="submit" class="pal-btn" style="width: 100%;">보관료 설정 저장</button>
+              <div id="palFeeSettingsMessage" style="margin-top: 15px;"></div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 정산 상세 모달 -->
+  <div id="palSettlementDetailModal" class="pal-modal">
+    <div class="pal-modal-content">
+      <div class="pal-modal-header">
+        <h2>정산 상세</h2>
+        <button class="pal-modal-close" onclick="palCloseSettlementDetail()">×</button>
+      </div>
+      <div id="palSettlementDetailContent"></div>
+    </div>
+  </div>
+  
+  <script>
+    // API 기본 URL
+    const PAL_API_BASE_URL = window.location.origin;
+    
+    // 전역 변수
+    let palCurrentRole = '';
+    let palCurrentCompany = '';
+    let palCurrentUsername = '';
+    let palQRStream = null;
+    let palQRScanning = false;
+    let palScannedPalletId = null;
+    let palCompanies = [];
+    
+    // 헤더 인코딩 함수 (special_works.html과 동일)
+    function palGetUserHeaders() {
+      const encodeHeader = (value) => encodeURIComponent((value || '').toString().trim());
+      return {
+        'X-User-Role': encodeHeader(palCurrentRole),
+        'X-User-Name': encodeHeader(palCurrentUsername),
+        'X-Company-Name': encodeHeader(palCurrentCompany)
+      };
+    }
+    
+    // 하위 메뉴 전환 함수
+    function palSwitchSubMenu(menuId) {
+      // 모든 페이지 숨기기
+      const pages = document.querySelectorAll('.pal-content-page');
+      pages.forEach(page => page.classList.remove('active'));
+      
+      // 모든 메뉴 버튼 비활성화
+      const menuButtons = document.querySelectorAll('.pal-sub-menu-btn');
+      menuButtons.forEach(btn => btn.classList.remove('active'));
+      
+      // 선택된 페이지 표시
+      const selectedPage = document.getElementById('palPage' + menuId.charAt(0).toUpperCase() + menuId.slice(1));
+      if (selectedPage) {
+        selectedPage.classList.add('active');
+      }
+      
+      // 선택된 메뉴 버튼 활성화
+      const selectedButton = event?.target || document.querySelector(`[onclick*="palSwitchSubMenu('${menuId}')"]`);
+      if (selectedButton) {
+        selectedButton.classList.add('active');
+      }
+      
+      // 각 페이지별 초기화
+      if (menuId === 'list') {
+        // 월별 화주사별 리스트 페이지 초기화
+        palLoadCompanyList();
+      } else if (menuId === 'inbound') {
+        // 파레트 관리 페이지 초기화
+        const dateInput = document.getElementById('palInboundDate');
+        if (dateInput && !dateInput.value) {
+          const today = new Date().toISOString().split('T')[0];
+          dateInput.value = today;
+        }
+        // 입고 섹션은 항상 펼침 상태로 유지
+        const inboundSection = document.getElementById('palInboundSection');
+        const inboundIcon = document.getElementById('palInboundIcon');
+        if (inboundSection) {
+          inboundSection.style.display = 'block';
+        }
+        if (inboundIcon) {
+          inboundIcon.textContent = '▲';
+        }
+      } else if (menuId === 'status') {
+        // 파레트 현황 페이지 초기화
+        palLoadPallets();
+        palUpdateStats();
+      } else if (menuId === 'fee') {
+        // 보관료 설정 페이지 초기화
+        const dateInput = document.getElementById('palFeeEffectiveFrom');
+        if (dateInput && !dateInput.value) {
+          const today = new Date().toISOString().split('T')[0];
+          dateInput.value = today;
+        }
+        palLoadFeeCompanyList();
+      }
+    }
+    
+    // 보관료 설정: 화주사 목록 로드
+    async function palLoadFeeCompanyList() {
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/auth/companies`, {
+          headers: palGetUserHeaders()
+        });
+        const result = await response.json();
+        
+        if (result.success && result.companies) {
+          const companyList = document.getElementById('palFeeCompanyList');
+          if (companyList) {
+            // "전체 화주사" 항목은 유지하고 나머지 추가
+            const existingAll = companyList.querySelector('[data-company=""]');
+            companyList.innerHTML = '';
+            if (existingAll) {
+              companyList.appendChild(existingAll);
+            } else {
+              companyList.innerHTML = `
+                <div style="padding: 12px; background: #fff9e6; border-radius: 8px; border: 2px solid #ffeaa7; cursor: pointer; transition: all 0.2s;" 
+                     class="pal-fee-company-item" 
+                     onclick="palSelectFeeCompany('')"
+                     data-company="">
+                  <div style="font-weight: 600; color: #ff6b35;">전체 화주사</div>
+                </div>
+              `;
+            }
+            
+            // 관리자 계정 제외하고 화주사만 필터링
+            const consignors = result.companies.filter(company => {
+              const role = company.role || '';
+              return role !== '관리자';
+            });
+            
+            consignors.forEach(company => {
+              const companyName = company.company_name || company.company || '';
+              if (companyName) {
+                const item = document.createElement('div');
+                item.className = 'pal-fee-company-item';
+                item.setAttribute('data-company', companyName);
+                item.style.cssText = 'padding: 12px; background: #ffffff; border-radius: 8px; border: 2px solid #ffeaa7; cursor: pointer; transition: all 0.2s;';
+                item.onclick = () => palSelectFeeCompany(companyName);
+                item.innerHTML = `<div style="font-weight: 600; color: #2d3436;">${palEscapeHtml(companyName)}</div>`;
+                companyList.appendChild(item);
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('화주사 목록 로드 오류:', error);
+      }
+    }
+    
+    // 보관료 설정: 화주사 선택
+    async function palSelectFeeCompany(companyName) {
+      // 모든 항목 비활성화
+      document.querySelectorAll('.pal-fee-company-item').forEach(item => {
+        item.style.background = '#ffffff';
+        item.style.borderColor = '#ffeaa7';
+      });
+      
+      // 선택된 항목 활성화
+      const selectedItem = document.querySelector(`[data-company="${companyName}"]`);
+      if (selectedItem) {
+        selectedItem.style.background = '#fff9e6';
+        selectedItem.style.borderColor = '#ff6b35';
+      }
+      
+      // 폼에 화주사명 설정
+      document.getElementById('palFeeCompanyDisplay').value = companyName || '전체 화주사';
+      document.getElementById('palFeeCompanyName').value = companyName;
+      
+      // 해당 화주사의 기존 보관료 설정 로드
+      if (companyName) {
+        await palLoadFeeSettings(companyName);
+      } else {
+        // 폼 초기화
+        document.getElementById('palFeeMonthlyFee').value = '';
+        document.getElementById('palFeeDailyFee').value = '';
+        document.getElementById('palFeeEffectiveFrom').value = new Date().toISOString().split('T')[0];
+        document.getElementById('palFeeNotes').value = '';
+      }
+    }
+    
+    // 보관료 설정: 기존 설정 로드
+    async function palLoadFeeSettings(companyName) {
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/fees?company=${encodeURIComponent(companyName)}`, {
+          headers: palGetUserHeaders()
+        });
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const fee = result.data;
+          document.getElementById('palFeeMonthlyFee').value = fee.monthly_fee || '';
+          document.getElementById('palFeeDailyFee').value = fee.daily_fee ? fee.daily_fee.toFixed(2) + '원' : '';
+          document.getElementById('palFeeEffectiveFrom').value = fee.effective_from || new Date().toISOString().split('T')[0];
+          document.getElementById('palFeeNotes').value = fee.notes || '';
+        } else {
+          // 기존 설정이 없으면 초기화
+          document.getElementById('palFeeMonthlyFee').value = '';
+          document.getElementById('palFeeDailyFee').value = '';
+          document.getElementById('palFeeEffectiveFrom').value = new Date().toISOString().split('T')[0];
+          document.getElementById('palFeeNotes').value = '';
+        }
+      } catch (error) {
+        console.error('보관료 설정 로드 오류:', error);
+      }
+    }
+    
+    // 일일 보관료 자동 계산
+    function palCalculateDailyFee() {
+      const monthlyFee = parseFloat(document.getElementById('palFeeMonthlyFee').value) || 0;
+      const dailyFee = (monthlyFee / 30.44).toFixed(2);
+      const dailyFeeEl = document.getElementById('palFeeDailyFee');
+      if (dailyFeeEl) {
+        dailyFeeEl.value = dailyFee > 0 ? dailyFee + '원' : '';
+      }
+    }
+    
+    // 초기화 함수
+    function palInit() {
+      // 사용자 정보 가져오기 (special_works.html과 동일한 방식)
+      try {
+        // 1. companyInfo 요소에서 정보 추출 시도
+        const companyInfoEl = document.getElementById('companyInfo');
+        if (companyInfoEl && companyInfoEl.textContent) {
+          const headerText = companyInfoEl.textContent.trim();
+          // "[관리자]"가 포함되어 있으면 관리자
+          if (headerText.includes('[관리자]')) {
+            palCurrentRole = '관리자';
+            // 헤더 형식: "관리자 [관리자] (username)" 또는 "화주사명 (username)"
+            const usernameMatch = headerText.match(/\(([^)]+)\)/);
+            if (usernameMatch) {
+              palCurrentUsername = usernameMatch[1].trim();
+            }
+            // "[관리자]" 앞의 텍스트가 회사명
+            const companyMatch = headerText.match(/^([^[]+)/);
+            if (companyMatch) {
+              palCurrentCompany = companyMatch[1].trim();
+            }
+          } else {
+            // 화주사 모드: "화주사명 (username)"
+            const usernameMatch = headerText.match(/\(([^)]+)\)/);
+            if (usernameMatch) {
+              palCurrentUsername = usernameMatch[1].trim();
+            }
+            const companyMatch = headerText.match(/^([^(]+)/);
+            if (companyMatch) {
+              palCurrentCompany = companyMatch[1].trim();
+            }
+            palCurrentRole = '화주사';
+          }
+        } else {
+          // 2. 전역 변수 또는 localStorage에서 가져오기
+          palCurrentRole = (window.currentRole || localStorage.getItem('client_role') || '').toString().trim();
+          palCurrentCompany = (window.currentCompany || localStorage.getItem('client_company') || '').toString().trim();
+          palCurrentUsername = (window.currentUsername || localStorage.getItem('client_username') || '').toString().trim();
+        }
+      } catch (e) {
+        console.warn('[PAL] 사용자 정보 가져오기 실패:', e);
+        // 기본값 설정 (화주사 모드)
+        palCurrentRole = '화주사';
+      }
+      
+      console.log('[PAL] 사용자 정보:', {
+        role: palCurrentRole,
+        company: palCurrentCompany,
+        username: palCurrentUsername
+      });
+      
+      // 권한에 따라 섹션 표시/숨김 (단, .pal-content-page는 제외 - active 클래스로만 제어)
+      if (palCurrentRole === '관리자') {
+        document.querySelectorAll('.pal-admin-only:not(.pal-content-page)').forEach(el => {
+          el.style.display = 'block';
+        });
+        document.querySelectorAll('.pal-consignor-only').forEach(el => {
+          el.style.display = 'none';
+        });
+      } else {
+        document.querySelectorAll('.pal-admin-only').forEach(el => {
+          el.style.display = 'none';
+        });
+        document.querySelectorAll('.pal-consignor-only').forEach(el => {
+          el.style.display = 'block';
+        });
+      }
+      
+      // 오늘 날짜를 기본값으로 설정
+      const today = new Date().toISOString().split('T')[0];
+      const inboundDateEl = document.getElementById('palInboundDate');
+      const outboundDateEl = document.getElementById('palOutboundDate');
+      const feeEffectiveFromEl = document.getElementById('palFeeEffectiveFrom');
+      
+      if (inboundDateEl) inboundDateEl.value = today;
+      if (outboundDateEl) outboundDateEl.value = today;
+      if (feeEffectiveFromEl) feeEffectiveFromEl.value = today;
+      
+      // 화주사 목록 로드
+      palLoadCompanies();
+      
+      // 파레트 목록 로드
+      palLoadPallets();
+      
+      // 화주사 목록 로드 (정산 내역은 화주사 선택 후 로드)
+      palLoadCompanyList();
+      
+      // 출고용 화주사 드롭다운 초기화
+      setTimeout(() => {
+        palInitOutboundCompanyDropdown();
+      }, 500);
+      
+      // 월 보관료 입력 시 일일 보관료 자동 계산
+      const monthlyFeeInput = document.getElementById('palFeeMonthlyFee');
+      if (monthlyFeeInput) {
+        monthlyFeeInput.addEventListener('input', function() {
+          const monthlyFee = parseFloat(this.value) || 0;
+          const dailyFee = (monthlyFee / 30.44).toFixed(2);
+          const dailyFeeEl = document.getElementById('palFeeDailyFee');
+          if (dailyFeeEl) dailyFeeEl.value = dailyFee + '원';
+        });
+      }
+    }
+    
+    // window에 노출 (외부에서 호출 가능하도록) - 먼저 노출
+    window.palInit = palInit;
+    
+    console.log('[PAL] palInit 함수가 window에 등록됨');
+    
+    // 페이지 로드 시 초기화 (동적 로드와 일반 로드 모두 지원)
+    // 동적 로드된 경우에는 외부에서 호출하므로 여기서는 실행하지 않음
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('[PAL] DOMContentLoaded 이벤트 발생, palInit 호출');
+        palInit();
+      });
+    } else {
+      // 이미 로드된 경우 - 동적 로드가 아닐 때만 실행
+      // 동적 로드인지 확인 (palletsTab 컨테이너가 있는지)
+      const isDynamicLoad = document.getElementById('palletsTab') !== null;
+      if (!isDynamicLoad) {
+        console.log('[PAL] 일반 로드로 감지, palInit 호출');
+        setTimeout(palInit, 100);
+      } else {
+        console.log('[PAL] 동적 로드로 감지, 외부 호출 대기');
+      }
+    }
+    
+    // 섹션 토글
+    function palToggleSection(sectionId) {
+      const section = document.getElementById(sectionId);
+      const icon = document.getElementById(sectionId.replace('Section', 'Icon'));
+      
+      if (section && icon) {
+        // 입고 섹션은 항상 펼침 상태 유지
+        if (sectionId === 'palInboundSection') {
+          section.style.display = 'block';
+          icon.textContent = '▲';
+          return;
+        }
+        
+        if (section.style.display === 'none' || !section.style.display) {
+          section.style.display = 'block';
+          icon.textContent = '▲';
+        } else {
+          section.style.display = 'none';
+          icon.textContent = '▼';
+        }
+      }
+    }
+    
+    // 화주사 목록 로드
+    async function palLoadCompanies() {
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/auth/companies`);
+        const result = await response.json();
+        
+        if (result.success) {
+          palCompanies = result.companies || [];
+          palInitCompanyDropdowns();
+        }
+      } catch (error) {
+        console.error('화주사 목록 로드 오류:', error);
+      }
+    }
+    
+    // 화주사 드롭다운 초기화
+    function palInitCompanyDropdowns() {
+      const dropdowns = [
+        { input: 'palInboundCompanyInput', hidden: 'palInboundCompanyName', dropdown: 'palInboundCompanyDropdown' },
+        { input: 'palFilterCompanyInput', hidden: 'palFilterCompanyName', dropdown: 'palFilterCompanyDropdown' },
+        { input: 'palFeeCompanyInput', hidden: 'palFeeCompanyName', dropdown: 'palFeeCompanyDropdown' },
+        { input: 'palSettlementCompanyInput', hidden: 'palSettlementCompanyName', dropdown: 'palSettlementCompanyDropdown' }
+      ];
+      
+      dropdowns.forEach(config => {
+        palInitSearchableDropdown(config.input, config.hidden, config.dropdown);
+      });
+    }
+    
+    // 출고용 화주사 드롭다운 초기화
+    function palInitOutboundCompanyDropdown() {
+      palInitSearchableDropdown('palOutboundCompanyInput', 'palOutboundCompanyName', 'palOutboundCompanyDropdown');
+    }
+    
+    // 검색형 드롭다운 초기화
+    function palInitSearchableDropdown(inputId, hiddenId, dropdownId) {
+      const input = document.getElementById(inputId);
+      const hidden = document.getElementById(hiddenId);
+      const dropdown = document.getElementById(dropdownId);
+      
+      if (!input || !hidden || !dropdown) return;
+      
+      let dropdownTimeout = null;
+      let isDropdownOpen = false;
+      
+      // 드롭다운 업데이트
+      function updateDropdown(filterText = '') {
+        const filtered = palCompanies.filter(company => 
+          company.company_name.toLowerCase().includes(filterText.toLowerCase())
+        );
+        
+        if (filtered.length === 0) {
+          dropdown.innerHTML = '<div class="pal-dropdown-item" style="color: #999; cursor: default;">검색 결과가 없습니다</div>';
+        } else {
+          dropdown.innerHTML = filtered.map(company => 
+            `<div class="pal-dropdown-item" data-value="${palEscapeHtml(company.company_name)}">${palEscapeHtml(company.company_name)}</div>`
+          ).join('');
+        }
+      }
+      
+      // 드롭다운 열기
+      function openDropdown() {
+        if (dropdownTimeout) {
+          clearTimeout(dropdownTimeout);
+          dropdownTimeout = null;
+        }
+        updateDropdown(input.value);
+        dropdown.classList.add('show');
+        isDropdownOpen = true;
+      }
+      
+      // 드롭다운 닫기
+      function closeDropdown() {
+        dropdownTimeout = setTimeout(() => {
+          dropdown.classList.remove('show');
+          isDropdownOpen = false;
+          dropdownTimeout = null;
+        }, 150);
+      }
+      
+      // 이벤트 리스너
+      input.addEventListener('input', function(e) {
+        e.stopPropagation();
+        updateDropdown(this.value);
+        if (!isDropdownOpen) {
+          openDropdown();
+        }
+      });
+      
+      input.addEventListener('focus', function(e) {
+        e.stopPropagation();
+        openDropdown();
+      });
+      
+      input.addEventListener('click', function(e) {
+        e.stopPropagation();
+        openDropdown();
+      });
+      
+      // 드롭다운 아이템 클릭
+      dropdown.addEventListener('mousedown', function(e) {
+        e.stopPropagation();
+        const item = e.target.closest('.pal-dropdown-item');
+        if (item && item.dataset.value) {
+          const value = item.dataset.value;
+          input.value = value;
+          hidden.value = value;
+          closeDropdown();
+        }
+      });
+      
+      // 외부 클릭 시 닫기
+      document.addEventListener('mousedown', function(e) {
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+          closeDropdown();
+        }
+      });
+    }
+    
+    // HTML 이스케이프
+    function palEscapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // 파레트 입고 처리
+    async function palInbound() {
+      const messageDiv = document.getElementById('palInboundMessage');
+      messageDiv.innerHTML = '<div class="pal-message info">처리 중...</div>';
+      
+      try {
+        // 화주사명 가져오기 (hidden 필드 우선, 없으면 input 필드)
+        const hiddenCompanyName = document.getElementById('palInboundCompanyName').value;
+        const inputCompanyName = document.getElementById('palInboundCompanyInput').value;
+        const companyName = hiddenCompanyName || inputCompanyName;
+        
+        console.log('[PAL] 입고 화주사명:', { hiddenCompanyName, inputCompanyName, companyName });
+        
+        if (!companyName || companyName.trim() === '') {
+          messageDiv.innerHTML = '<div class="pal-message error">화주사명을 입력하세요.</div>';
+          return;
+        }
+        
+        const data = {
+          pallet_id: document.getElementById('palInboundPalletId').value || null,
+          company_name: companyName.trim(),
+          product_name: document.getElementById('palInboundProductName').value || null,
+          in_date: document.getElementById('palInboundDate').value,
+          storage_location: document.getElementById('palInboundLocation').value || null,
+          quantity: parseInt(document.getElementById('palInboundQuantity').value) || 1,
+          is_service: document.getElementById('palInboundIsService').checked,
+          notes: document.getElementById('palInboundNotes').value || null
+        };
+        
+        console.log('[PAL] 입고 데이터:', data);
+        
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/inbound`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...palGetUserHeaders()
+          },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          messageDiv.innerHTML = '<div class="pal-message success">✅ ' + result.message + '</div>';
+          // 폼 초기화
+          document.getElementById('palInboundForm').reset();
+          document.getElementById('palInboundDate').value = new Date().toISOString().split('T')[0];
+          // 파레트 목록 새로고침
+          palLoadPallets();
+        } else {
+          messageDiv.innerHTML = '<div class="pal-message error">❌ ' + result.message + '</div>';
+        }
+      } catch (error) {
+        console.error('파레트 입고 오류:', error);
+        messageDiv.innerHTML = '<div class="pal-message error">❌ 파레트 입고 중 오류가 발생했습니다: ' + error.message + '</div>';
+      }
+    }
+    
+    // 대량 파레트 입고
+    async function palBulkInbound() {
+      const messageDiv = document.getElementById('palBulkMessage');
+      const fileInput = document.getElementById('palBulkFileInput');
+      
+      if (!fileInput.files || fileInput.files.length === 0) {
+        messageDiv.innerHTML = '<div class="pal-message error">파일을 선택하세요.</div>';
+        return;
+      }
+      
+      messageDiv.innerHTML = '<div class="pal-message info">파일을 읽는 중...</div>';
+      
+      // 파일 읽기 (간단한 CSV 파싱)
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      
+      reader.onload = async function(e) {
+        try {
+          const text = e.target.result;
+          const lines = text.split('\n').filter(line => line.trim());
+          const headers = lines[0].split(',').map(h => h.trim());
+          
+          const pallets = [];
+          for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',').map(v => v.trim());
+            const pallet = {};
+            
+            headers.forEach((header, index) => {
+              pallet[header] = values[index] || null;
+            });
+            
+            // 데이터 변환
+            pallets.push({
+              pallet_id: pallet['파레트 ID'] || pallet['pallet_id'] || null,
+              company_name: pallet['화주사'] || pallet['company_name'],
+              product_name: pallet['품목명'] || pallet['product_name'] || null,
+              in_date: pallet['입고일'] || pallet['in_date'],
+              storage_location: pallet['보관 위치'] || pallet['storage_location'] || null,
+              quantity: parseInt(pallet['수량'] || pallet['quantity'] || 1),
+              is_service: pallet['서비스 여부'] === 'Y' || pallet['is_service'] === true,
+              notes: pallet['비고'] || pallet['notes'] || null
+            });
+          }
+          
+          messageDiv.innerHTML = '<div class="pal-message info">' + pallets.length + '개 파레트 입고 처리 중...</div>';
+          
+          const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/inbound/bulk`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...palGetUserHeaders()
+            },
+            body: JSON.stringify({ pallets })
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            messageDiv.innerHTML = '<div class="pal-message success">✅ ' + result.message + '</div>';
+            fileInput.value = '';
+            palLoadPallets();
+          } else {
+            messageDiv.innerHTML = '<div class="pal-message error">❌ ' + result.message + '</div>';
+          }
+        } catch (error) {
+          console.error('대량 입고 오류:', error);
+          messageDiv.innerHTML = '<div class="pal-message error">❌ 파일 처리 중 오류가 발생했습니다: ' + error.message + '</div>';
+        }
+      };
+      
+      reader.readAsText(file);
+    }
+    
+    // QR 스캔 시작
+    async function palStartQRScan() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        
+        palQRStream = stream;
+        palQRScanning = true;
+        
+        const video = document.getElementById('palQRVideo');
+        const scanner = document.getElementById('palQRScanner');
+        const startBtn = document.getElementById('palQRStartBtn');
+        const stopBtn = document.getElementById('palQRStopBtn');
+        
+        video.srcObject = stream;
+        scanner.style.display = 'block';
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+        
+        // QR 코드 스캔 (간단한 구현, 실제로는 jsQR 라이브러리 사용 권장)
+        palScanQRCode();
+      } catch (error) {
+        console.error('QR 스캔 시작 오류:', error);
+        alert('카메라 접근 권한이 필요합니다.');
+      }
+    }
+    
+    // QR 스캔 중지
+    function palStopQRScan() {
+      if (palQRStream) {
+        palQRStream.getTracks().forEach(track => track.stop());
+        palQRStream = null;
+      }
+      
+      palQRScanning = false;
+      
+      const video = document.getElementById('palQRVideo');
+      const scanner = document.getElementById('palQRScanner');
+      const startBtn = document.getElementById('palQRStartBtn');
+      const stopBtn = document.getElementById('palQRStopBtn');
+      const result = document.getElementById('palQRResult');
+      
+      video.srcObject = null;
+      scanner.style.display = 'none';
+      startBtn.style.display = 'inline-block';
+      stopBtn.style.display = 'none';
+      result.style.display = 'none';
+      palScannedPalletId = null;
+    }
+    
+    // QR 코드 스캔 (간단한 구현)
+    async function palScanQRCode() {
+      const video = document.getElementById('palQRVideo');
+      const canvas = document.getElementById('palQRCanvas');
+      const context = canvas.getContext('2d');
+      
+      function scan() {
+        if (!palQRScanning) return;
+        
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          
+          // 실제로는 jsQR 라이브러리를 사용하여 QR 코드 디코딩
+          // 여기서는 간단한 예시로 수동 입력 옵션 제공
+        }
+        
+        requestAnimationFrame(scan);
+      }
+      
+      scan();
+    }
+    
+    // 보관중인 파레트 검색 (출고용)
+    async function palSearchPalletsForOutbound() {
+      const tbody = document.getElementById('palOutboundPalletsTableBody');
+      const countSpan = document.getElementById('palOutboundPalletsCount');
+      
+      if (!tbody) return;
+      
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data">검색 중...</td></tr>';
+      
+      try {
+        const searchId = document.getElementById('palOutboundSearchId').value.trim();
+        const company = palCurrentRole === '관리자' 
+          ? (document.getElementById('palOutboundCompanyName').value || document.getElementById('palOutboundCompanyInput').value || '')
+          : palCurrentCompany;
+        const productName = document.getElementById('palOutboundProductName').value.trim();
+        
+        const params = new URLSearchParams();
+        params.append('status', '입고됨'); // 보관중인 파레트만
+        
+        if (palCurrentRole === '관리자' && company) {
+          params.append('company', company);
+        } else if (palCurrentRole !== '관리자' && company) {
+          params.append('company', company);
+        }
+        
+        if (searchId) {
+          params.append('pallet_id', searchId);
+        }
+        
+        if (productName) {
+          params.append('product_name', productName);
+        }
+        
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/list?${params.toString()}`, {
+          headers: palGetUserHeaders()
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const pallets = result.data;
+          if (countSpan) countSpan.textContent = `(${pallets.length}개)`;
+          
+          if (pallets.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="no-data">보관중인 파레트가 없습니다.</td></tr>';
+          } else {
+            tbody.innerHTML = pallets.map(pallet => {
+              // 백엔드에서 계산된 storage_days 사용, 없으면 직접 계산
+              let storageDays = pallet.storage_days;
+              if (!storageDays && pallet.in_date) {
+                // 날짜만 비교 (시간 제외)
+                const inDate = new Date(pallet.in_date + 'T00:00:00');
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                storageDays = Math.floor((today - inDate) / (1000 * 60 * 60 * 24)) + 1;
+                storageDays = Math.max(1, storageDays); // 최소 1일
+              }
+              
+              return `
+                <tr style="cursor: pointer;" onclick="palSelectPalletForOutbound('${pallet.pallet_id}')">
+                  <td style="text-align: center;">
+                    <input type="radio" name="palOutboundSelected" value="${pallet.pallet_id}" onclick="event.stopPropagation(); palSelectPalletForOutbound('${pallet.pallet_id}')">
+                  </td>
+                  <td>${palEscapeHtml(pallet.pallet_id)}</td>
+                  <td>${palEscapeHtml(pallet.company_name)}</td>
+                  <td>${palEscapeHtml(pallet.product_name || '-')}</td>
+                  <td>${pallet.in_date}</td>
+                  <td>${storageDays || 1}일</td>
+                  <td>${palEscapeHtml(pallet.storage_location || pallet.location || '-')}</td>
+                </tr>
+              `;
+            }).join('');
+          }
+        } else {
+          tbody.innerHTML = '<tr><td colspan="7" class="no-data">❌ ' + (result.message || '검색 실패') + '</td></tr>';
+        }
+      } catch (error) {
+        console.error('파레트 검색 오류:', error);
+        tbody.innerHTML = '<tr><td colspan="7" class="no-data">❌ 검색 중 오류가 발생했습니다.</td></tr>';
+      }
+    }
+    
+    // 파레트 선택 (출고용)
+    async function palSelectPalletForOutbound(palletId) {
+      // 라디오 버튼 선택
+      document.querySelectorAll('input[name="palOutboundSelected"]').forEach(radio => {
+        radio.checked = radio.value === palletId;
+      });
+      
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/${palletId}`, {
+          headers: palGetUserHeaders()
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const pallet = result.data;
+          // 백엔드에서 계산된 storage_days 사용, 없으면 직접 계산
+          let storageDays = pallet.storage_days;
+          if (!storageDays && pallet.in_date) {
+            // 날짜만 비교 (시간 제외)
+            const inDate = new Date(pallet.in_date + 'T00:00:00');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            storageDays = Math.floor((today - inDate) / (1000 * 60 * 60 * 24)) + 1;
+            storageDays = Math.max(1, storageDays); // 최소 1일
+          }
+          
+          const selectedContent = document.getElementById('palOutboundSelectedContent');
+          const selectedInfo = document.getElementById('palOutboundSelectedInfo');
+          
+          if (selectedContent && selectedInfo) {
+            selectedContent.innerHTML = `
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div><strong>파레트 ID:</strong> ${palEscapeHtml(pallet.pallet_id)}</div>
+                <div><strong>화주사:</strong> ${palEscapeHtml(pallet.company_name)}</div>
+                <div><strong>품목명:</strong> ${palEscapeHtml(pallet.product_name || '-')}</div>
+                <div><strong>입고일:</strong> ${pallet.in_date}</div>
+                <div><strong>보관일수:</strong> ${storageDays}일</div>
+                <div><strong>보관 위치:</strong> ${palEscapeHtml(pallet.location || '-')}</div>
+                <div><strong>수량:</strong> ${pallet.quantity || 1}</div>
+                <div><strong>서비스:</strong> ${pallet.is_service ? '예' : '아니오'}</div>
+              </div>
+              ${pallet.notes ? `<div style="margin-top: 10px;"><strong>비고:</strong> ${palEscapeHtml(pallet.notes)}</div>` : ''}
+            `;
+            
+            selectedInfo.style.display = 'block';
+            palScannedPalletId = palletId;
+            
+            // 오늘 날짜를 기본값으로 설정
+            const outboundDateEl = document.getElementById('palOutboundDate');
+            if (outboundDateEl && !outboundDateEl.value) {
+              outboundDateEl.value = new Date().toISOString().split('T')[0];
+            }
+          }
+        } else {
+          alert('파레트 정보를 불러올 수 없습니다: ' + (result.message || '알 수 없는 오류'));
+        }
+      } catch (error) {
+        console.error('파레트 정보 조회 오류:', error);
+        alert('파레트 정보를 불러오는 중 오류가 발생했습니다.');
+      }
+    }
+    
+    // 보관종료 처리 확인
+    async function palConfirmOutbound() {
+      if (!palScannedPalletId) {
+        alert('파레트를 선택해주세요.');
+        return;
+      }
+      
+      const messageDiv = document.getElementById('palOutboundMessage');
+      messageDiv.innerHTML = '<div class="pal-message info">처리 중...</div>';
+      
+      try {
+        const data = {
+          pallet_id: palScannedPalletId,
+          out_date: document.getElementById('palOutboundDate').value || null,
+          notes: document.getElementById('palOutboundNotes').value || null
+        };
+        
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/outbound`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...palGetUserHeaders()
+          },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          messageDiv.innerHTML = '<div class="pal-message success">✅ ' + result.message + '</div>';
+          
+          // 선택 정보 초기화
+          palCancelOutbound();
+          
+          // 목록 새로고침
+          palSearchPalletsForOutbound();
+          
+          // 파레트 현황도 새로고침 (통계도 함께 업데이트됨)
+          palLoadPallets();
+        } else {
+          messageDiv.innerHTML = '<div class="pal-message error">❌ ' + result.message + '</div>';
+        }
+      } catch (error) {
+        console.error('보관종료 처리 오류:', error);
+        messageDiv.innerHTML = '<div class="pal-message error">❌ 보관종료 처리 중 오류가 발생했습니다: ' + error.message + '</div>';
+      }
+    }
+    
+    // 선택 취소
+    function palCancelOutbound() {
+      const selectedInfo = document.getElementById('palOutboundSelectedInfo');
+      if (selectedInfo) {
+        selectedInfo.style.display = 'none';
+      }
+      
+      // 라디오 버튼 선택 해제
+      document.querySelectorAll('input[name="palOutboundSelected"]').forEach(radio => {
+        radio.checked = false;
+      });
+      
+      // 입력 필드 초기화
+      const outboundDateEl = document.getElementById('palOutboundDate');
+      const outboundNotesEl = document.getElementById('palOutboundNotes');
+      if (outboundDateEl) outboundDateEl.value = '';
+      if (outboundNotesEl) outboundNotesEl.value = '';
+      
+      palScannedPalletId = null;
+    }
+    
+    // 파레트 목록 로드
+    async function palLoadPallets() {
+      const tbody = document.getElementById('palPalletsTableBody');
+      const countSpan = document.getElementById('palPalletsCount');
+      
+      if (!tbody) return;
+      
+      tbody.innerHTML = '<tr><td colspan="11" class="no-data">데이터를 불러오는 중...</td></tr>';
+      
+      try {
+        const company = palCurrentRole === '관리자' 
+          ? (document.getElementById('palFilterCompanyName').value || document.getElementById('palFilterCompanyInput').value || '')
+          : palCurrentCompany;
+        const status = document.getElementById('palFilterStatus').value;
+        const month = document.getElementById('palFilterMonth').value;
+        const palletId = document.getElementById('palFilterPalletId')?.value?.trim() || '';
+        
+        // URL 파라미터 구성 (role은 헤더에서만 전송)
+        const params = new URLSearchParams();
+        
+        // 관리자인 경우에만 company 파라미터 추가 (비어있지 않을 때만)
+        if (palCurrentRole === '관리자' && company) {
+          params.append('company', company);
+        } else if (palCurrentRole !== '관리자' && company) {
+          // 화주사인 경우 필수
+          params.append('company', company);
+        }
+        
+        // status가 '전체'가 아닐 때만 추가
+        if (status && status !== '전체') {
+          params.append('status', status);
+        }
+        
+        if (month) {
+          params.append('month', month);
+        }
+        
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/list?${params}`, {
+          headers: palGetUserHeaders()
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          const pallets = result.data || [];
+          
+          // 통계 업데이트
+          const total = pallets.length;
+          const storage = pallets.filter(p => p.status === '입고됨').length;
+          const completed = pallets.filter(p => p.status === '보관종료').length;
+          const monthlyFee = pallets.reduce((sum, p) => sum + (p.current_fee || 0), 0);
+          
+          document.getElementById('palTotalPallets').textContent = total;
+          document.getElementById('palStoragePallets').textContent = storage;
+          document.getElementById('palCompletedPallets').textContent = completed;
+          document.getElementById('palMonthlyFee').textContent = monthlyFee.toLocaleString() + '원';
+          
+          countSpan.textContent = `(${total}개)`;
+          
+          // 파레트 ID 필터링 (프론트엔드에서)
+          let filteredPallets = pallets;
+          if (palletId) {
+            filteredPallets = pallets.filter(p => 
+              p.pallet_id && p.pallet_id.toLowerCase().includes(palletId.toLowerCase())
+            );
+          }
+          
+          if (filteredPallets.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="11" class="no-data">파레트가 없습니다.</td></tr>';
+          } else {
+            tbody.innerHTML = filteredPallets.map(pallet => {
+              // 서비스 파레트는 상태를 "서비스"로 표시
+              let statusText = pallet.status || '입고됨';
+              if (pallet.is_service === 1 || pallet.is_service === true) {
+                statusText = '서비스';
+              }
+              const canOutbound = statusText === '입고됨';
+              
+              // 갱신일 계산 (보관이 1달 이상이면 매월 1일)
+              let renewalDateStr = '-';
+              if (pallet.in_date) {
+                const inDate = new Date(pallet.in_date + 'T00:00:00+09:00');
+                if (!isNaN(inDate.getTime())) {
+                  if (!pallet.out_date) {
+                    // 보관중인 경우
+                    const today = new Date();
+                    const monthsDiff = (today.getFullYear() - inDate.getFullYear()) * 12 + (today.getMonth() - inDate.getMonth());
+                    if (monthsDiff >= 1) {
+                      // 마지막 갱신일 (현재 월의 1일)
+                      const lastRenewal = new Date(today.getFullYear(), today.getMonth(), 1);
+                      renewalDateStr = lastRenewal.toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                      }).replace(/\. /g, '-').replace(/\./g, '');
+                    }
+                  } else {
+                    // 보관종료된 경우
+                    const outDate = new Date(pallet.out_date + 'T00:00:00+09:00');
+                    if (!isNaN(outDate.getTime())) {
+                      const monthsDiff = (outDate.getFullYear() - inDate.getFullYear()) * 12 + (outDate.getMonth() - inDate.getMonth());
+                      if (monthsDiff >= 1) {
+                        // 마지막 갱신일 (보관종료 월의 1일)
+                        const lastRenewal = new Date(outDate.getFullYear(), outDate.getMonth(), 1);
+                        renewalDateStr = lastRenewal.toLocaleDateString('ko-KR', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit'
+                        }).replace(/\. /g, '-').replace(/\./g, '');
+                      }
+                    }
+                  }
+                }
+              }
+              
+              return `
+              <tr>
+                <td>${palEscapeHtml(pallet.pallet_id)}</td>
+                <td>${palEscapeHtml(pallet.company_name || '')}</td>
+                <td>${palEscapeHtml(pallet.product_name || '')}</td>
+                <td>${palEscapeHtml(statusText)}</td>
+                <td>${pallet.in_date || ''}</td>
+                <td>${renewalDateStr}</td>
+                <td>${pallet.out_date || '-'}</td>
+                <td>${pallet.storage_days || 0}일</td>
+                <td>${(pallet.current_fee || 0).toLocaleString()}원</td>
+                <td class="pal-admin-only">
+                  <button class="pal-btn" onclick="palViewPalletDetail('${pallet.pallet_id}')" style="padding: 6px 12px; font-size: 12px;">상세</button>
+                </td>
+                <td>
+                  <div style="display: flex; gap: 4px; align-items: center;">
+                    ${canOutbound 
+                      ? `<button class="pal-btn" onclick="palOutboundFromStatus('${pallet.pallet_id}')" style="padding: 3px 8px; font-size: 11px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">보관종료</button>`
+                      : ''
+                    }
+                    ${palCurrentRole === '관리자' 
+                      ? `<button class="pal-btn" onclick="palDeletePalletFromStatus('${pallet.pallet_id}')" style="padding: 3px 8px; font-size: 11px; background: #6c757d; color: white; border: none; border-radius: 3px; cursor: pointer;">삭제</button>`
+                      : ''
+                    }
+                    ${!canOutbound && palCurrentRole !== '관리자' 
+                      ? '<span style="color: #999; font-size: 11px;">-</span>'
+                      : ''
+                    }
+                  </div>
+                </td>
+              </tr>
+            `;
+            }).join('');
+          }
+        } else {
+          tbody.innerHTML = '<tr><td colspan="11" class="no-data">❌ ' + result.message + '</td></tr>';
+        }
+      } catch (error) {
+        console.error('파레트 목록 로드 오류:', error);
+        tbody.innerHTML = '<tr><td colspan="11" class="no-data">❌ 데이터를 불러오는 중 오류가 발생했습니다.</td></tr>';
+      }
+    }
+    
+    // 파레트 상세 조회
+    async function palViewPalletDetail(palletId) {
+      // TODO: 상세 모달 구현
+      alert('파레트 상세: ' + palletId);
+    }
+    
+    // 통계 업데이트 (파레트 목록 로드 시 자동으로 업데이트되므로 별도 함수 불필요)
+    function palUpdateStats() {
+      // palLoadPallets 함수에서 이미 통계를 업데이트하므로 여기서는 아무것도 하지 않음
+      // 이 함수는 호환성을 위해 유지
+    }
+    
+    // 파레트 현황에서 보관종료 처리
+    async function palOutboundFromStatus(palletId) {
+      if (!confirm(`파레트 ${palletId}를 보관종료 처리하시겠습니까?`)) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/outbound`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...palGetUserHeaders()
+          },
+          body: JSON.stringify({
+            pallet_id: palletId,
+            out_date: new Date().toISOString().split('T')[0],
+            notes: '파레트 현황에서 보관종료 처리'
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('✅ ' + result.message);
+          // 파레트 목록 새로고침 (이미 통계도 함께 업데이트됨)
+          palLoadPallets();
+        } else {
+          alert('❌ ' + result.message);
+        }
+      } catch (error) {
+        console.error('보관종료 처리 오류:', error);
+        alert('❌ 보관종료 처리 중 오류가 발생했습니다: ' + error.message);
+      }
+    }
+    
+    // 파레트 현황에서 파레트 삭제 처리
+    async function palDeletePalletFromStatus(palletId) {
+      if (!confirm(`파레트 ${palletId}를 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다.`)) {
+        return;
+      }
+      
+      if (!confirm(`정말로 파레트 ${palletId}를 삭제하시겠습니까?`)) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/${palletId}`, {
+          method: 'DELETE',
+          headers: palGetUserHeaders()
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('✅ ' + result.message);
+          // 파레트 목록 새로고침 (이미 통계도 함께 업데이트됨)
+          palLoadPallets();
+        } else {
+          alert('❌ ' + result.message);
+        }
+      } catch (error) {
+        console.error('파레트 삭제 오류:', error);
+        alert('❌ 파레트 삭제 중 오류가 발생했습니다: ' + error.message);
+      }
+    }
+    
+    // 보관료 설정 저장
+    async function palSaveFeeSettings() {
+      const messageDiv = document.getElementById('palFeeSettingsMessage');
+      messageDiv.innerHTML = '<div class="pal-message info">처리 중...</div>';
+      
+      try {
+        const companyName = document.getElementById('palFeeCompanyName').value;
+        
+        if (!companyName) {
+          messageDiv.innerHTML = '<div class="pal-message error">왼쪽에서 화주사를 선택하세요.</div>';
+          return;
+        }
+        
+        const monthlyFee = parseInt(document.getElementById('palFeeMonthlyFee').value);
+        if (!monthlyFee || monthlyFee < 0) {
+          messageDiv.innerHTML = '<div class="pal-message error">월 보관료를 입력하세요.</div>';
+          return;
+        }
+        
+        const data = {
+          company_name: companyName,
+          monthly_fee: monthlyFee,
+          effective_from: document.getElementById('palFeeEffectiveFrom').value || null,
+          notes: document.getElementById('palFeeNotes').value || null
+        };
+        
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/fees`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...palGetUserHeaders()
+          },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          messageDiv.innerHTML = '<div class="pal-message success">✅ ' + result.message + '</div>';
+          // 일일 보관료 업데이트
+          document.getElementById('palFeeDailyFee').value = result.data.daily_fee.toFixed(2) + '원';
+        } else {
+          messageDiv.innerHTML = '<div class="pal-message error">❌ ' + result.message + '</div>';
+        }
+      } catch (error) {
+        console.error('보관료 설정 오류:', error);
+        messageDiv.innerHTML = '<div class="pal-message error">❌ 보관료 설정 중 오류가 발생했습니다: ' + error.message + '</div>';
+      }
+    }
+    
+    // 화주사 목록 로드
+    async function palLoadCompanyList() {
+      const listContainer = document.getElementById('palCompaniesList');
+      const countSpan = document.getElementById('palCompaniesCount');
+      
+      if (!listContainer) return;
+      
+      listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">데이터를 불러오는 중...</div>';
+      
+      try {
+        const month = document.getElementById('palSettlementMonth').value;
+        
+        const params = new URLSearchParams();
+        if (month) {
+          params.append('month', month);
+        }
+        
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/companies?${params}`, {
+          headers: palGetUserHeaders()
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          const companies = result.data?.companies || [];
+          countSpan.textContent = `(${companies.length}개)`;
+          
+          if (companies.length === 0) {
+            listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">화주사가 없습니다.</div>';
+          } else {
+            listContainer.innerHTML = companies.map(company => `
+              <button class="pal-company-btn" onclick="palSelectCompany('${palEscapeHtml(company)}')" style="width: 100%; text-align: left; padding: 12px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 14px; word-break: break-word;">
+                ${palEscapeHtml(company)}
+              </button>
+            `).join('');
+          }
+        } else {
+          listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #f44336;">❌ ' + result.message + '</div>';
+        }
+      } catch (error) {
+        console.error('화주사 목록 로드 오류:', error);
+        listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #f44336;">❌ 데이터를 불러오는 중 오류가 발생했습니다.</div>';
+      }
+    }
+    
+    // 화주사 선택
+    let palSelectedCompany = null;
+    
+    function palSelectCompany(companyName) {
+      palSelectedCompany = companyName;
+      
+      // 선택된 버튼 스타일 업데이트
+      const buttons = document.querySelectorAll('.pal-company-btn');
+      buttons.forEach(btn => {
+        if (btn.textContent.trim() === companyName) {
+          btn.style.background = '#ff6b35';
+          btn.style.color = '#fff';
+          btn.style.borderColor = '#ff6b35';
+        } else {
+          btn.style.background = '#f8f9fa';
+          btn.style.color = '#000';
+          btn.style.borderColor = '#dee2e6';
+        }
+      });
+      
+      // 정산 내역 로드
+      palLoadSettlements(companyName);
+    }
+    
+    // 정산 생성
+    async function palGenerateSettlement() {
+      if (!confirm('정산을 생성하시겠습니까?')) {
+        return;
+      }
+      
+      try {
+        const settlementMonth = document.getElementById('palSettlementMonth').value;
+        const companyName = palSelectedCompany || (palCurrentRole !== '관리자' ? palCurrentCompany : null);
+        
+        if (!settlementMonth) {
+          alert('❌ 정산월을 선택해주세요.');
+          return;
+        }
+        
+        if (!companyName) {
+          alert('❌ 화주사를 선택해주세요.');
+          return;
+        }
+        
+        const data = {
+          settlement_month: settlementMonth.replace('-', '-'),
+          company_name: companyName
+        };
+        
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/settlements/generate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...palGetUserHeaders()
+          },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('✅ ' + result.message);
+          palLoadSettlements(companyName);
+        } else {
+          alert('❌ ' + result.message);
+        }
+      } catch (error) {
+        console.error('정산 생성 오류:', error);
+        alert('❌ 정산 생성 중 오류가 발생했습니다: ' + error.message);
+      }
+    }
+    
+    // 정산 확정
+    async function palConfirmSettlement(settlementId) {
+      if (!confirm('정산을 확정하시겠습니까?')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/settlements/${settlementId}/confirm`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...palGetUserHeaders()
+          },
+          body: JSON.stringify({ status: '확정' })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('✅ ' + result.message);
+          // 정산 내역 새로고침
+          const companyName = palSelectedCompany || (palCurrentRole !== '관리자' ? palCurrentCompany : null);
+          palLoadSettlements(companyName);
+        } else {
+          alert('❌ ' + result.message);
+        }
+      } catch (error) {
+        console.error('정산 확정 오류:', error);
+        alert('❌ 정산 확정 중 오류가 발생했습니다: ' + error.message);
+      }
+    }
+    
+    // 정산 상태 되돌리기 (확정 → 대기)
+    async function palRevertSettlement(settlementId) {
+      if (!confirm('정산 상태를 대기로 되돌리시겠습니까?')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/settlements/${settlementId}/confirm`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...palGetUserHeaders()
+          },
+          body: JSON.stringify({ status: '대기' })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('✅ ' + result.message);
+          // 정산 내역 새로고침
+          const companyName = palSelectedCompany || (palCurrentRole !== '관리자' ? palCurrentCompany : null);
+          palLoadSettlements(companyName);
+        } else {
+          alert('❌ ' + result.message);
+        }
+      } catch (error) {
+        console.error('정산 상태 되돌리기 오류:', error);
+        alert('❌ 정산 상태 되돌리기 중 오류가 발생했습니다: ' + error.message);
+      }
+    }
+    
+    // 정산 삭제
+    async function palDeleteSettlement(settlementId) {
+      if (!confirm('정산 내역을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+        return;
+      }
+      
+      if (!confirm('정말로 삭제하시겠습니까? 정산 내역과 관련된 모든 데이터가 삭제됩니다.')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/settlements/${settlementId}`, {
+          method: 'DELETE',
+          headers: palGetUserHeaders()
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('✅ ' + result.message);
+          // 정산 내역 새로고침
+          const companyName = palSelectedCompany || (palCurrentRole !== '관리자' ? palCurrentCompany : null);
+          palLoadSettlements(companyName);
+        } else {
+          alert('❌ ' + result.message);
+        }
+      } catch (error) {
+        console.error('정산 삭제 오류:', error);
+        alert('❌ 정산 삭제 중 오류가 발생했습니다: ' + error.message);
+      }
+    }
+    
+    // 정산 내역 로드
+    async function palLoadSettlements(companyName = null) {
+      const listContainer = document.getElementById('palSettlementsList');
+      const countSpan = document.getElementById('palSettlementsCount');
+      
+      if (!listContainer) return;
+      
+      // 화주사가 선택되지 않았으면 안내 메시지
+      const targetCompany = companyName || palSelectedCompany || (palCurrentRole !== '관리자' ? palCurrentCompany : null);
+      
+      if (!targetCompany) {
+        listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">화주사를 선택하세요.</div>';
+        countSpan.textContent = '(0개)';
+        return;
+      }
+      
+      listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">데이터를 불러오는 중...</div>';
+      
+      try {
+        const month = document.getElementById('palSettlementMonth').value;
+        
+        // URL 파라미터 구성 (role은 헤더에서만 전송)
+        const params = new URLSearchParams();
+        
+        // 화주사 파라미터 추가
+        params.append('company', targetCompany);
+        
+        // 월이 지정된 경우에만 추가 (지정되지 않으면 전체)
+        if (month) {
+          params.append('month', month);
+        }
+        
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/settlements?${params}`, {
+          headers: palGetUserHeaders()
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          const settlements = result.data || [];
+          countSpan.textContent = `(${settlements.length}개)`;
+          
+          const listContainer = document.getElementById('palSettlementsList');
+          
+          if (settlements.length === 0) {
+            listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">정산 내역이 없습니다.</div>';
+          } else {
+            listContainer.innerHTML = settlements.map((settlement, index) => {
+              const settlementId = settlement.id || `temp_${index}`;
+              
+              return `
+                <div class="pal-settlement-item" style="margin-bottom: 15px; border: 2px solid #ffeaa7; border-radius: 12px; overflow: hidden; background: #ffffff;">
+                  <!-- 정산 내역 요약 (클릭 가능) -->
+                  <div class="pal-settlement-header" onclick="palToggleSettlementDetail('${settlementId}')" style="padding: 15px; background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%); cursor: pointer; display: grid; grid-template-columns: 100px 120px 80px 100px 120px 80px 80px 100px; gap: 10px; align-items: center; transition: all 0.2s;">
+                    <div style="font-weight: 600; color: #ff6b35;">${settlement.settlement_month ? palEscapeHtml(settlement.settlement_month) : '전체'}</div>
+                    <div style="font-weight: 600;">${palEscapeHtml(settlement.company_name)}</div>
+                    <div>${settlement.total_pallets}개</div>
+                    <div>${settlement.total_storage_days}일</div>
+                    <div style="font-weight: 600; color: #ff6b35;">${settlement.total_fee.toLocaleString()}원</div>
+                    <div>
+                      <span style="padding: 4px 8px; border-radius: 4px; background: ${settlement.status === '확정' ? '#28a745' : settlement.status === '완료' ? '#6c757d' : '#ffc107'}; color: white; font-size: 11px; font-weight: 600;">${palEscapeHtml(settlement.status || '미생성')}</span>
+                    </div>
+                    <div>
+                      <span id="palSettlementIcon_${settlementId}" style="font-size: 12px;">▼</span>
+                    </div>
+                    <div onclick="event.stopPropagation();" style="display: flex; gap: 5px; flex-wrap: wrap;">
+                      ${settlement.id && palCurrentRole === '관리자' ? `
+                        ${settlement.status === '대기' 
+                          ? `<button class="pal-btn" onclick="palConfirmSettlement(${settlement.id})" style="padding: 4px 8px; font-size: 11px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">확정</button>`
+                          : ''}
+                        ${settlement.status === '확정' || settlement.status === '완료'
+                          ? `<button class="pal-btn" onclick="palRevertSettlement(${settlement.id})" style="padding: 4px 8px; font-size: 11px; background: #ffc107; color: white; border: none; border-radius: 4px; cursor: pointer;">대기로 변경</button>`
+                          : ''}
+                        <button class="pal-btn" onclick="palDeleteSettlement(${settlement.id})" style="padding: 4px 8px; font-size: 11px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">삭제</button>
+                      ` : ''}
+                    </div>
+                  </div>
+                  <!-- 파레트별 상세 리스트 (접이식) -->
+                  <div id="palSettlementDetail_${settlementId}" style="display: none; padding: 15px; background: #f8f9fa; border-top: 2px solid #ffeaa7;">
+                    <div style="margin-bottom: 10px; font-weight: 600; color: #636e72; font-size: 14px;">파레트별 상세 내역</div>
+                    <div id="palSettlementPallets_${settlementId}" style="background: #ffffff; border-radius: 8px; padding: 10px;">
+                      <div style="padding: 20px; text-align: center; color: #999;">로딩 중...</div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          }
+        } else {
+          const listContainer = document.getElementById('palSettlementsList');
+          listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #f44336;">❌ ' + result.message + '</div>';
+        }
+      } catch (error) {
+        console.error('정산 내역 로드 오류:', error);
+        const listContainer = document.getElementById('palSettlementsList');
+        listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #f44336;">❌ 데이터를 불러오는 중 오류가 발생했습니다.</div>';
+      }
+    }
+    
+    // 정산 내역 상세 토글
+    async function palToggleSettlementDetail(settlementId) {
+      const detailDiv = document.getElementById(`palSettlementDetail_${settlementId}`);
+      const iconSpan = document.getElementById(`palSettlementIcon_${settlementId}`);
+      const palletsDiv = document.getElementById(`palSettlementPallets_${settlementId}`);
+      
+      if (!detailDiv) return;
+      
+      const isExpanded = detailDiv.style.display !== 'none';
+      
+      if (isExpanded) {
+        // 접기
+        detailDiv.style.display = 'none';
+        iconSpan.textContent = '▼';
+      } else {
+        // 펼치기
+        detailDiv.style.display = 'block';
+        iconSpan.textContent = '▲';
+        
+        // 파레트 목록이 아직 로드되지 않았으면 로드
+        if (palletsDiv.innerHTML.includes('로딩 중')) {
+          await palLoadSettlementPallets(settlementId);
+        }
+      }
+    }
+    
+    // 정산 내역의 파레트 목록 로드
+    async function palLoadSettlementPallets(settlementId) {
+      const palletsDiv = document.getElementById(`palSettlementPallets_${settlementId}`);
+      if (!palletsDiv) return;
+      
+      try {
+        // settlementId가 temp_로 시작하면 임시 정산 내역 (파레트 목록 직접 조회)
+        if (settlementId.startsWith('temp_')) {
+          // 현재 선택된 화주사와 정산월로 파레트 목록 조회
+          const targetCompany = palSelectedCompany || (palCurrentRole !== '관리자' ? palCurrentCompany : null);
+          const month = document.getElementById('palSettlementMonth').value;
+          
+          const params = new URLSearchParams();
+          params.append('company', targetCompany);
+          if (month) {
+            params.append('month', month);
+          }
+          
+          const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/list?${params}`, {
+            headers: palGetUserHeaders()
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            const pallets = result.data || [];
+            console.log('[PAL] 임시 정산 파레트 목록:', pallets);
+            palletsDiv.innerHTML = pallets.length === 0 
+              ? '<div style="padding: 20px; text-align: center; color: #999;">파레트가 없습니다.</div>'
+              : `
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                  <thead>
+                    <tr style="background: #f5f5f5; border-bottom: 2px solid #dee2e6;">
+                      <th style="padding: 8px; text-align: left; font-weight: 600; width: 100px;">파레트 ID</th>
+                      <th style="padding: 8px; text-align: left; font-weight: 600; width: 120px;">품목명</th>
+                      <th style="padding: 8px; text-align: center; font-weight: 600; width: 140px;">최초 입고일</th>
+                      <th style="padding: 8px; text-align: center; font-weight: 600; width: 120px;">갱신일</th>
+                      <th style="padding: 8px; text-align: center; font-weight: 600; width: 140px;">보관종료일</th>
+                      <th style="padding: 8px; text-align: center; font-weight: 600; width: 80px;">상태</th>
+                      <th style="padding: 8px; text-align: right; font-weight: 600; width: 100px;">보관료</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${pallets.map(p => {
+                      // 최초 입고일 포맷팅 (한국 시간)
+                      // 실제 입고일(in_date)을 사용 (created_at은 데이터 입력 시간이므로 사용하지 않음)
+                      let inDate = null;
+                      let inDateStr = '-';
+                      
+                      // in_date가 date 객체인 경우 문자열로 변환
+                      let inDateValue = p.in_date;
+                      if (inDateValue && typeof inDateValue === 'object' && inDateValue.getFullYear) {
+                        // date 객체인 경우
+                        inDateValue = inDateValue.getFullYear() + '-' + 
+                                     String(inDateValue.getMonth() + 1).padStart(2, '0') + '-' + 
+                                     String(inDateValue.getDate()).padStart(2, '0');
+                      }
+                      
+                      if (inDateValue) {
+                        // 문자열이면 그대로 사용, date 객체면 변환된 문자열 사용
+                        const dateStr = typeof inDateValue === 'string' ? inDateValue : inDateValue;
+                        inDate = new Date(dateStr + 'T00:00:00+09:00');
+                      } else if (p.created_at) {
+                        // in_date가 없을 때만 created_at 사용 (fallback)
+                        inDate = new Date(p.created_at);
+                      }
+                      
+                      if (inDate && !isNaN(inDate.getTime())) {
+                        inDateStr = inDate.toLocaleDateString('ko-KR', { 
+                          year: 'numeric', 
+                          month: '2-digit', 
+                          day: '2-digit'
+                        }).replace(/\. /g, '-').replace(/\./g, '');
+                      }
+                      
+                      // 갱신일 계산 (보관이 1달 이상이면 매월 1일)
+                      let renewalDateStr = '-';
+                      if (inDate && !isNaN(inDate.getTime())) {
+                        if (!p.out_date) {
+                          const today = new Date();
+                          const monthsDiff = (today.getFullYear() - inDate.getFullYear()) * 12 + (today.getMonth() - inDate.getMonth());
+                          if (monthsDiff >= 1) {
+                            // 마지막 갱신일 (현재 월의 1일)
+                            const lastRenewal = new Date(today.getFullYear(), today.getMonth(), 1);
+                            renewalDateStr = lastRenewal.toLocaleDateString('ko-KR', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit'
+                            }).replace(/\. /g, '-').replace(/\./g, '');
+                          }
+                        } else {
+                          const outDate = new Date(p.out_date + 'T00:00:00+09:00');
+                          if (!isNaN(outDate.getTime())) {
+                            const monthsDiff = (outDate.getFullYear() - inDate.getFullYear()) * 12 + (outDate.getMonth() - inDate.getMonth());
+                            if (monthsDiff >= 1) {
+                              // 마지막 갱신일 (보관종료 월의 1일)
+                              const lastRenewal = new Date(outDate.getFullYear(), outDate.getMonth(), 1);
+                              renewalDateStr = lastRenewal.toLocaleDateString('ko-KR', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit'
+                              }).replace(/\. /g, '-').replace(/\./g, '');
+                            }
+                          }
+                        }
+                      }
+                      
+                      // 보관종료일 포맷팅
+                      let outDateStr = '-';
+                      if (p.out_date) {
+                        const outDate = new Date(p.out_date + 'T00:00:00+09:00');
+                        if (!isNaN(outDate.getTime())) {
+                          outDateStr = outDate.toLocaleDateString('ko-KR', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                          }).replace(/\. /g, '-').replace(/\./g, '');
+                        }
+                      }
+                      
+                      // 상태 표시
+                      let statusText = p.status || '입고됨';
+                      if (p.is_service === 1 || p.is_service === true) {
+                        statusText = '서비스';
+                      }
+                      const statusColor = statusText === '입고됨' ? '#28a745' : statusText === '보관종료' ? '#6c757d' : '#ffc107';
+                      
+                      return `
+                        <tr style="border-bottom: 1px solid #f0f0f0;">
+                          <td style="padding: 8px; font-size: 12px;">${palEscapeHtml(p.pallet_id)}</td>
+                          <td style="padding: 8px;">${palEscapeHtml(p.product_name || '-')}</td>
+                          <td style="padding: 8px; text-align: center; font-size: 12px;">${inDateStr}</td>
+                          <td style="padding: 8px; text-align: center; font-size: 12px;">${renewalDateStr}</td>
+                          <td style="padding: 8px; text-align: center; font-size: 12px;">${outDateStr}</td>
+                          <td style="padding: 8px; text-align: center;">
+                            <span style="padding: 4px 8px; border-radius: 4px; background: ${statusColor}; color: white; font-size: 11px; font-weight: 600;">${statusText}</span>
+                          </td>
+                          <td style="padding: 8px; text-align: right;">${(p.current_fee || 0).toLocaleString()}원</td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              `;
+          } else {
+            palletsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #f44336;">❌ ' + result.message + '</div>';
+          }
+        } else {
+          // 정산 내역 상세 API 호출
+          const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/settlements/${settlementId}/detail`, {
+            headers: palGetUserHeaders()
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            const settlement = result.data;
+            const pallets = settlement.pallets || [];
+            
+            palletsDiv.innerHTML = pallets.length === 0 
+              ? '<div style="padding: 20px; text-align: center; color: #999;">파레트가 없습니다.</div>'
+              : `
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                  <thead>
+                    <tr style="background: #f5f5f5; border-bottom: 2px solid #dee2e6;">
+                      <th style="padding: 8px; text-align: left; font-weight: 600; width: 100px;">파레트 ID</th>
+                      <th style="padding: 8px; text-align: left; font-weight: 600; width: 120px;">품목명</th>
+                      <th style="padding: 8px; text-align: center; font-weight: 600; width: 140px;">최초 입고일</th>
+                      <th style="padding: 8px; text-align: center; font-weight: 600; width: 120px;">갱신일</th>
+                      <th style="padding: 8px; text-align: center; font-weight: 600; width: 140px;">보관종료일</th>
+                      <th style="padding: 8px; text-align: center; font-weight: 600; width: 80px;">상태</th>
+                      <th style="padding: 8px; text-align: right; font-weight: 600; width: 100px;">보관료</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${pallets.map(p => {
+                      // 최초 입고일 포맷팅 (한국 시간)
+                      // 실제 입고일(in_date)을 사용 (created_at은 데이터 입력 시간이므로 사용하지 않음)
+                      let inDate = null;
+                      let inDateStr = '-';
+                      
+                      if (p.in_date) {
+                        inDate = new Date(p.in_date + 'T00:00:00+09:00');
+                      } else if (p.created_at) {
+                        // in_date가 없을 때만 created_at 사용 (fallback)
+                        inDate = new Date(p.created_at);
+                      }
+                      
+                      if (inDate && !isNaN(inDate.getTime())) {
+                        inDateStr = inDate.toLocaleDateString('ko-KR', { 
+                          year: 'numeric', 
+                          month: '2-digit', 
+                          day: '2-digit'
+                        }).replace(/\. /g, '-').replace(/\./g, '');
+                      }
+                      
+                      // 갱신일 계산 (보관이 1달 이상이면 매월 1일)
+                      let renewalDateStr = '-';
+                      // inDate가 위에서 이미 계산되었으므로 재사용
+                      if (inDate && !isNaN(inDate.getTime())) {
+                        if (!p.out_date) {
+                          const today = new Date();
+                          const monthsDiff = (today.getFullYear() - inDate.getFullYear()) * 12 + (today.getMonth() - inDate.getMonth());
+                          if (monthsDiff >= 1) {
+                            // 마지막 갱신일 (현재 월의 1일)
+                            const lastRenewal = new Date(today.getFullYear(), today.getMonth(), 1);
+                            renewalDateStr = lastRenewal.toLocaleDateString('ko-KR', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit'
+                            }).replace(/\. /g, '-').replace(/\./g, '');
+                          }
+                        } else {
+                          const outDate = new Date(p.out_date + 'T00:00:00+09:00');
+                          if (!isNaN(outDate.getTime())) {
+                            const monthsDiff = (outDate.getFullYear() - inDate.getFullYear()) * 12 + (outDate.getMonth() - inDate.getMonth());
+                            if (monthsDiff >= 1) {
+                              // 마지막 갱신일 (보관종료 월의 1일)
+                              const lastRenewal = new Date(outDate.getFullYear(), outDate.getMonth(), 1);
+                              renewalDateStr = lastRenewal.toLocaleDateString('ko-KR', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit'
+                              }).replace(/\. /g, '-').replace(/\./g, '');
+                            }
+                          }
+                        }
+                      }
+                      
+                      // 보관종료일 포맷팅
+                      let outDateStr = '-';
+                      if (p.out_date) {
+                        const outDate = new Date(p.out_date + 'T00:00:00+09:00');
+                        if (!isNaN(outDate.getTime())) {
+                          outDateStr = outDate.toLocaleDateString('ko-KR', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                          }).replace(/\. /g, '-').replace(/\./g, '');
+                        }
+                      }
+                      
+                      // 상태 표시
+                      let statusText = p.status || '입고됨';
+                      if (p.is_service === 1 || p.is_service === true) {
+                        statusText = '서비스';
+                      }
+                      const statusColor = statusText === '입고됨' ? '#28a745' : statusText === '보관종료' ? '#6c757d' : '#ffc107';
+                      
+                      return `
+                        <tr style="border-bottom: 1px solid #f0f0f0;">
+                          <td style="padding: 8px; font-size: 12px;">${palEscapeHtml(p.pallet_id)}</td>
+                          <td style="padding: 8px;">${palEscapeHtml(p.product_name || '-')}</td>
+                          <td style="padding: 8px; text-align: center; font-size: 12px;">${inDateStr}</td>
+                          <td style="padding: 8px; text-align: center; font-size: 12px;">${renewalDateStr}</td>
+                          <td style="padding: 8px; text-align: center; font-size: 12px;">${outDateStr}</td>
+                          <td style="padding: 8px; text-align: center;">
+                            <span style="padding: 4px 8px; border-radius: 4px; background: ${statusColor}; color: white; font-size: 11px; font-weight: 600;">${statusText}</span>
+                          </td>
+                          <td style="padding: 8px; text-align: right;">${(p.rounded_fee || 0).toLocaleString()}원</td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              `;
+          } else {
+            palletsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #f44336;">❌ ' + result.message + '</div>';
+          }
+        }
+      } catch (error) {
+        console.error('파레트 목록 로드 오류:', error);
+        palletsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #f44336;">❌ 데이터를 불러오는 중 오류가 발생했습니다.</div>';
+      }
+    }
+    
+    // 정산 상세 모달 닫기
+    function palCloseSettlementDetail() {
+      document.getElementById('palSettlementDetailModal').style.display = 'none';
+    }
+    
+    // 모달 외부 클릭 시 닫기
+    window.onclick = function(event) {
+      const modal = document.getElementById('palSettlementDetailModal');
+      if (event.target === modal) {
+        palCloseSettlementDetail();
+      }
+    }
+  </script>
+</body>
+</html>
+

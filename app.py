@@ -93,6 +93,7 @@ from api.cs.scheduler import start_cs_notification_scheduler
 from api.special_works.routes_db import special_works_bp
 from api.schedule_notifications.scheduler import start_schedule_notification_scheduler
 from api.schedule_notifications.routes import schedule_notifications_bp
+from api.pallets.routes import pallets_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(returns_bp)
@@ -107,6 +108,8 @@ print("[앱 시작] 헤더 배너 Blueprint 등록 완료")
 app.register_blueprint(cs_bp)
 app.register_blueprint(special_works_bp)
 app.register_blueprint(schedule_notifications_bp)
+app.register_blueprint(pallets_bp)
+print("[앱 시작] 파레트 보관료 관리 시스템 Blueprint 등록 완료")
 
 # C/S 알림 스케줄러 시작
 print("[정보] [앱 시작] C/S 알림 스케줄러 시작 시도...")
@@ -171,6 +174,18 @@ def special_works():
         return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
 
 
+@app.route('/pallets.html')
+def pallets():
+    """파레트 보관료 관리 페이지"""
+    try:
+        # pallets.html 파일 직접 제공
+        return send_file('pallets.html')
+    except FileNotFoundError:
+        return '<h1>파레트 관리 페이지 파일을 찾을 수 없습니다.</h1><p>pallets.html 파일이 필요합니다.</p>', 404
+    except Exception as e:
+        return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
+
+
 @app.route('/dashboard')
 def dashboard():
     """대시보드 페이지"""
@@ -187,6 +202,11 @@ def qrmobile():
         return '<h1>모바일 페이지 파일을 찾을 수 없습니다.</h1><p>index.html 파일이 필요합니다.</p>', 404
     except Exception as e:
         return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
+
+@app.route('/index.html')
+def index_html():
+    """모바일 페이지 (index.html 직접 접근)"""
+    return qrmobile()
 
 @app.route('/admin')
 def admin():
