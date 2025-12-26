@@ -14,7 +14,7 @@
  * 실제 서버 주소로 변경 필요
  */
 const NEW_SYSTEM_CONFIG = {
-  API_BASE_URL: 'http://192.168.0.114:5000', // 실제 서버 주소로 변경
+  API_BASE_URL: 'https://jjaysolution.com', // 배포된 서버 주소 (Vercel)
   API_KEY: '', // API 키가 필요한 경우 여기에 설정 (환경 변수 PALLET_SYNC_API_KEY와 일치해야 함)
   ENABLED: true // 동기화 활성화 여부
 };
