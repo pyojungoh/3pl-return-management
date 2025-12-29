@@ -577,7 +577,13 @@ def get_pallets_for_settlement(company_name: str = None,
                               end_date: date = None) -> List[Dict]:
     """
     정산 대상 파레트 조회
+    
+    ✅ 개선사항:
+    - 화주사명 정규화 및 해시태그 기능 지원
+    - 같은 화주사는 하나로 통합 (TKS 컴퍼니, tks컴퍼니, TKS컴퍼니 → 하나로 통합)
     """
+    from api.database.models import normalize_company_name, get_company_search_keywords
+    
     conn = get_db_connection()
     
     try:
@@ -590,35 +596,69 @@ def get_pallets_for_settlement(company_name: str = None,
         query = "SELECT * FROM pallets WHERE 1=1"
         params = []
         
-        # 화주사 필터링
+        # 화주사 필터링 (정규화 및 해시태그 지원)
         if company_name:
-            if USE_POSTGRESQL:
-                query += " AND company_name = %s"
+            # 검색 가능한 키워드 목록 가져오기 (본인 이름 + 해시태그)
+            search_keywords = get_company_search_keywords(company_name)
+            normalized_keywords = [normalize_company_name(kw) for kw in search_keywords]
+            
+            # 모든 파레트를 가져온 후 필터링 (정규화된 키워드로 매칭)
+            if start_date and end_date:
+                if USE_POSTGRESQL:
+                    cursor.execute('''
+                        SELECT * FROM pallets 
+                        WHERE in_date <= %s AND (out_date IS NULL OR out_date >= %s)
+                        ORDER BY company_name, in_date
+                    ''', (end_date, start_date))
+                else:
+                    cursor.execute('''
+                        SELECT * FROM pallets 
+                        WHERE in_date <= ? AND (out_date IS NULL OR out_date >= ?)
+                        ORDER BY company_name, in_date
+                    ''', (end_date, start_date))
             else:
-                query += " AND company_name = ?"
-            params.append(company_name)
-        
-        # 기간 필터링: 해당 기간에 보관했던 모든 파레트
-        if start_date and end_date:
+                if USE_POSTGRESQL:
+                    cursor.execute('SELECT * FROM pallets ORDER BY company_name, in_date')
+                else:
+                    cursor.execute('SELECT * FROM pallets ORDER BY company_name, in_date')
+            
+            rows = cursor.fetchall()
+            
+            # 정규화된 키워드로 필터링
+            result = []
+            for row in rows:
+                if USE_POSTGRESQL:
+                    pallet = dict(row)
+                else:
+                    pallet = dict(zip([col[0] for col in cursor.description], row))
+                
+                pallet_company_normalized = normalize_company_name(pallet.get('company_name', ''))
+                if pallet_company_normalized in normalized_keywords:
+                    result.append(pallet)
+            
+            return result
+        else:
+            # 화주사 필터링 없음
+            if start_date and end_date:
+                if USE_POSTGRESQL:
+                    query += " AND in_date <= %s AND (out_date IS NULL OR out_date >= %s)"
+                else:
+                    query += " AND in_date <= ? AND (out_date IS NULL OR out_date >= ?)"
+                params.extend([end_date, start_date])
+            
+            query += " ORDER BY company_name, in_date"
+            
             if USE_POSTGRESQL:
-                query += " AND in_date <= %s AND (out_date IS NULL OR out_date >= %s)"
+                cursor.execute(query, params)
             else:
-                query += " AND in_date <= ? AND (out_date IS NULL OR out_date >= ?)"
-            params.extend([end_date, start_date])
-        
-        query += " ORDER BY company_name, in_date"
-        
-        if USE_POSTGRESQL:
-            cursor.execute(query, params)
-        else:
-            cursor.execute(query, params)
-        
-        rows = cursor.fetchall()
-        
-        if USE_POSTGRESQL:
-            return [dict(row) for row in rows]
-        else:
-            return [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+                cursor.execute(query, params)
+            
+            rows = cursor.fetchall()
+            
+            if USE_POSTGRESQL:
+                return [dict(row) for row in rows]
+            else:
+                return [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
     finally:
         cursor.close()
         conn.close()
@@ -650,11 +690,34 @@ def generate_monthly_settlement(settlement_month: str = None,
     if not pallets:
         return False, "정산할 파레트가 없습니다", {}
     
-    # 화주사별로 그룹화
+    # 화주사별로 그룹화 (정규화 및 해시태그 지원)
+    from api.database.models import normalize_company_name, get_company_search_keywords
+    
     company_settlements = {}
+    company_normalized_map = {}  # 정규화된 이름 -> 대표 화주사명 매핑
     
     for pallet in pallets:
-        company = pallet['company_name']
+        raw_company = pallet['company_name']
+        if not raw_company:
+            continue
+        
+        # 정규화된 키워드 목록 가져오기 (본인 이름 + 해시태그)
+        search_keywords = get_company_search_keywords(raw_company)
+        normalized_keywords = [normalize_company_name(kw) for kw in search_keywords]
+        
+        # 대표 화주사명 결정 (이미 매핑된 것이 있으면 사용, 없으면 원본 사용)
+        representative_company = raw_company
+        for normalized_kw in normalized_keywords:
+            if normalized_kw in company_normalized_map:
+                representative_company = company_normalized_map[normalized_kw]
+                break
+        
+        # 매핑 업데이트
+        for normalized_kw in normalized_keywords:
+            if normalized_kw not in company_normalized_map:
+                company_normalized_map[normalized_kw] = representative_company
+        
+        company = representative_company
         
         if company not in company_settlements:
             company_settlements[company] = {
@@ -787,7 +850,13 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                    role: str = '화주사') -> List[Dict]:
     """
     월별 정산 내역 조회
+    
+    ✅ 개선사항:
+    - 화주사명 정규화 및 해시태그 기능 지원
+    - 같은 화주사는 하나로 통합 (TKS 컴퍼니, tks컴퍼니, TKS컴퍼니 → 하나로 통합)
     """
+    from api.database.models import normalize_company_name, get_company_search_keywords
+    
     conn = get_db_connection()
     
     try:
@@ -800,41 +869,61 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
         query = "SELECT * FROM pallet_monthly_settlements WHERE 1=1"
         params = []
         
-        # 화주사 필터링
-        if role != '관리자' and company_name:
-            if USE_POSTGRESQL:
-                query += " AND company_name = %s"
+        # 화주사 필터링 (정규화 및 해시태그 지원)
+        if company_name:
+            # 검색 가능한 키워드 목록 가져오기 (본인 이름 + 해시태그)
+            search_keywords = get_company_search_keywords(company_name)
+            normalized_keywords = [normalize_company_name(kw) for kw in search_keywords]
+            
+            # 모든 정산 내역을 가져온 후 필터링
+            if settlement_month:
+                if USE_POSTGRESQL:
+                    cursor.execute('SELECT * FROM pallet_monthly_settlements WHERE settlement_month = %s ORDER BY settlement_month DESC, company_name', (settlement_month,))
+                else:
+                    cursor.execute('SELECT * FROM pallet_monthly_settlements WHERE settlement_month = ? ORDER BY settlement_month DESC, company_name', (settlement_month,))
             else:
-                query += " AND company_name = ?"
-            params.append(company_name)
-        elif company_name:
-            if USE_POSTGRESQL:
-                query += " AND company_name = %s"
-            else:
-                query += " AND company_name = ?"
-            params.append(company_name)
-        
-        # 월 필터링
-        if settlement_month:
-            if USE_POSTGRESQL:
-                query += " AND settlement_month = %s"
-            else:
-                query += " AND settlement_month = ?"
-            params.append(settlement_month)
-        
-        query += " ORDER BY settlement_month DESC, company_name"
-        
-        if USE_POSTGRESQL:
-            cursor.execute(query, params)
+                if USE_POSTGRESQL:
+                    cursor.execute('SELECT * FROM pallet_monthly_settlements ORDER BY settlement_month DESC, company_name')
+                else:
+                    cursor.execute('SELECT * FROM pallet_monthly_settlements ORDER BY settlement_month DESC, company_name')
+            
+            rows = cursor.fetchall()
+            
+            # 정규화된 키워드로 필터링
+            result = []
+            for row in rows:
+                if USE_POSTGRESQL:
+                    settlement = dict(row)
+                else:
+                    settlement = dict(zip([col[0] for col in cursor.description], row))
+                
+                settlement_company_normalized = normalize_company_name(settlement.get('company_name', ''))
+                if settlement_company_normalized in normalized_keywords:
+                    result.append(settlement)
+            
+            return result
         else:
-            cursor.execute(query, params)
-        
-        rows = cursor.fetchall()
-        
-        if USE_POSTGRESQL:
-            return [dict(row) for row in rows]
-        else:
-            return [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+            # 화주사 필터링 없음
+            if settlement_month:
+                if USE_POSTGRESQL:
+                    query += " AND settlement_month = %s"
+                else:
+                    query += " AND settlement_month = ?"
+                params.append(settlement_month)
+            
+            query += " ORDER BY settlement_month DESC, company_name"
+            
+            if USE_POSTGRESQL:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query, params)
+            
+            rows = cursor.fetchall()
+            
+            if USE_POSTGRESQL:
+                return [dict(row) for row in rows]
+            else:
+                return [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
     finally:
         cursor.close()
         conn.close()
@@ -945,9 +1034,16 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
     """
     파레트를 보관 중인 화주사 목록 조회
     
+    ✅ 개선사항:
+    - 화주사명 정규화 (대소문자 무시, 공백 제거)
+    - 해시태그 기능 지원 (search_keywords 필드 활용)
+    - 같은 화주사는 하나로 통합 (TKS 컴퍼니, tks컴퍼니, TKS컴퍼니 → 하나로 통합)
+    
     Args:
         settlement_month: 정산월 (YYYY-MM 형식). 지정되면 해당 월에 보관했던 화주사만 조회
     """
+    from api.database.models import normalize_company_name, get_company_search_keywords
+    
     conn = get_db_connection()
     
     try:
@@ -997,10 +1093,54 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
         
         rows = cursor.fetchall()
         
+        # 원본 화주사명 목록
+        raw_companies = []
         if USE_POSTGRESQL:
-            return [row['company_name'] for row in rows]
+            raw_companies = [row['company_name'] for row in rows]
         else:
-            return [row[0] for row in rows]
+            raw_companies = [row[0] for row in rows]
+        
+        # 화주사명 정규화 및 통합
+        # 1. 각 화주사명에 대해 정규화된 키워드 목록 생성 (본인 이름 + 해시태그)
+        company_keywords_map = {}  # 정규화된 키워드 -> 원본 화주사명 매핑
+        company_representatives = {}  # 정규화된 키워드 -> 대표 화주사명
+        
+        for company_name in raw_companies:
+            if not company_name:
+                continue
+            
+            # 검색 가능한 키워드 목록 가져오기 (본인 이름 + 해시태그)
+            keywords = get_company_search_keywords(company_name)
+            
+            # 각 키워드에 대해 매핑 생성
+            normalized_company = normalize_company_name(company_name)
+            
+            for keyword in keywords:
+                normalized_keyword = normalize_company_name(keyword)
+                
+                # 이미 다른 화주사가 이 키워드를 사용하고 있는지 확인
+                if normalized_keyword in company_keywords_map:
+                    # 기존 대표 화주사명과 비교하여 우선순위 결정 (더 짧거나 알파벳 순서가 앞서는 것)
+                    existing_rep = company_representatives[normalized_keyword]
+                    if len(company_name) < len(existing_rep) or (len(company_name) == len(existing_rep) and company_name < existing_rep):
+                        company_representatives[normalized_keyword] = company_name
+                        company_keywords_map[normalized_keyword] = company_name
+                else:
+                    company_keywords_map[normalized_keyword] = company_name
+                    company_representatives[normalized_keyword] = company_name
+        
+        # 2. 각 원본 화주사명에 대해 대표 화주사명 찾기
+        final_companies = {}
+        for company_name in raw_companies:
+            if not company_name:
+                continue
+            
+            normalized = normalize_company_name(company_name)
+            representative = company_representatives.get(normalized, company_name)
+            final_companies[representative] = True
+        
+        # 3. 정렬된 목록 반환
+        return sorted(final_companies.keys())
     finally:
         cursor.close()
         conn.close()
