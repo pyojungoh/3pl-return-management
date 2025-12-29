@@ -16,9 +16,9 @@
       display: flex;
       flex-direction: column;
       height: 100%;
-      padding: 0;
-      max-width: 100%;
-      margin: 0;
+      padding: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
     }
     
     /* 하위 메뉴바 스타일 */
@@ -77,8 +77,13 @@
     #palContentArea {
       flex: 1;
       overflow-y: auto;
-      padding: 20px;
+      padding: 0;
       background: transparent;
+    }
+    
+    /* 화주사 모드: 하위 메뉴바가 숨겨졌을 때 상단 패딩 조정 */
+    #palContentArea.pal-consignor-mode {
+      padding-top: 20px;
     }
     
     .pal-content-page {
@@ -1340,6 +1345,12 @@
         const subMenuBar = document.getElementById('palSubMenuBar');
         if (subMenuBar) {
           subMenuBar.style.display = 'none';
+        }
+        
+        // 콘텐츠 영역에 화주사 모드 클래스 추가 (상단 패딩 조정용)
+        const contentArea = document.getElementById('palContentArea');
+        if (contentArea) {
+          contentArea.classList.add('pal-consignor-mode');
         }
         
         // 'list' 페이지만 표시
