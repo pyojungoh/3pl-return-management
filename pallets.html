@@ -3227,49 +3227,9 @@
                         }
                       }
                       
-                      // 보관일수 계산 (해당 월의 보관일수만)
-                      // settlementMonth가 있으면 해당 월 내에서만 계산
-                      let storageDays = 0;
-                      if (settlementMonth) {
-                        // 정산월 정보 파싱 (YYYY-MM 형식)
-                        const [settlementYear, settlementMonthNum] = settlementMonth.split('-').map(Number);
-                        const settlementStartDate = new Date(settlementYear, settlementMonthNum - 1, 1, 0, 0, 0, 0);
-                        const settlementEndDate = new Date(settlementYear, settlementMonthNum, 0, 23, 59, 59, 999); // 해당 월의 마지막 날
-                        
-                        if (inDate && !isNaN(inDate.getTime())) {
-                          // 보관 시작일: 입고일과 정산월 시작일 중 늦은 날
-                          const storageStart = inDate > settlementStartDate ? inDate : settlementStartDate;
-                          
-                          // 보관 종료일: 보관종료일과 정산월 종료일 중 이른 날
-                          let storageEnd;
-                          if (p.out_date) {
-                            const outDate = new Date(p.out_date + 'T00:00:00+09:00');
-                            storageEnd = outDate < settlementEndDate ? outDate : settlementEndDate;
-                          } else {
-                            // 보관중인 경우: 정산월 종료일과 오늘 중 이른 날
-                            const today = new Date();
-                            today.setHours(0, 0, 0, 0);
-                            storageEnd = today < settlementEndDate ? today : settlementEndDate;
-                          }
-                          
-                          // 보관일수 계산 (해당 월 내에서만)
-                          storageStart.setHours(0, 0, 0, 0);
-                          storageEnd.setHours(0, 0, 0, 0);
-                          const diffTime = storageEnd - storageStart;
-                          storageDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1);
-                        }
-                      } else {
-                        // 전체 합계인 경우: storage_days가 있으면 사용, 없으면 전체 기간 계산
-                        if (p.storage_days !== undefined && p.storage_days !== null) {
-                          storageDays = p.storage_days;
-                        } else if (inDate && !isNaN(inDate.getTime())) {
-                          const endDate = p.out_date ? new Date(p.out_date + 'T00:00:00+09:00') : new Date();
-                          if (!isNaN(endDate.getTime())) {
-                            const diffTime = endDate - inDate;
-                            storageDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1);
-                          }
-                        }
-                      }
+                      // 보관일수: 백엔드에서 계산된 값 사용 (해당 월의 보관일수)
+                      // 백엔드에서 month 파라미터가 있을 때 해당 월의 보관일수만 계산하여 반환
+                      let storageDays = p.storage_days || 0;
                       
                       // 상태 표시
                       let statusText = p.status || '입고됨';

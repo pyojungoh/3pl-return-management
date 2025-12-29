@@ -239,7 +239,25 @@ def pallet_list():
         )
         
         # 보관료 계산 추가 및 date 객체를 문자열로 변환
-        from api.pallets.models import calculate_fee, calculate_storage_days
+        from api.pallets.models import calculate_fee, calculate_storage_days, calculate_daily_fee
+        import math
+        from datetime import timedelta
+        
+        # month 파라미터가 있으면 해당 월의 시작일과 종료일 계산
+        month_start = None
+        month_end = None
+        if month:
+            try:
+                year, month_num = map(int, month.split('-'))
+                month_start = date(year, month_num, 1)
+                if month_num == 12:
+                    month_end = date(year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    month_end = date(year, month_num + 1, 1) - timedelta(days=1)
+            except (ValueError, TypeError):
+                month_start = None
+                month_end = None
+        
         for pallet in pallets:
             try:
                 # date 객체를 문자열로 변환 (JSON 직렬화를 위해)
@@ -276,16 +294,36 @@ def pallet_list():
                     out_date_obj = None
                 
                 if in_date_obj:
-                    pallet['storage_days'] = calculate_storage_days(
-                        in_date_obj,
-                        out_date_obj
-                    )
-                    pallet['current_fee'] = calculate_fee(
-                        pallet.get('company_name', ''),
-                        in_date_obj,
-                        out_date_obj,
-                        pallet.get('is_service', 0) == 1
-                    )
+                    is_service = pallet.get('is_service', 0) == 1
+                    
+                    if month_start and month_end:
+                        # 해당 월의 보관일수와 보관료 계산
+                        storage_start = max(in_date_obj, month_start)
+                        if out_date_obj:
+                            storage_end = min(out_date_obj, month_end)
+                        else:
+                            storage_end = min(month_end, date.today())
+                        
+                        pallet['storage_days'] = max(0, (storage_end - storage_start).days + 1)
+                        
+                        if is_service:
+                            pallet['current_fee'] = 0
+                        else:
+                            daily_fee = calculate_daily_fee(pallet.get('company_name', ''), storage_start)
+                            calculated_fee = daily_fee * pallet['storage_days']
+                            pallet['current_fee'] = math.ceil(calculated_fee / 100) * 100
+                    else:
+                        # 전체 기간 보관료 계산
+                        pallet['storage_days'] = calculate_storage_days(
+                            in_date_obj,
+                            out_date_obj
+                        )
+                        pallet['current_fee'] = calculate_fee(
+                            pallet.get('company_name', ''),
+                            in_date_obj,
+                            out_date_obj,
+                            is_service
+                        )
                 else:
                     pallet['storage_days'] = 0
                     pallet['current_fee'] = 0
