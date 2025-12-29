@@ -1282,10 +1282,29 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
         
         rows = cursor.fetchall()
         
-        if USE_POSTGRESQL:
-            settlement['pallets'] = [dict(row) for row in rows]
-        else:
-            settlement['pallets'] = [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+        # 파레트별 상세 내역 처리 (보관료 재계산)
+        pallets_list = []
+        for row in rows:
+            if USE_POSTGRESQL:
+                pallet = dict(row)
+            else:
+                pallet = dict(zip([col[0] for col in cursor.description], row))
+            
+            # 보관료 재계산: 일일 보관료 × 보관일수 (백원 단위 올림)
+            storage_days = pallet.get('storage_days', 0)
+            daily_fee = pallet.get('daily_fee', 0)
+            is_service = pallet.get('is_service', 0) == 1
+            
+            if is_service:
+                rounded_fee = 0
+            else:
+                calculated_fee = daily_fee * storage_days
+                rounded_fee = math.ceil(calculated_fee / 100) * 100
+            
+            pallet['rounded_fee'] = int(rounded_fee)
+            pallets_list.append(pallet)
+        
+        settlement['pallets'] = pallets_list
         
         return settlement
     finally:
