@@ -553,8 +553,11 @@
           
           <!-- 오른쪽: 정산 내역 -->
           <div class="pal-table-container" style="height: calc(100vh - 300px); min-height: 500px; display: flex; flex-direction: column;">
-            <div class="pal-table-header" style="flex-shrink: 0;">
+            <div class="pal-table-header" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
               <h3>정산 내역 <span id="palSettlementsCount" style="font-size: 14px; color: #636e72;">(0개)</span></h3>
+              <button class="pal-btn" onclick="palExportSettlements()" style="padding: 8px 16px; font-size: 13px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; display: none;" id="palExportSettlementsBtn">
+                📥 엑셀 다운로드
+              </button>
             </div>
             <div style="flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px;">
               <div id="palSettlementsList">
@@ -1817,6 +1820,10 @@
           headers: palGetUserHeaders()
         });
         
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const result = await response.json();
         
         if (result.success) {
@@ -1929,8 +1936,15 @@
           tbody.innerHTML = '<tr><td colspan="11" class="no-data">❌ ' + result.message + '</td></tr>';
         }
       } catch (error) {
-        console.error('파레트 목록 로드 오류:', error);
-        tbody.innerHTML = '<tr><td colspan="11" class="no-data">❌ 데이터를 불러오는 중 오류가 발생했습니다.</td></tr>';
+        console.error('●▶ 파레트 목록 로드 오류:', error);
+        let errorMessage = '데이터를 불러오는 중 오류가 발생했습니다.';
+        if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_RESET'))) {
+          errorMessage = '서버 연결 오류가 발생했습니다. 서버가 실행 중인지 확인해주세요.';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        tbody.innerHTML = '<tr><td colspan="11" class="no-data">❌ ' + errorMessage + '</td></tr>';
+        if (countSpan) countSpan.textContent = '(오류)';
       }
     }
     
@@ -2275,7 +2289,7 @@
       }
     }
     
-    // 정산 내역 로드
+    // 정산 내역 로드 (전체 합계 + 월별 최신순)
     async function palLoadSettlements(companyName = null) {
       const listContainer = document.getElementById('palSettlementsList');
       const countSpan = document.getElementById('palSettlementsCount');
@@ -2294,78 +2308,117 @@
       listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">데이터를 불러오는 중...</div>';
       
       try {
-        const month = document.getElementById('palSettlementMonth').value;
+        // 1. 전체 합계 조회 (settlement_month 없이)
+        const totalParams = new URLSearchParams();
+        totalParams.append('company', targetCompany);
         
-        // URL 파라미터 구성 (role은 헤더에서만 전송)
-        const params = new URLSearchParams();
+        // 2. 모든 월별 정산 내역 한 번에 조회 (all_months=true)
+        const allMonthsParams = new URLSearchParams();
+        allMonthsParams.append('company', targetCompany);
+        allMonthsParams.append('all_months', 'true');
         
-        // 화주사 파라미터 추가
-        params.append('company', targetCompany);
+        // 병렬 요청으로 전체 합계와 월별 목록 동시 조회
+        const [totalResponse, allMonthsResponse] = await Promise.all([
+          fetch(`${PAL_API_BASE_URL}/api/pallets/settlements?${totalParams}`, {
+            headers: palGetUserHeaders()
+          }),
+          fetch(`${PAL_API_BASE_URL}/api/pallets/settlements?${allMonthsParams}`, {
+            headers: palGetUserHeaders()
+          })
+        ]);
         
-        // 월이 지정된 경우에만 추가 (지정되지 않으면 전체)
-        if (month) {
-          params.append('month', month);
+        const totalResult = await totalResponse.json();
+        const allMonthsResult = await allMonthsResponse.json();
+        
+        let totalSettlement = null;
+        if (totalResult.success && totalResult.data && totalResult.data.length > 0) {
+          totalSettlement = totalResult.data[0]; // 전체 합계는 1개만 반환됨
+          totalSettlement.settlement_month = null; // 전체 표시용
         }
         
-        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/settlements?${params}`, {
-          headers: palGetUserHeaders()
-        });
+        // 월별 정산 내역 (이미 최신순으로 정렬됨)
+        const monthlySettlements = allMonthsResult.success && allMonthsResult.data ? allMonthsResult.data : [];
         
-        const result = await response.json();
+        // 전체 합계와 월별 목록 결합
+        const allSettlements = [];
+        if (totalSettlement) {
+          allSettlements.push(totalSettlement);
+        }
+        allSettlements.push(...monthlySettlements);
         
-        if (result.success) {
-          const settlements = result.data || [];
-          countSpan.textContent = `(${settlements.length}개)`;
+        countSpan.textContent = `(${allSettlements.length}개)`;
+        
+        // 엑셀 다운로드 버튼 표시 (화주사가 선택되어 있으면 항상 표시)
+        const exportBtn = document.getElementById('palExportSettlementsBtn');
+        if (exportBtn && targetCompany) {
+          exportBtn.style.display = 'block';
+        } else if (exportBtn) {
+          exportBtn.style.display = 'none';
+        }
+        
+        if (allSettlements.length === 0) {
+          listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">정산 내역이 없습니다.</div>';
+        } else {
+          // 헤더 추가
+          const headerHTML = `
+            <div style="padding: 12px 15px; background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white; font-weight: 700; border-radius: 8px 8px 0 0; display: grid; grid-template-columns: 100px 120px 80px 120px 80px 80px 80px 120px; gap: 10px; align-items: center; margin-bottom: 10px;">
+              <div>정산월</div>
+              <div>화주사</div>
+              <div style="text-align: center;">파레트 수</div>
+              <div style="text-align: right;">보관료</div>
+              <div style="text-align: center;">상태</div>
+              <div style="text-align: center;">펼침</div>
+              <div style="text-align: center;">다운로드</div>
+              <div style="text-align: center;">관리</div>
+            </div>
+          `;
           
-          const listContainer = document.getElementById('palSettlementsList');
-          
-          if (settlements.length === 0) {
-            listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">정산 내역이 없습니다.</div>';
-          } else {
-            listContainer.innerHTML = settlements.map((settlement, index) => {
-              const settlementId = settlement.id || `temp_${index}`;
-              
-              return `
-                <div class="pal-settlement-item" style="margin-bottom: 15px; border: 2px solid #ffeaa7; border-radius: 12px; overflow: hidden; background: #ffffff;">
-                  <!-- 정산 내역 요약 (클릭 가능) -->
-                  <div class="pal-settlement-header" onclick="palToggleSettlementDetail('${settlementId}')" style="padding: 15px; background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%); cursor: pointer; display: grid; grid-template-columns: 100px 120px 80px 100px 120px 80px 80px 100px; gap: 10px; align-items: center; transition: all 0.2s;">
-                    <div style="font-weight: 600; color: #ff6b35;">${settlement.settlement_month ? palEscapeHtml(settlement.settlement_month) : '전체'}</div>
-                    <div style="font-weight: 600;">${palEscapeHtml(settlement.company_name)}</div>
-                    <div>${settlement.total_pallets}개</div>
-                    <div>${settlement.total_storage_days}일</div>
-                    <div style="font-weight: 600; color: #ff6b35;">${settlement.total_fee.toLocaleString()}원</div>
-                    <div>
-                      <span style="padding: 4px 8px; border-radius: 4px; background: ${settlement.status === '확정' ? '#28a745' : settlement.status === '완료' ? '#6c757d' : '#ffc107'}; color: white; font-size: 11px; font-weight: 600;">${palEscapeHtml(settlement.status || '미생성')}</span>
-                    </div>
-                    <div>
-                      <span id="palSettlementIcon_${settlementId}" style="font-size: 12px;">▼</span>
-                    </div>
-                    <div onclick="event.stopPropagation();" style="display: flex; gap: 5px; flex-wrap: wrap;">
-                      ${settlement.id && palCurrentRole === '관리자' ? `
-                        ${settlement.status === '대기' 
-                          ? `<button class="pal-btn" onclick="palConfirmSettlement(${settlement.id})" style="padding: 4px 8px; font-size: 11px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">확정</button>`
-                          : ''}
-                        ${settlement.status === '확정' || settlement.status === '완료'
-                          ? `<button class="pal-btn" onclick="palRevertSettlement(${settlement.id})" style="padding: 4px 8px; font-size: 11px; background: #ffc107; color: white; border: none; border-radius: 4px; cursor: pointer;">대기로 변경</button>`
-                          : ''}
-                        <button class="pal-btn" onclick="palDeleteSettlement(${settlement.id})" style="padding: 4px 8px; font-size: 11px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">삭제</button>
-                      ` : ''}
-                    </div>
+          listContainer.innerHTML = headerHTML + allSettlements.map((settlement, index) => {
+            const settlementId = settlement.id || `temp_${index}`;
+            const isTotal = !settlement.settlement_month; // 전체 합계인지 확인
+            const settlementMonth = settlement.settlement_month || null;
+            
+            return `
+              <div class="pal-settlement-item" style="margin-bottom: 15px; border: 2px solid #ffeaa7; border-radius: 12px; overflow: hidden; background: #ffffff;">
+                <!-- 정산 내역 요약 (클릭 가능) -->
+                <div class="pal-settlement-header" onclick="palToggleSettlementDetail('${settlementId}', '${settlementMonth || ''}')" style="padding: 15px; background: ${isTotal ? 'linear-gradient(135deg, #fff3d4 0%, #fffef9 100%)' : 'linear-gradient(135deg, #fffef9 0%, #ffffff 100%)'}; cursor: pointer; display: grid; grid-template-columns: 100px 120px 80px 120px 80px 80px 80px 120px; gap: 10px; align-items: center; transition: all 0.2s;">
+                  <div style="font-weight: ${isTotal ? '700' : '600'}; color: #ff6b35; font-size: ${isTotal ? '15px' : '14px'};">${isTotal ? '📊 전체' : palEscapeHtml(settlement.settlement_month)}</div>
+                  <div style="font-weight: 600;">${palEscapeHtml(settlement.company_name)}</div>
+                  <div style="text-align: center;">${settlement.total_pallets}개</div>
+                  <div style="font-weight: ${isTotal ? '700' : '600'}; color: #ff6b35; font-size: ${isTotal ? '15px' : '14px'}; text-align: right;">${settlement.total_fee.toLocaleString()}원</div>
+                  <div>
+                    <span style="padding: 4px 8px; border-radius: 4px; background: ${settlement.status === '확정' ? '#28a745' : settlement.status === '완료' ? '#6c757d' : '#ffc107'}; color: white; font-size: 11px; font-weight: 600;">${palEscapeHtml(settlement.status || '미생성')}</span>
                   </div>
-                  <!-- 파레트별 상세 리스트 (접이식) -->
-                  <div id="palSettlementDetail_${settlementId}" style="display: none; padding: 15px; background: #f8f9fa; border-top: 2px solid #ffeaa7;">
-                    <div style="margin-bottom: 10px; font-weight: 600; color: #636e72; font-size: 14px;">파레트별 상세 내역</div>
-                    <div id="palSettlementPallets_${settlementId}" style="background: #ffffff; border-radius: 8px; padding: 10px;">
-                      <div style="padding: 20px; text-align: center; color: #999;">로딩 중...</div>
-                    </div>
+                  <div>
+                    <span id="palSettlementIcon_${settlementId}" style="font-size: 12px;">▼</span>
+                  </div>
+                  <div onclick="event.stopPropagation();" style="display: flex; gap: 5px; flex-wrap: wrap;">
+                    ${!isTotal ? `
+                      <button class="pal-btn" onclick="event.stopPropagation(); palExportSettlementMonth('${settlementMonth || ''}')" style="padding: 4px 8px; font-size: 11px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;" title="엑셀 다운로드">📥 엑셀</button>
+                    ` : ''}
+                  </div>
+                  <div onclick="event.stopPropagation();" style="display: flex; gap: 5px; flex-wrap: wrap;">
+                    ${settlement.id && palCurrentRole === '관리자' && !isTotal ? `
+                      ${settlement.status === '대기' 
+                        ? `<button class="pal-btn" onclick="palConfirmSettlement(${settlement.id})" style="padding: 4px 8px; font-size: 11px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">확정</button>`
+                        : ''}
+                      ${settlement.status === '확정' || settlement.status === '완료'
+                        ? `<button class="pal-btn" onclick="palRevertSettlement(${settlement.id})" style="padding: 4px 8px; font-size: 11px; background: #ffc107; color: white; border: none; border-radius: 4px; cursor: pointer;">대기로 변경</button>`
+                        : ''}
+                      <button class="pal-btn" onclick="palDeleteSettlement(${settlement.id})" style="padding: 4px 8px; font-size: 11px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">삭제</button>
+                    ` : ''}
                   </div>
                 </div>
-              `;
-            }).join('');
-          }
-        } else {
-          const listContainer = document.getElementById('palSettlementsList');
-          listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #f44336;">❌ ' + result.message + '</div>';
+                <!-- 파레트별 상세 리스트 (접이식) -->
+                <div id="palSettlementDetail_${settlementId}" style="display: none; padding: 15px; background: #f8f9fa; border-top: 2px solid #ffeaa7;">
+                  <div style="margin-bottom: 10px; font-weight: 600; color: #636e72; font-size: 14px;">파레트별 상세 내역</div>
+                  <div id="palSettlementPallets_${settlementId}" data-settlement-month="${settlementMonth || ''}" style="background: #ffffff; border-radius: 8px; padding: 10px;">
+                    <div style="padding: 20px; text-align: center; color: #999;">로딩 중...</div>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('');
         }
       } catch (error) {
         console.error('정산 내역 로드 오류:', error);
@@ -2375,7 +2428,7 @@
     }
     
     // 정산 내역 상세 토글
-    async function palToggleSettlementDetail(settlementId) {
+    async function palToggleSettlementDetail(settlementId, settlementMonth = null) {
       const detailDiv = document.getElementById(`palSettlementDetail_${settlementId}`);
       const iconSpan = document.getElementById(`palSettlementIcon_${settlementId}`);
       const palletsDiv = document.getElementById(`palSettlementPallets_${settlementId}`);
@@ -2395,27 +2448,38 @@
         
         // 파레트 목록이 아직 로드되지 않았으면 로드
         if (palletsDiv.innerHTML.includes('로딩 중')) {
-          await palLoadSettlementPallets(settlementId);
+          // settlementMonth가 전달되지 않았으면 data 속성에서 읽기
+          if (!settlementMonth && palletsDiv) {
+            settlementMonth = palletsDiv.getAttribute('data-settlement-month') || null;
+          }
+          await palLoadSettlementPallets(settlementId, settlementMonth);
         }
       }
     }
     
     // 정산 내역의 파레트 목록 로드
-    async function palLoadSettlementPallets(settlementId) {
+    async function palLoadSettlementPallets(settlementId, settlementMonth = null) {
       const palletsDiv = document.getElementById(`palSettlementPallets_${settlementId}`);
       if (!palletsDiv) return;
       
       try {
+        // settlementMonth가 전달되지 않았으면 data 속성에서 읽기
+        if (!settlementMonth) {
+          settlementMonth = palletsDiv.getAttribute('data-settlement-month') || null;
+          if (settlementMonth === '') settlementMonth = null; // 빈 문자열을 null로 변환
+        }
+        
         // settlementId가 temp_로 시작하면 임시 정산 내역 (파레트 목록 직접 조회)
         if (settlementId.startsWith('temp_')) {
           // 현재 선택된 화주사와 정산월로 파레트 목록 조회
           const targetCompany = palSelectedCompany || (palCurrentRole !== '관리자' ? palCurrentCompany : null);
-          const month = document.getElementById('palSettlementMonth').value;
           
           const params = new URLSearchParams();
           params.append('company', targetCompany);
-          if (month) {
-            params.append('month', month);
+          
+          // settlementMonth가 있으면 해당 월만, 없으면 전체 (전체 합계인 경우)
+          if (settlementMonth) {
+            params.append('month', settlementMonth);
           }
           
           const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/list?${params}`, {
@@ -2426,7 +2490,7 @@
           
           if (result.success) {
             const pallets = result.data || [];
-            console.log('[PAL] 임시 정산 파레트 목록:', pallets);
+            console.log('[PAL] 임시 정산 파레트 목록:', pallets, 'settlementMonth:', settlementMonth);
             palletsDiv.innerHTML = pallets.length === 0 
               ? '<div style="padding: 20px; text-align: center; color: #999;">파레트가 없습니다.</div>'
               : `
@@ -2438,6 +2502,7 @@
                       <th style="padding: 8px; text-align: center; font-weight: 600; width: 140px;">최초 입고일</th>
                       <th style="padding: 8px; text-align: center; font-weight: 600; width: 120px;">갱신일</th>
                       <th style="padding: 8px; text-align: center; font-weight: 600; width: 140px;">보관종료일</th>
+                      <th style="padding: 8px; text-align: center; font-weight: 600; width: 80px;">보관일수</th>
                       <th style="padding: 8px; text-align: center; font-weight: 600; width: 80px;">상태</th>
                       <th style="padding: 8px; text-align: right; font-weight: 600; width: 100px;">보관료</th>
                     </tr>
@@ -2520,6 +2585,50 @@
                         }
                       }
                       
+                      // 보관일수 계산 (해당 월의 보관일수만)
+                      // settlementMonth가 있으면 해당 월 내에서만 계산
+                      let storageDays = 0;
+                      if (settlementMonth) {
+                        // 정산월 정보 파싱 (YYYY-MM 형식)
+                        const [settlementYear, settlementMonthNum] = settlementMonth.split('-').map(Number);
+                        const settlementStartDate = new Date(settlementYear, settlementMonthNum - 1, 1, 0, 0, 0, 0);
+                        const settlementEndDate = new Date(settlementYear, settlementMonthNum, 0, 23, 59, 59, 999); // 해당 월의 마지막 날
+                        
+                        if (inDate && !isNaN(inDate.getTime())) {
+                          // 보관 시작일: 입고일과 정산월 시작일 중 늦은 날
+                          const storageStart = inDate > settlementStartDate ? inDate : settlementStartDate;
+                          
+                          // 보관 종료일: 보관종료일과 정산월 종료일 중 이른 날
+                          let storageEnd;
+                          if (p.out_date) {
+                            const outDate = new Date(p.out_date + 'T00:00:00+09:00');
+                            storageEnd = outDate < settlementEndDate ? outDate : settlementEndDate;
+                          } else {
+                            // 보관중인 경우: 정산월 종료일과 오늘 중 이른 날
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            storageEnd = today < settlementEndDate ? today : settlementEndDate;
+                          }
+                          
+                          // 보관일수 계산 (해당 월 내에서만)
+                          storageStart.setHours(0, 0, 0, 0);
+                          storageEnd.setHours(0, 0, 0, 0);
+                          const diffTime = storageEnd - storageStart;
+                          storageDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1);
+                        }
+                      } else {
+                        // 전체 합계인 경우: storage_days가 있으면 사용, 없으면 전체 기간 계산
+                        if (p.storage_days !== undefined && p.storage_days !== null) {
+                          storageDays = p.storage_days;
+                        } else if (inDate && !isNaN(inDate.getTime())) {
+                          const endDate = p.out_date ? new Date(p.out_date + 'T00:00:00+09:00') : new Date();
+                          if (!isNaN(endDate.getTime())) {
+                            const diffTime = endDate - inDate;
+                            storageDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1);
+                          }
+                        }
+                      }
+                      
                       // 상태 표시
                       let statusText = p.status || '입고됨';
                       if (p.is_service === 1 || p.is_service === true) {
@@ -2534,6 +2643,7 @@
                           <td style="padding: 8px; text-align: center; font-size: 12px;">${inDateStr}</td>
                           <td style="padding: 8px; text-align: center; font-size: 12px;">${renewalDateStr}</td>
                           <td style="padding: 8px; text-align: center; font-size: 12px;">${outDateStr}</td>
+                          <td style="padding: 8px; text-align: center; font-size: 12px;">${storageDays}일</td>
                           <td style="padding: 8px; text-align: center;">
                             <span style="padding: 4px 8px; border-radius: 4px; background: ${statusColor}; color: white; font-size: 11px; font-weight: 600;">${statusText}</span>
                           </td>
@@ -2570,6 +2680,7 @@
                       <th style="padding: 8px; text-align: center; font-weight: 600; width: 140px;">최초 입고일</th>
                       <th style="padding: 8px; text-align: center; font-weight: 600; width: 120px;">갱신일</th>
                       <th style="padding: 8px; text-align: center; font-weight: 600; width: 140px;">보관종료일</th>
+                      <th style="padding: 8px; text-align: center; font-weight: 600; width: 80px;">보관일수</th>
                       <th style="padding: 8px; text-align: center; font-weight: 600; width: 80px;">상태</th>
                       <th style="padding: 8px; text-align: right; font-weight: 600; width: 100px;">보관료</th>
                     </tr>
@@ -2642,6 +2753,9 @@
                         }
                       }
                       
+                      // 보관일수 (API에서 제공되는 값 사용 - 정산 상세 API는 이미 해당 월의 보관일수를 계산하여 반환)
+                      const storageDays = p.storage_days || 0;
+                      
                       // 상태 표시
                       let statusText = p.status || '입고됨';
                       if (p.is_service === 1 || p.is_service === true) {
@@ -2656,6 +2770,7 @@
                           <td style="padding: 8px; text-align: center; font-size: 12px;">${inDateStr}</td>
                           <td style="padding: 8px; text-align: center; font-size: 12px;">${renewalDateStr}</td>
                           <td style="padding: 8px; text-align: center; font-size: 12px;">${outDateStr}</td>
+                          <td style="padding: 8px; text-align: center; font-size: 12px;">${storageDays}일</td>
                           <td style="padding: 8px; text-align: center;">
                             <span style="padding: 4px 8px; border-radius: 4px; background: ${statusColor}; color: white; font-size: 11px; font-weight: 600;">${statusText}</span>
                           </td>
@@ -2673,6 +2788,114 @@
       } catch (error) {
         console.error('파레트 목록 로드 오류:', error);
         palletsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #f44336;">❌ 데이터를 불러오는 중 오류가 발생했습니다.</div>';
+      }
+    }
+    
+    // 정산 내역 엑셀 다운로드 (전체)
+    async function palExportSettlements() {
+      console.log('palExportSettlements 호출됨');
+      const targetCompany = palSelectedCompany || (palCurrentRole !== '관리자' ? palCurrentCompany : null);
+      
+      if (!targetCompany) {
+        alert('❌ 화주사를 선택해주세요.');
+        return;
+      }
+      
+      try {
+        const params = new URLSearchParams();
+        params.append('company', targetCompany);
+        
+        const url = `${PAL_API_BASE_URL}/api/pallets/settlements/export?${params}`;
+        const response = await fetch(url, {
+          headers: palGetUserHeaders()
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          alert('❌ 다운로드 실패: ' + (error.message || '알 수 없는 오류'));
+          return;
+        }
+        
+        // 파일명 추출 (Content-Disposition 헤더에서)
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = '파레트_보관료_정산내역.csv';
+        if (contentDisposition) {
+          const matches = contentDisposition.match(/filename\*=UTF-8''(.+)/);
+          if (matches) {
+            filename = decodeURIComponent(matches[1]);
+          }
+        }
+        
+        // Blob으로 변환 후 다운로드
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(downloadUrl);
+      } catch (error) {
+        console.error('엑셀 다운로드 오류:', error);
+        alert('❌ 다운로드 중 오류가 발생했습니다: ' + error.message);
+      }
+    }
+    
+    // 월별 정산 내역 엑셀 다운로드
+    async function palExportSettlementMonth(settlementMonth) {
+      console.log('palExportSettlementMonth 호출됨, settlementMonth:', settlementMonth);
+      const targetCompany = palSelectedCompany || (palCurrentRole !== '관리자' ? palCurrentCompany : null);
+      
+      if (!targetCompany) {
+        alert('❌ 화주사를 선택해주세요.');
+        return;
+      }
+      
+      if (!settlementMonth || settlementMonth === '') {
+        alert('❌ 정산월 정보가 없습니다.');
+        return;
+      }
+      
+      try {
+        const params = new URLSearchParams();
+        params.append('company', targetCompany);
+        params.append('month', settlementMonth);
+        
+        const url = `${PAL_API_BASE_URL}/api/pallets/settlements/export?${params}`;
+        const response = await fetch(url, {
+          headers: palGetUserHeaders()
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          alert('❌ 다운로드 실패: ' + (error.message || '알 수 없는 오류'));
+          return;
+        }
+        
+        // 파일명 추출 (Content-Disposition 헤더에서)
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = `파레트_보관료_정산내역_${settlementMonth}.csv`;
+        if (contentDisposition) {
+          const matches = contentDisposition.match(/filename\*=UTF-8''(.+)/);
+          if (matches) {
+            filename = decodeURIComponent(matches[1]);
+          }
+        }
+        
+        // Blob으로 변환 후 다운로드
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(downloadUrl);
+      } catch (error) {
+        console.error('엑셀 다운로드 오류:', error);
+        alert('❌ 다운로드 중 오류가 발생했습니다: ' + error.message);
       }
     }
     

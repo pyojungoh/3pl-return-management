@@ -241,30 +241,61 @@ def pallet_list():
         # 보관료 계산 추가 및 date 객체를 문자열로 변환
         from api.pallets.models import calculate_fee, calculate_storage_days
         for pallet in pallets:
-            # date 객체를 문자열로 변환 (JSON 직렬화를 위해)
-            if pallet.get('in_date') and isinstance(pallet['in_date'], date):
-                pallet['in_date'] = pallet['in_date'].isoformat()
-            if pallet.get('out_date') and isinstance(pallet['out_date'], date):
-                pallet['out_date'] = pallet['out_date'].isoformat()
-            
-            # 날짜 문자열을 date 객체로 변환하여 계산
-            in_date_obj = pallet['in_date']
-            if isinstance(in_date_obj, str):
-                in_date_obj = datetime.strptime(in_date_obj, '%Y-%m-%d').date()
-            out_date_obj = pallet.get('out_date')
-            if out_date_obj and isinstance(out_date_obj, str):
-                out_date_obj = datetime.strptime(out_date_obj, '%Y-%m-%d').date()
-            
-            pallet['storage_days'] = calculate_storage_days(
-                in_date_obj,
-                out_date_obj
-            )
-            pallet['current_fee'] = calculate_fee(
-                pallet['company_name'],
-                in_date_obj,
-                out_date_obj,
-                pallet.get('is_service', 0) == 1
-            )
+            try:
+                # date 객체를 문자열로 변환 (JSON 직렬화를 위해)
+                if pallet.get('in_date') and isinstance(pallet['in_date'], date):
+                    pallet['in_date'] = pallet['in_date'].isoformat()
+                if pallet.get('out_date') and isinstance(pallet['out_date'], date):
+                    pallet['out_date'] = pallet['out_date'].isoformat()
+                
+                # 날짜 문자열을 date 객체로 변환하여 계산
+                in_date_obj = pallet.get('in_date')
+                if in_date_obj:
+                    if isinstance(in_date_obj, str):
+                        try:
+                            in_date_obj = datetime.strptime(in_date_obj, '%Y-%m-%d').date()
+                        except (ValueError, TypeError) as e:
+                            print(f"⚠️ 입고일 파싱 오류 (pallet_id: {pallet.get('pallet_id')}): {e}")
+                            in_date_obj = None
+                    elif not isinstance(in_date_obj, date):
+                        in_date_obj = None
+                else:
+                    in_date_obj = None
+                    
+                out_date_obj = pallet.get('out_date')
+                if out_date_obj:
+                    if isinstance(out_date_obj, str):
+                        try:
+                            out_date_obj = datetime.strptime(out_date_obj, '%Y-%m-%d').date()
+                        except (ValueError, TypeError) as e:
+                            print(f"⚠️ 보관종료일 파싱 오류 (pallet_id: {pallet.get('pallet_id')}): {e}")
+                            out_date_obj = None
+                    elif not isinstance(out_date_obj, date):
+                        out_date_obj = None
+                else:
+                    out_date_obj = None
+                
+                if in_date_obj:
+                    pallet['storage_days'] = calculate_storage_days(
+                        in_date_obj,
+                        out_date_obj
+                    )
+                    pallet['current_fee'] = calculate_fee(
+                        pallet.get('company_name', ''),
+                        in_date_obj,
+                        out_date_obj,
+                        pallet.get('is_service', 0) == 1
+                    )
+                else:
+                    pallet['storage_days'] = 0
+                    pallet['current_fee'] = 0
+            except Exception as e:
+                print(f"⚠️ 파레트 데이터 처리 오류 (pallet_id: {pallet.get('pallet_id')}): {e}")
+                import traceback
+                traceback.print_exc()
+                # 기본값 설정
+                pallet['storage_days'] = pallet.get('storage_days', 0)
+                pallet['current_fee'] = pallet.get('current_fee', 0)
         
         return jsonify({
             'success': True,
@@ -559,12 +590,14 @@ def calculate_fees():
 def settlements_list():
     """
     월별 정산 내역 조회 (정산 내역이 없으면 파레트 목록 기반으로 임시 정산 내역 생성)
+    month 파라미터가 없으면 모든 월별 정산 내역을 반환 (전체 합계 제외)
     """
     try:
         role, company_name, username = get_user_context()
         
         filter_company = request.args.get('company', '') or (company_name if role != '관리자' else '')
         settlement_month = request.args.get('month')
+        all_months = request.args.get('all_months', 'false').lower() == 'true'  # 모든 월별 데이터 요청
         
         # 화주사인 경우 필수 (company_name이 헤더에 있으면 사용)
         if role != '관리자' and not filter_company and not company_name:
@@ -577,30 +610,142 @@ def settlements_list():
         
         # 정산 내역 조회
         final_company = filter_company if filter_company else (company_name if role != '관리자' else None)
-        settlements = get_settlements(
-            company_name=final_company if final_company else None,
-            settlement_month=settlement_month,
-            role=role
-        )
         
-        # 정산 내역이 없으면 파레트 목록 기반으로 임시 정산 내역 생성
-        if not settlements:
-            from api.pallets.models import get_pallets_for_settlement, calculate_daily_fee, calculate_fee, calculate_storage_days
-            from datetime import date, timedelta
-            import math
+        # all_months가 true이면 모든 월별 정산 내역을 한 번에 조회
+        if all_months and not settlement_month:
+            # 먼저 DB에 저장된 정산 내역 조회 (월별)
+            settlements = get_settlements(
+                company_name=final_company if final_company else None,
+                settlement_month=None,  # 모든 월
+                role=role
+            )
             
-            # 정산월이 있으면 해당 월만, 없으면 전체 기간
-            if settlement_month:
-                year, month = map(int, settlement_month.split('-'))
-                start_date = date(year, month, 1)
-                if month == 12:
-                    end_date = date(year + 1, 1, 1) - timedelta(days=1)
+            # 최근 24개월 목록 생성
+            from datetime import date
+            today = date.today()
+            all_settlement_months = []
+            for i in range(24):
+                target_date = date(today.year, today.month, 1)
+                for _ in range(i):
+                    if target_date.month == 1:
+                        target_date = date(target_date.year - 1, 12, 1)
+                    else:
+                        target_date = date(target_date.year, target_date.month - 1, 1)
+                settlement_month_str = f"{target_date.year}-{target_date.month:02d}"
+                all_settlement_months.append(settlement_month_str)
+            
+            # DB에 없는 월별 정산 내역이 있으면 임시 생성
+            existing_months = {s.get('settlement_month') for s in settlements if s.get('settlement_month')}
+            missing_months = [m for m in all_settlement_months if m not in existing_months]
+            
+            # DB에 없는 월별 정산 내역 생성 (임시)
+            if missing_months:
+                from api.pallets.models import get_pallets_for_settlement, calculate_daily_fee, calculate_fee
+                import math
+                from datetime import timedelta
+                
+                # 파레트 전체 목록 한 번만 조회
+                pallets = get_pallets_for_settlement(
+                    company_name=final_company if final_company else None,
+                    start_date=None,
+                    end_date=None
+                )
+                
+                if final_company:
+                    pallets = [p for p in pallets if p['company_name'] == final_company]
+                
+                # 각 월별로 임시 정산 내역 생성
+                for month_str in missing_months:
+                    year, month = map(int, month_str.split('-'))
+                    month_start = date(year, month, 1)
+                    if month == 12:
+                        month_end = date(year + 1, 1, 1) - timedelta(days=1)
+                    else:
+                        month_end = date(year, month + 1, 1) - timedelta(days=1)
+                    
+                    # 해당 월에 해당하는 파레트만 필터링
+                    month_pallets = []
+                    for pallet in pallets:
+                        in_date = pallet['in_date']
+                        out_date = pallet.get('out_date')
+                        # 해당 월에 보관 중이었던 파레트
+                        if in_date <= month_end and (out_date is None or out_date >= month_start):
+                            month_pallets.append(pallet)
+                    
+                    if month_pallets:
+                        # 임시 정산 내역 계산
+                        # 입고중(status='입고됨')과 서비스(is_service=1) 상태만 카운트
+                        total_pallets = 0
+                        total_storage_days = 0
+                        total_fee = 0
+                        
+                        for pallet in month_pallets:
+                            in_date = pallet['in_date']
+                            out_date = pallet.get('out_date')
+                            is_service = pallet.get('is_service', 0) == 1
+                            status = pallet.get('status', '입고됨')
+                            
+                            # 입고중(status='입고됨') 또는 서비스 상태만 카운트
+                            if status == '입고됨' or is_service:
+                                total_pallets += 1
+                            
+                            if not is_service:
+                                # 해당 월 내 보관일수 계산
+                                storage_start = max(in_date, month_start)
+                                if out_date:
+                                    storage_end = min(out_date, month_end)
+                                else:
+                                    storage_end = min(month_end, date.today())
+                                
+                                pallet_storage_days = max(0, (storage_end - storage_start).days + 1)
+                                total_storage_days += pallet_storage_days
+                                
+                                # 보관료 계산
+                                daily_fee = calculate_daily_fee(pallet['company_name'], storage_start)
+                                calculated_fee = daily_fee * pallet_storage_days
+                                fee = math.ceil(calculated_fee / 100) * 100
+                                total_fee += fee
+                        
+                        settlements.append({
+                            'id': None,
+                            'company_name': final_company,
+                            'settlement_month': month_str,
+                            'total_pallets': total_pallets,
+                            'total_storage_days': total_storage_days,
+                            'total_fee': total_fee,
+                            'status': '미생성',
+                            'created_at': None,
+                            'updated_at': None
+                        })
+            
+            # settlement_month 기준으로 정렬 (최신순)
+            settlements.sort(key=lambda x: x.get('settlement_month', ''), reverse=True)
+        else:
+            # 기존 로직 (단일 월 또는 전체 합계)
+            settlements = get_settlements(
+                company_name=final_company if final_company else None,
+                settlement_month=settlement_month,
+                role=role
+            )
+            
+            # 정산 내역이 없으면 파레트 목록 기반으로 임시 정산 내역 생성 (all_months가 false일 때만)
+            if not settlements:
+                from api.pallets.models import get_pallets_for_settlement, calculate_daily_fee, calculate_fee, calculate_storage_days
+                from datetime import date, timedelta
+                import math
+                
+                # 정산월이 있으면 해당 월만, 없으면 전체 기간
+                if settlement_month:
+                    year, month = map(int, settlement_month.split('-'))
+                    start_date = date(year, month, 1)
+                    if month == 12:
+                        end_date = date(year + 1, 1, 1) - timedelta(days=1)
+                    else:
+                        end_date = date(year, month + 1, 1) - timedelta(days=1)
                 else:
-                    end_date = date(year, month + 1, 1) - timedelta(days=1)
-            else:
-                # 전체 기간: 오늘까지
-                start_date = None
-                end_date = None
+                    # 전체 기간: 오늘까지
+                    start_date = None
+                    end_date = None
             
             # 파레트 목록 조회
             pallets = get_pallets_for_settlement(
@@ -664,26 +809,25 @@ def settlements_list():
                     company_settlements[company]['total_pallets'] += 1
                     # 각 파레트별 보관료를 합산 (파레트 개수로 곱하지 않음)
                     company_settlements[company]['total_fee'] += fee
-                
-                # 총 보관일수 계산 (전체 기간 기준)
-                for company, settlement_data in company_settlements.items():
-                    first_in_date = settlement_data['first_in_date']
-                    last_out_date = settlement_data['last_out_date']
                     
+                    # 월별 보관일수 계산: 각 파레트의 해당 월 내 보관일수를 합산
                     if settlement_month:
-                        # 정산월이 있으면: 해당 월의 1일부터 마지막 보관종료일(또는 월말 또는 오늘)까지
-                        # 정산월의 시작일은 항상 해당 월의 1일
-                        storage_start = start_date  # 정산월의 1일
-                        
-                        if last_out_date:
-                            # 전부 보관종료된 경우: 마지막 보관종료일과 월말 중 이른 날
-                            storage_end = min(last_out_date, end_date)
+                        # 해당 월 내 보관일수 계산
+                        storage_start = max(in_date, start_date)
+                        if out_date:
+                            storage_end = min(out_date, end_date)
                         else:
-                            # 보관중인 파레트가 있는 경우: 월말과 오늘 중 이른 날
                             storage_end = min(end_date, date.today())
                         
-                        total_storage_days = (storage_end - storage_start).days + 1
-                    else:
+                        pallet_storage_days = max(0, (storage_end - storage_start).days + 1)
+                        company_settlements[company]['total_storage_days'] += pallet_storage_days
+                
+                # 정산월이 없을 때만 전체 기간 기준으로 계산 (월별은 이미 위에서 계산됨)
+                for company, settlement_data in company_settlements.items():
+                    if not settlement_month:
+                        first_in_date = settlement_data['first_in_date']
+                        last_out_date = settlement_data['last_out_date']
+                        
                         # 정산월이 없으면: 첫 입고일부터 마지막 보관종료일(또는 오늘)까지
                         if last_out_date:
                             # 전부 보관종료된 경우: 마지막 보관종료일까지
@@ -692,8 +836,7 @@ def settlements_list():
                             # 보관중인 파레트가 있는 경우: 오늘까지
                             storage_end = date.today()
                         total_storage_days = (storage_end - first_in_date).days + 1
-                    
-                    settlement_data['total_storage_days'] = max(0, total_storage_days)
+                        settlement_data['total_storage_days'] = max(0, total_storage_days)
                 
                 # 임시 정산 내역 생성 (DB에 저장하지 않음)
                 for company, settlement_data in company_settlements.items():
@@ -881,6 +1024,282 @@ def delete_settlement_route(settlement_id):
         return jsonify({
             'success': False,
             'message': f'정산 삭제 실패: {str(e)}'
+        }), 500
+
+
+@pallets_bp.route('/settlements/export', methods=['GET'])
+def export_settlements():
+    """
+    정산 내역 엑셀 다운로드 (UTF-8 BOM)
+    """
+    try:
+        from flask import Response
+        import io
+        import csv
+        from urllib.parse import quote
+        from api.pallets.models import get_pallets_for_settlement, calculate_daily_fee, calculate_fee
+        from datetime import date, timedelta
+        import math
+        
+        role, company_name, username = get_user_context()
+        
+        filter_company = request.args.get('company', '') or (company_name if role != '관리자' else '')
+        settlement_month = request.args.get('month')  # 선택적 필터
+        
+        # 화주사인 경우 필수
+        if role != '관리자' and not filter_company and not company_name:
+            return jsonify({
+                'success': False,
+                'message': '화주사명이 필요합니다.'
+            }), 400
+        
+        final_company = filter_company if filter_company else (company_name if role != '관리자' else None)
+        
+        # 정산 내역 조회 (settlement_month 파라미터에 따라 필터링)
+        settlements = get_settlements(
+            company_name=final_company if final_company else None,
+            settlement_month=settlement_month,  # 월별 필터 적용
+            role=role
+        )
+        
+        # 정산 내역이 없으면 파레트 목록 기반으로 임시 정산 내역 생성
+        if not settlements:
+            # settlement_month가 있으면 해당 월만, 없으면 전체 기간
+            if settlement_month:
+                year, month = map(int, settlement_month.split('-'))
+                start_date = date(year, month, 1)
+                if month == 12:
+                    end_date = date(year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    end_date = date(year, month + 1, 1) - timedelta(days=1)
+            else:
+                # 전체 기간
+                start_date = None
+                end_date = None
+            
+            pallets = get_pallets_for_settlement(
+                company_name=final_company if final_company else None,
+                start_date=start_date,
+                end_date=end_date
+            )
+            
+            if final_company:
+                pallets = [p for p in pallets if p['company_name'] == final_company]
+            
+            if pallets:
+                company_settlements = {}
+                
+                for pallet in pallets:
+                    company = pallet['company_name']
+                    
+                    if company not in company_settlements:
+                        company_settlements[company] = {
+                            'total_pallets': 0,
+                            'total_storage_days': 0,
+                            'total_fee': 0,
+                            'first_in_date': None,
+                            'last_out_date': None
+                        }
+                    
+                    in_date = pallet['in_date']
+                    out_date = pallet.get('out_date')
+                    is_service = pallet.get('is_service', 0) == 1
+                    
+                    if company_settlements[company]['first_in_date'] is None or in_date < company_settlements[company]['first_in_date']:
+                        company_settlements[company]['first_in_date'] = in_date
+                    
+                    if out_date:
+                        if company_settlements[company]['last_out_date'] is None or out_date > company_settlements[company]['last_out_date']:
+                            company_settlements[company]['last_out_date'] = out_date
+                    
+                    # 보관료 계산 (파레트별) - 각 파레트의 보관일수에 따라 개별 계산 후 합산
+                    if is_service:
+                        fee = 0
+                    else:
+                        if settlement_month:
+                            # 정산월이 있으면 해당 월 내에서만 계산
+                            storage_start = max(in_date, start_date)
+                            if out_date:
+                                storage_end = min(out_date, end_date)
+                            else:
+                                storage_end = min(end_date, date.today())
+                            pallet_storage_days = max(0, (storage_end - storage_start).days + 1)
+                            daily_fee = calculate_daily_fee(company, storage_start)
+                            calculated_fee = daily_fee * pallet_storage_days
+                            fee = math.ceil(calculated_fee / 100) * 100
+                        else:
+                            # 전체 기간 보관료 계산
+                            fee = calculate_fee(company, in_date, out_date, is_service)
+                    
+                    # 파레트 개수: 입고중(status='입고됨') 또는 서비스 상태만 카운트
+                    status = pallet.get('status', '입고됨')
+                    if status == '입고됨' or is_service:
+                        company_settlements[company]['total_pallets'] += 1
+                    company_settlements[company]['total_fee'] += fee
+                    
+                    # 월별 보관일수 계산: 각 파레트의 해당 월 내 보관일수를 합산
+                    if settlement_month:
+                        # 해당 월 내 보관일수 계산
+                        storage_start = max(in_date, start_date)
+                        if out_date:
+                            storage_end = min(out_date, end_date)
+                        else:
+                            storage_end = min(end_date, date.today())
+                        
+                        pallet_storage_days = max(0, (storage_end - storage_start).days + 1)
+                        company_settlements[company]['total_storage_days'] += pallet_storage_days
+                
+                # 정산월이 없을 때만 전체 기간 기준으로 계산 (월별은 이미 위에서 계산됨)
+                for company, settlement_data in company_settlements.items():
+                    if not settlement_month:
+                        first_in_date = settlement_data['first_in_date']
+                        last_out_date = settlement_data['last_out_date']
+                        
+                        if last_out_date:
+                            storage_end = last_out_date
+                        else:
+                            storage_end = date.today()
+                        total_storage_days = (storage_end - first_in_date).days + 1
+                        settlement_data['total_storage_days'] = max(0, total_storage_days)
+                
+                for company, settlement_data in company_settlements.items():
+                    settlements.append({
+                        'id': None,
+                        'company_name': company,
+                        'settlement_month': settlement_month,  # settlement_month 파라미터 전달
+                        'total_pallets': settlement_data['total_pallets'],
+                        'total_storage_days': settlement_data['total_storage_days'],
+                        'total_fee': settlement_data['total_fee'],
+                        'status': '미생성',
+                        'created_at': None,
+                        'updated_at': None
+                    })
+        
+        # CSV 데이터 생성
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 헤더: 정산 내역 요약
+        writer.writerow(['파레트 보관료 정산 내역'])
+        writer.writerow(['화주사', final_company or '전체'])
+        writer.writerow(['다운로드 일시', date.today().strftime('%Y-%m-%d %H:%M:%S')])
+        writer.writerow([])
+        writer.writerow(['정산 내역 요약'])
+        writer.writerow(['정산월', '화주사', '파레트 수', '보관일수', '보관료', '상태'])
+        
+        # 정산 내역 요약 데이터
+        for settlement in settlements:
+            writer.writerow([
+                settlement.get('settlement_month', '전체') or '전체',
+                settlement.get('company_name', ''),
+                settlement.get('total_pallets', 0),
+                settlement.get('total_storage_days', 0),
+                settlement.get('total_fee', 0),
+                settlement.get('status', '미생성') or '미생성'
+            ])
+        
+        writer.writerow([])
+        writer.writerow(['파레트별 상세 내역'])
+        writer.writerow(['파레트 ID', '화주사', '품목명', '입고일', '갱신일', '보관종료일', '보관일수', '상태', '보관료'])
+        
+        # 파레트별 상세 내역
+        # settlement_month가 지정된 경우 해당 월만, 없으면 전체
+        if settlement_month:
+            year, month = map(int, settlement_month.split('-'))
+            start_date = date(year, month, 1)
+            if month == 12:
+                end_date = date(year + 1, 1, 1) - timedelta(days=1)
+            else:
+                end_date = date(year, month + 1, 1) - timedelta(days=1)
+        else:
+            start_date = None
+            end_date = None
+        
+        pallets = get_pallets_for_settlement(
+            company_name=final_company if final_company else None,
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        if final_company:
+            pallets = [p for p in pallets if p['company_name'] == final_company]
+        
+        for pallet in pallets:
+            in_date = pallet.get('in_date')
+            out_date = pallet.get('out_date')
+            is_service = pallet.get('is_service', 0) == 1
+            
+            # 보관일수 계산
+            if in_date:
+                if out_date:
+                    storage_days = (out_date - in_date).days + 1
+                else:
+                    storage_days = (date.today() - in_date).days + 1
+            else:
+                storage_days = 0
+            
+            # 보관료 계산
+            if is_service:
+                fee = 0
+            else:
+                fee = calculate_fee(pallet.get('company_name', ''), in_date, out_date, is_service)
+            
+            # 상태
+            status = pallet.get('status', '입고됨')
+            if is_service:
+                status = '서비스'
+            
+            # 갱신일 계산 (보관이 1달 이상이면 매월 1일)
+            renewal_date = None
+            if in_date:
+                if out_date:
+                    months_diff = (out_date.year - in_date.year) * 12 + (out_date.month - in_date.month)
+                    if months_diff >= 1:
+                        renewal_date = date(out_date.year, out_date.month, 1)
+                else:
+                    today = date.today()
+                    months_diff = (today.year - in_date.year) * 12 + (today.month - in_date.month)
+                    if months_diff >= 1:
+                        renewal_date = date(today.year, today.month, 1)
+            
+            writer.writerow([
+                pallet.get('pallet_id', ''),
+                pallet.get('company_name', ''),
+                pallet.get('product_name', ''),
+                in_date.strftime('%Y-%m-%d') if in_date else '',
+                renewal_date.strftime('%Y-%m-%d') if renewal_date else '',
+                out_date.strftime('%Y-%m-%d') if out_date else '',
+                storage_days,
+                status,
+                fee
+            ])
+        
+        output.seek(0)
+        
+        # 파일명 생성
+        filename = f"파레트_보관료_정산내역_{final_company or '전체'}"
+        if settlement_month:
+            filename += f"_{settlement_month}"
+        filename += ".csv"
+        encoded_filename = quote(filename.encode('utf-8'))
+        
+        response = Response(
+            output.getvalue().encode('utf-8-sig'),  # UTF-8 BOM 추가로 Excel에서 한글 깨짐 방지
+            mimetype='text/csv; charset=utf-8',
+            headers={
+                'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        print(f'❌ 정산 내역 엑셀 다운로드 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'엑셀 다운로드 중 오류: {str(e)}'
         }), 500
 
 

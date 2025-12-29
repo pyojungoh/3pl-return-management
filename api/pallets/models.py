@@ -672,11 +672,12 @@ def generate_monthly_settlement(settlement_month: str = None,
         # 보관 시작일: 입고일과 정산월 시작일 중 늦은 날
         storage_start = max(in_date, start_date)
         
-        # 보관 종료일: 보관종료일과 정산월 종료일 중 이른 날
+        # 보관 종료일: 보관종료일과 정산월 종료일 중 이른 날 (보관중인 경우 오늘 날짜도 고려)
         if out_date:
             storage_end = min(out_date, end_date)
         else:
-            storage_end = end_date
+            # 보관중인 경우: 정산월 종료일과 오늘 날짜 중 이른 날
+            storage_end = min(end_date, date.today())
         
         # 보관일수 계산
         storage_days = (storage_end - storage_start).days + 1
@@ -690,8 +691,10 @@ def generate_monthly_settlement(settlement_month: str = None,
             fee = math.ceil(calculated_fee / 100) * 100
         
         # 정산 데이터에 추가
-        # 파레트 개수만 증가 (보관료는 각 파레트별로 계산된 값을 합산)
-        company_settlements[company]['total_pallets'] += 1
+        # 파레트 개수: 입고중(status='입고됨') 또는 서비스 상태만 카운트
+        status = pallet.get('status', '입고됨')
+        if status == '입고됨' or is_service:
+            company_settlements[company]['total_pallets'] += 1
         company_settlements[company]['total_storage_days'] += storage_days
         # 각 파레트별 보관료를 합산 (파레트 개수로 곱하지 않음)
         company_settlements[company]['total_fee'] += fee
