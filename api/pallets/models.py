@@ -903,7 +903,7 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
             
             return result
         else:
-            # 화주사 필터링 없음
+            # 화주사 필터링 없음 - 모든 정산 내역 조회 후 정규화하여 통합
             if settlement_month:
                 if USE_POSTGRESQL:
                     query += " AND settlement_month = %s"
@@ -920,10 +920,74 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
             
             rows = cursor.fetchall()
             
+            # 모든 정산 내역을 가져온 후 정규화하여 통합
+            all_settlements = []
             if USE_POSTGRESQL:
-                return [dict(row) for row in rows]
+                all_settlements = [dict(row) for row in rows]
             else:
-                return [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+                all_settlements = [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+            
+            # 화주사명 정규화 및 통합
+            # 1. 각 화주사명에 대해 정규화된 키워드 목록 생성 (본인 이름 + 해시태그)
+            company_keywords_map = {}  # 정규화된 키워드 -> 원본 화주사명 매핑
+            company_representatives = {}  # 정규화된 키워드 -> 대표 화주사명
+            
+            for settlement in all_settlements:
+                raw_company = settlement.get('company_name', '')
+                if not raw_company:
+                    continue
+                
+                # 검색 가능한 키워드 목록 가져오기 (본인 이름 + 해시태그)
+                keywords = get_company_search_keywords(raw_company)
+                
+                # 각 키워드에 대해 매핑 생성
+                normalized_company = normalize_company_name(raw_company)
+                
+                for keyword in keywords:
+                    normalized_keyword = normalize_company_name(keyword)
+                    
+                    # 이미 다른 화주사가 이 키워드를 사용하고 있는지 확인
+                    if normalized_keyword in company_keywords_map:
+                        # 기존 대표 화주사명과 비교하여 우선순위 결정 (더 짧거나 알파벳 순서가 앞서는 것)
+                        existing_rep = company_representatives[normalized_keyword]
+                        if len(raw_company) < len(existing_rep) or (len(raw_company) == len(existing_rep) and raw_company < existing_rep):
+                            company_representatives[normalized_keyword] = raw_company
+                            company_keywords_map[normalized_keyword] = raw_company
+                    else:
+                        company_keywords_map[normalized_keyword] = raw_company
+                        company_representatives[normalized_keyword] = raw_company
+            
+            # 2. 각 정산 내역에 대해 대표 화주사명 찾기 및 통합
+            merged_settlements = {}  # (settlement_month, representative_company) -> 통합된 정산 내역
+            
+            for settlement in all_settlements:
+                raw_company = settlement.get('company_name', '')
+                if not raw_company:
+                    continue
+                
+                normalized = normalize_company_name(raw_company)
+                representative = company_representatives.get(normalized, raw_company)
+                
+                # 정산월과 대표 화주사명으로 키 생성
+                settlement_month_key = settlement.get('settlement_month', '')
+                merge_key = (settlement_month_key, representative)
+                
+                if merge_key not in merged_settlements:
+                    # 새로운 정산 내역 생성 (대표 화주사명으로)
+                    merged_settlement = settlement.copy()
+                    merged_settlement['company_name'] = representative
+                    merged_settlements[merge_key] = merged_settlement
+                else:
+                    # 기존 정산 내역에 통합 (파레트 수, 보관일수, 보관료 합산)
+                    existing = merged_settlements[merge_key]
+                    existing['total_pallets'] = existing.get('total_pallets', 0) + settlement.get('total_pallets', 0)
+                    existing['total_storage_days'] = existing.get('total_storage_days', 0) + settlement.get('total_storage_days', 0)
+                    existing['total_fee'] = existing.get('total_fee', 0) + settlement.get('total_fee', 0)
+            
+            # 3. 정렬된 목록 반환
+            result = list(merged_settlements.values())
+            result.sort(key=lambda x: (x.get('settlement_month') or '', x.get('company_name', '')))
+            return result
     finally:
         cursor.close()
         conn.close()

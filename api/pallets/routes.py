@@ -507,17 +507,37 @@ def set_fees():
                 'message': '월 보관료가 필요합니다.'
             }), 400
         
+        # effective_from 날짜 파싱
+        effective_from_date = None
+        if effective_from:
+            try:
+                from datetime import datetime
+                effective_from_date = datetime.strptime(effective_from, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'message': '적용 시작일 형식이 올바르지 않습니다.'
+                }), 400
+        
         success, message = set_pallet_fee(
             company_name=target_company,
             monthly_fee=monthly_fee,
-            effective_from=effective_from,
+            effective_from=effective_from_date,
             notes=notes
         )
         
         if success:
+            # 저장된 보관료 정보 반환
+            daily_fee = round(monthly_fee / 30.44, 2)
             return jsonify({
                 'success': True,
-                'message': message
+                'message': message,
+                'data': {
+                    'monthly_fee': monthly_fee,
+                    'daily_fee': daily_fee,
+                    'effective_from': effective_from or date.today().isoformat(),
+                    'notes': notes
+                }
             }), 200
         else:
             return jsonify({

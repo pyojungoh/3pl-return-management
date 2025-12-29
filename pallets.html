@@ -1251,9 +1251,10 @@
       if (companyName) {
         await palLoadFeeSettings(companyName);
       } else {
-        // 폼 초기화
-        document.getElementById('palFeeMonthlyFee').value = '';
-        document.getElementById('palFeeDailyFee').value = '';
+        // 폼 초기화 (기본값 16000원 설정)
+        document.getElementById('palFeeMonthlyFee').value = '16000';
+        const defaultDailyFee = (16000 / 30.44).toFixed(2);
+        document.getElementById('palFeeDailyFee').value = defaultDailyFee + '원';
         document.getElementById('palFeeEffectiveFrom').value = new Date().toISOString().split('T')[0];
         document.getElementById('palFeeNotes').value = '';
       }
@@ -1274,9 +1275,10 @@
           document.getElementById('palFeeEffectiveFrom').value = fee.effective_from || new Date().toISOString().split('T')[0];
           document.getElementById('palFeeNotes').value = fee.notes || '';
         } else {
-          // 기존 설정이 없으면 초기화
-          document.getElementById('palFeeMonthlyFee').value = '';
-          document.getElementById('palFeeDailyFee').value = '';
+          // 기존 설정이 없으면 기본값 16000원 설정
+          document.getElementById('palFeeMonthlyFee').value = '16000';
+          const defaultDailyFee = (16000 / 30.44).toFixed(2);
+          document.getElementById('palFeeDailyFee').value = defaultDailyFee + '원';
           document.getElementById('palFeeEffectiveFrom').value = new Date().toISOString().split('T')[0];
           document.getElementById('palFeeNotes').value = '';
         }
@@ -2637,7 +2639,14 @@
         if (result.success) {
           messageDiv.innerHTML = '<div class="pal-message success">✅ ' + result.message + '</div>';
           // 일일 보관료 업데이트
-          document.getElementById('palFeeDailyFee').value = result.data.daily_fee.toFixed(2) + '원';
+          if (result.data && result.data.daily_fee) {
+            document.getElementById('palFeeDailyFee').value = result.data.daily_fee.toFixed(2) + '원';
+          } else {
+            // 응답에 daily_fee가 없으면 직접 계산
+            const monthlyFee = parseInt(document.getElementById('palFeeMonthlyFee').value) || 0;
+            const dailyFee = (monthlyFee / 30.44).toFixed(2);
+            document.getElementById('palFeeDailyFee').value = dailyFee + '원';
+          }
         } else {
           messageDiv.innerHTML = '<div class="pal-message error">❌ ' + result.message + '</div>';
         }
