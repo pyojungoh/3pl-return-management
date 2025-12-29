@@ -414,11 +414,13 @@ def calculate_daily_fee(company_name: str, as_of_date: date = None) -> float:
     """
     일일 보관료 계산
     
+    ✅ 수정: 월 보관료를 30일로 나누어 30일 보관 시 정확히 월 보관료가 되도록 함
+    
     Returns:
         일일 보관료 (float)
     """
     monthly_fee = get_monthly_fee(company_name, as_of_date)
-    daily_fee = monthly_fee / 30.44
+    daily_fee = monthly_fee / 30.0  # 30일 기준으로 계산 (30일 보관 = 월 보관료)
     return round(daily_fee, 2)
 
 
@@ -510,7 +512,7 @@ def set_pallet_fee(company_name: str, monthly_fee: int,
     if effective_from is None:
         effective_from = date.today()
     
-    daily_fee = round(monthly_fee / 30.44, 2)
+    daily_fee = round(monthly_fee / 30.0, 2)  # 30일 기준으로 계산 (30일 보관 = 월 보관료)
     
     conn = get_db_connection()
     cursor = conn.cursor()

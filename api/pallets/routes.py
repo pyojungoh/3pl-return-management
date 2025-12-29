@@ -527,8 +527,8 @@ def set_fees():
         )
         
         if success:
-            # 저장된 보관료 정보 반환
-            daily_fee = round(monthly_fee / 30.44, 2)
+            # 저장된 보관료 정보 반환 (30일 기준: 30일 보관 = 월 보관료)
+            daily_fee = round(monthly_fee / 30.0, 2)
             return jsonify({
                 'success': True,
                 'message': message,
