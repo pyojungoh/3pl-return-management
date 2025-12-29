@@ -1864,7 +1864,7 @@
         <button type="button" class="menu-item" id="returnsMenuBtn" onclick="switchMenu('returns')">📦 반품관리</button>
         <button type="button" class="menu-item" id="csMenuBtn" onclick="switchMenu('cs')">📞 C/S</button>
         <button type="button" class="menu-item" id="specialWorksMenuBtn" onclick="switchMenu('specialWorks')">🔧 특수작업</button>
-        <button type="button" class="menu-item" id="palletsMenuBtn" onclick="switchMenu('pallets')" style="opacity: 0.6; cursor: not-allowed;" title="준비 중">📦 파레트 관리 (준비중)</button>
+        <button type="button" class="menu-item" id="palletsMenuBtn" onclick="switchMenu('pallets')">📦 파레트 관리</button>
         <button type="button" class="menu-item" id="scheduleMenuBtn" onclick="switchMenu('schedule')">📅 스케쥴</button>
         <button type="button" class="menu-item" id="boardMenuBtn" onclick="switchMenu('board')">📋 게시판</button>
       </div>
@@ -5710,15 +5710,6 @@
     window.addReturn = addReturn;
     // 메뉴 전환 함수
     function switchMenu(menuName) {
-      // 화주사 모드에서 파레트 관리 메뉴 접근 차단
-      const roleNormalized = (currentRole || '').toString().trim();
-      const isAdmin = (roleNormalized === '관리자');
-      
-      if (menuName === 'pallets' && !isAdmin) {
-        alert('⏳ 파레트 관리 기능은 현재 준비 중입니다.\n\n곧 제공될 예정입니다.');
-        return;
-      }
-      
       // 모든 메뉴 아이템에서 active 클래스 제거
       const menuItems = document.querySelectorAll('.menu-item');
       menuItems.forEach(item => {
@@ -6237,13 +6228,35 @@
         container = document.createElement('div');
         container.id = 'palletsTab';
         container.className = 'tab-content';
-        // 관리자 탭 영역에 추가 (special_works.html과 동일)
-        const adminTabs = document.getElementById('adminTabs');
-        if (adminTabs && adminTabs.parentNode) {
-          adminTabs.parentNode.insertBefore(container, adminTabs.nextSibling);
+        
+        // 화주사 모드와 관리자 모드 모두 지원
+        const roleNormalized = (currentRole || '').toString().trim();
+        const isAdmin = (roleNormalized === '관리자');
+        
+        if (isAdmin) {
+          // 관리자 탭 영역에 추가
+          const adminTabs = document.getElementById('adminTabs');
+          if (adminTabs && adminTabs.parentNode) {
+            adminTabs.parentNode.insertBefore(container, adminTabs.nextSibling);
+          } else {
+            // adminTabs를 찾을 수 없으면 body에 추가
+            document.body.appendChild(container);
+          }
         } else {
-          // adminTabs를 찾을 수 없으면 body에 추가
-          document.body.appendChild(container);
+          // 화주사 모드: contentArea에 추가
+          const contentArea = document.getElementById('contentArea');
+          if (contentArea) {
+            // 기존 콘텐츠 숨기기
+            const existingTabs = contentArea.querySelectorAll('.tab-content');
+            existingTabs.forEach(tab => {
+              tab.classList.add('hidden');
+              tab.style.display = 'none';
+            });
+            contentArea.appendChild(container);
+          } else {
+            // contentArea를 찾을 수 없으면 body에 추가
+            document.body.appendChild(container);
+          }
         }
       }
       

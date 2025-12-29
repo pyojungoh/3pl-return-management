@@ -512,8 +512,8 @@
 </head>
 <body>
   <div id="palContainer">
-    <!-- 하위 메뉴바 -->
-    <div id="palSubMenuBar">
+    <!-- 하위 메뉴바 (관리자만 표시) -->
+    <div id="palSubMenuBar" class="pal-admin-only">
       <button class="pal-sub-menu-btn active" onclick="palSwitchSubMenu('list')">📋 월별 화주사별 리스트</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('inbound')">📦 파레트 관리</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('status')">📊 파레트 현황</button>
@@ -527,21 +527,41 @@
       <div id="palPageList" class="pal-content-page active">
         <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 20px;">📋 월별 화주사별 리스트</h2>
         
-        <!-- 기간 설정 -->
-        <div class="pal-filters" style="margin-bottom: 20px;">
+        <!-- 기간 설정 (관리자만 표시) -->
+        <div class="pal-filters pal-admin-only" style="margin-bottom: 20px;">
           <div class="pal-filter-group">
             <label>정산월 (비워두면 전체)</label>
             <input type="month" id="palSettlementMonth" class="pal-form-input" onchange="palLoadCompanyList()">
           </div>
-          <div class="pal-filter-group pal-admin-only">
+          <div class="pal-filter-group">
             <button class="pal-btn" onclick="palGenerateSettlement()" style="height: 40px;">정산 생성</button>
           </div>
         </div>
         
-        <!-- 왼쪽: 화주사 목록, 오른쪽: 정산 내역 -->
-        <div style="display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: start;">
-          <!-- 왼쪽: 화주사 목록 -->
-          <div class="pal-table-container" style="height: calc(100vh - 300px); min-height: 500px; display: flex; flex-direction: column;">
+        <!-- 통계 박스 (화주사 모드일 때만 표시) -->
+        <div class="pal-stats-container" id="palListStatsContainer" style="display: none; margin-bottom: 20px;">
+          <div class="pal-stat-box">
+            <div class="pal-stat-box-title">전체 파레트</div>
+            <div class="pal-stat-box-value" id="palListTotalPallets">0</div>
+          </div>
+          <div class="pal-stat-box">
+            <div class="pal-stat-box-title">보관중</div>
+            <div class="pal-stat-box-value" id="palListStoragePallets">0</div>
+          </div>
+          <div class="pal-stat-box">
+            <div class="pal-stat-box-title">보관종료</div>
+            <div class="pal-stat-box-value" id="palListCompletedPallets">0</div>
+          </div>
+          <div class="pal-stat-box">
+            <div class="pal-stat-box-title">이번달 보관료</div>
+            <div class="pal-stat-box-value" id="palListMonthlyFee">0원</div>
+          </div>
+        </div>
+        
+        <!-- 왼쪽: 화주사 목록 (관리자만), 오른쪽: 정산 내역 -->
+        <div style="display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: start;" id="palListLayout">
+          <!-- 왼쪽: 화주사 목록 (관리자만 표시) -->
+          <div class="pal-table-container pal-admin-only" style="height: calc(100vh - 300px); min-height: 500px; display: flex; flex-direction: column;">
             <div class="pal-table-header" style="flex-shrink: 0;">
               <h3>화주사 목록 <span id="palCompaniesCount" style="font-size: 14px; color: #636e72;">(0개)</span></h3>
             </div>
@@ -553,7 +573,7 @@
           </div>
           
           <!-- 오른쪽: 정산 내역 -->
-          <div class="pal-table-container" style="height: calc(100vh - 300px); min-height: 500px; display: flex; flex-direction: column;">
+          <div class="pal-table-container" style="height: calc(100vh - 300px); min-height: 500px; display: flex; flex-direction: column;" id="palSettlementsContainer">
             <div class="pal-table-header" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
               <h3>정산 내역 <span id="palSettlementsCount" style="font-size: 14px; color: #636e72;">(0개)</span></h3>
               <button class="pal-btn" onclick="palExportSettlements()" style="padding: 8px 16px; font-size: 13px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; display: none;" id="palExportSettlementsBtn">
@@ -562,7 +582,7 @@
             </div>
             <div style="flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px;">
               <div id="palSettlementsList">
-                <div style="padding: 20px; text-align: center; color: #636e72;">화주사를 선택하세요.</div>
+                <div style="padding: 20px; text-align: center; color: #636e72;" id="palSettlementsPlaceholder">화주사를 선택하세요.</div>
               </div>
             </div>
           </div>
@@ -810,6 +830,9 @@
           <div class="pal-filter-group">
             <button class="pal-btn pal-btn-secondary" onclick="palLoadPallets()" style="height: 40px;">🔄 새로고침</button>
           </div>
+          <div class="pal-filter-group pal-admin-only">
+            <button class="pal-btn" onclick="palDeleteSelectedPallets()" style="height: 40px; background: #dc3545; color: white;">🗑️ 선택삭제</button>
+          </div>
         </div>
         
         <div class="pal-table-container">
@@ -820,6 +843,9 @@
             <table class="pal-table">
               <thead>
                 <tr>
+                  <th class="pal-admin-only" style="width: 50px;">
+                    <input type="checkbox" id="palPalletsSelectAll" onchange="palToggleSelectAllPallets(this.checked)">
+                  </th>
                   <th>파레트 ID</th>
                   <th>화주사</th>
                   <th>품목명</th>
@@ -835,7 +861,7 @@
               </thead>
               <tbody id="palPalletsTableBody">
                 <tr>
-                  <td colspan="11" class="no-data">데이터를 불러오는 중...</td>
+                  <td colspan="12" class="no-data">데이터를 불러오는 중...</td>
                 </tr>
               </tbody>
             </table>
@@ -1040,6 +1066,12 @@
     
     // 하위 메뉴 전환 함수
     function palSwitchSubMenu(menuId) {
+      // 화주사 모드에서는 'list' 메뉴만 접근 가능
+      if (palCurrentRole !== '관리자' && menuId !== 'list') {
+        alert('⏳ 이 기능은 관리자만 사용할 수 있습니다.');
+        return;
+      }
+      
       // 모든 페이지 숨기기
       const pages = document.querySelectorAll('.pal-content-page');
       pages.forEach(page => page.classList.remove('active'));
@@ -1063,7 +1095,26 @@
       // 각 페이지별 초기화
       if (menuId === 'list') {
         // 월별 화주사별 리스트 페이지 초기화
-        palLoadCompanyList();
+        if (palCurrentRole === '관리자') {
+          palLoadCompanyList();
+        } else {
+          // 화주사 모드: 통계 박스 표시 및 레이아웃 조정
+          const statsContainer = document.getElementById('palListStatsContainer');
+          const listLayout = document.getElementById('palListLayout');
+          const settlementsContainer = document.getElementById('palSettlementsContainer');
+          
+          if (statsContainer) statsContainer.style.display = 'flex';
+          if (listLayout) listLayout.style.gridTemplateColumns = '1fr'; // 화주사 목록 제거
+          if (settlementsContainer) {
+            settlementsContainer.style.height = 'calc(100vh - 350px)'; // 통계 박스 공간 확보
+          }
+          
+          // 통계 업데이트 및 정산 내역 자동 로드
+          palUpdateListStats();
+          if (palCurrentCompany) {
+            palLoadSettlements(palCurrentCompany);
+          }
+        }
       } else if (menuId === 'inbound') {
         // 파레트 관리 페이지 초기화
         const dateInput = document.getElementById('palInboundDate');
@@ -1277,12 +1328,45 @@
           el.style.display = 'none';
         });
       } else {
+        // 화주사 모드: 관리자 전용 요소 숨김
         document.querySelectorAll('.pal-admin-only').forEach(el => {
           el.style.display = 'none';
         });
         document.querySelectorAll('.pal-consignor-only').forEach(el => {
           el.style.display = 'block';
         });
+        
+        // 화주사 모드: 하위 메뉴바 숨김, 'list' 페이지만 표시
+        const subMenuBar = document.getElementById('palSubMenuBar');
+        if (subMenuBar) {
+          subMenuBar.style.display = 'none';
+        }
+        
+        // 'list' 페이지만 표시
+        document.querySelectorAll('.pal-content-page').forEach(page => {
+          if (page.id === 'palPageList') {
+            page.classList.add('active');
+          } else {
+            page.classList.remove('active');
+          }
+        });
+        
+        // 화주사 모드 초기화: 통계 박스 표시 및 레이아웃 조정
+        const statsContainer = document.getElementById('palListStatsContainer');
+        const listLayout = document.getElementById('palListLayout');
+        const settlementsContainer = document.getElementById('palSettlementsContainer');
+        
+        if (statsContainer) statsContainer.style.display = 'flex';
+        if (listLayout) listLayout.style.gridTemplateColumns = '1fr'; // 화주사 목록 제거
+        if (settlementsContainer) {
+          settlementsContainer.style.height = 'calc(100vh - 350px)'; // 통계 박스 공간 확보
+        }
+        
+        // 통계 업데이트 및 정산 내역 자동 로드
+        palUpdateListStats();
+        if (palCurrentCompany) {
+          palLoadSettlements(palCurrentCompany);
+        }
       }
       
       // 오늘 날짜를 기본값으로 설정
@@ -1921,7 +2005,7 @@
       
       if (!tbody) return;
       
-      tbody.innerHTML = '<tr><td colspan="11" class="no-data">데이터를 불러오는 중...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="12" class="no-data">데이터를 불러오는 중...</td></tr>';
       
       try {
         const company = palCurrentRole === '관리자' 
@@ -1986,7 +2070,7 @@
           }
           
           if (filteredPallets.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="11" class="no-data">파레트가 없습니다.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="12" class="no-data">파레트가 없습니다.</td></tr>';
           } else {
             tbody.innerHTML = filteredPallets.map(pallet => {
               // 서비스 파레트는 상태를 "서비스"로 표시
@@ -2035,6 +2119,10 @@
               
               return `
               <tr>
+                ${palCurrentRole === '관리자' 
+                  ? `<td style="text-align: center;"><input type="checkbox" class="pal-pallet-checkbox" data-pallet-id="${palEscapeHtml(pallet.pallet_id)}" onchange="palUpdatePalletSelection()"></td>`
+                  : ''
+                }
                 <td>${palEscapeHtml(pallet.pallet_id)}</td>
                 <td>${palEscapeHtml(pallet.company_name || '')}</td>
                 <td>${palEscapeHtml(pallet.product_name || '')}</td>
@@ -2047,10 +2135,6 @@
                 <td>
                   <div style="display: flex; gap: 4px; align-items: center;">
                     <button class="pal-btn" onclick="palViewQRCode('${pallet.pallet_id}', '${pallet.in_date || ''}')" style="padding: 6px 12px; font-size: 12px; background: #17a2b8; color: white;">QR 보기</button>
-                    ${palCurrentRole === '관리자' 
-                      ? `<button class="pal-btn" onclick="palViewPalletDetail('${pallet.pallet_id}')" style="padding: 6px 12px; font-size: 12px;">상세</button>`
-                      : ''
-                    }
                   </div>
                 </td>
                 <td>
@@ -2074,7 +2158,7 @@
             }).join('');
           }
         } else {
-          tbody.innerHTML = '<tr><td colspan="11" class="no-data">❌ ' + result.message + '</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="12" class="no-data">❌ ' + result.message + '</td></tr>';
         }
       } catch (error) {
         console.error('●▶ 파레트 목록 로드 오류:', error);
@@ -2084,7 +2168,7 @@
         } else if (error.message) {
           errorMessage = error.message;
         }
-        tbody.innerHTML = '<tr><td colspan="11" class="no-data">❌ ' + errorMessage + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="no-data">❌ ' + errorMessage + '</td></tr>';
         if (countSpan) countSpan.textContent = '(오류)';
       }
     }
@@ -2401,6 +2485,85 @@
       }
     }
     
+    // 파레트 선택 상태 업데이트
+    function palUpdatePalletSelection() {
+      const checkboxes = document.querySelectorAll('.pal-pallet-checkbox');
+      const selectAllCheckbox = document.getElementById('palPalletsSelectAll');
+      if (selectAllCheckbox) {
+        const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+        selectAllCheckbox.checked = checkedCount === checkboxes.length && checkboxes.length > 0;
+        selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+      }
+    }
+    
+    // 전체 선택/해제
+    function palToggleSelectAllPallets(checked) {
+      document.querySelectorAll('.pal-pallet-checkbox').forEach(cb => {
+        cb.checked = checked;
+      });
+      palUpdatePalletSelection();
+    }
+    
+    // 선택된 파레트 삭제
+    async function palDeleteSelectedPallets() {
+      const checkboxes = document.querySelectorAll('.pal-pallet-checkbox:checked');
+      const selectedIds = Array.from(checkboxes).map(cb => cb.dataset.palletId);
+      
+      if (selectedIds.length === 0) {
+        alert('삭제할 파레트를 선택해주세요.');
+        return;
+      }
+      
+      if (!confirm(`선택한 ${selectedIds.length}개의 파레트를 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다.`)) {
+        return;
+      }
+      
+      if (!confirm(`정말로 ${selectedIds.length}개의 파레트를 삭제하시겠습니까?`)) {
+        return;
+      }
+      
+      try {
+        let successCount = 0;
+        let failCount = 0;
+        const errors = [];
+        
+        // 각 파레트를 순차적으로 삭제
+        for (const palletId of selectedIds) {
+          try {
+            const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/${palletId}`, {
+              method: 'DELETE',
+              headers: palGetUserHeaders()
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+              successCount++;
+            } else {
+              failCount++;
+              errors.push(`${palletId}: ${result.message}`);
+            }
+          } catch (error) {
+            failCount++;
+            errors.push(`${palletId}: ${error.message}`);
+          }
+        }
+        
+        // 결과 메시지
+        let message = `✅ ${successCount}개의 파레트가 삭제되었습니다.`;
+        if (failCount > 0) {
+          message += `\n❌ ${failCount}개의 파레트 삭제 실패:\n${errors.join('\n')}`;
+        }
+        alert(message);
+        
+        // 파레트 목록 새로고침
+        palLoadPallets();
+      } catch (error) {
+        console.error('선택 삭제 오류:', error);
+        alert('❌ 삭제 중 오류가 발생했습니다: ' + error.message);
+      }
+    }
+    
     // 보관료 설정 저장
     async function palSaveFeeSettings() {
       const messageDiv = document.getElementById('palFeeSettingsMessage');
@@ -2451,12 +2614,60 @@
       }
     }
     
+    // 리스트 페이지 통계 업데이트 (화주사 모드용)
+    async function palUpdateListStats() {
+      if (palCurrentRole === '관리자') return; // 관리자는 파레트 현황에서 통계를 봄
+      
+      if (!palCurrentCompany) return;
+      
+      try {
+        const params = new URLSearchParams();
+        params.append('company', palCurrentCompany);
+        
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/list?${params}`, {
+          headers: palGetUserHeaders()
+        });
+        
+        if (!response.ok) return;
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          const pallets = result.data || [];
+          
+          // 통계 계산
+          const total = pallets.length;
+          const storage = pallets.filter(p => p.status === '입고됨').length;
+          const completed = pallets.filter(p => p.status === '보관종료').length;
+          const monthlyFee = pallets.reduce((sum, p) => sum + (p.current_fee || 0), 0);
+          
+          // 통계 박스 업데이트
+          const totalEl = document.getElementById('palListTotalPallets');
+          const storageEl = document.getElementById('palListStoragePallets');
+          const completedEl = document.getElementById('palListCompletedPallets');
+          const feeEl = document.getElementById('palListMonthlyFee');
+          
+          if (totalEl) totalEl.textContent = total;
+          if (storageEl) storageEl.textContent = storage;
+          if (completedEl) completedEl.textContent = completed;
+          if (feeEl) feeEl.textContent = monthlyFee.toLocaleString() + '원';
+        }
+      } catch (error) {
+        console.error('리스트 통계 업데이트 오류:', error);
+      }
+    }
+    
     // 화주사 목록 로드
     async function palLoadCompanyList() {
       const listContainer = document.getElementById('palCompaniesList');
       const countSpan = document.getElementById('palCompaniesCount');
       
       if (!listContainer) return;
+      
+      // 화주사 모드면 화주사 목록을 로드하지 않음
+      if (palCurrentRole !== '관리자') {
+        return;
+      }
       
       listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">데이터를 불러오는 중...</div>';
       
@@ -2675,9 +2886,18 @@
       const targetCompany = companyName || palSelectedCompany || (palCurrentRole !== '관리자' ? palCurrentCompany : null);
       
       if (!targetCompany) {
-        listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">화주사를 선택하세요.</div>';
+        const placeholder = document.getElementById('palSettlementsPlaceholder');
+        if (placeholder) {
+          placeholder.textContent = palCurrentRole === '관리자' ? '화주사를 선택하세요.' : '정산 내역을 불러오는 중...';
+        } else {
+          listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">' + (palCurrentRole === '관리자' ? '화주사를 선택하세요.' : '정산 내역을 불러오는 중...') + '</div>';
+        }
         countSpan.textContent = '(0개)';
-        return;
+        
+        // 화주사 모드인데 화주사 정보가 없으면 통계도 업데이트하지 않음
+        if (palCurrentRole !== '관리자' && !palCurrentCompany) {
+          return;
+        }
       }
       
       listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">데이터를 불러오는 중...</div>';
@@ -2729,6 +2949,11 @@
           exportBtn.style.display = 'block';
         } else if (exportBtn) {
           exportBtn.style.display = 'none';
+        }
+        
+        // 화주사 모드일 때 통계 업데이트
+        if (palCurrentRole !== '관리자') {
+          palUpdateListStats();
         }
         
         if (allSettlements.length === 0) {
