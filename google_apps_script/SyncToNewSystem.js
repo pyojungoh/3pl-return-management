@@ -38,15 +38,20 @@ const NEW_SYSTEM_CONFIG = {
  */
 function onFormSubmit(e) {
   try {
+    console.log(`[onFormSubmit] ⚡ Google Forms 제출 즉시 감지!`);
+    console.log(`[onFormSubmit] 이벤트 객체:`, JSON.stringify(e));
+    
     // 동기화가 비활성화되어 있으면 무시
     if (!NEW_SYSTEM_CONFIG.ENABLED) {
-      console.log('동기화가 비활성화되어 있습니다.');
+      console.log('[onFormSubmit] 동기화가 비활성화되어 있습니다.');
       return;
     }
 
     // e.values는 Google Forms 응답 데이터 배열
     if (!e || !e.values || e.values.length < 2) {
-      console.error('응답 데이터가 올바르지 않습니다.');
+      console.error('[onFormSubmit] ❌ 응답 데이터가 올바르지 않습니다.');
+      console.error('[onFormSubmit] e:', e);
+      console.error('[onFormSubmit] e.values:', e.values);
       return;
     }
 
@@ -105,6 +110,25 @@ function onFormSubmit(e) {
     console.log(`[동기화 시작] 파레트 ID: ${palletId}, 작업 유형: ${workType}, 화주사: ${vendor}, 행 번호: ${addedRowNum}`);
     console.log(`[동기화 시작] 타임스탬프 타입: ${typeof timestamp}, 값: ${timestamp}`);
 
+    // 타임스탬프를 Date 객체로 변환
+    let timestampDate = timestamp;
+    if (typeof timestamp === 'string') {
+      // 문자열인 경우 Date 객체로 변환 시도
+      timestampDate = new Date(timestamp);
+      if (isNaN(timestampDate.getTime())) {
+        // 변환 실패 시 현재 시간 사용
+        console.warn(`[동기화 시작] 타임스탬프 변환 실패, 현재 시간 사용: ${timestamp}`);
+        timestampDate = new Date();
+      }
+    } else if (!(timestamp instanceof Date)) {
+      // Date 객체가 아니면 현재 시간 사용
+      console.warn(`[동기화 시작] 타임스탬프가 Date 객체가 아님, 현재 시간 사용: ${timestamp}`);
+      timestampDate = new Date();
+    }
+
+    // 포맷된 날짜 문자열 생성 (notes용)
+    const formattedDate = Utilities.formatDate(timestampDate, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+
     // 작업 유형에 따라 분기 처리
     if (workType === '보관종료') {
       // 보관종료 처리
@@ -112,8 +136,8 @@ function onFormSubmit(e) {
         pallet_id: palletId,
         company_name: vendor,
         product_name: product,
-        out_date: timestamp,
-        notes: `Google Forms에서 자동 동기화: ${Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss')}`
+        out_date: timestampDate, // Date 객체 전달
+        notes: `Google Forms에서 자동 동기화: ${formattedDate}`
       });
     }
     else if (workType === '입고') {
@@ -122,11 +146,11 @@ function onFormSubmit(e) {
         pallet_id: palletId,
         company_name: vendor,
         product_name: product,
-        in_date: timestamp,
+        in_date: timestampDate, // Date 객체 전달
         storage_location: null, // 중요하지 않음
         quantity: 1, // 기본값
         is_service: false,
-        notes: `Google Forms에서 자동 동기화: ${Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss')}`
+        notes: `Google Forms에서 자동 동기화: ${formattedDate}`
       });
     }
     else if (workType === '서비스') {
@@ -135,11 +159,11 @@ function onFormSubmit(e) {
         pallet_id: palletId,
         company_name: vendor,
         product_name: product,
-        in_date: timestamp,
+        in_date: timestampDate, // Date 객체 전달
         storage_location: null,
         quantity: 1,
         is_service: true, // 서비스 파레트로 표시
-        notes: `Google Forms에서 자동 동기화 (서비스): ${Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss')}`
+        notes: `Google Forms에서 자동 동기화 (서비스): ${formattedDate}`
       });
     }
     else if (workType === '사용중') {
@@ -148,11 +172,11 @@ function onFormSubmit(e) {
         pallet_id: palletId,
         company_name: vendor,
         product_name: product,
-        in_date: timestamp,
+        in_date: timestampDate, // Date 객체 전달
         storage_location: null,
         quantity: 1,
         is_service: false,
-        notes: `Google Forms에서 자동 동기화 (사용중): ${Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss')}`
+        notes: `Google Forms에서 자동 동기화 (사용중): ${formattedDate}`
       });
     }
     else {
@@ -314,11 +338,20 @@ function isValidDate(d) {
 // ========================================
 
 /**
- * Google Forms 응답 트리거 설정
+ * Google Forms 응답 트리거 설정 가이드
  * 
- * 참고: Google Forms와 연결된 스프레드시트에서는
- * 'onFormSubmit' 함수가 자동으로 호출됩니다.
- * 별도의 트리거 설정이 필요하지 않습니다.
+ * 참고: onFormSubmit은 단순 트리거이므로 명시적으로 생성할 수 없습니다.
+ * Google Forms와 스프레드시트가 연결되어 있으면 자동으로 호출되어야 합니다.
+ * 
+ * 수동 트리거 설정 방법:
+ * 1. Google Sheets → 확장 프로그램 → Apps Script
+ * 2. 왼쪽 메뉴에서 "트리거" 클릭
+ * 3. "트리거 추가" 클릭
+ * 4. 설정:
+ *    - 실행할 함수: onEditForFormSubmit
+ *    - 이벤트 소스: 스프레드시트에서
+ *    - 이벤트 유형: 편집 시
+ * 5. 저장
  */
 function setupFormSubmitTrigger() {
   try {
@@ -335,26 +368,274 @@ function setupFormSubmitTrigger() {
 
     // onFormSubmit 함수 존재 확인
     const hasOnFormSubmit = typeof onFormSubmit === 'function';
-
-    if (hasOnFormSubmit) {
-      SpreadsheetApp.getUi().alert('✅ 설정 완료!\n\n' +
-        'Google Forms 응답이 이 스프레드시트에 저장될 때\n' +
-        'onFormSubmit 함수가 자동으로 호출되어\n' +
-        '신규 시스템으로 동기화됩니다.\n\n' +
-        '별도의 트리거 설정이 필요하지 않습니다.\n\n' +
-        '테스트: Google Forms에 응답을 제출해보세요.');
-    } else {
+    const hasOnEditForFormSubmit = typeof onEditForFormSubmit === 'function';
+    
+    if (!hasOnFormSubmit) {
       SpreadsheetApp.getUi().alert('⚠️ onFormSubmit 함수를 찾을 수 없습니다.\n\n' +
         'SyncToNewSystem.js 파일이 Google Apps Script 프로젝트에\n' +
         '포함되어 있는지 확인하세요.\n\n' +
         'clasp push를 실행하여 파일을 업로드했는지 확인하세요.');
+      return;
     }
 
+    if (!hasOnEditForFormSubmit) {
+      SpreadsheetApp.getUi().alert('⚠️ onEditForFormSubmit 함수를 찾을 수 없습니다.\n\n' +
+        'SyncToNewSystem.js 파일이 Google Apps Script 프로젝트에\n' +
+        '포함되어 있는지 확인하세요.');
+      return;
+    }
+
+    // 기존 트리거 확인
+    const triggers = ScriptApp.getProjectTriggers();
+    const existingTriggers = triggers.filter(t => 
+      t.getHandlerFunction() === 'onEditForFormSubmit' || 
+      t.getHandlerFunction() === 'onChangeForFormSubmit' ||
+      t.getHandlerFunction() === 'onFormSubmit'
+    );
+
+    let message = '📋 실시간 동기화 트리거 설정 가이드\n\n';
+    
+    if (existingTriggers.length > 0) {
+      message += '✅ 트리거가 이미 설정되어 있습니다:\n';
+      existingTriggers.forEach(t => {
+        message += `- ${t.getHandlerFunction()} (${t.getEventType()})\n`;
+      });
+      message += '\n';
+    }
+    
+    if (hasOnFormSubmit) {
+      message += '✅ onFormSubmit 함수가 준비되어 있습니다.\n';
+      message += '   (Google Forms와 스프레드시트가 연결되면 자동 실행)\n\n';
+    }
+
+    if (existingTriggers.length === 0) {
+      message += '⚠️ 설치형 트리거가 설정되어 있지 않습니다.\n\n';
+      message += '📝 실시간 동기화를 위한 트리거 설정 방법:\n\n';
+      message += '⭐ 방법 1: onChange 트리거 (가장 권장, 즉시 실행)\n';
+      message += '1. Google Sheets → 확장 프로그램 → Apps Script\n';
+      message += '2. 왼쪽 메뉴에서 "트리거" 클릭\n';
+      message += '3. "트리거 추가" 클릭\n';
+      message += '4. 다음 설정 (⚠️ 반드시 모두 선택):\n';
+      message += '   ⭐ 실행할 함수: onChangeForFormSubmit\n';
+      message += '   ⭐ 실행할 배포: Head (반드시 선택!)\n';
+      message += '   ⭐ 이벤트 소스: 스프레드시트에서\n';
+      message += '   ⭐ 이벤트 유형: 변경 시 ⚡\n';
+      message += '5. 저장\n\n';
+      message += '방법 2: onEdit 트리거 (대안)\n';
+      message += '   - 실행할 함수: onEditForFormSubmit\n';
+      message += '   - 실행할 배포: Head (반드시 선택!)\n';
+      message += '   - 이벤트 소스: 스프레드시트에서\n';
+      message += '   - 이벤트 유형: 편집 시\n\n';
+    } else {
+      // 기존 트리거의 배포 정보 확인
+      message += '📋 현재 설정된 트리거 상세 정보:\n';
+      existingTriggers.forEach(t => {
+        const deployment = t.getHandlerFunction();
+        message += `- 함수: ${t.getHandlerFunction()}\n`;
+        message += `  이벤트: ${t.getEventType()}\n`;
+        message += `  배포: ${t.getUniqueId() ? '설정됨' : '⚠️ 확인 필요'}\n\n`;
+      });
+    }
+
+    message += '💡 중요:\n';
+    message += '- ⚠️ "실행할 배포"를 반드시 "Head"로 선택해야 합니다!\n';
+    message += '- 배포를 선택하지 않으면 트리거가 작동하지 않습니다.\n';
+    message += '- ⚡ onChange 트리거는 Google Forms 제출 시 즉시 실행됩니다.\n';
+    message += '- onFormSubmit은 Google Forms 연결 시 자동으로 작동합니다.\n';
+    message += '- 두 트리거를 모두 설정하면 더 안정적입니다.\n\n';
+    message += '테스트: Google Forms에 응답을 제출하면 즉시 동기화됩니다.\n';
+    message += '실행 로그는 Apps Script → 실행 메뉴에서 확인할 수 있습니다.';
+
+    SpreadsheetApp.getUi().alert(message);
+
   } catch (error) {
-    console.error('트리거 설정 오류:', error);
+    console.error('트리거 설정 확인 오류:', error);
     SpreadsheetApp.getUi().alert('트리거 설정 확인 실패: ' + error.message);
   }
 }
+
+/**
+ * onEdit 설치형 트리거 핸들러 (onFormSubmit 대안)
+ * 스프레드시트 편집 시 새 행이 추가되었는지 확인하고 onFormSubmit을 시뮬레이션합니다.
+ */
+function onEditForFormSubmit(e) {
+  try {
+    console.log(`[onEditForFormSubmit] 트리거 실행됨`);
+    
+    // 동기화가 비활성화되어 있으면 무시
+    if (!NEW_SYSTEM_CONFIG.ENABLED) {
+      console.log(`[onEditForFormSubmit] 동기화 비활성화됨`);
+      return;
+    }
+
+    const sheet = e.source.getActiveSheet();
+    const sheetName = sheet.getName();
+    
+    console.log(`[onEditForFormSubmit] 시트 이름: ${sheetName}`);
+    
+    // "설문지 응답 시트1"에서만 작동
+    if (sheetName !== '설문지 응답 시트1') {
+      console.log(`[onEditForFormSubmit] 다른 시트에서 실행됨: ${sheetName}, 무시`);
+      return;
+    }
+
+    const row = e.range.getRow();
+    const col = e.range.getColumn();
+    const numRows = e.range.getNumRows();
+    const numCols = e.range.getNumColumns();
+    
+    console.log(`[onEditForFormSubmit] 편집 위치 - 행: ${row}, 열: ${col}, 행 수: ${numRows}, 열 수: ${numCols}`);
+    
+    // 첫 번째 행(헤더)이면 무시
+    if (row === 1) {
+      console.log(`[onEditForFormSubmit] 헤더 행 편집, 무시`);
+      return;
+    }
+
+    // A열(타임스탬프 열)이 포함된 편집인지 확인
+    // Google Forms는 여러 열을 한 번에 추가할 수 있으므로 A열이 포함되어 있으면 처리
+    const lastCol = e.range.getLastColumn();
+    if (col > 1 && lastCol < 1) {
+      console.log(`[onEditForFormSubmit] A열이 포함되지 않은 편집, 무시`);
+      return;
+    }
+
+    // 해당 행의 타임스탬프 값 확인
+    const timestampValue = sheet.getRange(row, 1).getValue();
+    console.log(`[onEditForFormSubmit] 타임스탬프 값: ${timestampValue}`);
+    
+    if (!timestampValue) {
+      console.log(`[onEditForFormSubmit] 타임스탬프 값이 없음, 무시`);
+      return;
+    }
+
+    // 해당 행의 모든 데이터 가져오기
+    const sheetLastCol = sheet.getLastColumn();
+    const rowData = sheet.getRange(row, 1, 1, sheetLastCol).getValues()[0];
+    
+    console.log(`[onEditForFormSubmit] 행 데이터: ${JSON.stringify(rowData)}`);
+
+    // e.values 형식으로 변환
+    const mockEvent = {
+      values: rowData,
+      range: sheet.getRange(row, 1, 1, sheetLastCol)
+    };
+
+    console.log(`[onEditForFormSubmit] 새 행 감지 - 행 번호: ${row}, 데이터: ${JSON.stringify(rowData)}`);
+
+    // onFormSubmit 함수 호출
+    onFormSubmit(mockEvent);
+
+  } catch (error) {
+    console.error('[onEditForFormSubmit] 오류:', error);
+    console.error('[onEditForFormSubmit] 오류 스택:', error.stack);
+    // 오류가 발생해도 스프레드시트 편집은 정상적으로 진행되도록 함
+  }
+}
+
+/**
+ * onChange/onFormSubmit 설치형 트리거 핸들러 (Google Forms 제출 시 즉시 실행)
+ * "양식 제출 시" 트리거와 "변경 시" 트리거 모두 처리
+ */
+function onChangeForFormSubmit(e) {
+  try {
+    console.log(`[onChangeForFormSubmit] ⚡ 트리거 즉시 실행됨`);
+    console.log(`[onChangeForFormSubmit] 이벤트 객체:`, JSON.stringify(e));
+    console.log(`[onChangeForFormSubmit] changeType: ${e.changeType}, values: ${e.values ? '있음' : '없음'}`);
+    
+    // 동기화가 비활성화되어 있으면 무시
+    if (!NEW_SYSTEM_CONFIG.ENABLED) {
+      console.log(`[onChangeForFormSubmit] 동기화 비활성화됨`);
+      return;
+    }
+
+    // "양식 제출 시" 트리거인 경우 (e.values가 있고 e.changeType이 없음)
+    if (e.values && e.values.length > 0 && !e.changeType) {
+      console.log(`[onChangeForFormSubmit] ⚡ 양식 제출 이벤트 감지 - onFormSubmit 직접 호출`);
+      // onFormSubmit 함수를 직접 호출
+      onFormSubmit(e);
+      return;
+    }
+
+    // "변경 시" 트리거인 경우 (e.changeType이 있음)
+    // INSERT_ROW 변경만 처리 (새 행 추가)
+    if (e.changeType && e.changeType !== 'INSERT_ROW') {
+      console.log(`[onChangeForFormSubmit] INSERT_ROW가 아님: ${e.changeType}, 무시`);
+      return;
+    }
+    
+    // changeType이 없고 values도 없으면 무시
+    if (!e.changeType && !e.values) {
+      console.log(`[onChangeForFormSubmit] changeType과 values가 모두 없음, 무시`);
+      return;
+    }
+
+    const sheet = e.source.getActiveSheet();
+    const sheetName = sheet.getName();
+    
+    console.log(`[onChangeForFormSubmit] 시트 이름: ${sheetName}`);
+    
+    // "설문지 응답 시트1"에서만 작동
+    if (sheetName !== '설문지 응답 시트1') {
+      console.log(`[onChangeForFormSubmit] 다른 시트에서 실행됨: ${sheetName}, 무시`);
+      return;
+    }
+
+    const row = e.range.getRow();
+    
+    console.log(`[onChangeForFormSubmit] ⚡ 새 행 추가 즉시 감지 - 행 번호: ${row}`);
+    
+    // 첫 번째 행(헤더)이면 무시
+    if (row === 1) {
+      console.log(`[onChangeForFormSubmit] 헤더 행 추가, 무시`);
+      return;
+    }
+
+    // 데이터가 채워질 때까지 빠르게 재시도 (최대 3초, 0.2초 간격)
+    let timestampValue = null;
+    let retryCount = 0;
+    const maxRetries = 15; // 15회 * 0.2초 = 최대 3초
+    
+    while (retryCount < maxRetries && !timestampValue) {
+      Utilities.sleep(200); // 0.2초 대기 (더 빠른 반응)
+      timestampValue = sheet.getRange(row, 1).getValue();
+      retryCount++;
+      if (retryCount % 5 === 0) {
+        console.log(`[onChangeForFormSubmit] 재시도 ${retryCount}/${maxRetries} - 타임스탬프 값: ${timestampValue}`);
+      }
+    }
+    
+    if (!timestampValue) {
+      console.error(`[onChangeForFormSubmit] ❌ 타임스탬프 값이 없음 (${maxRetries}회 재시도 후)`);
+      return;
+    }
+
+    // 해당 행의 모든 데이터 가져오기
+    const sheetLastCol = sheet.getLastColumn();
+    const rowData = sheet.getRange(row, 1, 1, sheetLastCol).getValues()[0];
+    
+    console.log(`[onChangeForFormSubmit] ⚡ 행 데이터 즉시 처리: ${JSON.stringify(rowData)}`);
+
+    // e.values 형식으로 변환
+    const mockEvent = {
+      values: rowData,
+      range: sheet.getRange(row, 1, 1, sheetLastCol)
+    };
+
+    console.log(`[onChangeForFormSubmit] ⚡ 즉시 동기화 시작 - 행 번호: ${row}`);
+
+    // onFormSubmit 함수 호출 (즉시 실행)
+    onFormSubmit(mockEvent);
+
+    console.log(`[onChangeForFormSubmit] ✅ 즉시 동기화 완료 - 행 번호: ${row}`);
+
+  } catch (error) {
+    console.error('[onChangeForFormSubmit] ❌ 오류:', error);
+    console.error('[onChangeForFormSubmit] 오류 스택:', error.stack);
+    // 오류가 발생해도 스프레드시트 편집은 정상적으로 진행되도록 함
+  }
+}
+
 
 /**
  * 기존 데이터 일괄 동기화 (한 번만 실행)
@@ -473,12 +754,13 @@ function syncExistingDataToNewSystem() {
 // 📋 메뉴 설정
 // ========================================
 
+
 /**
  * 동기화 메뉴 설정
  */
 function setupSyncMenu(ui) {
   ui.createMenu('🔄 신규 시스템 동기화')
-    .addItem('⚙️ 트리거 설정', 'setupFormSubmitTrigger')
+    .addItem('⚙️ 실시간 트리거 설정 가이드', 'setupFormSubmitTrigger')
     .addSeparator()
     .addItem('📤 기존 데이터 일괄 동기화', 'syncExistingDataToNewSystem')
     .addItem('🔄 최신 응답 수동 동기화', 'syncLatestResponseManually')

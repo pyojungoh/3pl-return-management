@@ -630,6 +630,19 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_pallets_out_date 
                 ON pallets(out_date)
             ''')
+            # 복합 인덱스 (자주 사용되는 조합 쿼리 최적화) - PostgreSQL
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_company_in_date 
+                ON pallets(company_name, in_date DESC)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_company_status 
+                ON pallets(company_name, status)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_in_date_pallet_id 
+                ON pallets(in_date DESC, pallet_id DESC)
+            ''')
             
             # pallet_fees 테이블 (화주사별 보관료 설정)
             cursor.execute('''
@@ -1287,6 +1300,19 @@ def init_db():
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_pallets_out_date 
                 ON pallets(out_date)
+            ''')
+            # 복합 인덱스 (자주 사용되는 조합 쿼리 최적화) - SQLite
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_company_in_date 
+                ON pallets(company_name, in_date DESC)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_company_status 
+                ON pallets(company_name, status)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_pallets_in_date_pallet_id 
+                ON pallets(in_date DESC, pallet_id DESC)
             ''')
             
             # pallet_fees 테이블 (화주사별 보관료 설정)

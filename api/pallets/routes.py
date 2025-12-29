@@ -1,7 +1,7 @@
 """
 파레트 보관료 관리 시스템 - API 라우트
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response
 from datetime import date, datetime
 from api.pallets.models import (
     create_pallet, update_pallet_status, get_pallet_by_id, get_pallets,
@@ -1373,6 +1373,480 @@ def scan_qr():
         return jsonify({
             'success': False,
             'message': f'QR 코드 스캔 실패: {str(e)}'
+        }), 500
+
+
+@pallets_bp.route('/labels/filter', methods=['GET'])
+def filter_labels():
+    """
+    라벨 출력용 파레트 필터링
+    """
+    try:
+        role, company_name, username = get_user_context()
+        
+        # 필터 파라미터
+        pallet_id_filter = request.args.get('pallet_id', '').strip()
+        company_filter = request.args.get('company', '').strip()
+        product_filter = request.args.get('product', '').strip()
+        start_date_str = request.args.get('start_date', '').strip()
+        end_date_str = request.args.get('end_date', '').strip()
+        status_filter = request.args.get('status', '').strip()
+        include_printed = request.args.get('include_printed', 'false').lower() == 'true'
+        
+        # 날짜 파싱
+        start_date = None
+        end_date = None
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            except:
+                pass
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            except:
+                pass
+        
+        # 데이터베이스 쿼리
+        from api.database.models import get_db_connection, USE_POSTGRESQL
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # print_status 컬럼이 있는지 확인하고 없으면 추가
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name='pallets' AND column_name='print_status'")
+                if cursor.fetchone() is None:
+                    cursor.execute("ALTER TABLE pallets ADD COLUMN print_status TEXT DEFAULT '미출력'")
+                    cursor.execute("ALTER TABLE pallets ADD COLUMN print_date TEXT")
+                    conn.commit()
+            else:
+                cursor.execute("PRAGMA table_info(pallets)")
+                columns = [row[1] for row in cursor.fetchall()]
+                if 'print_status' not in columns:
+                    cursor.execute("ALTER TABLE pallets ADD COLUMN print_status TEXT DEFAULT '미출력'")
+                    cursor.execute("ALTER TABLE pallets ADD COLUMN print_date TEXT")
+                    conn.commit()
+        except Exception as e:
+            # 컬럼이 이미 있거나 다른 오류인 경우 무시하고 계속 진행
+            try:
+                conn.rollback()
+            except:
+                pass
+        
+        # 파라미터 플레이스홀더 (PostgreSQL: %s, SQLite: ?)
+        param_placeholder = '%s' if USE_POSTGRESQL else '?'
+        
+        # 기본 쿼리 (print_status 컬럼이 없을 수도 있으므로 COALESCE 사용)
+        if USE_POSTGRESQL:
+            query = "SELECT pallet_id, company_name, product_name, in_date, status, COALESCE(print_status, '미출력') as print_status FROM pallets WHERE 1=1"
+        else:
+            query = "SELECT pallet_id, company_name, product_name, in_date, status, COALESCE(print_status, '미출력') as print_status FROM pallets WHERE 1=1"
+        params = []
+        
+        # 화주사 필터 (관리자가 아니면 자신의 화주사만)
+        if role != '관리자' and company_name:
+            query += f" AND company_name = {param_placeholder}"
+            params.append(company_name)
+        elif company_filter:
+            query += f" AND company_name = {param_placeholder}"
+            params.append(company_filter)
+        
+        # 파레트 ID 필터 (콤마 구분 다중 검색)
+        if pallet_id_filter:
+            id_terms = [term.strip() for term in pallet_id_filter.split(',') if term.strip()]
+            if id_terms:
+                id_conditions = []
+                for term in id_terms:
+                    if '_' in term:
+                        # 정확 매칭
+                        id_conditions.append(f"pallet_id = {param_placeholder}")
+                        params.append(term)
+                    else:
+                        # 접두 매칭
+                        id_conditions.append(f"pallet_id LIKE {param_placeholder}")
+                        params.append(f"{term}%")
+                if id_conditions:
+                    query += " AND (" + " OR ".join(id_conditions) + ")"
+        
+        # 품목명 필터
+        if product_filter:
+            query += f" AND product_name LIKE {param_placeholder}"
+            params.append(f"%{product_filter}%")
+        
+        # 입고일 필터
+        if start_date:
+            query += f" AND in_date >= {param_placeholder}"
+            params.append(start_date.isoformat())
+        if end_date:
+            query += f" AND in_date <= {param_placeholder}"
+            params.append(end_date.isoformat())
+        
+        # 상태 필터
+        if status_filter and status_filter != '전체':
+            query += f" AND status = {param_placeholder}"
+            params.append(status_filter)
+        
+        # 출력 상태 필터 (include_printed가 false면 미출력만)
+        if not include_printed:
+            query += f" AND (print_status IS NULL OR print_status = '' OR print_status != '출력완료')"
+        
+        query += " ORDER BY in_date DESC, pallet_id DESC"
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        # PostgreSQL의 경우 row_factory가 없으므로 수동 변환
+        if USE_POSTGRESQL:
+            from psycopg2.extras import RealDictCursor
+            if isinstance(cursor, RealDictCursor):
+                rows = [dict(row) for row in rows]
+            else:
+                # 일반 cursor인 경우
+                columns = [desc[0] for desc in cursor.description]
+                rows = [dict(zip(columns, row)) for row in rows]
+        
+        conn.close()
+        
+        # 결과 변환
+        pallets = []
+        for row in rows:
+            if isinstance(row, dict):
+                # 이미 dict인 경우 (PostgreSQL 변환 후)
+                pallets.append({
+                    'pallet_id': row.get('pallet_id', ''),
+                    'company_name': row.get('company_name', ''),
+                    'product_name': row.get('product_name', ''),
+                    'in_date': row.get('in_date', ''),
+                    'status': row.get('status', ''),
+                    'print_status': row.get('print_status', '미출력')
+                })
+            else:
+                # SQLite Row 객체인 경우
+                pallets.append({
+                    'pallet_id': row['pallet_id'],
+                    'company_name': row['company_name'],
+                    'product_name': row['product_name'],
+                    'in_date': row['in_date'],
+                    'status': row['status'],
+                    'print_status': row.get('print_status', '미출력') if 'print_status' in row.keys() else '미출력'
+                })
+        
+        return jsonify({
+            'success': True,
+            'data': pallets
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'필터링 중 오류가 발생했습니다: {str(e)}'
+        }), 500
+
+
+@pallets_bp.route('/labels/mark-printed', methods=['POST'])
+def mark_labels_printed():
+    """
+    선택된 라벨을 출력완료로 표시
+    """
+    try:
+        data = request.get_json()
+        pallet_ids = data.get('pallet_ids', [])
+        
+        if not pallet_ids:
+            return jsonify({
+                'success': False,
+                'message': '출력완료로 표시할 파레트를 선택해주세요.'
+            }), 400
+        
+        from api.database.models import get_db_connection, USE_POSTGRESQL
+        from datetime import datetime
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # print_status 컬럼이 있는지 확인하고 없으면 추가
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name='pallets' AND column_name='print_status'")
+                if cursor.fetchone() is None:
+                    cursor.execute("ALTER TABLE pallets ADD COLUMN print_status TEXT DEFAULT '미출력'")
+                    cursor.execute("ALTER TABLE pallets ADD COLUMN print_date TEXT")
+                    conn.commit()
+            else:
+                cursor.execute("PRAGMA table_info(pallets)")
+                columns = [row[1] for row in cursor.fetchall()]
+                if 'print_status' not in columns:
+                    cursor.execute("ALTER TABLE pallets ADD COLUMN print_status TEXT DEFAULT '미출력'")
+                    cursor.execute("ALTER TABLE pallets ADD COLUMN print_date TEXT")
+                    conn.commit()
+        except Exception as e:
+            # 컬럼이 이미 있거나 다른 오류인 경우 무시하고 계속 진행
+            try:
+                conn.rollback()
+            except:
+                pass
+        
+        # 출력완료 상태 업데이트
+        param_placeholder = '%s' if USE_POSTGRESQL else '?'
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        placeholders = ','.join([param_placeholder for _ in pallet_ids])
+        query = f"UPDATE pallets SET print_status = '출력완료', print_date = {param_placeholder} WHERE pallet_id IN ({placeholders})"
+        params = [today] + pallet_ids
+        
+        cursor.execute(query, params)
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'{len(pallet_ids)}개의 라벨이 출력완료로 표시되었습니다.'
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'출력완료 표시 중 오류가 발생했습니다: {str(e)}'
+        }), 500
+
+
+@pallets_bp.route('/labels/print', methods=['POST'])
+def print_labels():
+    """
+    선택된 라벨 PDF 생성 (12칸 레이아웃)
+    """
+    try:
+        data = request.get_json()
+        pallet_ids = data.get('pallet_ids', [])
+        
+        if not pallet_ids:
+            return jsonify({
+                'success': False,
+                'message': '인쇄할 파레트를 선택해주세요.'
+            }), 400
+        
+        # reportlab 라이브러리 확인 및 임포트
+        try:
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.units import mm
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.utils import ImageReader
+            import io
+            import urllib.request
+            import urllib.parse
+        except ImportError:
+            return jsonify({
+                'success': False,
+                'message': 'PDF 생성 라이브러리가 설치되지 않았습니다. reportlab을 설치해주세요.'
+            }), 500
+        
+        # 데이터베이스에서 파레트 정보 조회
+        from api.database.models import get_db_connection, USE_POSTGRESQL
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 파라미터 플레이스홀더 (PostgreSQL: %s, SQLite: ?)
+        param_placeholder = '%s' if USE_POSTGRESQL else '?'
+        placeholders = ','.join([param_placeholder for _ in pallet_ids])
+        cursor.execute(f"SELECT pallet_id, company_name, product_name, in_date FROM pallets WHERE pallet_id IN ({placeholders})", pallet_ids)
+        rows = cursor.fetchall()
+        
+        # PostgreSQL의 경우 row_factory가 없으므로 수동 변환
+        if USE_POSTGRESQL:
+            columns = [desc[0] for desc in cursor.description]
+            rows = [dict(zip(columns, row)) for row in rows]
+        
+        conn.close()
+        
+        if not rows:
+            return jsonify({
+                'success': False,
+                'message': '선택한 파레트를 찾을 수 없습니다.'
+            }), 404
+        
+        # PDF 생성
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+        
+        # 라벨 설정 (LS-3112: 12칸, 3열 × 4행)
+        LABELS_PER_PAGE = 12
+        LABELS_PER_ROW = 3
+        LABEL_WIDTH = 63.5 * mm
+        LABEL_HEIGHT = 70 * mm
+        PAGE_WIDTH, PAGE_HEIGHT = A4
+        
+        # 마진 계산 (구글 앱스크립트와 동일)
+        MARGIN_TOP = 22.4 * mm
+        MARGIN_LEFT = 17 * mm
+        MARGIN_RIGHT = 22.6 * mm
+        MARGIN_BOTTOM = 0
+        
+        # 라벨 간격 계산
+        LABEL_SPACING_X = (PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT - (LABEL_WIDTH * LABELS_PER_ROW)) / (LABELS_PER_ROW - 1) if LABELS_PER_ROW > 1 else 0
+        LABEL_SPACING_Y = (PAGE_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM - (LABEL_HEIGHT * 4)) / 3  # 4행이므로 간격은 3개
+        
+        # QR 코드를 미리 다운로드 (병렬 처리로 속도 향상)
+        print(f"[PDF 생성] QR 코드 사전 다운로드 시작 (총 {len(rows)}개)...")
+        import concurrent.futures
+        
+        def download_qr_code(row_data):
+            """QR 코드 다운로드 함수 (바이트 데이터만 반환)"""
+            try:
+                if isinstance(row_data, dict):
+                    pallet_id = row_data.get('pallet_id', '')
+                    company = row_data.get('company_name', '') or ''
+                    product = row_data.get('product_name', '') or ''
+                else:
+                    pallet_id = row_data['pallet_id']
+                    company = row_data['company_name'] or ''
+                    product = row_data['product_name'] or ''
+                
+                form_url = "https://docs.google.com/forms/d/e/1FAIpQLSdDmnWcW27tfDptUvuSjEgN8K7nNNQWecdpeMMhwftTtbiyIQ/viewform"
+                qr_text = f"{form_url}?usp=pp_url&entry.419411235={urllib.parse.quote(pallet_id)}&entry.427884801=보관종료&entry.2110345042={urllib.parse.quote(company)}&entry.306824944={urllib.parse.quote(product)}"
+                qr_url = f"https://quickchart.io/qr?text={urllib.parse.quote(qr_text)}&size=150&ecLevel=M"
+                
+                qr_response = urllib.request.urlopen(qr_url, timeout=3)
+                qr_data = qr_response.read()
+                if qr_data and len(qr_data) > 0:
+                    return qr_data
+            except Exception as e:
+                print(f"[PDF 생성] QR 코드 다운로드 실패: {str(e)[:100]}")
+            return None
+        
+        # 병렬로 QR 코드 다운로드 (최대 10개 동시, 바이트 데이터만 저장)
+        qr_data_dict = {}
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                future_to_row = {executor.submit(download_qr_code, row): idx for idx, row in enumerate(rows)}
+                completed = 0
+                for future in concurrent.futures.as_completed(future_to_row):
+                    idx = future_to_row[future]
+                    try:
+                        qr_data_dict[idx] = future.result()
+                        completed += 1
+                        if completed % 10 == 0:
+                            print(f"[PDF 생성] QR 코드 다운로드 진행: {completed}/{len(rows)}")
+                    except Exception as e:
+                        qr_data_dict[idx] = None
+                        print(f"[PDF 생성] QR 코드 다운로드 실패 (라벨 {idx + 1}): {str(e)[:50]}")
+        except Exception as e:
+            print(f"[PDF 생성] QR 코드 병렬 다운로드 중 오류: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # 실패해도 계속 진행 (QR 코드 없이)
+            qr_data_dict = {idx: None for idx in range(len(rows))}
+        
+        print(f"[PDF 생성] QR 코드 다운로드 완료 ({len([d for d in qr_data_dict.values() if d])}개 성공), PDF 그리기 시작...")
+        
+        count = 0
+        total_rows = len(rows)
+        
+        for idx, row in enumerate(rows):
+            if idx % 10 == 0 and idx > 0:
+                print(f"[PDF 생성] 진행 중: {idx}/{total_rows} 라벨 처리 완료")
+            
+            # 새 페이지 시작 (12개마다)
+            if count > 0 and count % LABELS_PER_PAGE == 0:
+                c.showPage()
+            
+            # 라벨 위치 계산
+            label_index = count % LABELS_PER_PAGE
+            row_index = label_index // LABELS_PER_ROW
+            col_index = label_index % LABELS_PER_ROW
+            
+            x = MARGIN_LEFT + col_index * (LABEL_WIDTH + LABEL_SPACING_X)
+            y = PAGE_HEIGHT - MARGIN_TOP - (row_index + 1) * LABEL_HEIGHT - row_index * LABEL_SPACING_Y
+            
+            # 라벨 내용 그리기
+            if isinstance(row, dict):
+                pallet_id = row.get('pallet_id', '')
+                company = row.get('company_name', '') or ''
+                product = row.get('product_name', '') or ''
+                in_date = row.get('in_date', '') or ''
+            else:
+                pallet_id = row['pallet_id']
+                company = row['company_name'] or ''
+                product = row['product_name'] or ''
+                in_date = row['in_date'] or ''
+            
+            # 날짜 포맷팅
+            try:
+                if in_date:
+                    date_obj = datetime.strptime(in_date, '%Y-%m-%d').date()
+                    in_date_str = date_obj.strftime('%Y-%m-%d')
+                else:
+                    in_date_str = '-'
+            except:
+                in_date_str = str(in_date) if in_date else '-'
+            
+            # 미리 다운로드한 QR 코드 사용 (바이트 데이터를 ImageReader로 변환)
+            qr_image = None
+            qr_data = qr_data_dict.get(idx)
+            if qr_data:
+                try:
+                    qr_image = ImageReader(io.BytesIO(qr_data))
+                except Exception as e:
+                    print(f"[PDF 생성] QR 코드 ImageReader 생성 실패 (라벨 {idx + 1}): {str(e)[:50]}")
+            
+            # 텍스트 그리기
+            c.setFont("Helvetica-Bold", 11)
+            c.drawString(x + 3*mm, y + LABEL_HEIGHT - 8*mm, f"파레트 ID: {pallet_id}")
+            
+            c.setFont("Helvetica-Bold", 11)
+            c.drawString(x + 3*mm, y + LABEL_HEIGHT - 14*mm, product[:20] if product else '-')
+            
+            # QR 코드 그리기 (중앙)
+            if qr_image:
+                qr_width_mm = 40 * mm
+                qr_height_mm = 40 * mm
+                qr_x = x + (LABEL_WIDTH - qr_width_mm) / 2
+                qr_y = y + LABEL_HEIGHT / 2 - qr_height_mm / 2
+                c.drawImage(qr_image, qr_x, qr_y, width=qr_width_mm, height=qr_height_mm)
+            
+            # 하단 정보
+            c.setFont("Helvetica-Bold", 11)
+            c.drawString(x + 3*mm, y + 8*mm, f"화주사: {company[:15] if company else '-'}")
+            
+            c.setFont("Helvetica-Bold", 11)
+            c.drawString(x + 3*mm, y + 3*mm, f"입고일: {in_date_str}")
+            
+            count += 1
+        
+        print(f"[PDF 생성] 모든 라벨 처리 완료 ({count}개), PDF 저장 중...")
+        try:
+            c.save()
+            print(f"[PDF 생성] Canvas 저장 완료")
+            buffer.seek(0)
+            pdf_data = buffer.getvalue()
+            print(f"[PDF 생성] PDF 데이터 추출 완료, 크기: {len(pdf_data)} bytes")
+        except Exception as save_error:
+            print(f"[PDF 생성] PDF 저장 중 오류: {str(save_error)}")
+            import traceback
+            traceback.print_exc()
+            raise
+        
+        # PDF 응답 반환
+        return Response(
+            pdf_data,
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename*=UTF-8\'\'파레트_라벨_{date.today().isoformat()}.pdf'
+            }
+        )
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'PDF 생성 중 오류가 발생했습니다: {str(e)}'
         }), 500
 
 
