@@ -820,6 +820,18 @@
                 <label class="pal-form-label">입고일 *</label>
                 <input type="date" id="palInboundDate" class="pal-form-input" required>
               </div>
+              
+              <!-- 품목 리스트 -->
+              <div class="pal-form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <label class="pal-form-label" style="margin: 0;">품목 목록</label>
+                  <button type="button" class="pal-btn" onclick="palAddProductItem()" style="padding: 6px 12px; font-size: 12px; background: #28a745; color: white;">+ 품목 추가</button>
+                </div>
+                <div id="palProductItemsList" style="display: flex; flex-direction: column; gap: 10px;">
+                  <!-- 품목 항목들이 여기에 동적으로 추가됨 -->
+                </div>
+              </div>
+              
               <div class="pal-form-group">
                 <label class="pal-form-label">보관 위치</label>
                 <input type="text" id="palInboundLocation" class="pal-form-input" placeholder="예: A-01">
@@ -833,17 +845,6 @@
               <div class="pal-form-group">
                 <label class="pal-form-label">비고</label>
                 <textarea id="palInboundNotes" class="pal-form-input" style="min-height: 80px;" placeholder="비고를 입력하세요"></textarea>
-              </div>
-              
-              <!-- 품목 리스트 -->
-              <div class="pal-form-group">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                  <label class="pal-form-label" style="margin: 0;">품목 목록</label>
-                  <button type="button" class="pal-btn" onclick="palAddProductItem()" style="padding: 6px 12px; font-size: 12px; background: #28a745; color: white;">+ 품목 추가</button>
-                </div>
-                <div id="palProductItemsList" style="display: flex; flex-direction: column; gap: 10px;">
-                  <!-- 품목 항목들이 여기에 동적으로 추가됨 -->
-                </div>
               </div>
               
               <button type="submit" class="pal-btn" style="width: 100%;">입고 처리</button>
@@ -1707,6 +1708,13 @@
         }
       });
       
+      // 입력 필드에서 포커스가 벗어날 때 hidden 필드에도 값 설정 (직접 입력한 경우)
+      input.addEventListener('blur', function() {
+        if (this.value && !hidden.value) {
+          hidden.value = this.value;
+        }
+      });
+      
       // 외부 클릭 시 닫기
       document.addEventListener('mousedown', function(e) {
         if (!input.contains(e.target) && !dropdown.contains(e.target)) {
@@ -1836,8 +1844,18 @@
       
       try {
         // 화주사명 가져오기 (hidden 필드 우선, 없으면 input 필드)
-        const hiddenCompanyName = document.getElementById('palInboundCompanyName').value;
-        const inputCompanyName = document.getElementById('palInboundCompanyInput').value;
+        const hiddenInput = document.getElementById('palInboundCompanyName');
+        const textInput = document.getElementById('palInboundCompanyInput');
+        
+        // input 필드에 값이 있으면 hidden 필드에도 설정
+        if (textInput && textInput.value && (!hiddenInput || !hiddenInput.value)) {
+          if (hiddenInput) {
+            hiddenInput.value = textInput.value;
+          }
+        }
+        
+        const hiddenCompanyName = hiddenInput ? hiddenInput.value : '';
+        const inputCompanyName = textInput ? textInput.value : '';
         const companyName = hiddenCompanyName || inputCompanyName;
         
         console.log('[PAL] 입고 화주사명:', { hiddenCompanyName, inputCompanyName, companyName });
