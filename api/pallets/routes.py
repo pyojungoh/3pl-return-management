@@ -1287,20 +1287,43 @@ def export_settlements():
             out_date = pallet.get('out_date')
             is_service = pallet.get('is_service', 0) == 1
             
-            # 보관일수 계산
+            # 보관일수 계산 (settlement_month가 있으면 해당 월 내에서만 계산)
             if in_date:
-                if out_date:
-                    storage_days = (out_date - in_date).days + 1
+                if settlement_month:
+                    # 해당 월 내 보관일수 계산
+                    storage_start = max(in_date, start_date)
+                    if out_date:
+                        storage_end = min(out_date, end_date)
+                    else:
+                        storage_end = min(end_date, date.today())
+                    storage_days = max(0, (storage_end - storage_start).days + 1)
                 else:
-                    storage_days = (date.today() - in_date).days + 1
+                    # 전체 기간 보관일수 계산
+                    if out_date:
+                        storage_days = (out_date - in_date).days + 1
+                    else:
+                        storage_days = (date.today() - in_date).days + 1
             else:
                 storage_days = 0
             
-            # 보관료 계산
+            # 보관료 계산 (settlement_month가 있으면 해당 월 내에서만 계산)
             if is_service:
                 fee = 0
             else:
-                fee = calculate_fee(pallet.get('company_name', ''), in_date, out_date, is_service)
+                if settlement_month:
+                    # 해당 월 내 보관료 계산
+                    storage_start = max(in_date, start_date)
+                    if out_date:
+                        storage_end = min(out_date, end_date)
+                    else:
+                        storage_end = min(end_date, date.today())
+                    pallet_storage_days = max(0, (storage_end - storage_start).days + 1)
+                    daily_fee = calculate_daily_fee(pallet.get('company_name', ''), storage_start)
+                    calculated_fee = daily_fee * pallet_storage_days
+                    fee = math.ceil(calculated_fee / 100) * 100
+                else:
+                    # 전체 기간 보관료 계산
+                    fee = calculate_fee(pallet.get('company_name', ''), in_date, out_date, is_service)
             
             # 상태
             status = pallet.get('status', '입고됨')
