@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>파레트 보관료 관리</title>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     /* body 스타일 제거 (dashboard_server.html에 통합되므로) */
     body {
@@ -643,6 +645,7 @@
     <!-- 하위 메뉴바 (관리자만 표시) -->
     <div id="palSubMenuBar" class="pal-admin-only">
       <button class="pal-sub-menu-btn active" onclick="palSwitchSubMenu('list')">📋 월별 화주사별 리스트</button>
+      <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('revenue')">📈 월별 수입 현황</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('inbound')">📦 파레트 관리</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('status')">📊 파레트 현황</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('fee')">💰 보관료 설정</button>
@@ -1155,6 +1158,92 @@
           </div>
         </div>
       </div>
+      
+      <!-- 월별 수입 현황 페이지 -->
+      <div id="palPageRevenue" class="pal-content-page pal-admin-only">
+        <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 20px;">📈 월별 수입 현황</h2>
+        
+        <!-- 기간 선택 -->
+        <div class="pal-filters" style="margin-bottom: 20px; display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap;">
+          <div class="pal-filter-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px; margin-bottom: 4px;">시작 월</label>
+            <input type="month" id="palRevenueStartMonth" class="pal-form-input" style="padding: 6px 10px; font-size: 13px; width: 140px;">
+          </div>
+          <div class="pal-filter-group" style="margin-bottom: 0;">
+            <label style="font-size: 12px; margin-bottom: 4px;">종료 월</label>
+            <input type="month" id="palRevenueEndMonth" class="pal-form-input" style="padding: 6px 10px; font-size: 13px; width: 140px;">
+          </div>
+          <button class="pal-btn" onclick="palLoadRevenueData()" style="padding: 6px 14px; font-size: 12px; height: 32px; white-space: nowrap;">조회</button>
+        </div>
+        
+        <!-- 통계 요약 박스 -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
+          <div class="pal-stat-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="pal-stat-box-title">총 수입</div>
+            <div class="pal-stat-box-value" id="palRevenueTotal">0원</div>
+          </div>
+          <div class="pal-stat-box" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <div class="pal-stat-box-title">평균 수입</div>
+            <div class="pal-stat-box-value" id="palRevenueAverage">0원</div>
+          </div>
+          <div class="pal-stat-box" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+            <div class="pal-stat-box-title">최고 수입</div>
+            <div class="pal-stat-box-value" id="palRevenueMax">0원</div>
+          </div>
+          <div class="pal-stat-box" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+            <div class="pal-stat-box-title">최저 수입</div>
+            <div class="pal-stat-box-value" id="palRevenueMin">0원</div>
+          </div>
+        </div>
+        
+        <!-- 차트 영역 -->
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 20px;">
+          <!-- 월별 수입 추이 차트 -->
+          <div class="pal-table-container">
+            <div class="pal-table-header">
+              <h3>월별 수입 추이</h3>
+            </div>
+            <div style="padding: 20px;">
+              <canvas id="palRevenueMonthlyChart" style="max-height: 400px;"></canvas>
+            </div>
+          </div>
+          
+          <!-- 화주사별 수입 비율 차트 -->
+          <div class="pal-table-container">
+            <div class="pal-table-header">
+              <h3>화주사별 수입 비율</h3>
+            </div>
+            <div style="padding: 20px;">
+              <canvas id="palRevenueCompanyChart" style="max-height: 400px;"></canvas>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 월별 상세 내역 테이블 -->
+        <div class="pal-table-container">
+          <div class="pal-table-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>월별 상세 내역</h3>
+            <button class="pal-btn" onclick="palExportRevenueData()" style="padding: 6px 12px; font-size: 12px; background: #28a745; color: white;">📥 엑셀 다운로드</button>
+          </div>
+          <div class="pal-table-scroll-wrapper">
+            <table class="pal-table">
+              <thead>
+                <tr>
+                  <th>월</th>
+                  <th>총 수입</th>
+                  <th>화주사 수</th>
+                  <th>평균 수입</th>
+                </tr>
+              </thead>
+              <tbody id="palRevenueTableBody">
+                <tr>
+                  <td colspan="4" class="no-data">데이터를 불러오는 중...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   
@@ -1280,6 +1369,9 @@
           dateInput.value = today;
         }
         palLoadFeeCompanyList();
+      } else if (menuId === 'revenue') {
+        // 월별 수입 현황 페이지 초기화
+        palLoadRevenueData();
       }
     }
     
@@ -4493,6 +4585,210 @@
           }
         }, 500);
       }, 500);
+    }
+    
+    // 월별 수입 현황 관련 변수
+    let palRevenueMonthlyChart = null;
+    let palRevenueCompanyChart = null;
+    let palCurrentRevenueData = null;
+    
+    // 월별 수입 현황 데이터 로드
+    async function palLoadRevenueData() {
+      const startMonth = document.getElementById('palRevenueStartMonth').value;
+      const endMonth = document.getElementById('palRevenueEndMonth').value;
+      
+      const params = new URLSearchParams();
+      if (startMonth) params.append('start_month', startMonth);
+      if (endMonth) params.append('end_month', endMonth);
+      
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/revenue/monthly?${params}`, {
+          headers: palGetUserHeaders()
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          palCurrentRevenueData = result.data;
+          palUpdateRevenueDisplay(result.data);
+        } else {
+          alert('❌ 데이터 로드 실패: ' + result.message);
+        }
+      } catch (error) {
+        console.error('월별 수입 현황 로드 오류:', error);
+        alert('❌ 데이터 로드 중 오류가 발생했습니다: ' + error.message);
+      }
+    }
+    
+    // 월별 수입 현황 표시 업데이트
+    function palUpdateRevenueDisplay(data) {
+      const summary = data.summary;
+      const monthlyData = data.monthly_data;
+      const companyDistribution = data.company_distribution;
+      
+      // 통계 요약 업데이트
+      document.getElementById('palRevenueTotal').textContent = summary.total_revenue.toLocaleString() + '원';
+      document.getElementById('palRevenueAverage').textContent = Math.round(summary.average_revenue).toLocaleString() + '원';
+      document.getElementById('palRevenueMax').textContent = summary.max_revenue.toLocaleString() + '원';
+      document.getElementById('palRevenueMin').textContent = summary.min_revenue.toLocaleString() + '원';
+      
+      // 월별 수입 추이 차트
+      const monthlyCtx = document.getElementById('palRevenueMonthlyChart').getContext('2d');
+      if (palRevenueMonthlyChart) {
+        palRevenueMonthlyChart.destroy();
+      }
+      
+      const sortedMonthlyData = [...monthlyData].reverse(); // 시간순으로 정렬
+      palRevenueMonthlyChart = new Chart(monthlyCtx, {
+        type: 'line',
+        data: {
+          labels: sortedMonthlyData.map(d => d.month),
+          datasets: [{
+            label: '월별 수입',
+            data: sortedMonthlyData.map(d => d.total_fee),
+            borderColor: '#ff6b35',
+            backgroundColor: 'rgba(255, 107, 53, 0.1)',
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return '수입: ' + context.parsed.y.toLocaleString() + '원';
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return value.toLocaleString() + '원';
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // 화주사별 수입 비율 차트
+      const companyCtx = document.getElementById('palRevenueCompanyChart').getContext('2d');
+      if (palRevenueCompanyChart) {
+        palRevenueCompanyChart.destroy();
+      }
+      
+      // 상위 10개만 표시
+      const topCompanies = companyDistribution.slice(0, 10);
+      const colors = [
+        '#ff6b35', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff',
+        '#5f27cd', '#00d2d3', '#ff6348', '#ffa502', '#ff7675'
+      ];
+      
+      palRevenueCompanyChart = new Chart(companyCtx, {
+        type: 'doughnut',
+        data: {
+          labels: topCompanies.map(d => d.company_name),
+          datasets: [{
+            data: topCompanies.map(d => d.total_fee),
+            backgroundColor: colors.slice(0, topCompanies.length)
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'right'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.parsed || 0;
+                  const percentage = topCompanies[context.dataIndex]?.percentage || 0;
+                  return label + ': ' + value.toLocaleString() + '원 (' + percentage.toFixed(1) + '%)';
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // 월별 상세 내역 테이블 업데이트
+      const tbody = document.getElementById('palRevenueTableBody');
+      if (monthlyData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="no-data">데이터가 없습니다.</td></tr>';
+      } else {
+        tbody.innerHTML = monthlyData.map(item => `
+          <tr>
+            <td>${item.month}</td>
+            <td>${item.total_fee.toLocaleString()}원</td>
+            <td>${item.company_count}개</td>
+            <td>${Math.round(item.average_fee).toLocaleString()}원</td>
+          </tr>
+        `).join('');
+      }
+    }
+    
+    // 월별 수입 현황 엑셀 다운로드
+    async function palExportRevenueData() {
+      if (!palCurrentRevenueData) {
+        alert('❌ 먼저 데이터를 조회해주세요.');
+        return;
+      }
+      
+      try {
+        // CSV 데이터 생성
+        const csvRows = [];
+        csvRows.push('\uFEFF'); // UTF-8 BOM
+        csvRows.push('월별 보관료 수입 현황');
+        csvRows.push('');
+        csvRows.push('통계 요약');
+        csvRows.push('총 수입,' + palCurrentRevenueData.summary.total_revenue + '원');
+        csvRows.push('평균 수입,' + Math.round(palCurrentRevenueData.summary.average_revenue) + '원');
+        csvRows.push('최고 수입,' + palCurrentRevenueData.summary.max_revenue + '원');
+        csvRows.push('최저 수입,' + palCurrentRevenueData.summary.min_revenue + '원');
+        csvRows.push('');
+        csvRows.push('월별 상세 내역');
+        csvRows.push('월,총 수입,화주사 수,평균 수입');
+        
+        palCurrentRevenueData.monthly_data.forEach(item => {
+          csvRows.push(`${item.month},${item.total_fee},${item.company_count},${Math.round(item.average_fee)}`);
+        });
+        
+        csvRows.push('');
+        csvRows.push('화주사별 수입 분포');
+        csvRows.push('화주사명,총 수입,비율(%)');
+        
+        palCurrentRevenueData.company_distribution.forEach(item => {
+          csvRows.push(`${item.company_name},${item.total_fee},${item.percentage.toFixed(2)}`);
+        });
+        
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '월별_보관료_수입_현황.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('엑셀 다운로드 오류:', error);
+        alert('❌ 다운로드 중 오류가 발생했습니다: ' + error.message);
+      }
     }
   </script>
 </body>

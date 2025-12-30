@@ -1212,6 +1212,154 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
         conn.close()
 
 
+def get_monthly_revenue(start_month: str = None, end_month: str = None) -> Dict:
+    """
+    월별 보관료 수입 현황 조회
+    
+    Args:
+        start_month: 시작 월 (YYYY-MM 형식, 선택)
+        end_month: 종료 월 (YYYY-MM 형식, 선택)
+    
+    Returns:
+        {
+            "summary": {
+                "total_revenue": int,
+                "average_revenue": float,
+                "max_revenue": int,
+                "min_revenue": int,
+                "total_months": int
+            },
+            "monthly_data": [
+                {
+                    "month": str,
+                    "total_fee": int,
+                    "company_count": int,
+                    "average_fee": float
+                },
+                ...
+            ],
+            "company_distribution": [
+                {
+                    "company_name": str,
+                    "total_fee": int,
+                    "percentage": float
+                },
+                ...
+            ]
+        }
+    """
+    conn = get_db_connection()
+    
+    try:
+        if USE_POSTGRESQL:
+            from psycopg2.extras import RealDictCursor
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
+        
+        # 기본 쿼리
+        query = "SELECT settlement_month, SUM(total_fee) as total_fee, COUNT(DISTINCT company_name) as company_count FROM pallet_monthly_settlements WHERE 1=1"
+        params = []
+        
+        # 기간 필터링
+        if start_month:
+            query += " AND settlement_month >= %s" if USE_POSTGRESQL else " AND settlement_month >= ?"
+            params.append(start_month)
+        
+        if end_month:
+            query += " AND settlement_month <= %s" if USE_POSTGRESQL else " AND settlement_month <= ?"
+            params.append(end_month)
+        
+        query += " GROUP BY settlement_month ORDER BY settlement_month DESC"
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        # 월별 데이터 처리
+        monthly_data = []
+        total_revenue = 0
+        revenue_list = []
+        
+        for row in rows:
+            if USE_POSTGRESQL:
+                month = row['settlement_month']
+                total_fee = int(row['total_fee'] or 0)
+                company_count = int(row['company_count'] or 0)
+            else:
+                month = row[0]
+                total_fee = int(row[1] or 0)
+                company_count = int(row[2] or 0)
+            
+            average_fee = total_fee / company_count if company_count > 0 else 0
+            
+            monthly_data.append({
+                'month': month,
+                'total_fee': total_fee,
+                'company_count': company_count,
+                'average_fee': round(average_fee, 2)
+            })
+            
+            total_revenue += total_fee
+            revenue_list.append(total_fee)
+        
+        # 통계 계산
+        total_months = len(monthly_data)
+        average_revenue = total_revenue / total_months if total_months > 0 else 0
+        max_revenue = max(revenue_list) if revenue_list else 0
+        min_revenue = min(revenue_list) if revenue_list else 0
+        
+        summary = {
+            'total_revenue': total_revenue,
+            'average_revenue': round(average_revenue, 2),
+            'max_revenue': max_revenue,
+            'min_revenue': min_revenue,
+            'total_months': total_months
+        }
+        
+        # 화주사별 수입 분포 조회
+        company_query = "SELECT company_name, SUM(total_fee) as total_fee FROM pallet_monthly_settlements WHERE 1=1"
+        company_params = []
+        
+        if start_month:
+            company_query += " AND settlement_month >= %s" if USE_POSTGRESQL else " AND settlement_month >= ?"
+            company_params.append(start_month)
+        
+        if end_month:
+            company_query += " AND settlement_month <= %s" if USE_POSTGRESQL else " AND settlement_month <= ?"
+            company_params.append(end_month)
+        
+        company_query += " GROUP BY company_name ORDER BY total_fee DESC"
+        
+        cursor.execute(company_query, company_params)
+        company_rows = cursor.fetchall()
+        
+        company_distribution = []
+        for row in company_rows:
+            if USE_POSTGRESQL:
+                company_name = row['company_name']
+                company_total_fee = int(row['total_fee'] or 0)
+            else:
+                company_name = row[0]
+                company_total_fee = int(row[1] or 0)
+            
+            percentage = (company_total_fee / total_revenue * 100) if total_revenue > 0 else 0
+            
+            company_distribution.append({
+                'company_name': company_name,
+                'total_fee': company_total_fee,
+                'percentage': round(percentage, 2)
+            })
+        
+        return {
+            'summary': summary,
+            'monthly_data': monthly_data,
+            'company_distribution': company_distribution
+        }
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
     """
     정산 상세 조회 (파레트별 내역 포함)

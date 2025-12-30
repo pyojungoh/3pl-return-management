@@ -7,7 +7,8 @@ from api.pallets.models import (
     create_pallet, update_pallet_status, get_pallet_by_id, get_pallets,
     calculate_fee, get_pallet_fee, set_pallet_fee,
     generate_monthly_settlement, get_settlements, get_settlement_detail,
-    update_settlement_status, delete_settlement, delete_settlement
+    update_settlement_status, delete_settlement, delete_settlement,
+    get_monthly_revenue
 )
 
 # Blueprint 생성
@@ -1997,4 +1998,59 @@ def get_companies():
         return jsonify({
             'success': False,
             'message': f'화주사 목록 조회 실패: {str(e)}'
+        }), 500
+
+
+@pallets_bp.route('/revenue/monthly', methods=['GET'])
+def get_monthly_revenue_route():
+    """
+    월별 보관료 수입 현황 조회 (관리자 전용)
+    
+    Query Parameters:
+        start_month: 시작 월 (YYYY-MM 형식, 선택)
+        end_month: 종료 월 (YYYY-MM 형식, 선택)
+    
+    Returns:
+        {
+            "success": bool,
+            "data": {
+                "summary": {
+                    "total_revenue": int,
+                    "average_revenue": float,
+                    "max_revenue": int,
+                    "min_revenue": int,
+                    "total_months": int
+                },
+                "monthly_data": [...],
+                "company_distribution": [...]
+            }
+        }
+    """
+    try:
+        role, company_name, username = get_user_context()
+        
+        # 관리자만 접근 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 접근할 수 있습니다.'
+            }), 403
+        
+        start_month = request.args.get('start_month')
+        end_month = request.args.get('end_month')
+        
+        data = get_monthly_revenue(start_month=start_month, end_month=end_month)
+        
+        return jsonify({
+            'success': True,
+            'data': data
+        }), 200
+        
+    except Exception as e:
+        print(f"월별 수입 현황 조회 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'월별 수입 현황 조회 실패: {str(e)}'
         }), 500
