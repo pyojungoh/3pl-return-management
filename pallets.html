@@ -404,6 +404,103 @@
       border: 1px solid #bee5eb;
     }
     
+    /* 품목 항목 스타일 */
+    .pal-product-item {
+      background: #fff9e6;
+      border: 2px solid #ffeaa7;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+    }
+    
+    .pal-product-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .pal-product-item-title {
+      font-weight: 600;
+      color: #ff6b35;
+      font-size: 13px;
+    }
+    
+    .pal-product-item-remove {
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .pal-product-item-remove:hover {
+      background: #c82333;
+    }
+    
+    .pal-product-item-content {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .pal-product-item-content input[type="text"] {
+      flex: 1;
+      padding: 8px 12px;
+      border: 2px solid #ffeaa7;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    
+    .pal-product-quantity-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      border: 2px solid #ffeaa7;
+      border-radius: 6px;
+      padding: 4px;
+    }
+    
+    .pal-product-quantity-btn {
+      background: #ff6b35;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      width: 28px;
+      height: 28px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      line-height: 1;
+    }
+    
+    .pal-product-quantity-btn:hover {
+      background: #feca57;
+    }
+    
+    .pal-product-quantity-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .pal-product-quantity-value {
+      min-width: 40px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 14px;
+      color: #2d3436;
+    }
+    
     /* QR 스캔 영역 */
     .pal-qr-scanner {
       position: relative;
@@ -712,10 +809,6 @@
             <h3 style="color: #ff6b35; margin-bottom: 15px;">단일 입고</h3>
             <form id="palInboundForm" onsubmit="event.preventDefault(); palInbound();">
               <div class="pal-form-group">
-                <label class="pal-form-label">파레트 ID (자동 생성)</label>
-                <input type="text" id="palInboundPalletId" class="pal-form-input" placeholder="비워두면 자동 생성">
-              </div>
-              <div class="pal-form-group">
                 <label class="pal-form-label">화주사 *</label>
                 <div class="pal-searchable-select">
                   <input type="text" id="palInboundCompanyInput" class="pal-form-input" placeholder="화주사를 입력하거나 선택하세요" autocomplete="off">
@@ -724,20 +817,12 @@
                 </div>
               </div>
               <div class="pal-form-group">
-                <label class="pal-form-label">품목명</label>
-                <input type="text" id="palInboundProductName" class="pal-form-input" placeholder="품목명을 입력하세요">
-              </div>
-              <div class="pal-form-group">
                 <label class="pal-form-label">입고일 *</label>
                 <input type="date" id="palInboundDate" class="pal-form-input" required>
               </div>
               <div class="pal-form-group">
                 <label class="pal-form-label">보관 위치</label>
                 <input type="text" id="palInboundLocation" class="pal-form-input" placeholder="예: A-01">
-              </div>
-              <div class="pal-form-group">
-                <label class="pal-form-label">수량</label>
-                <input type="number" id="palInboundQuantity" class="pal-form-input" value="1" min="1">
               </div>
               <div class="pal-form-group">
                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
@@ -749,6 +834,18 @@
                 <label class="pal-form-label">비고</label>
                 <textarea id="palInboundNotes" class="pal-form-input" style="min-height: 80px;" placeholder="비고를 입력하세요"></textarea>
               </div>
+              
+              <!-- 품목 리스트 -->
+              <div class="pal-form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <label class="pal-form-label" style="margin: 0;">품목 목록</label>
+                  <button type="button" class="pal-btn" onclick="palAddProductItem()" style="padding: 6px 12px; font-size: 12px; background: #28a745; color: white;">+ 품목 추가</button>
+                </div>
+                <div id="palProductItemsList" style="display: flex; flex-direction: column; gap: 10px;">
+                  <!-- 품목 항목들이 여기에 동적으로 추가됨 -->
+                </div>
+              </div>
+              
               <button type="submit" class="pal-btn" style="width: 100%;">입고 처리</button>
               <div id="palInboundMessage" style="margin-top: 15px;"></div>
             </form>
@@ -1161,6 +1258,12 @@
         if (inboundIcon) {
           inboundIcon.textContent = '▲';
         }
+        // 품목 리스트 초기화 (기본 1개 품목)
+        const itemsList = document.getElementById('palProductItemsList');
+        if (itemsList) {
+          itemsList.innerHTML = '';
+          palAddProductItem();
+        }
       } else if (menuId === 'status') {
         // 파레트 현황 페이지 초기화
         palLoadPallets();
@@ -1410,6 +1513,9 @@
       // 오늘 날짜를 기본값으로 설정
       const today = new Date().toISOString().split('T')[0];
       const inboundDateEl = document.getElementById('palInboundDate');
+      
+      // 품목 리스트 초기화 (기본 1개 품목 추가)
+      palAddProductItem();
       const outboundDateEl = document.getElementById('palOutboundDate');
       const feeEffectiveFromEl = document.getElementById('palFeeEffectiveFrom');
       
@@ -1616,6 +1722,113 @@
       return div.innerHTML;
     }
     
+    // 품목 항목 추가
+    function palAddProductItem() {
+      const itemsList = document.getElementById('palProductItemsList');
+      if (!itemsList) return;
+      
+      const itemIndex = itemsList.children.length;
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'pal-product-item';
+      itemDiv.dataset.index = itemIndex;
+      itemDiv.innerHTML = `
+        <div class="pal-product-item-header">
+          <span class="pal-product-item-title">품목 ${itemIndex + 1}</span>
+          <button type="button" class="pal-product-item-remove" onclick="palRemoveProductItem(${itemIndex})">삭제</button>
+        </div>
+        <div class="pal-product-item-content">
+          <input type="text" class="pal-product-name-input" placeholder="품목명을 입력하세요" data-index="${itemIndex}">
+          <div class="pal-product-quantity-control">
+            <button type="button" class="pal-product-quantity-btn" onclick="palUpdateProductQuantity(${itemIndex}, -1)">-</button>
+            <span class="pal-product-quantity-value" data-index="${itemIndex}">1</span>
+            <button type="button" class="pal-product-quantity-btn" onclick="palUpdateProductQuantity(${itemIndex}, 1)">+</button>
+          </div>
+        </div>
+      `;
+      itemsList.appendChild(itemDiv);
+    }
+    
+    // 품목 항목 제거
+    function palRemoveProductItem(index) {
+      const itemsList = document.getElementById('palProductItemsList');
+      if (!itemsList) return;
+      
+      const items = Array.from(itemsList.children);
+      if (items.length <= 1) {
+        alert('최소 1개의 품목이 필요합니다.');
+        return;
+      }
+      
+      const itemToRemove = items.find(item => parseInt(item.dataset.index) === index);
+      if (itemToRemove) {
+        itemToRemove.remove();
+        // 인덱스 재정렬
+        palReorderProductItems();
+      }
+    }
+    
+    // 품목 항목 인덱스 재정렬
+    function palReorderProductItems() {
+      const itemsList = document.getElementById('palProductItemsList');
+      if (!itemsList) return;
+      
+      const items = Array.from(itemsList.children);
+      items.forEach((item, newIndex) => {
+        item.dataset.index = newIndex;
+        const titleSpan = item.querySelector('.pal-product-item-title');
+        if (titleSpan) {
+          titleSpan.textContent = `품목 ${newIndex + 1}`;
+        }
+        const nameInput = item.querySelector('.pal-product-name-input');
+        if (nameInput) {
+          nameInput.dataset.index = newIndex;
+        }
+        const quantityValue = item.querySelector('.pal-product-quantity-value');
+        if (quantityValue) {
+          quantityValue.dataset.index = newIndex;
+        }
+        const removeBtn = item.querySelector('.pal-product-item-remove');
+        if (removeBtn) {
+          removeBtn.setAttribute('onclick', `palRemoveProductItem(${newIndex})`);
+        }
+        const minusBtn = item.querySelector('.pal-product-quantity-btn');
+        if (minusBtn && minusBtn.textContent === '-') {
+          minusBtn.setAttribute('onclick', `palUpdateProductQuantity(${newIndex}, -1)`);
+        }
+        const plusBtn = item.querySelectorAll('.pal-product-quantity-btn')[1];
+        if (plusBtn && plusBtn.textContent === '+') {
+          plusBtn.setAttribute('onclick', `palUpdateProductQuantity(${newIndex}, 1)`);
+        }
+      });
+    }
+    
+    // 품목 수량 조절
+    function palUpdateProductQuantity(index, change) {
+      const itemsList = document.getElementById('palProductItemsList');
+      if (!itemsList) return;
+      
+      const item = Array.from(itemsList.children).find(item => parseInt(item.dataset.index) === index);
+      if (!item) return;
+      
+      const quantityValue = item.querySelector('.pal-product-quantity-value');
+      if (!quantityValue) return;
+      
+      let currentQuantity = parseInt(quantityValue.textContent) || 1;
+      currentQuantity += change;
+      
+      if (currentQuantity < 1) {
+        currentQuantity = 1;
+      }
+      
+      quantityValue.textContent = currentQuantity;
+      
+      // - 버튼 활성화/비활성화
+      const minusBtn = item.querySelector('.pal-product-quantity-btn');
+      if (minusBtn && minusBtn.textContent === '-') {
+        minusBtn.disabled = currentQuantity <= 1;
+      }
+    }
+    
     // 파레트 입고 처리
     async function palInbound() {
       const messageDiv = document.getElementById('palInboundMessage');
@@ -1634,18 +1847,51 @@
           return;
         }
         
-        const data = {
-          pallet_id: document.getElementById('palInboundPalletId').value || null,
-          company_name: companyName.trim(),
-          product_name: document.getElementById('palInboundProductName').value || null,
-          in_date: document.getElementById('palInboundDate').value,
-          storage_location: document.getElementById('palInboundLocation').value || null,
-          quantity: parseInt(document.getElementById('palInboundQuantity').value) || 1,
-          is_service: document.getElementById('palInboundIsService').checked,
-          notes: document.getElementById('palInboundNotes').value || null
-        };
+        // 품목 리스트에서 데이터 수집
+        const itemsList = document.getElementById('palProductItemsList');
+        if (!itemsList || itemsList.children.length === 0) {
+          messageDiv.innerHTML = '<div class="pal-message error">최소 1개의 품목을 입력하세요.</div>';
+          return;
+        }
         
-        console.log('[PAL] 입고 데이터:', data);
+        const pallets = [];
+        const items = Array.from(itemsList.children);
+        
+        for (const item of items) {
+          const productNameInput = item.querySelector('.pal-product-name-input');
+          const quantityValue = item.querySelector('.pal-product-quantity-value');
+          
+          if (!productNameInput || !quantityValue) continue;
+          
+          const productName = (productNameInput.value || '').trim();
+          const quantity = parseInt(quantityValue.textContent) || 1;
+          
+          if (!productName) {
+            messageDiv.innerHTML = '<div class="pal-message error">모든 품목의 품목명을 입력하세요.</div>';
+            return;
+          }
+          
+          // 각 수량만큼 파레트 생성 (파레트 ID는 백엔드에서 자동 생성)
+          for (let i = 0; i < quantity; i++) {
+            pallets.push({
+              pallet_id: null, // 자동 생성
+              company_name: companyName.trim(),
+              product_name: productName,
+              in_date: document.getElementById('palInboundDate').value,
+              storage_location: document.getElementById('palInboundLocation').value || null,
+              quantity: 1, // 각 파레트는 수량 1
+              is_service: document.getElementById('palInboundIsService').checked,
+              notes: document.getElementById('palInboundNotes').value || null
+            });
+          }
+        }
+        
+        if (pallets.length === 0) {
+          messageDiv.innerHTML = '<div class="pal-message error">등록할 파레트가 없습니다.</div>';
+          return;
+        }
+        
+        console.log('[PAL] 입고 데이터:', { pallets_count: pallets.length, pallets });
         
         const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/inbound`, {
           method: 'POST',
@@ -1653,7 +1899,7 @@
             'Content-Type': 'application/json',
             ...palGetUserHeaders()
           },
-          body: JSON.stringify(data)
+          body: JSON.stringify({ pallets })
         });
         
         const result = await response.json();
@@ -1663,6 +1909,12 @@
           // 폼 초기화
           document.getElementById('palInboundForm').reset();
           document.getElementById('palInboundDate').value = new Date().toISOString().split('T')[0];
+          // 품목 리스트 초기화 (1개만 남기기)
+          const itemsList = document.getElementById('palProductItemsList');
+          if (itemsList) {
+            itemsList.innerHTML = '';
+            palAddProductItem();
+          }
           // 파레트 목록 새로고침
           palLoadPallets();
         } else {
