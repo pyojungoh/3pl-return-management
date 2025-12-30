@@ -267,7 +267,7 @@
     .pal-table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 1200px;
+      min-width: 1400px;
     }
     
     .pal-table thead {
@@ -279,18 +279,20 @@
     }
     
     .pal-table th {
-      padding: 12px;
+      padding: 8px 6px;
       text-align: center;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 12px;
+      white-space: nowrap;
     }
     
     .pal-table td {
-      padding: 12px;
+      padding: 8px 6px;
       text-align: center;
-      font-size: 14px;
+      font-size: 12px;
       border-bottom: 1px solid #f0f0f0;
       vertical-align: middle;
+      white-space: nowrap;
     }
     
     .pal-table tbody tr:hover {
@@ -870,21 +872,21 @@
             <table class="pal-table">
               <thead>
                 <tr>
-                  <th class="pal-admin-only" style="width: 50px;">
-                    <input type="checkbox" id="palPalletsSelectAll" onchange="palToggleSelectAllPallets(this.checked)">
+                  <th class="pal-admin-only" style="width: 40px;">
+                    <input type="checkbox" id="palPalletsSelectAll" onchange="palToggleSelectAllPallets(this.checked)" style="width: 16px; height: 16px;">
                   </th>
-                  <th>파레트 ID</th>
-                  <th>화주사</th>
-                  <th>품목명</th>
-                  <th>상태</th>
-                  <th>입고일</th>
-                  <th>갱신일</th>
-                  <th>보관종료일</th>
-                  <th>총보관</th>
-                  <th>월보관</th>
-                  <th>보관료</th>
-                  <th>QR/관리</th>
-                  <th>작업</th>
+                  <th style="font-size: 11px;">파레트 ID</th>
+                  <th style="font-size: 11px;">화주사</th>
+                  <th style="font-size: 11px;">품목명</th>
+                  <th style="font-size: 11px;">상태</th>
+                  <th style="font-size: 11px;">입고일</th>
+                  <th style="font-size: 11px;">갱신일</th>
+                  <th style="font-size: 11px;">보관종료일</th>
+                  <th style="font-size: 11px;">총보관</th>
+                  <th style="font-size: 11px;">월보관</th>
+                  <th style="font-size: 11px;">보관료</th>
+                  <th style="font-size: 11px;">QR/관리</th>
+                  <th style="font-size: 11px;">작업</th>
                 </tr>
               </thead>
               <tbody id="palPalletsTableBody">
@@ -2156,36 +2158,36 @@
               return `
               <tr>
                 ${palCurrentRole === '관리자' 
-                  ? `<td style="text-align: center;"><input type="checkbox" class="pal-pallet-checkbox" data-pallet-id="${palEscapeHtml(pallet.pallet_id)}" onchange="palUpdatePalletSelection()"></td>`
+                  ? `<td style="text-align: center;"><input type="checkbox" class="pal-pallet-checkbox" data-pallet-id="${palEscapeHtml(pallet.pallet_id)}" onchange="palUpdatePalletSelection()" style="width: 16px; height: 16px;"></td>`
                   : ''
                 }
-                <td>${palEscapeHtml(pallet.pallet_id)}</td>
-                <td>${palEscapeHtml(pallet.company_name || '')}</td>
-                <td>${palEscapeHtml(pallet.product_name || '')}</td>
-                <td>${palEscapeHtml(statusText)}</td>
-                <td>${pallet.in_date || ''}</td>
-                <td>${renewalDateStr}</td>
-                <td>${pallet.out_date || '-'}</td>
-                <td>${pallet.total_storage_days || pallet.storage_days || 0}일</td>
-                <td>${pallet.monthly_storage_days || 0}일</td>
-                <td>${(pallet.current_fee || 0).toLocaleString()}원</td>
+                <td style="font-size: 11px;">${palEscapeHtml(pallet.pallet_id)}</td>
+                <td style="font-size: 11px;">${palEscapeHtml(pallet.company_name || '')}</td>
+                <td style="font-size: 11px; white-space: normal; word-break: break-word; max-width: 150px;">${palEscapeHtml(pallet.product_name || '')}</td>
+                <td style="font-size: 11px; font-weight: 600;">${palEscapeHtml(statusText)}</td>
+                <td style="font-size: 11px;">${pallet.in_date || ''}</td>
+                <td style="font-size: 11px;">${renewalDateStr}</td>
+                <td style="font-size: 11px;">${pallet.out_date || '-'}</td>
+                <td style="font-size: 11px;">${pallet.total_storage_days || pallet.storage_days || 0}일</td>
+                <td style="font-size: 11px;">${pallet.monthly_storage_days || 0}일</td>
+                <td style="font-size: 11px; font-weight: 600;">${(pallet.current_fee || 0).toLocaleString()}원</td>
                 <td>
-                  <div style="display: flex; gap: 4px; align-items: center;">
-                    <button class="pal-btn" onclick="palViewQRCode('${pallet.pallet_id}', '${pallet.in_date || ''}')" style="padding: 6px 12px; font-size: 12px; background: #17a2b8; color: white;">QR 보기</button>
+                  <div style="display: flex; gap: 3px; align-items: center; justify-content: center;">
+                    <button class="pal-btn" onclick="palViewQRCode('${pallet.pallet_id}', '${pallet.in_date || ''}')" style="padding: 4px 8px; font-size: 10px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;">QR</button>
                   </div>
                 </td>
                 <td>
-                  <div style="display: flex; gap: 4px; align-items: center;">
+                  <div style="display: flex; gap: 3px; align-items: center; justify-content: center; flex-wrap: nowrap;">
                     ${canOutbound 
-                      ? `<button class="pal-btn" onclick="palOutboundFromStatus('${pallet.pallet_id}')" style="padding: 3px 8px; font-size: 11px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">보관종료</button>`
+                      ? `<button class="pal-btn" onclick="palOutboundFromStatus('${pallet.pallet_id}')" style="padding: 4px 8px; font-size: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;">보관종료</button>`
                       : ''
                     }
                     ${palCurrentRole === '관리자' 
-                      ? `<button class="pal-btn" onclick="palDeletePalletFromStatus('${pallet.pallet_id}')" style="padding: 3px 8px; font-size: 11px; background: #6c757d; color: white; border: none; border-radius: 3px; cursor: pointer;">삭제</button>`
+                      ? `<button class="pal-btn" onclick="palDeletePalletFromStatus('${pallet.pallet_id}')" style="padding: 4px 8px; font-size: 10px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;">삭제</button>`
                       : ''
                     }
                     ${!canOutbound && palCurrentRole !== '관리자' 
-                      ? '<span style="color: #999; font-size: 11px;">-</span>'
+                      ? '<span style="color: #999; font-size: 10px;">-</span>'
                       : ''
                     }
                   </div>
