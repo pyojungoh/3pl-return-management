@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>파레트 보관료 관리</title>
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     /* body 스타일 제거 (dashboard_server.html에 통합되므로) */
     body {
@@ -4592,6 +4590,22 @@
     let palRevenueCompanyChart = null;
     let palCurrentRevenueData = null;
     
+    // Chart.js 로드 대기 함수
+    function palWaitForChartJS(callback, maxAttempts = 10) {
+      let attempts = 0;
+      const checkInterval = setInterval(() => {
+        attempts++;
+        if (typeof Chart !== 'undefined') {
+          clearInterval(checkInterval);
+          callback();
+        } else if (attempts >= maxAttempts) {
+          clearInterval(checkInterval);
+          console.error('Chart.js 로드 타임아웃');
+          alert('차트 라이브러리 로드에 실패했습니다. 페이지를 새로고침해주세요.');
+        }
+      }, 100);
+    }
+    
     // 월별 수입 현황 데이터 로드
     async function palLoadRevenueData() {
       const startMonth = document.getElementById('palRevenueStartMonth').value;
@@ -4610,7 +4624,10 @@
         
         if (result.success) {
           palCurrentRevenueData = result.data;
-          palUpdateRevenueDisplay(result.data);
+          // Chart.js가 로드될 때까지 대기 후 차트 생성
+          palWaitForChartJS(() => {
+            palUpdateRevenueDisplay(result.data);
+          });
         } else {
           alert('❌ 데이터 로드 실패: ' + result.message);
         }
@@ -4618,6 +4635,26 @@
         console.error('월별 수입 현황 로드 오류:', error);
         alert('❌ 데이터 로드 중 오류가 발생했습니다: ' + error.message);
       }
+    }
+    
+    // Chart.js 로드 확인 및 재시도
+    function palCheckChartJS() {
+      if (typeof Chart === 'undefined') {
+        console.warn('Chart.js가 로드되지 않았습니다. 재시도 중...');
+        // Chart.js 스크립트 동적 로드
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+        script.onload = function() {
+          console.log('Chart.js 로드 완료');
+        };
+        script.onerror = function() {
+          console.error('Chart.js 로드 실패');
+          alert('차트 라이브러리 로드에 실패했습니다. 페이지를 새로고침해주세요.');
+        };
+        document.head.appendChild(script);
+        return false;
+      }
+      return true;
     }
     
     // 월별 수입 현황 표시 업데이트
@@ -4631,6 +4668,21 @@
       document.getElementById('palRevenueAverage').textContent = Math.round(summary.average_revenue).toLocaleString() + '원';
       document.getElementById('palRevenueMax').textContent = summary.max_revenue.toLocaleString() + '원';
       document.getElementById('palRevenueMin').textContent = summary.min_revenue.toLocaleString() + '원';
+      
+      // Chart.js 확인
+      if (!palCheckChartJS()) {
+        // Chart.js가 로드되지 않았으면 잠시 후 재시도
+        setTimeout(() => {
+          if (typeof Chart !== 'undefined') {
+            palUpdateRevenueDisplay(data);
+          } else {
+            console.error('Chart.js를 로드할 수 없습니다.');
+            document.getElementById('palRevenueMonthlyChart').parentElement.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">차트 라이브러리를 로드할 수 없습니다. 페이지를 새로고침해주세요.</div>';
+            document.getElementById('palRevenueCompanyChart').parentElement.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">차트 라이브러리를 로드할 수 없습니다. 페이지를 새로고침해주세요.</div>';
+          }
+        }, 500);
+        return;
+      }
       
       // 월별 수입 추이 차트
       const monthlyCtx = document.getElementById('palRevenueMonthlyChart').getContext('2d');
@@ -4789,6 +4841,16 @@
         console.error('엑셀 다운로드 오류:', error);
         alert('❌ 다운로드 중 오류가 발생했습니다: ' + error.message);
       }
+    }
+  </script>
+  <!-- Chart.js (body 끝에 배치하여 확실히 로드되도록) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    // Chart.js 로드 확인
+    if (typeof Chart === 'undefined') {
+      console.error('Chart.js 로드 실패');
+    } else {
+      console.log('Chart.js 로드 완료');
     }
   </script>
 </body>
