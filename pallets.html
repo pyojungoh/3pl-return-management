@@ -880,7 +880,8 @@
                   <th>입고일</th>
                   <th>갱신일</th>
                   <th>보관종료일</th>
-                  <th>보관일수</th>
+                  <th>총보관</th>
+                  <th>월보관</th>
                   <th>보관료</th>
                   <th>QR/관리</th>
                   <th>작업</th>
@@ -888,7 +889,7 @@
               </thead>
               <tbody id="palPalletsTableBody">
                 <tr>
-                  <td colspan="12" class="no-data">데이터를 불러오는 중...</td>
+                  <td colspan="13" class="no-data">데이터를 불러오는 중...</td>
                 </tr>
               </tbody>
             </table>
@@ -2040,7 +2041,7 @@
       
       if (!tbody) return;
       
-      tbody.innerHTML = '<tr><td colspan="12" class="no-data">데이터를 불러오는 중...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중...</td></tr>';
       
       try {
         const company = palCurrentRole === '관리자' 
@@ -2105,7 +2106,7 @@
           }
           
           if (filteredPallets.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="12" class="no-data">파레트가 없습니다.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="13" class="no-data">파레트가 없습니다.</td></tr>';
           } else {
             tbody.innerHTML = filteredPallets.map(pallet => {
               // 서비스 파레트는 상태를 "서비스"로 표시
@@ -2165,7 +2166,8 @@
                 <td>${pallet.in_date || ''}</td>
                 <td>${renewalDateStr}</td>
                 <td>${pallet.out_date || '-'}</td>
-                <td>${pallet.storage_days || 0}일</td>
+                <td>${pallet.total_storage_days || pallet.storage_days || 0}일</td>
+                <td>${pallet.monthly_storage_days || 0}일</td>
                 <td>${(pallet.current_fee || 0).toLocaleString()}원</td>
                 <td>
                   <div style="display: flex; gap: 4px; align-items: center;">
@@ -2193,7 +2195,7 @@
             }).join('');
           }
         } else {
-          tbody.innerHTML = '<tr><td colspan="12" class="no-data">❌ ' + result.message + '</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="13" class="no-data">❌ ' + result.message + '</td></tr>';
         }
       } catch (error) {
         console.error('●▶ 파레트 목록 로드 오류:', error);
@@ -2203,7 +2205,7 @@
         } else if (error.message) {
           errorMessage = error.message;
         }
-        tbody.innerHTML = '<tr><td colspan="12" class="no-data">❌ ' + errorMessage + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="no-data">❌ ' + errorMessage + '</td></tr>';
         if (countSpan) countSpan.textContent = '(오류)';
       }
     }

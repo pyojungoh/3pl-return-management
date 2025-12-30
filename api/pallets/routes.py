@@ -243,7 +243,15 @@ def pallet_list():
         import math
         from datetime import timedelta
         
-        # month 파라미터가 있으면 해당 월의 시작일과 종료일 계산
+        # 현재 월의 시작일과 종료일 계산 (파레트 현황에서 항상 현재 월 기준으로 계산)
+        today = date.today()
+        current_month_start = date(today.year, today.month, 1)
+        if today.month == 12:
+            current_month_end = date(today.year + 1, 1, 1) - timedelta(days=1)
+        else:
+            current_month_end = date(today.year, today.month + 1, 1) - timedelta(days=1)
+        
+        # month 파라미터가 있으면 해당 월의 시작일과 종료일 계산 (필터용)
         month_start = None
         month_end = None
         if month:
@@ -296,35 +304,35 @@ def pallet_list():
                 if in_date_obj:
                     is_service = pallet.get('is_service', 0) == 1
                     
-                    if month_start and month_end:
-                        # 해당 월의 보관일수와 보관료 계산
-                        storage_start = max(in_date_obj, month_start)
-                        if out_date_obj:
-                            storage_end = min(out_date_obj, month_end)
-                        else:
-                            storage_end = min(month_end, date.today())
-                        
-                        pallet['storage_days'] = max(0, (storage_end - storage_start).days + 1)
-                        
-                        if is_service:
-                            pallet['current_fee'] = 0
-                        else:
-                            daily_fee = calculate_daily_fee(pallet.get('company_name', ''), storage_start)
-                            calculated_fee = daily_fee * pallet['storage_days']
-                            pallet['current_fee'] = math.ceil(calculated_fee / 100) * 100
+                    # 총보관일수 계산 (입고일부터 보관종료일 또는 현재까지)
+                    total_storage_days = calculate_storage_days(
+                        in_date_obj,
+                        out_date_obj
+                    )
+                    pallet['total_storage_days'] = total_storage_days
+                    
+                    # 월보관일수 계산 (현재 월 내에서만)
+                    monthly_storage_start = max(in_date_obj, current_month_start)
+                    if out_date_obj:
+                        monthly_storage_end = min(out_date_obj, current_month_end)
                     else:
-                        # 전체 기간 보관료 계산
-                        pallet['storage_days'] = calculate_storage_days(
-                            in_date_obj,
-                            out_date_obj
-                        )
-                        pallet['current_fee'] = calculate_fee(
-                            pallet.get('company_name', ''),
-                            in_date_obj,
-                            out_date_obj,
-                            is_service
-                        )
+                        monthly_storage_end = min(current_month_end, date.today())
+                    monthly_storage_days = max(0, (monthly_storage_end - monthly_storage_start).days + 1)
+                    pallet['monthly_storage_days'] = monthly_storage_days
+                    
+                    # 보관료는 월보관일수 기준으로 계산
+                    if is_service:
+                        pallet['current_fee'] = 0
+                    else:
+                        daily_fee = calculate_daily_fee(pallet.get('company_name', ''), monthly_storage_start)
+                        calculated_fee = daily_fee * monthly_storage_days
+                        pallet['current_fee'] = math.ceil(calculated_fee / 100) * 100
+                    
+                    # 호환성을 위해 storage_days는 총보관일수로 설정 (기존 코드와의 호환)
+                    pallet['storage_days'] = total_storage_days
                 else:
+                    pallet['total_storage_days'] = 0
+                    pallet['monthly_storage_days'] = 0
                     pallet['storage_days'] = 0
                     pallet['current_fee'] = 0
             except Exception as e:
@@ -332,6 +340,8 @@ def pallet_list():
                 import traceback
                 traceback.print_exc()
                 # 기본값 설정
+                pallet['total_storage_days'] = pallet.get('total_storage_days', 0)
+                pallet['monthly_storage_days'] = pallet.get('monthly_storage_days', 0)
                 pallet['storage_days'] = pallet.get('storage_days', 0)
                 pallet['current_fee'] = pallet.get('current_fee', 0)
         
