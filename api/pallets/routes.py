@@ -60,12 +60,21 @@ def pallet_inbound():
         data = request.get_json() or {}
         
         # 디버깅: 요청 데이터 로깅
-        print(f"[DEBUG] pallet_inbound 요청 - data: {data}")
-        print(f"[DEBUG] pallet_inbound 요청 - pallet_id: {data.get('pallet_id')}")
+        print(f"[DEBUG] pallet_inbound 요청 - role: {role}, company_name: {company_name}, username: {username}")
+        print(f"[DEBUG] pallet_inbound 요청 - data keys: {list(data.keys())}")
+        print(f"[DEBUG] pallet_inbound 요청 - data.get('company_name'): {data.get('company_name')}")
+        print(f"[DEBUG] pallet_inbound 요청 - data.get('pallets'): {type(data.get('pallets'))}")
+        if isinstance(data.get('pallets'), list):
+            print(f"[DEBUG] pallet_inbound 요청 - pallets count: {len(data.get('pallets', []))}")
+            if len(data.get('pallets', [])) > 0:
+                print(f"[DEBUG] pallet_inbound 요청 - first pallet: {data.get('pallets')[0]}")
         
         # Google Apps Script 등 외부 호출 시 username이 없으면 기본값 설정
         if not username:
             username = 'Google Forms Sync'
+        
+        # 대량 입고인지 먼저 확인
+        is_bulk_inbound = isinstance(data.get('pallets'), list)
         
         # 관리자가 아닌 경우, 헤더의 company_name 사용
         # 외부 호출 시 data에 company_name이 있으면 사용
@@ -73,14 +82,34 @@ def pallet_inbound():
             data['company_name'] = company_name or data.get('company_name', '')
         
         # 관리자인 경우, 요청 본문의 company_name 사용
-        if role == '관리자' and not data.get('company_name'):
-            return jsonify({
-                'success': False,
-                'message': '화주사명이 필요합니다.'
-            }), 400
+        # 단, 대량 입고인 경우는 각 pallet_data에 company_name이 있는지 확인
+        if role == '관리자':
+            if is_bulk_inbound:
+                # 대량 입고: 각 pallet_data에 company_name이 있는지 확인
+                missing_company = False
+                for pallet_data in data.get('pallets', []):
+                    company_name_value = pallet_data.get('company_name')
+                    if not company_name_value or not str(company_name_value).strip():
+                        missing_company = True
+                        print(f"[DEBUG] 화주사명 누락 - pallet_data: {pallet_data}")
+                        break
+                if missing_company:
+                    return jsonify({
+                        'success': False,
+                        'message': '화주사명이 필요합니다. (대량 입고의 경우 각 품목에 화주사명이 필요합니다)'
+                    }), 400
+            else:
+                # 단일 입고: 최상위 company_name 확인
+                company_name_value = data.get('company_name')
+                if not company_name_value or not str(company_name_value).strip():
+                    print(f"[DEBUG] 화주사명 누락 - data: {data}")
+                    return jsonify({
+                        'success': False,
+                        'message': '화주사명이 필요합니다.'
+                    }), 400
         
-        # 대량 입고인지 확인
-        if isinstance(data.get('pallets'), list):
+        # 대량 입고 처리
+        if is_bulk_inbound:
             # 대량 입고
             results = []
             errors = []

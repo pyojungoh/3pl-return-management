@@ -1890,10 +1890,16 @@
           }
           
           // 각 수량만큼 파레트 생성 (파레트 ID는 백엔드에서 자동 생성)
+          const trimmedCompanyName = companyName.trim();
+          if (!trimmedCompanyName) {
+            messageDiv.innerHTML = '<div class="pal-message error">화주사명을 입력하세요.</div>';
+            return;
+          }
+          
           for (let i = 0; i < quantity; i++) {
             pallets.push({
               pallet_id: null, // 자동 생성
-              company_name: companyName.trim(),
+              company_name: trimmedCompanyName,
               product_name: productName,
               in_date: document.getElementById('palInboundDate').value,
               storage_location: document.getElementById('palInboundLocation').value || null,
