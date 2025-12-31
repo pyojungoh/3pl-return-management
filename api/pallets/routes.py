@@ -8,7 +8,7 @@ from api.pallets.models import (
     calculate_fee, get_pallet_fee, set_pallet_fee,
     generate_monthly_settlement, get_settlements, get_settlement_detail,
     update_settlement_status, delete_settlement, delete_settlement,
-    get_monthly_revenue
+    get_monthly_revenue, get_daily_fees_batch
 )
 
 # Blueprint 생성
@@ -269,7 +269,7 @@ def pallet_list():
         )
         
         # 보관료 계산 추가 및 date 객체를 문자열로 변환
-        from api.pallets.models import calculate_fee, calculate_storage_days, calculate_daily_fee
+        from api.pallets.models import calculate_fee, calculate_storage_days, calculate_daily_fee, get_daily_fees_batch
         import math
         from datetime import timedelta
         
@@ -296,40 +296,46 @@ def pallet_list():
                 month_start = None
                 month_end = None
         
+        # 성능 최적화: 모든 화주사의 일일 보관료를 한 번에 조회 (캐싱)
+        company_names = [p.get('company_name', '') for p in pallets if p.get('company_name')]
+        daily_fees_cache = get_daily_fees_batch(company_names, current_month_start) if company_names else {}
+        default_daily_fee = round(16000 / 30.0, 2)  # 기본값: 533.33원
+        
         for pallet in pallets:
             try:
-                # date 객체를 문자열로 변환 (JSON 직렬화를 위해)
-                if pallet.get('in_date') and isinstance(pallet['in_date'], date):
-                    pallet['in_date'] = pallet['in_date'].isoformat()
-                if pallet.get('out_date') and isinstance(pallet['out_date'], date):
-                    pallet['out_date'] = pallet['out_date'].isoformat()
-                
-                # 날짜 문자열을 date 객체로 변환하여 계산
+                # date 객체를 그대로 사용 (파싱 오버헤드 제거)
                 in_date_obj = pallet.get('in_date')
-                if in_date_obj:
-                    if isinstance(in_date_obj, str):
-                        try:
-                            in_date_obj = datetime.strptime(in_date_obj, '%Y-%m-%d').date()
-                        except (ValueError, TypeError) as e:
-                            print(f"⚠️ 입고일 파싱 오류 (pallet_id: {pallet.get('pallet_id')}): {e}")
-                            in_date_obj = None
-                    elif not isinstance(in_date_obj, date):
+                if in_date_obj and isinstance(in_date_obj, str):
+                    # 문자열인 경우에만 파싱 (호환성 유지)
+                    try:
+                        in_date_obj = datetime.strptime(in_date_obj, '%Y-%m-%d').date()
+                    except (ValueError, TypeError) as e:
+                        print(f"⚠️ 입고일 파싱 오류 (pallet_id: {pallet.get('pallet_id')}): {e}")
                         in_date_obj = None
-                else:
+                elif in_date_obj and not isinstance(in_date_obj, date):
                     in_date_obj = None
-                    
+                
                 out_date_obj = pallet.get('out_date')
-                if out_date_obj:
-                    if isinstance(out_date_obj, str):
-                        try:
-                            out_date_obj = datetime.strptime(out_date_obj, '%Y-%m-%d').date()
-                        except (ValueError, TypeError) as e:
-                            print(f"⚠️ 보관종료일 파싱 오류 (pallet_id: {pallet.get('pallet_id')}): {e}")
-                            out_date_obj = None
-                    elif not isinstance(out_date_obj, date):
+                if out_date_obj and isinstance(out_date_obj, str):
+                    # 문자열인 경우에만 파싱 (호환성 유지)
+                    try:
+                        out_date_obj = datetime.strptime(out_date_obj, '%Y-%m-%d').date()
+                    except (ValueError, TypeError) as e:
+                        print(f"⚠️ 보관종료일 파싱 오류 (pallet_id: {pallet.get('pallet_id')}): {e}")
                         out_date_obj = None
-                else:
+                elif out_date_obj and not isinstance(out_date_obj, date):
                     out_date_obj = None
+                
+                # date 객체를 문자열로 변환 (JSON 직렬화를 위해)
+                if in_date_obj and isinstance(in_date_obj, date):
+                    pallet['in_date'] = in_date_obj.isoformat()
+                elif in_date_obj:
+                    pallet['in_date'] = str(in_date_obj)
+                
+                if out_date_obj and isinstance(out_date_obj, date):
+                    pallet['out_date'] = out_date_obj.isoformat()
+                elif out_date_obj:
+                    pallet['out_date'] = str(out_date_obj)
                 
                 if in_date_obj:
                     is_service = pallet.get('is_service', 0) == 1
@@ -350,11 +356,12 @@ def pallet_list():
                     monthly_storage_days = max(0, (monthly_storage_end - monthly_storage_start).days + 1)
                     pallet['monthly_storage_days'] = monthly_storage_days
                     
-                    # 보관료는 월보관일수 기준으로 계산
+                    # 보관료는 월보관일수 기준으로 계산 (캐시에서 조회)
                     if is_service:
                         pallet['current_fee'] = 0
                     else:
-                        daily_fee = calculate_daily_fee(pallet.get('company_name', ''), monthly_storage_start)
+                        company_name_key = pallet.get('company_name', '')
+                        daily_fee = daily_fees_cache.get(company_name_key, default_daily_fee)
                         calculated_fee = daily_fee * monthly_storage_days
                         pallet['current_fee'] = math.ceil(calculated_fee / 100) * 100
                     

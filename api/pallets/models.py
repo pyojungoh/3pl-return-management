@@ -424,6 +424,79 @@ def calculate_daily_fee(company_name: str, as_of_date: date = None) -> float:
     return round(daily_fee, 2)
 
 
+def get_daily_fees_batch(company_names: List[str], as_of_date: date = None) -> Dict[str, float]:
+    """
+    화주사별 일일 보관료 일괄 조회 (성능 최적화용)
+    
+    Args:
+        company_names: 화주사명 리스트
+        as_of_date: 기준일 (선택사항, 없으면 현재일)
+    
+    Returns:
+        화주사별 일일 보관료 딕셔너리 {company_name: daily_fee}
+        기본값: 16000원 / 30.0 = 533.33원
+    """
+    if not company_names:
+        return {}
+    
+    if as_of_date is None:
+        as_of_date = date.today()
+    
+    # 중복 제거
+    unique_companies = list(set(company_names))
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 모든 화주사의 보관료를 한 번에 조회
+        # PostgreSQL: ANY 배열 사용
+        # SQLite: IN 절 사용
+        if USE_POSTGRESQL:
+            cursor.execute('''
+                SELECT DISTINCT ON (company_name) company_name, monthly_fee
+                FROM pallet_fees
+                WHERE company_name = ANY(%s) AND effective_from <= %s
+                ORDER BY company_name, effective_from DESC
+            ''', (unique_companies, as_of_date))
+        else:
+            # SQLite: IN 절로 변환
+            # 호환성을 위해 서브쿼리 + JOIN 방식 사용 (ROW_NUMBER 대신)
+            placeholders = ','.join(['?' for _ in unique_companies])
+            params = list(unique_companies) + [as_of_date]
+            cursor.execute(f'''
+                SELECT pf1.company_name, pf1.monthly_fee
+                FROM pallet_fees pf1
+                INNER JOIN (
+                    SELECT company_name, MAX(effective_from) as max_date
+                    FROM pallet_fees
+                    WHERE company_name IN ({placeholders}) AND effective_from <= ?
+                    GROUP BY company_name
+                ) pf2 ON pf1.company_name = pf2.company_name AND pf1.effective_from = pf2.max_date
+            ''', params)
+        
+        rows = cursor.fetchall()
+        
+        # 딕셔너리로 변환
+        result = {}
+        for row in rows:
+            company_name = row[0]
+            monthly_fee = int(row[1])
+            daily_fee = monthly_fee / 30.0
+            result[company_name] = round(daily_fee, 2)
+        
+        # 조회되지 않은 화주사는 기본값 사용
+        default_daily_fee = round(16000 / 30.0, 2)  # 533.33
+        for company_name in unique_companies:
+            if company_name not in result:
+                result[company_name] = default_daily_fee
+        
+        return result
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def calculate_storage_days(in_date: date, out_date: date = None,
                           as_of_date: date = None) -> int:
     """
