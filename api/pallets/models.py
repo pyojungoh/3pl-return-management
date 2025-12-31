@@ -1532,13 +1532,18 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
                 out_date = datetime.strptime(out_date, '%Y-%m-%d').date()
             
             # 해당 월 내 보관일수 계산
-            storage_start = max(in_date, start_date) if in_date else start_date
-            if out_date:
-                storage_end = min(out_date, end_date)
+            if in_date:
+                storage_start = max(in_date, start_date)
+                if out_date:
+                    storage_end = min(out_date, end_date)
+                else:
+                    storage_end = min(end_date, date.today())
+                
+                storage_days = max(0, (storage_end - storage_start).days + 1)
             else:
-                storage_end = min(end_date, date.today())
+                # 입고일이 없으면 0일
+                storage_days = 0
             
-            storage_days = max(0, (storage_end - storage_start).days + 1)
             pallet['storage_days'] = storage_days
             
             # 보관료 재계산: 일일 보관료 × 보관일수 (백원 단위 올림)
