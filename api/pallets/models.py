@@ -817,8 +817,8 @@ def generate_monthly_settlement(settlement_month: str = None,
             # 보관중인 경우: 정산월 종료일과 오늘 날짜 중 이른 날
             storage_end = min(end_date, date.today())
         
-        # 보관일수 계산
-        storage_days = (storage_end - storage_start).days + 1
+        # 보관일수 계산 (음수 방지)
+        storage_days = max(0, (storage_end - storage_start).days + 1)
         
         # 보관료 계산 (파레트별) - 각 파레트의 보관일수에 따라 개별 계산
         if is_service:

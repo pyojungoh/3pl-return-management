@@ -642,7 +642,7 @@
   <div id="palContainer">
     <!-- 하위 메뉴바 (관리자만 표시) -->
     <div id="palSubMenuBar" class="pal-admin-only">
-      <button class="pal-sub-menu-btn active" onclick="palSwitchSubMenu('list')">📋 월별 화주사별 리스트</button>
+      <button class="pal-sub-menu-btn active" onclick="palSwitchSubMenu('list')">📋 화주사별 현황</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('revenue')">📈 월별 수입 현황</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('inbound')">📦 파레트 관리</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('status')">📊 파레트 현황</button>
@@ -652,9 +652,9 @@
     
     <!-- 콘텐츠 영역 -->
     <div id="palContentArea">
-      <!-- 월별 화주사별 리스트 페이지 -->
+      <!-- 화주사별 현황 페이지 -->
       <div id="palPageList" class="pal-content-page active">
-        <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 20px;">📋 월별 화주사별 리스트</h2>
+        <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 20px;">📋 화주사별 현황</h2>
         
         <!-- 기간 설정 (관리자만 표시) -->
         <div class="pal-filters pal-admin-only" style="margin-bottom: 15px; display: flex; align-items: flex-end; gap: 8px; flex-wrap: nowrap;">
@@ -1309,7 +1309,7 @@
       
       // 각 페이지별 초기화
       if (menuId === 'list') {
-        // 월별 화주사별 리스트 페이지 초기화
+        // 화주사별 현황 페이지 초기화
         if (palCurrentRole === '관리자') {
           palLoadCompanyList();
         } else {

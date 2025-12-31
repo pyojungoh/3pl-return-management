@@ -802,6 +802,7 @@ def settlements_list():
                                 else:
                                     storage_end = min(month_end, date.today())
                                 
+                                # 보관일수 계산 (음수 방지)
                                 pallet_storage_days = max(0, (storage_end - storage_start).days + 1)
                                 total_storage_days += pallet_storage_days
                                 
@@ -902,7 +903,8 @@ def settlements_list():
                                 storage_end = min(out_date, end_date)
                             else:
                                 storage_end = end_date
-                            pallet_storage_days = (storage_end - storage_start).days + 1
+                            # 보관일수 계산 (음수 방지)
+                            pallet_storage_days = max(0, (storage_end - storage_start).days + 1)
                             daily_fee = calculate_daily_fee(company, storage_start)
                             calculated_fee = daily_fee * pallet_storage_days
                             fee = math.ceil(calculated_fee / 100) * 100
