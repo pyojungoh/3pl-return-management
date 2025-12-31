@@ -297,8 +297,10 @@ def pallet_list():
                 month_end = None
         
         # 성능 최적화: 모든 화주사의 일일 보관료를 한 번에 조회 (캐싱)
+        # month 파라미터가 있으면 해당 월의 시작일, 없으면 현재 월의 시작일로 조회
+        fee_date = month_start if (month and month_start) else current_month_start
         company_names = [p.get('company_name', '') for p in pallets if p.get('company_name')]
-        daily_fees_cache = get_daily_fees_batch(company_names, current_month_start) if company_names else {}
+        daily_fees_cache = get_daily_fees_batch(company_names, fee_date) if company_names else {}
         default_daily_fee = round(16000 / 30.0, 2)  # 기본값: 533.33원
         
         for pallet in pallets:
@@ -347,14 +349,29 @@ def pallet_list():
                     )
                     pallet['total_storage_days'] = total_storage_days
                     
-                    # 월보관일수 계산 (현재 월 내에서만)
-                    monthly_storage_start = max(in_date_obj, current_month_start)
-                    if out_date_obj:
-                        monthly_storage_end = min(out_date_obj, current_month_end)
+                    # 월보관일수 계산 (month 파라미터가 있으면 해당 월, 없으면 현재 월)
+                    if month and month_start and month_end:
+                        # month 파라미터가 있으면 해당 월의 보관일수 계산
+                        monthly_storage_start = max(in_date_obj, month_start)
+                        if out_date_obj:
+                            monthly_storage_end = min(out_date_obj, month_end)
+                        else:
+                            monthly_storage_end = min(month_end, date.today())
+                        monthly_storage_days = max(0, (monthly_storage_end - monthly_storage_start).days + 1)
+                        # month 파라미터가 있을 때는 storage_days도 해당 월 기준으로 설정
+                        pallet['storage_days'] = monthly_storage_days
+                        pallet['monthly_storage_days'] = monthly_storage_days
                     else:
-                        monthly_storage_end = min(current_month_end, date.today())
-                    monthly_storage_days = max(0, (monthly_storage_end - monthly_storage_start).days + 1)
-                    pallet['monthly_storage_days'] = monthly_storage_days
+                        # month 파라미터가 없으면 현재 월 기준으로 계산
+                        monthly_storage_start = max(in_date_obj, current_month_start)
+                        if out_date_obj:
+                            monthly_storage_end = min(out_date_obj, current_month_end)
+                        else:
+                            monthly_storage_end = min(current_month_end, date.today())
+                        monthly_storage_days = max(0, (monthly_storage_end - monthly_storage_start).days + 1)
+                        pallet['monthly_storage_days'] = monthly_storage_days
+                        # 호환성을 위해 storage_days는 총보관일수로 설정 (기존 코드와의 호환)
+                        pallet['storage_days'] = total_storage_days
                     
                     # 보관료는 월보관일수 기준으로 계산 (캐시에서 조회)
                     if is_service:
@@ -362,11 +379,8 @@ def pallet_list():
                     else:
                         company_name_key = pallet.get('company_name', '')
                         daily_fee = daily_fees_cache.get(company_name_key, default_daily_fee)
-                        calculated_fee = daily_fee * monthly_storage_days
+                        calculated_fee = daily_fee * pallet.get('monthly_storage_days', monthly_storage_days)
                         pallet['current_fee'] = math.ceil(calculated_fee / 100) * 100
-                    
-                    # 호환성을 위해 storage_days는 총보관일수로 설정 (기존 코드와의 호환)
-                    pallet['storage_days'] = total_storage_days
                 else:
                     pallet['total_storage_days'] = 0
                     pallet['monthly_storage_days'] = 0
