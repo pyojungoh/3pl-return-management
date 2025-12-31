@@ -1503,7 +1503,16 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
         
         rows = cursor.fetchall()
         
-        # 파레트별 상세 내역 처리 (보관료 재계산)
+        # 정산월의 시작일과 종료일 계산
+        settlement_month = settlement['settlement_month']
+        year, month = map(int, settlement_month.split('-'))
+        start_date = date(year, month, 1)
+        if month == 12:
+            end_date = date(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            end_date = date(year, month + 1, 1) - timedelta(days=1)
+        
+        # 파레트별 상세 내역 처리 (보관료 재계산 - 해당 월 기준으로)
         pallets_list = []
         for row in rows:
             if USE_POSTGRESQL:
@@ -1511,11 +1520,29 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
             else:
                 pallet = dict(zip([col[0] for col in cursor.description], row))
             
-            # 보관료 재계산: 일일 보관료 × 보관일수 (백원 단위 올림)
-            storage_days = pallet.get('storage_days', 0)
-            daily_fee = pallet.get('daily_fee', 0)
+            # 해당 월 내 보관일수 재계산
+            in_date = pallet.get('in_date')
+            out_date = pallet.get('out_date')
             is_service = pallet.get('is_service', 0) == 1
             
+            # 날짜 문자열을 date 객체로 변환
+            if isinstance(in_date, str):
+                in_date = datetime.strptime(in_date, '%Y-%m-%d').date()
+            if out_date and isinstance(out_date, str):
+                out_date = datetime.strptime(out_date, '%Y-%m-%d').date()
+            
+            # 해당 월 내 보관일수 계산
+            storage_start = max(in_date, start_date) if in_date else start_date
+            if out_date:
+                storage_end = min(out_date, end_date)
+            else:
+                storage_end = min(end_date, date.today())
+            
+            storage_days = max(0, (storage_end - storage_start).days + 1)
+            pallet['storage_days'] = storage_days
+            
+            # 보관료 재계산: 일일 보관료 × 보관일수 (백원 단위 올림)
+            daily_fee = pallet.get('daily_fee', 0)
             if is_service:
                 rounded_fee = 0
             else:
