@@ -267,7 +267,7 @@
     .pal-table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 1400px;
+      min-width: 1200px;
     }
     
     .pal-table thead {
@@ -974,8 +974,8 @@
                   <th class="pal-admin-only" style="width: 40px;">
                     <input type="checkbox" id="palPalletsSelectAll" onchange="palToggleSelectAllPallets(this.checked)" style="width: 16px; height: 16px;">
                   </th>
-                  <th style="font-size: 11px;">파레트 ID</th>
-                  <th style="font-size: 11px;">화주사</th>
+                  <th style="font-size: 11px; width: 90px; max-width: 90px;">파레트 ID</th>
+                  <th style="font-size: 11px; width: 110px; max-width: 110px;">화주사</th>
                   <th style="font-size: 11px;">품목명</th>
                   <th style="font-size: 11px;">상태</th>
                   <th style="font-size: 11px;">입고일</th>
@@ -2527,8 +2527,8 @@
                   ? `<td style="text-align: center;"><input type="checkbox" class="pal-pallet-checkbox" data-pallet-id="${palEscapeHtml(pallet.pallet_id)}" onchange="palUpdatePalletSelection()" style="width: 16px; height: 16px;"></td>`
                   : ''
                 }
-                <td style="font-size: 11px;">${palEscapeHtml(pallet.pallet_id)}</td>
-                <td style="font-size: 11px;">${palEscapeHtml(pallet.company_name || '')}</td>
+                <td style="font-size: 11px; width: 90px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${palEscapeHtml(pallet.pallet_id)}">${palEscapeHtml(pallet.pallet_id)}</td>
+                <td style="font-size: 11px; width: 110px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${palEscapeHtml(pallet.company_name || '')}">${palEscapeHtml(pallet.company_name || '')}</td>
                 <td style="font-size: 11px; white-space: normal; word-break: break-word; max-width: 150px;">${palEscapeHtml(pallet.product_name || '')}</td>
                 <td style="font-size: 11px; font-weight: 600;">${palEscapeHtml(statusText)}</td>
                 <td style="font-size: 11px;">${pallet.in_date || ''}</td>
@@ -4637,21 +4637,10 @@
       }
     }
     
-    // Chart.js 로드 확인 및 재시도
+    // Chart.js 로드 확인 (dashboard_server.html에서 이미 로드되어 있어야 함)
     function palCheckChartJS() {
       if (typeof Chart === 'undefined') {
-        console.warn('Chart.js가 로드되지 않았습니다. 재시도 중...');
-        // Chart.js 스크립트 동적 로드
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
-        script.onload = function() {
-          console.log('Chart.js 로드 완료');
-        };
-        script.onerror = function() {
-          console.error('Chart.js 로드 실패');
-          alert('차트 라이브러리 로드에 실패했습니다. 페이지를 새로고침해주세요.');
-        };
-        document.head.appendChild(script);
+        console.warn('[PAL] Chart.js가 로드되지 않았습니다. dashboard_server.html에서 로드되어야 합니다.');
         return false;
       }
       return true;
@@ -4669,18 +4658,23 @@
       document.getElementById('palRevenueMax').textContent = summary.max_revenue.toLocaleString() + '원';
       document.getElementById('palRevenueMin').textContent = summary.min_revenue.toLocaleString() + '원';
       
-      // Chart.js 확인
+      // Chart.js 확인 (dashboard_server.html에서 이미 로드되어 있어야 함)
       if (!palCheckChartJS()) {
-        // Chart.js가 로드되지 않았으면 잠시 후 재시도
-        setTimeout(() => {
+        // Chart.js가 로드되지 않았으면 잠시 후 재시도 (최대 5초)
+        let attempts = 0;
+        const maxAttempts = 50; // 5초 (100ms * 50)
+        const checkInterval = setInterval(() => {
+          attempts++;
           if (typeof Chart !== 'undefined') {
+            clearInterval(checkInterval);
             palUpdateRevenueDisplay(data);
-          } else {
-            console.error('Chart.js를 로드할 수 없습니다.');
+          } else if (attempts >= maxAttempts) {
+            clearInterval(checkInterval);
+            console.error('[PAL] Chart.js를 로드할 수 없습니다.');
             document.getElementById('palRevenueMonthlyChart').parentElement.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">차트 라이브러리를 로드할 수 없습니다. 페이지를 새로고침해주세요.</div>';
             document.getElementById('palRevenueCompanyChart').parentElement.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">차트 라이브러리를 로드할 수 없습니다. 페이지를 새로고침해주세요.</div>';
           }
-        }, 500);
+        }, 100);
         return;
       }
       
@@ -4843,16 +4837,7 @@
       }
     }
   </script>
-  <!-- Chart.js (body 끝에 배치하여 확실히 로드되도록) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script>
-    // Chart.js 로드 확인
-    if (typeof Chart === 'undefined') {
-      console.error('Chart.js 로드 실패');
-    } else {
-      console.log('Chart.js 로드 완료');
-    }
-  </script>
+  <!-- Chart.js는 dashboard_server.html의 head에서 이미 로드되므로 여기서는 제거 -->
 </body>
 </html>
 
