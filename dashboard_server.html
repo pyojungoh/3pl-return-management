@@ -1894,6 +1894,7 @@
           <option value="">로딩 중...</option>
         </select>
         <button class="refresh-btn" onclick="refreshReturnsData()" id="refreshReturnsBtn">🔄 새로고침</button>
+        <button class="refresh-btn" onclick="loadPreviousMonthReturns()" id="previousMonthReturnsBtn" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);">📅 전달조회</button>
         <button class="refresh-btn admin-only-btn" id="downloadTemplateBtn" onclick="downloadCsvTemplate()" onmouseenter="showDownloadTooltip(event)" onmouseleave="hideDownloadTooltip()" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); position: relative; display: none;">📥 서식 다운로드</button>
         <label for="csvUploadInput" class="admin-only-btn" style="cursor: pointer; display: none;">
           <span class="refresh-btn" style="display: inline-block; margin: 0;">📤 CSV 업로드</span>
