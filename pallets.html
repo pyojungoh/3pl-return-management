@@ -906,6 +906,35 @@
       
       <!-- QR 인쇄용 숨김 영역 (인쇄 전용, 화면에 표시 안 됨) -->
       <div id="palQRPrintArea" style="display: none; position: absolute; left: -9999px; top: -9999px; width: 63.5mm; height: 70mm;"></div>
+      
+      <!-- 출고일 수정 모달 -->
+      <div id="palEditOutDateModal" class="pal-modal" style="display: none;">
+        <div class="pal-modal-content" style="max-width: 500px;">
+          <div class="pal-modal-header">
+            <h2>📅 출고일 수정</h2>
+            <button class="pal-modal-close" onclick="palCloseEditOutDateModal()">&times;</button>
+          </div>
+          <div class="pal-modal-body" style="padding: 20px;">
+            <div class="pal-form-group" style="margin-bottom: 15px;">
+              <label class="pal-form-label">파레트 ID</label>
+              <input type="text" id="palEditOutDatePalletId" class="pal-form-input" readonly style="background: #f8f9fa;">
+            </div>
+            <div class="pal-form-group" style="margin-bottom: 20px;">
+              <label class="pal-form-label">출고일 *</label>
+              <input type="date" id="palEditOutDateInput" class="pal-form-input" required>
+            </div>
+            <div class="pal-form-group" style="margin-bottom: 20px;">
+              <label class="pal-form-label">비고</label>
+              <textarea id="palEditOutDateNotes" class="pal-form-input" style="min-height: 80px;" placeholder="출고일 변경 사유를 입력하세요 (선택사항)"></textarea>
+            </div>
+            <div id="palEditOutDateMessage" style="margin-bottom: 15px;"></div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+              <button class="pal-btn pal-btn-secondary" onclick="palCloseEditOutDateModal()">취소</button>
+              <button class="pal-btn" onclick="palSaveOutDate()">저장</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- 파레트 현황 페이지 -->
       <div id="palPageStatus" class="pal-content-page">
@@ -2530,6 +2559,11 @@
           params.append('month', month);
         }
         
+        // 파레트 ID 부분 검색 (백엔드로 전달)
+        if (palletId) {
+          params.append('pallet_id', palletId);
+        }
+        
         const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/list?${params}`, {
           headers: palGetUserHeaders()
         });
@@ -2556,13 +2590,8 @@
           
           countSpan.textContent = `(${total}개)`;
           
-          // 파레트 ID 필터링 (프론트엔드에서)
+          // 백엔드에서 이미 필터링되었으므로 프론트엔드 필터링 제거
           let filteredPallets = pallets;
-          if (palletId) {
-            filteredPallets = pallets.filter(p => 
-              p.pallet_id && p.pallet_id.toLowerCase().includes(palletId.toLowerCase())
-            );
-          }
           
           if (filteredPallets.length === 0) {
             tbody.innerHTML = '<tr><td colspan="13" class="no-data">파레트가 없습니다.</td></tr>';
@@ -2639,11 +2668,15 @@
                       ? `<button class="pal-btn" onclick="palOutboundFromStatus('${pallet.pallet_id}')" style="padding: 4px 8px; font-size: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;">보관종료</button>`
                       : ''
                     }
+                    ${statusText === '보관종료' 
+                      ? `<button class="pal-btn" onclick="palEditOutDate('${pallet.pallet_id}', '${pallet.out_date || ''}')" style="padding: 4px 8px; font-size: 10px; background: #ffc107; color: #000; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;" title="출고일 수정">📅</button>`
+                      : ''
+                    }
                     ${palCurrentRole === '관리자' 
                       ? `<button class="pal-btn" onclick="palDeletePalletFromStatus('${pallet.pallet_id}')" style="padding: 4px 8px; font-size: 10px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;">삭제</button>`
                       : ''
                     }
-                    ${!canOutbound && palCurrentRole !== '관리자' 
+                    ${!canOutbound && statusText !== '보관종료' && palCurrentRole !== '관리자' 
                       ? '<span style="color: #999; font-size: 10px;">-</span>'
                       : ''
                     }
@@ -2947,6 +2980,102 @@
       } catch (error) {
         console.error('보관종료 처리 오류:', error);
         alert('❌ 보관종료 처리 중 오류가 발생했습니다: ' + error.message);
+      }
+    }
+    
+    // 출고일 수정 모달 열기
+    function palEditOutDate(palletId, currentOutDate) {
+      const modal = document.getElementById('palEditOutDateModal');
+      const palletIdInput = document.getElementById('palEditOutDatePalletId');
+      const outDateInput = document.getElementById('palEditOutDateInput');
+      const notesInput = document.getElementById('palEditOutDateNotes');
+      const messageDiv = document.getElementById('palEditOutDateMessage');
+      
+      if (!modal || !palletIdInput || !outDateInput) return;
+      
+      // 현재 값 설정
+      palletIdInput.value = palletId;
+      outDateInput.value = currentOutDate || '';
+      if (notesInput) notesInput.value = '';
+      if (messageDiv) messageDiv.innerHTML = '';
+      
+      // 모달 표시
+      modal.style.display = 'flex';
+    }
+    
+    // 출고일 수정 모달 닫기
+    function palCloseEditOutDateModal() {
+      const modal = document.getElementById('palEditOutDateModal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+    }
+    
+    // 출고일 저장
+    async function palSaveOutDate() {
+      const palletIdInput = document.getElementById('palEditOutDatePalletId');
+      const outDateInput = document.getElementById('palEditOutDateInput');
+      const notesInput = document.getElementById('palEditOutDateNotes');
+      const messageDiv = document.getElementById('palEditOutDateMessage');
+      
+      if (!palletIdInput || !outDateInput) return;
+      
+      const palletId = palletIdInput.value.trim();
+      const outDate = outDateInput.value.trim();
+      const notes = notesInput ? notesInput.value.trim() : '';
+      
+      if (!palletId) {
+        if (messageDiv) messageDiv.innerHTML = '<div class="pal-message error">파레트 ID가 없습니다.</div>';
+        return;
+      }
+      
+      if (!outDate) {
+        if (messageDiv) messageDiv.innerHTML = '<div class="pal-message error">출고일을 입력해주세요.</div>';
+        outDateInput.focus();
+        return;
+      }
+      
+      // 날짜 유효성 검사
+      const selectedDate = new Date(outDate);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (selectedDate > today) {
+        if (!confirm('미래 날짜로 설정하시겠습니까?')) {
+          return;
+        }
+      }
+      
+      if (messageDiv) messageDiv.innerHTML = '<div class="pal-message info">처리 중...</div>';
+      
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/${palletId}/out-date`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...palGetUserHeaders()
+          },
+          body: JSON.stringify({
+            out_date: outDate,
+            notes: notes || null
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          if (messageDiv) messageDiv.innerHTML = '<div class="pal-message success">✅ ' + result.message + '</div>';
+          
+          // 목록 새로고침
+          setTimeout(() => {
+            palCloseEditOutDateModal();
+            palLoadPallets();
+          }, 1000);
+        } else {
+          if (messageDiv) messageDiv.innerHTML = '<div class="pal-message error">❌ ' + result.message + '</div>';
+        }
+      } catch (error) {
+        console.error('출고일 수정 오류:', error);
+        if (messageDiv) messageDiv.innerHTML = '<div class="pal-message error">❌ 출고일 수정 중 오류가 발생했습니다: ' + error.message + '</div>';
       }
     }
     

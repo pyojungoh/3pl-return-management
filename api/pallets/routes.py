@@ -564,6 +564,118 @@ def pallet_update(pallet_id):
         }), 500
 
 
+@pallets_bp.route('/<string:pallet_id>/out-date', methods=['PUT'])
+def pallet_update_out_date(pallet_id):
+    """
+    보관종료된 파레트의 출고일 수정
+    """
+    try:
+        from datetime import datetime
+        role, company_name, username = get_user_context()
+        
+        pallet = get_pallet_by_id(pallet_id)
+        if not pallet:
+            return jsonify({
+                'success': False,
+                'message': '파레트를 찾을 수 없습니다.'
+            }), 404
+        
+        # 보관종료된 파레트만 수정 가능
+        if pallet.get('status') != '보관종료':
+            return jsonify({
+                'success': False,
+                'message': '보관종료된 파레트만 출고일을 수정할 수 있습니다.'
+            }), 400
+        
+        # 권한 확인
+        if role != '관리자' and pallet.get('company_name') != company_name:
+            return jsonify({
+                'success': False,
+                'message': '권한이 없습니다.'
+            }), 403
+        
+        data = request.get_json() or {}
+        out_date_str = data.get('out_date')
+        notes = data.get('notes')
+        
+        if not out_date_str:
+            return jsonify({
+                'success': False,
+                'message': '출고일이 필요합니다.'
+            }), 400
+        
+        # 날짜 파싱
+        try:
+            out_date = datetime.strptime(out_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'message': '날짜 형식이 올바르지 않습니다. (YYYY-MM-DD 형식 필요)'
+            }), 400
+        
+        # 출고일 업데이트
+        from api.database.models import get_db_connection, USE_POSTGRESQL
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    UPDATE pallets 
+                    SET out_date = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE pallet_id = %s
+                ''', (out_date, pallet_id))
+                
+                # 트랜잭션 이력 저장 (출고일 수정)
+                cursor.execute('''
+                    INSERT INTO pallet_transactions (
+                        pallet_id, transaction_type, quantity, transaction_date,
+                        processed_by, notes, created_at
+                    ) VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, CURRENT_TIMESTAMP)
+                ''', (pallet_id, '출고일수정', pallet.get('quantity', 1), username, notes))
+            else:
+                cursor.execute('''
+                    UPDATE pallets 
+                    SET out_date = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE pallet_id = ?
+                ''', (out_date, pallet_id))
+                
+                # 트랜잭션 이력 저장 (출고일 수정)
+                cursor.execute('''
+                    INSERT INTO pallet_transactions (
+                        pallet_id, transaction_type, quantity, transaction_date,
+                        processed_by, notes, created_at
+                    ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, CURRENT_TIMESTAMP)
+                ''', (pallet_id, '출고일수정', pallet.get('quantity', 1), username, notes))
+            
+            conn.commit()
+            
+            # 업데이트된 파레트 정보 조회
+            updated_pallet = get_pallet_by_id(pallet_id)
+            
+            return jsonify({
+                'success': True,
+                'message': f'출고일이 {out_date_str}로 변경되었습니다.',
+                'data': updated_pallet
+            }), 200
+            
+        except Exception as e:
+            conn.rollback() if USE_POSTGRESQL else None
+            raise e
+        finally:
+            cursor.close()
+            conn.close()
+            
+    except Exception as e:
+        print(f"출고일 수정 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'출고일 수정 실패: {str(e)}'
+        }), 500
+
+
 @pallets_bp.route('/<string:pallet_id>', methods=['DELETE'])
 def pallet_delete(pallet_id):
     """
