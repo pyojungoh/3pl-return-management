@@ -565,10 +565,12 @@ def create_cs():
         # 날짜에서 년월 추출 (YYYY-MM-DD 형식에서)
         try:
             date_obj = datetime.strptime(date, '%Y-%m-%d')
-            month = f"{date_obj.year}년{date_obj.month}월"
+            # 월을 2자리 형식으로 (01월, 02월, ...)
+            month = f"{date_obj.year}년{date_obj.month:02d}월"
         except:
             # 이미 년월 형식인 경우
-            month = date if '년' in date and '월' in date else f"{datetime.now().year}년{datetime.now().month}월"
+            kst_now = get_kst_now()
+            month = date if '년' in date and '월' in date else f"{kst_now.year}년{kst_now.month:02d}월"
         
         # C/S 접수 생성
         cs_id = create_cs_request(company_name, username, date, month, issue_type, content, management_number, customer_name)
