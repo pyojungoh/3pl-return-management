@@ -696,12 +696,42 @@ def get_available_months():
                 
                 rows = cursor.fetchall()
                 months = [row[0] for row in rows if row[0]]
-                return jsonify({
-                    'success': True,
-                    'months': months
-                })
             finally:
                 conn.close()
+        
+        # 현재 월 자동 추가 (01월 형식으로)
+        kst_now = get_kst_now()
+        current_month_str = f"{kst_now.year}년{kst_now.month:02d}월"
+        if current_month_str not in months:
+            months.append(current_month_str)
+        
+        # 다음 월도 자동 추가
+        next_month = kst_now.month + 1
+        next_year = kst_now.year
+        if next_month > 12:
+            next_month = 1
+            next_year += 1
+        next_month_str = f"{next_year}년{next_month:02d}월"
+        if next_month_str not in months:
+            months.append(next_month_str)
+        
+        # 정렬 (년도 내림차순, 월 내림차순)
+        def parse_month(month_str):
+            try:
+                if '년' in month_str and '월' in month_str:
+                    year_part = month_str.split('년')[0]
+                    month_part = month_str.split('년')[1].split('월')[0]
+                    return (int(year_part), int(month_part))
+                return (0, 0)
+            except:
+                return (0, 0)
+        
+        months.sort(key=parse_month, reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'months': months
+        })
     except Exception as e:
         print(f'❌ C/S 월 목록 조회 오류: {e}')
         import traceback
