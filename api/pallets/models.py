@@ -409,7 +409,8 @@ def delete_pallet(pallet_id: str) -> Tuple[bool, str]:
 
 
 def get_pallets(company_name: str = None, status: str = None,
-                month: str = None, role: str = '화주사') -> List[Dict]:
+                month: str = None, role: str = '화주사',
+                pallet_id: str = None, product_name: str = None) -> List[Dict]:
     """
     파레트 목록 조회
     
@@ -418,6 +419,8 @@ def get_pallets(company_name: str = None, status: str = None,
         status: 상태 필터 (입고됨, 보관종료, 서비스, 전체)
         month: 월 필터 (YYYY-MM 형식)
         role: 권한 (관리자, 화주사)
+        pallet_id: 파레트 ID 부분 일치 검색 (LIKE 검색)
+        product_name: 품목명 부분 일치 검색 (LIKE 검색)
     """
     conn = get_db_connection()
     
@@ -452,6 +455,22 @@ def get_pallets(company_name: str = None, status: str = None,
             else:
                 query += " AND status = ?"
             params.append(status)
+        
+        # 파레트 ID 부분 일치 검색 (LIKE)
+        if pallet_id and pallet_id.strip():
+            if USE_POSTGRESQL:
+                query += " AND pallet_id LIKE %s"
+            else:
+                query += " AND pallet_id LIKE ?"
+            params.append(f'%{pallet_id.strip()}%')
+        
+        # 품목명 부분 일치 검색 (LIKE)
+        if product_name and product_name.strip():
+            if USE_POSTGRESQL:
+                query += " AND product_name LIKE %s"
+            else:
+                query += " AND product_name LIKE ?"
+            params.append(f'%{product_name.strip()}%')
         
         # 월 필터링
         if month:

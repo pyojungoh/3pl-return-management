@@ -306,13 +306,22 @@ def pallet_outbound():
 def pallet_list():
     """
     파레트 목록 조회
+    
+    Query Parameters:
+        - company: 화주사명 (관리자 모드에서 필터링용)
+        - status: 상태 필터 (입고됨, 보관종료, 서비스, 전체)
+        - month: 월 필터 (YYYY-MM 형식)
+        - pallet_id: 파레트 ID 부분 일치 검색
+        - product_name: 품목명 부분 일치 검색
     """
     try:
         role, company_name, username = get_user_context()
         
-        filter_company = request.args.get('company', '')
+        filter_company = request.args.get('company', '').strip()
         status = request.args.get('status', '전체')
         month = request.args.get('month')
+        pallet_id_filter = request.args.get('pallet_id', '').strip()
+        product_name_filter = request.args.get('product_name', '').strip()
         
         # 화주사인 경우 필수 (company_name이 헤더에 있으면 사용)
         if role != '관리자':
@@ -329,7 +338,9 @@ def pallet_list():
             company_name=final_company,
             status=status_filter,
             month=month,
-            role=role
+            role=role,
+            pallet_id=pallet_id_filter if pallet_id_filter else None,
+            product_name=product_name_filter if product_name_filter else None
         )
         
         # 보관료 계산 추가 및 date 객체를 문자열로 변환
