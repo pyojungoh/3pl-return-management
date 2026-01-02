@@ -544,10 +544,12 @@
     }
     
     .sw-memo-cell > span {
-      display: block;
+      display: inline-block;
+      max-width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      vertical-align: middle;
     }
     
     .sw-memo-tooltip {
@@ -555,7 +557,7 @@
       opacity: 0;
       position: absolute;
       z-index: 10000;
-      top: calc(100% + 8px);
+      bottom: calc(100% + 8px);
       left: 50%;
       transform: translateX(-50%);
       padding: 10px 14px;
@@ -565,8 +567,9 @@
       font-size: 13px;
       white-space: normal;
       word-wrap: break-word;
-      max-width: 300px;
-      min-width: 150px;
+      word-break: break-word;
+      max-width: 400px;
+      min-width: 200px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       transition: opacity 0.2s ease, visibility 0.2s ease;
       pointer-events: none;
@@ -576,11 +579,11 @@
     .sw-memo-tooltip::after {
       content: '';
       position: absolute;
-      bottom: 100%;
+      top: 100%;
       left: 50%;
       transform: translateX(-50%);
       border: 6px solid transparent;
-      border-bottom-color: #2d3436;
+      border-top-color: #2d3436;
     }
     
     .sw-memo-cell:hover .sw-memo-tooltip {
@@ -590,7 +593,14 @@
     
     /* 테이블 셀 overflow 조정 (툴팁이 잘리지 않도록) */
     .sw-table td.sw-memo-cell {
-      overflow: visible;
+      overflow: visible !important;
+    }
+    
+    /* 테이블 스크롤 래퍼에서 툴팁이 잘리지 않도록 */
+    .sw-table-scroll-wrapper {
+      overflow-x: auto;
+      overflow-y: auto;
+      position: relative;
     }
     
     .sw-table-scroll-wrapper {
