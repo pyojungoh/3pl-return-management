@@ -16,6 +16,8 @@
   <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.js"></script>
   <!-- QR 코드 생성 라이브러리 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Chart.js (파레트 관리 - 월별 수입 현황용) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -2164,6 +2166,7 @@
             <option value="">전체</option>
           </select>
           <button class="refresh-btn" onclick="refreshCsData()" id="refreshCsBtn">🔄 새로고침</button>
+          <button class="refresh-btn" onclick="loadPreviousMonthCs()" id="previousMonthCsBtn" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);">📅 전달조회</button>
           <button class="refresh-btn" onclick="exportCsData()" id="exportCsBtn" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);">📥 엑셀 다운로드</button>
           <button class="refresh-btn admin-only-btn" onclick="openCsIssueTypesManager()" id="csIssueTypesManagerBtn" style="display: none; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">⚙️ C/S 종류 관리</button>
           <button class="refresh-btn" onclick="testTelegram()" id="testTelegramBtn" style="display:none; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">📱 텔레그램 테스트</button>
@@ -6311,27 +6314,75 @@
             username: window.currentUsername
           });
           
-          // 스크립트 실행
+          // 스크립트 실행 (외부 스크립트와 인라인 스크립트 분리)
           const scripts = container.querySelectorAll('script');
+          const externalScripts = [];
+          const inlineScripts = [];
+          
           scripts.forEach(script => {
-            const newScript = document.createElement('script');
             if (script.src) {
-              newScript.src = script.src;
+              externalScripts.push(script);
             } else {
-              newScript.textContent = script.textContent;
-            }
-            document.body.appendChild(newScript);
-            if (script.parentNode) {
-              script.parentNode.removeChild(script);
+              inlineScripts.push(script);
             }
           });
           
-          // 초기화 함수 호출 (약간의 지연 후)
-          setTimeout(() => {
-            if (typeof window.palInit === 'function') {
-              window.palInit();
-            }
-          }, 100);
+          // 외부 스크립트 로드 (Promise로 순차 실행)
+          const loadExternalScripts = externalScripts.reduce((promise, script) => {
+            return promise.then(() => {
+              return new Promise((resolve, reject) => {
+                // Chart.js는 이미 dashboard_server.html에 로드되어 있으므로 스킵
+                if (script.src.includes('chart.js') || script.src.includes('chart.umd')) {
+                  console.log('[PAL] Chart.js는 이미 로드되어 있음, 스킵');
+                  resolve();
+                  return;
+                }
+                
+                const newScript = document.createElement('script');
+                newScript.src = script.src;
+                newScript.onload = () => {
+                  console.log('[PAL] 외부 스크립트 로드 완료:', script.src);
+                  resolve();
+                };
+                newScript.onerror = () => {
+                  console.error('[PAL] 외부 스크립트 로드 실패:', script.src);
+                  resolve(); // 실패해도 계속 진행
+                };
+                document.body.appendChild(newScript);
+                if (script.parentNode) {
+                  script.parentNode.removeChild(script);
+                }
+              });
+            });
+          }, Promise.resolve());
+          
+          // 외부 스크립트 로드 완료 후 인라인 스크립트 실행
+          loadExternalScripts.then(() => {
+            inlineScripts.forEach(script => {
+              const newScript = document.createElement('script');
+              newScript.textContent = script.textContent;
+              document.body.appendChild(newScript);
+              if (script.parentNode) {
+                script.parentNode.removeChild(script);
+              }
+            });
+            
+            // Chart.js 로드 확인 후 초기화 함수 호출
+            const checkChartJS = () => {
+              if (typeof Chart !== 'undefined') {
+                console.log('[PAL] Chart.js 로드 확인 완료');
+                setTimeout(() => {
+                  if (typeof window.palInit === 'function') {
+                    window.palInit();
+                  }
+                }, 100);
+              } else {
+                console.warn('[PAL] Chart.js 로드 대기 중...');
+                setTimeout(checkChartJS, 100);
+              }
+            };
+            checkChartJS();
+          });
         })
         .catch(error => {
           console.error('파레트 관리 콘텐츠 로드 오류:', error);
@@ -8826,12 +8877,15 @@
               monthSelect.appendChild(optgroup);
             });
             
-            // 현재 월 선택 (기본값)
+            // 현재 월 선택 (기본값) - 01월 형식으로 맞춤
             const today = new Date();
-            const currentMonth = `${today.getFullYear()}년${today.getMonth() + 1}월`;
-            if (result.months.includes(currentMonth)) {
-              monthSelect.value = currentMonth;
-            } else if (result.months.length > 0) {
+            const currentMonth = `${today.getFullYear()}년${String(today.getMonth() + 1).padStart(2, '0')}월`;
+            // 정확히 일치하는 월 찾기
+            const exactMatch = result.months.find(m => m === currentMonth);
+            if (exactMatch) {
+              monthSelect.value = exactMatch;
+            } else {
+              // 일치하지 않으면 가장 최근 월 선택
               monthSelect.value = result.months[0];
             }
             
@@ -8872,13 +8926,44 @@
           const monthSelect = document.getElementById('csMonthSelect');
           if (monthSelect) {
             const today = new Date();
-            const currentMonth = `${today.getFullYear()}년${today.getMonth() + 1}월`;
+            const currentMonth = `${today.getFullYear()}년${String(today.getMonth() + 1).padStart(2, '0')}월`;
             monthSelect.innerHTML = `<option value="${currentMonth}">${currentMonth}</option>`;
             monthSelect.value = currentMonth;
           }
         });
     }
     window.loadCsAvailableMonths = loadCsAvailableMonths;
+    
+    // 전달 조회 함수
+    function loadPreviousMonthCs() {
+      const monthSelect = document.getElementById('csMonthSelect');
+      if (!monthSelect) return;
+      
+      const today = new Date();
+      let prevYear = today.getFullYear();
+      let prevMonth = today.getMonth(); // 0-11 (현재 월 - 1)
+      
+      if (prevMonth === 0) {
+        // 1월이면 전년도 12월
+        prevYear -= 1;
+        prevMonth = 12;
+      }
+      
+      const previousMonthStr = `${prevYear}년${String(prevMonth).padStart(2, '0')}월`;
+      
+      // 전달 월이 목록에 있는지 확인
+      const options = Array.from(monthSelect.options);
+      const foundOption = options.find(opt => opt.value === previousMonthStr);
+      
+      if (foundOption) {
+        monthSelect.value = previousMonthStr;
+        loadCsData();
+      } else {
+        // 전달 월이 목록에 없으면 알림
+        alert(`전달(${previousMonthStr}) 데이터가 없습니다.`);
+      }
+    }
+    window.loadPreviousMonthCs = loadPreviousMonthCs;
     
     // C/S 데이터 새로고침
     function refreshCsData() {
