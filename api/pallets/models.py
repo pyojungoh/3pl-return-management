@@ -1326,43 +1326,20 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
         else:
             cursor = conn.cursor()
         
-        if settlement_month:
-            # 특정 월에 보관했던 화주사만 조회
-            year, month = map(int, settlement_month.split('-'))
-            start_date = date(year, month, 1)
-            if month == 12:
-                end_date = date(year + 1, 1, 1) - timedelta(days=1)
-            else:
-                end_date = date(year, month + 1, 1) - timedelta(days=1)
-            
-            if USE_POSTGRESQL:
-                cursor.execute('''
-                    SELECT DISTINCT company_name 
-                    FROM pallets 
-                    WHERE in_date <= %s AND (out_date IS NULL OR out_date >= %s)
-                    ORDER BY company_name
-                ''', (end_date, start_date))
-            else:
-                cursor.execute('''
-                    SELECT DISTINCT company_name 
-                    FROM pallets 
-                    WHERE in_date <= ? AND (out_date IS NULL OR out_date >= ?)
-                    ORDER BY company_name
-                ''', (end_date, start_date))
+        # 월 필터가 있어도 전체 화주사 목록을 반환 (해당 월에 파레트가 없어도 포함)
+        # 정산 페이지에서 모든 화주사를 선택할 수 있도록 함
+        if USE_POSTGRESQL:
+            cursor.execute('''
+                SELECT DISTINCT company_name 
+                FROM pallets 
+                ORDER BY company_name
+            ''')
         else:
-            # 전체 화주사 조회
-            if USE_POSTGRESQL:
-                cursor.execute('''
-                    SELECT DISTINCT company_name 
-                    FROM pallets 
-                    ORDER BY company_name
-                ''')
-            else:
-                cursor.execute('''
-                    SELECT DISTINCT company_name 
-                    FROM pallets 
-                    ORDER BY company_name
-                ''')
+            cursor.execute('''
+                SELECT DISTINCT company_name 
+                FROM pallets 
+                ORDER BY company_name
+            ''')
         
         rows = cursor.fetchall()
         
