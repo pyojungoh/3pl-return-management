@@ -4291,6 +4291,7 @@ def update_schedule(schedule_id: int, schedule_data: Dict) -> bool:
         try:
             cursor.execute('''
                 UPDATE schedules SET
+                    company_name = %s,
                     title = %s,
                     start_date = %s,
                     end_date = %s,
@@ -4300,6 +4301,7 @@ def update_schedule(schedule_id: int, schedule_data: Dict) -> bool:
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
             ''', (
+                schedule_data.get('company_name'),
                 schedule_data.get('title'),
                 schedule_data.get('start_date'),
                 schedule_data.get('end_date'),
@@ -4322,6 +4324,7 @@ def update_schedule(schedule_id: int, schedule_data: Dict) -> bool:
         try:
             cursor.execute('''
                 UPDATE schedules SET
+                    company_name = ?,
                     title = ?,
                     start_date = ?,
                     end_date = ?,
@@ -4331,6 +4334,7 @@ def update_schedule(schedule_id: int, schedule_data: Dict) -> bool:
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ''', (
+                schedule_data.get('company_name'),
                 schedule_data.get('title'),
                 schedule_data.get('start_date'),
                 schedule_data.get('end_date'),
