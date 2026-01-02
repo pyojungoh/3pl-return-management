@@ -1160,6 +1160,42 @@
     /**
      * 작업 종류 필터링
      */
+    /**
+     * 화주사별 필터링
+     */
+    function swFilterByCompany(companyName) {
+      const container = document.getElementById('swContainer');
+      if (!container) return;
+      
+      // 선택된 화주사 업데이트 (null이면 전체)
+      swSelectedCompany = companyName;
+      
+      // 통계 박스 선택 상태 업데이트
+      const statsContainer = container.querySelector('#swAdminCompanyStatsContainer');
+      if (statsContainer) {
+        const boxes = statsContainer.querySelectorAll('.sw-stat-box');
+        boxes.forEach(box => {
+          const boxCompanyName = box.querySelector('.sw-stat-box-name')?.textContent?.trim();
+          if (boxCompanyName === companyName) {
+            box.classList.add('selected');
+          } else {
+            box.classList.remove('selected');
+          }
+        });
+      }
+      
+      // 관리자 모드면 관리자 조회 함수 호출, 화주사 모드면 화주사 조회 함수 호출
+      const roleNormalized = (swCurrentRole || '').toString().trim();
+      const isAdmin = (roleNormalized === '관리자');
+      
+      if (isAdmin) {
+        swAdminLoadWorks();
+      } else {
+        swConsignorLoadWorks();
+      }
+    }
+    window.swFilterByCompany = swFilterByCompany;
+    
     function swFilterByWorkType(workTypeName) {
       const container = document.getElementById('swContainer');
       if (!container) return;
