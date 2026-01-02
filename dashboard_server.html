@@ -3104,19 +3104,19 @@
           </div>
         </div>
         
-        <!-- 화주사 목록 테이블 -->
-        <div class="table-container">
+        <!-- 관리자 목록 박스 -->
+        <div class="table-container" style="margin-bottom: 30px; background: #ffffff; padding: 24px; border-radius: 14px; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1); border: 2px solid #e74c3c;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <div>
-              <h3 style="margin: 0; color: #333; font-size: 18px; display: inline-block; margin-right: 15px;">등록된 화주사 목록</h3>
-              <span id="companiesStatistics" style="color: #666; font-size: 14px;">(관리자: 0, 화주사: 0)</span>
+              <h3 style="margin: 0; color: #e74c3c; font-size: 18px; font-weight: 700; display: inline-block; margin-right: 15px;">👑 관리자 목록</h3>
+              <span id="adminStatistics" style="color: #666; font-size: 14px;">(0명)</span>
             </div>
             <button class="refresh-btn" onclick="refreshCompaniesData()" id="refreshCompaniesBtn" style="padding: 8px 15px; font-size: 14px;">🔄 새로고침</button>
           </div>
           <div class="table-scroll-wrapper">
             <table style="min-width: 1200px;">
             <thead>
-              <tr>
+              <tr style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white;">
                 <th>화주사명</th>
                 <th>아이디</th>
                 <th>권한</th>
@@ -3132,7 +3132,44 @@
                 <th>관리</th>
               </tr>
             </thead>
-            <tbody id="companiesTableBody">
+            <tbody id="adminTableBody">
+              <tr>
+                <td colspan="13" class="no-data">데이터를 불러오는 중...</td>
+              </tr>
+            </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- 화주사 목록 박스 -->
+        <div class="table-container" style="background: #ffffff; padding: 24px; border-radius: 14px; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1); border: 2px solid #3498db;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <div>
+              <h3 style="margin: 0; color: #3498db; font-size: 18px; font-weight: 700; display: inline-block; margin-right: 15px;">🏢 화주사 목록</h3>
+              <span id="consignorStatistics" style="color: #666; font-size: 14px;">(0명)</span>
+            </div>
+            <button class="refresh-btn" onclick="refreshCompaniesData()" style="padding: 8px 15px; font-size: 14px;">🔄 새로고침</button>
+          </div>
+          <div class="table-scroll-wrapper">
+            <table style="min-width: 1200px;">
+            <thead>
+              <tr style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white;">
+                <th>화주사명</th>
+                <th>아이디</th>
+                <th>권한</th>
+                <th>태그</th>
+                <th>사업자번호</th>
+                <th>사업자명</th>
+                <th>주소</th>
+                <th>전화번호</th>
+                <th>이메일</th>
+                <th>사업자 등록증</th>
+                <th>최근 로그인</th>
+                <th>등록일</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="consignorTableBody">
               <tr>
                 <td colspan="13" class="no-data">데이터를 불러오는 중...</td>
               </tr>
@@ -13082,12 +13119,15 @@
     
     /* ========== 화주사 목록 불러오기 ========== */
     async function loadCompanies() {
-      const tbody = document.getElementById('companiesTableBody');
-      const statisticsSpan = document.getElementById('companiesStatistics');
+      const adminTbody = document.getElementById('adminTableBody');
+      const consignorTbody = document.getElementById('consignorTableBody');
+      const adminStatisticsSpan = document.getElementById('adminStatistics');
+      const consignorStatisticsSpan = document.getElementById('consignorStatistics');
       
-      if (!tbody) return;
+      if (!adminTbody || !consignorTbody) return;
       
-      tbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중...</td></tr>';
+      adminTbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중...</td></tr>';
+      consignorTbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중...</td></tr>';
       
       try {
         const response = await fetch('/api/auth/companies');
@@ -13095,64 +13135,116 @@
         
         if (result.success && result.companies) {
           updateReturnCompanyOptionsList(result.companies, true);
+          
+          // 관리자와 화주사 분리
+          const admins = result.companies.filter(company => company.role === '관리자');
+          const consignors = result.companies.filter(company => company.role !== '관리자');
+          
           // 통계 업데이트
-          if (statisticsSpan && result.statistics) {
-            const stats = result.statistics;
-            statisticsSpan.textContent = `(관리자: ${stats.admin_count || 0}, 화주사: ${stats.consignor_count || 0})`;
+          if (adminStatisticsSpan) {
+            adminStatisticsSpan.textContent = `(${admins.length}명)`;
+          }
+          if (consignorStatisticsSpan) {
+            consignorStatisticsSpan.textContent = `(${consignors.length}명)`;
           }
           
-          // 테이블 렌더링
-          if (result.companies.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="13" class="no-data">등록된 화주사가 없습니다.</td></tr>';
-            return;
+          // 관리자 테이블 렌더링
+          adminTbody.innerHTML = '';
+          if (admins.length === 0) {
+            adminTbody.innerHTML = '<tr><td colspan="13" class="no-data">등록된 관리자가 없습니다.</td></tr>';
+          } else {
+            admins.forEach(company => {
+              const row = document.createElement('tr');
+              const createdDate = company.created_at ? new Date(company.created_at).toLocaleDateString('ko-KR') : '-';
+              const lastLogin = company.last_login ? new Date(company.last_login).toLocaleDateString('ko-KR') : '-';
+              const tags = company.search_keywords || '';
+              
+              row.innerHTML = `
+                <td style="text-align: center;">${escapeHtml(company.company_name || '')}</td>
+                <td style="text-align: center;">${escapeHtml(company.username || '')}</td>
+                <td style="text-align: center;">
+                  <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #e74c3c; color: white;">
+                    ${escapeHtml(company.role || '관리자')}
+                  </span>
+                </td>
+                <td style="text-align: center;">${escapeHtml(tags)}</td>
+                <td style="text-align: center;">${escapeHtml(company.business_number || '-')}</td>
+                <td style="text-align: center;">${escapeHtml(company.business_name || '-')}</td>
+                <td style="text-align: center;">${escapeHtml(company.business_address || '-')}</td>
+                <td style="text-align: center;">${escapeHtml(company.business_tel || '-')}</td>
+                <td style="text-align: center;">${escapeHtml(company.business_email || '-')}</td>
+                <td style="text-align: center;">
+                  ${company.business_certificate_url ? 
+                    `<button onclick="viewCertificate(${company.id}, '${escapeHtml(company.business_certificate_url)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">보기</button>` : 
+                    `<button onclick="uploadCertificate(${company.id})" style="padding: 4px 8px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">업로드</button>`
+                  }
+                </td>
+                <td style="text-align: center;">${lastLogin}</td>
+                <td style="text-align: center;">${createdDate}</td>
+                <td style="text-align: center; white-space: nowrap;">
+                  <div style="display: inline-flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                    <button onclick="openTagModal(${company.id}, '${escapeHtml(company.username)}', '${escapeHtml(company.company_name)}', '${escapeHtml(tags)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">태그</button>
+                    <button onclick="changeCompanyPassword(${company.id}, '${escapeHtml(company.username)}')" style="padding: 4px 8px; background: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">비밀번호</button>
+                    <button onclick="deleteCompany(${company.id}, '${escapeHtml(company.company_name)}')" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">삭제</button>
+                  </div>
+                </td>
+              `;
+              adminTbody.appendChild(row);
+            });
           }
           
-          tbody.innerHTML = '';
-          result.companies.forEach(company => {
-            const row = document.createElement('tr');
-            const createdDate = company.created_at ? new Date(company.created_at).toLocaleDateString('ko-KR') : '-';
-            const lastLogin = company.last_login ? new Date(company.last_login).toLocaleDateString('ko-KR') : '-';
-            const tags = company.search_keywords || '';
-            
-            row.innerHTML = `
-              <td style="text-align: center;">${escapeHtml(company.company_name || '')}</td>
-              <td style="text-align: center;">${escapeHtml(company.username || '')}</td>
-              <td style="text-align: center;">
-                <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; 
-                  ${company.role === '관리자' ? 'background: #e74c3c; color: white;' : 'background: #3498db; color: white;'}">
-                  ${escapeHtml(company.role || '화주사')}
-                </span>
-              </td>
-              <td style="text-align: center;">${escapeHtml(tags)}</td>
-              <td style="text-align: center;">${escapeHtml(company.business_number || '-')}</td>
-              <td style="text-align: center;">${escapeHtml(company.business_name || '-')}</td>
-              <td style="text-align: center;">${escapeHtml(company.business_address || '-')}</td>
-              <td style="text-align: center;">${escapeHtml(company.business_tel || '-')}</td>
-              <td style="text-align: center;">${escapeHtml(company.business_email || '-')}</td>
-              <td style="text-align: center;">
-                ${company.business_certificate_url ? 
-                  `<button onclick="viewCertificate(${company.id}, '${escapeHtml(company.business_certificate_url)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">보기</button>` : 
-                  `<button onclick="uploadCertificate(${company.id})" style="padding: 4px 8px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">업로드</button>`
-                }
-              </td>
-              <td style="text-align: center;">${lastLogin}</td>
-              <td style="text-align: center;">${createdDate}</td>
-              <td style="text-align: center; white-space: nowrap;">
-                <div style="display: inline-flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: nowrap;">
-                  <button onclick="openTagModal(${company.id}, '${escapeHtml(company.username)}', '${escapeHtml(company.company_name)}', '${escapeHtml(tags)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">태그</button>
-                  <button onclick="changeCompanyPassword(${company.id}, '${escapeHtml(company.username)}')" style="padding: 4px 8px; background: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">비밀번호</button>
-                  <button onclick="deleteCompany(${company.id}, '${escapeHtml(company.company_name)}')" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">삭제</button>
-                </div>
-              </td>
-            `;
-            tbody.appendChild(row);
-          });
+          // 화주사 테이블 렌더링
+          consignorTbody.innerHTML = '';
+          if (consignors.length === 0) {
+            consignorTbody.innerHTML = '<tr><td colspan="13" class="no-data">등록된 화주사가 없습니다.</td></tr>';
+          } else {
+            consignors.forEach(company => {
+              const row = document.createElement('tr');
+              const createdDate = company.created_at ? new Date(company.created_at).toLocaleDateString('ko-KR') : '-';
+              const lastLogin = company.last_login ? new Date(company.last_login).toLocaleDateString('ko-KR') : '-';
+              const tags = company.search_keywords || '';
+              
+              row.innerHTML = `
+                <td style="text-align: center;">${escapeHtml(company.company_name || '')}</td>
+                <td style="text-align: center;">${escapeHtml(company.username || '')}</td>
+                <td style="text-align: center;">
+                  <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #3498db; color: white;">
+                    ${escapeHtml(company.role || '화주사')}
+                  </span>
+                </td>
+                <td style="text-align: center;">${escapeHtml(tags)}</td>
+                <td style="text-align: center;">${escapeHtml(company.business_number || '-')}</td>
+                <td style="text-align: center;">${escapeHtml(company.business_name || '-')}</td>
+                <td style="text-align: center;">${escapeHtml(company.business_address || '-')}</td>
+                <td style="text-align: center;">${escapeHtml(company.business_tel || '-')}</td>
+                <td style="text-align: center;">${escapeHtml(company.business_email || '-')}</td>
+                <td style="text-align: center;">
+                  ${company.business_certificate_url ? 
+                    `<button onclick="viewCertificate(${company.id}, '${escapeHtml(company.business_certificate_url)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">보기</button>` : 
+                    `<button onclick="uploadCertificate(${company.id})" style="padding: 4px 8px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">업로드</button>`
+                  }
+                </td>
+                <td style="text-align: center;">${lastLogin}</td>
+                <td style="text-align: center;">${createdDate}</td>
+                <td style="text-align: center; white-space: nowrap;">
+                  <div style="display: inline-flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                    <button onclick="openTagModal(${company.id}, '${escapeHtml(company.username)}', '${escapeHtml(company.company_name)}', '${escapeHtml(tags)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">태그</button>
+                    <button onclick="changeCompanyPassword(${company.id}, '${escapeHtml(company.username)}')" style="padding: 4px 8px; background: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">비밀번호</button>
+                    <button onclick="deleteCompany(${company.id}, '${escapeHtml(company.company_name)}')" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">삭제</button>
+                  </div>
+                </td>
+              `;
+              consignorTbody.appendChild(row);
+            });
+          }
         } else {
-          tbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러올 수 없습니다.</td></tr>';
+          adminTbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러올 수 없습니다.</td></tr>';
+          consignorTbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러올 수 없습니다.</td></tr>';
         }
       } catch (error) {
         console.error('화주사 목록 로드 오류:', error);
-        tbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중 오류가 발생했습니다.</td></tr>';
+        adminTbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중 오류가 발생했습니다.</td></tr>';
+        consignorTbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중 오류가 발생했습니다.</td></tr>';
       }
     }
     window.loadCompanies = loadCompanies;
