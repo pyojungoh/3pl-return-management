@@ -4,6 +4,7 @@
 from flask import Blueprint, request, jsonify, Response
 from datetime import date, datetime
 from api.pallets.models import (
+    update_pallet_status_batch,
     create_pallet, update_pallet_status, get_pallet_by_id, get_pallets,
     calculate_fee, get_pallet_fee, set_pallet_fee,
     generate_monthly_settlement, get_settlements, get_settlement_detail,
@@ -193,39 +194,102 @@ def pallet_inbound():
 @pallets_bp.route('/outbound', methods=['POST'])
 def pallet_outbound():
     """
-    파레트 보관종료 (QR 스캔 또는 수동)
+    파레트 보관종료 (단일 또는 대량 처리)
+    
+    Request Body:
+        - pallet_id: 단일 파레트 ID (기존 방식, 호환성 유지)
+        - pallet_ids: 파레트 ID 배열 (대량 처리)
+        - out_date: 보관종료일 (YYYY-MM-DD 형식, 선택사항, 기본값: 오늘)
+        - notes: 비고 (선택사항)
     """
     try:
+        from datetime import datetime
         role, company_name, username = get_user_context()
         data = request.get_json() or {}
         
-        pallet_id = data.get('pallet_id')
-        out_date = data.get('out_date')
+        pallet_id = data.get('pallet_id')  # 단일 처리 (호환성)
+        pallet_ids = data.get('pallet_ids')  # 대량 처리
+        out_date_str = data.get('out_date')
         notes = data.get('notes')
         
-        if not pallet_id:
-            return jsonify({
-                'success': False,
-                'message': '파레트 ID가 필요합니다.'
-            }), 400
+        # 날짜 파싱
+        out_date = None
+        if out_date_str:
+            try:
+                out_date = datetime.strptime(out_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'message': '날짜 형식이 올바르지 않습니다. (YYYY-MM-DD 형식 필요)'
+                }), 400
         
-        success, message, pallet = update_pallet_status(
-            pallet_id=pallet_id,
-            out_date=out_date,
-            processed_by=username,
-            notes=notes
-        )
+        # 대량 처리 모드
+        if pallet_ids:
+            if not isinstance(pallet_ids, list) or len(pallet_ids) == 0:
+                return jsonify({
+                    'success': False,
+                    'message': '파레트 ID 배열이 필요합니다.'
+                }), 400
+            
+            result = update_pallet_status_batch(
+                pallet_ids=pallet_ids,
+                out_date=out_date,
+                processed_by=username,
+                notes=notes
+            )
+            
+            if result['success_count'] > 0:
+                message = f"{result['success_count']}개 파레트 보관종료 완료"
+                if result['failed_count'] > 0:
+                    message += f", {result['failed_count']}개 실패"
+                
+                return jsonify({
+                    'success': True,
+                    'message': message,
+                    'processed': result['processed'],
+                    'failed': result['failed'],
+                    'errors': result['errors'],
+                    'success_count': result['success_count'],
+                    'failed_count': result['failed_count']
+                }), 200
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '모든 파레트 보관종료에 실패했습니다.',
+                    'failed': result['failed'],
+                    'errors': result['errors']
+                }), 400
         
-        if success:
-            return jsonify({
-                'success': True,
-                'message': message,
-                'data': pallet
-            }), 200
+        # 단일 처리 모드 (기존 방식, 호환성 유지)
+        elif pallet_id:
+            if not pallet_id:
+                return jsonify({
+                    'success': False,
+                    'message': '파레트 ID가 필요합니다.'
+                }), 400
+            
+            success, message, pallet = update_pallet_status(
+                pallet_id=pallet_id,
+                out_date=out_date,
+                processed_by=username,
+                notes=notes
+            )
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': message,
+                    'data': pallet
+                }), 200
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': message
+                }), 400
         else:
             return jsonify({
                 'success': False,
-                'message': message
+                'message': '파레트 ID 또는 파레트 ID 배열이 필요합니다.'
             }), 400
             
     except Exception as e:

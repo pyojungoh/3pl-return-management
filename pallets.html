@@ -759,7 +759,9 @@
                 <table class="pal-table">
                   <thead>
                     <tr>
-                      <th style="width: 50px;">선택</th>
+                      <th style="width: 50px;">
+                        <input type="checkbox" id="palOutboundSelectAll" onclick="palToggleSelectAllPallets()" title="전체 선택/해제">
+                      </th>
                       <th>파레트 ID</th>
                       <th>화주사</th>
                       <th>품목명</th>
@@ -779,11 +781,14 @@
             
             <!-- 선택한 파레트 정보 및 보관종료 처리 -->
             <div id="palOutboundSelectedInfo" style="display: none; background: #fff9e6; padding: 20px; border-radius: 12px; border: 2px solid #ffeaa7; margin-bottom: 20px;">
-              <h3 style="color: #ff6b35; margin-bottom: 15px;">선택한 파레트 정보</h3>
-              <div id="palOutboundSelectedContent"></div>
+              <h3 style="color: #ff6b35; margin-bottom: 15px;">
+                선택한 파레트 정보 
+                <span id="palOutboundSelectedCount" style="font-size: 14px; color: #636e72; font-weight: normal;">(0개)</span>
+              </h3>
+              <div id="palOutboundSelectedContent" style="max-height: 200px; overflow-y: auto; margin-bottom: 15px; padding: 10px; background: #fff; border-radius: 8px; border: 1px solid #ddd;"></div>
               <div class="pal-form-group" style="margin-top: 15px;">
-                <label class="pal-form-label">보관종료일 (선택사항, 기본값: 오늘)</label>
-                <input type="date" id="palOutboundDate" class="pal-form-input">
+                <label class="pal-form-label">보관종료일 * (기본값: 오늘)</label>
+                <input type="date" id="palOutboundDate" class="pal-form-input" required>
               </div>
               <div class="pal-form-group">
                 <label class="pal-form-label">비고</label>
@@ -2247,9 +2252,9 @@
               }
               
               return `
-                <tr style="cursor: pointer;" onclick="palSelectPalletForOutbound('${pallet.pallet_id}')">
+                <tr style="cursor: pointer;" onclick="palTogglePalletSelection('${pallet.pallet_id}')">
                   <td style="text-align: center;">
-                    <input type="radio" name="palOutboundSelected" value="${pallet.pallet_id}" onclick="event.stopPropagation(); palSelectPalletForOutbound('${pallet.pallet_id}')">
+                    <input type="checkbox" class="palOutboundCheckbox" value="${pallet.pallet_id}" onclick="event.stopPropagation(); palTogglePalletSelection('${pallet.pallet_id}')">
                   </td>
                   <td>${palEscapeHtml(pallet.pallet_id)}</td>
                   <td>${palEscapeHtml(pallet.company_name)}</td>
@@ -2270,83 +2275,149 @@
       }
     }
     
-    // 파레트 선택 (출고용)
-    async function palSelectPalletForOutbound(palletId) {
-      // 라디오 버튼 선택
-      document.querySelectorAll('input[name="palOutboundSelected"]').forEach(radio => {
-        radio.checked = radio.value === palletId;
+    // 파레트 선택 토글 (출고용 - 체크박스)
+    function palTogglePalletSelection(palletId) {
+      const checkbox = document.querySelector(`.palOutboundCheckbox[value="${palletId}"]`);
+      if (!checkbox) return;
+      
+      // 체크박스 상태 토글
+      checkbox.checked = !checkbox.checked;
+      
+      // 선택 정보 업데이트
+      palUpdateOutboundSelectionInfo();
+    }
+    
+    // 전체 선택/해제
+    function palToggleSelectAllPallets() {
+      const selectAllCheckbox = document.getElementById('palOutboundSelectAll');
+      const checkboxes = document.querySelectorAll('.palOutboundCheckbox');
+      
+      if (!selectAllCheckbox || !checkboxes.length) return;
+      
+      const isChecked = selectAllCheckbox.checked;
+      checkboxes.forEach(cb => {
+        cb.checked = isChecked;
       });
       
+      palUpdateOutboundSelectionInfo();
+    }
+    
+    // 선택된 파레트 정보 업데이트
+    async function palUpdateOutboundSelectionInfo() {
+      const checkboxes = document.querySelectorAll('.palOutboundCheckbox:checked');
+      const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+      
+      const selectedInfo = document.getElementById('palOutboundSelectedInfo');
+      const selectedContent = document.getElementById('palOutboundSelectedContent');
+      const selectedCount = document.getElementById('palOutboundSelectedCount');
+      
+      if (!selectedInfo || !selectedContent || !selectedCount) return;
+      
+      if (selectedIds.length === 0) {
+        selectedInfo.style.display = 'none';
+        palScannedPalletId = null;
+        return;
+      }
+      
+      selectedCount.textContent = `(${selectedIds.length}개)`;
+      selectedInfo.style.display = 'block';
+      
+      // 선택된 파레트 정보 로드
       try {
-        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/${palletId}`, {
-          headers: palGetUserHeaders()
-        });
+        const palletPromises = selectedIds.map(id => 
+          fetch(`${PAL_API_BASE_URL}/api/pallets/${id}`, {
+            headers: palGetUserHeaders()
+          }).then(res => res.json())
+        );
         
-        const result = await response.json();
+        const results = await Promise.all(palletPromises);
+        const pallets = results
+          .filter(r => r.success && r.data)
+          .map(r => r.data);
         
-        if (result.success && result.data) {
-          const pallet = result.data;
-          // 백엔드에서 계산된 storage_days 사용, 없으면 직접 계산
+        if (pallets.length === 0) {
+          selectedContent.innerHTML = '<div style="color: #999;">선택한 파레트 정보를 불러올 수 없습니다.</div>';
+          return;
+        }
+        
+        // 선택된 파레트 목록 표시
+        selectedContent.innerHTML = pallets.map(pallet => {
           let storageDays = pallet.storage_days;
           if (!storageDays && pallet.in_date) {
-            // 날짜만 비교 (시간 제외)
             const inDate = new Date(pallet.in_date + 'T00:00:00');
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             storageDays = Math.floor((today - inDate) / (1000 * 60 * 60 * 24)) + 1;
-            storageDays = Math.max(1, storageDays); // 최소 1일
+            storageDays = Math.max(1, storageDays);
           }
           
-          const selectedContent = document.getElementById('palOutboundSelectedContent');
-          const selectedInfo = document.getElementById('palOutboundSelectedInfo');
-          
-          if (selectedContent && selectedInfo) {
-            selectedContent.innerHTML = `
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                <div><strong>파레트 ID:</strong> ${palEscapeHtml(pallet.pallet_id)}</div>
-                <div><strong>화주사:</strong> ${palEscapeHtml(pallet.company_name)}</div>
-                <div><strong>품목명:</strong> ${palEscapeHtml(pallet.product_name || '-')}</div>
-                <div><strong>입고일:</strong> ${pallet.in_date}</div>
-                <div><strong>보관일수:</strong> ${storageDays}일</div>
-                <div><strong>보관 위치:</strong> ${palEscapeHtml(pallet.location || '-')}</div>
-                <div><strong>수량:</strong> ${pallet.quantity || 1}</div>
-                <div><strong>서비스:</strong> ${pallet.is_service ? '예' : '아니오'}</div>
+          return `
+            <div style="padding: 8px; margin-bottom: 8px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid #ff6b35;">
+              <div style="font-weight: 600; color: #ff6b35; margin-bottom: 4px;">${palEscapeHtml(pallet.pallet_id)}</div>
+              <div style="font-size: 12px; color: #666;">
+                화주사: ${palEscapeHtml(pallet.company_name)} | 
+                품목: ${palEscapeHtml(pallet.product_name || '-')} | 
+                입고일: ${pallet.in_date} | 
+                보관일수: ${storageDays}일
               </div>
-              ${pallet.notes ? `<div style="margin-top: 10px;"><strong>비고:</strong> ${palEscapeHtml(pallet.notes)}</div>` : ''}
-            `;
-            
-            selectedInfo.style.display = 'block';
-            palScannedPalletId = palletId;
-            
-            // 오늘 날짜를 기본값으로 설정
-            const outboundDateEl = document.getElementById('palOutboundDate');
-            if (outboundDateEl && !outboundDateEl.value) {
-              outboundDateEl.value = new Date().toISOString().split('T')[0];
-            }
-          }
-        } else {
-          alert('파레트 정보를 불러올 수 없습니다: ' + (result.message || '알 수 없는 오류'));
+            </div>
+          `;
+        }).join('');
+        
+        // 오늘 날짜를 기본값으로 설정
+        const outboundDateEl = document.getElementById('palOutboundDate');
+        if (outboundDateEl && !outboundDateEl.value) {
+          outboundDateEl.value = new Date().toISOString().split('T')[0];
         }
       } catch (error) {
         console.error('파레트 정보 조회 오류:', error);
-        alert('파레트 정보를 불러오는 중 오류가 발생했습니다.');
+        selectedContent.innerHTML = '<div style="color: #dc3545;">파레트 정보를 불러오는 중 오류가 발생했습니다.</div>';
       }
     }
     
-    // 보관종료 처리 확인
+    // 선택된 파레트 ID 배열 가져오기
+    function palGetSelectedPalletIds() {
+      const checkboxes = document.querySelectorAll('.palOutboundCheckbox:checked');
+      return Array.from(checkboxes).map(cb => cb.value);
+    }
+    
+    // 보관종료 처리 확인 (대량 처리 지원)
     async function palConfirmOutbound() {
-      if (!palScannedPalletId) {
+      const selectedIds = palGetSelectedPalletIds();
+      
+      if (selectedIds.length === 0) {
         alert('파레트를 선택해주세요.');
         return;
       }
       
+      const outDate = document.getElementById('palOutboundDate').value;
+      if (!outDate) {
+        alert('보관종료일을 입력해주세요.');
+        document.getElementById('palOutboundDate').focus();
+        return;
+      }
+      
+      // 날짜 유효성 검사 (미래 날짜 방지)
+      const selectedDate = new Date(outDate);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (selectedDate > today) {
+        if (!confirm('미래 날짜로 설정하시겠습니까? (일반적으로 오늘 이전 날짜를 사용합니다)')) {
+          return;
+        }
+      }
+      
+      if (!confirm(`선택한 ${selectedIds.length}개의 파레트를 ${outDate}로 보관종료 처리하시겠습니까?`)) {
+        return;
+      }
+      
       const messageDiv = document.getElementById('palOutboundMessage');
-      messageDiv.innerHTML = '<div class="pal-message info">처리 중...</div>';
+      messageDiv.innerHTML = '<div class="pal-message info">처리 중... (' + selectedIds.length + '개)</div>';
       
       try {
         const data = {
-          pallet_id: palScannedPalletId,
-          out_date: document.getElementById('palOutboundDate').value || null,
+          pallet_ids: selectedIds,
+          out_date: outDate,
           notes: document.getElementById('palOutboundNotes').value || null
         };
         
@@ -2362,7 +2433,21 @@
         const result = await response.json();
         
         if (result.success) {
-          messageDiv.innerHTML = '<div class="pal-message success">✅ ' + result.message + '</div>';
+          let message = '✅ ' + result.message;
+          if (result.processed && result.processed.length > 0) {
+            message += '<br>성공: ' + result.processed.length + '개';
+            if (result.processed.length <= 10) {
+              message += ' (' + result.processed.join(', ') + ')';
+            }
+          }
+          if (result.failed && result.failed.length > 0) {
+            message += '<br>❌ 실패: ' + result.failed.length + '개';
+            if (result.errors && result.errors.length > 0) {
+              message += '<br>' + result.errors.join('<br>');
+            }
+          }
+          
+          messageDiv.innerHTML = '<div class="pal-message success">' + message + '</div>';
           
           // 선택 정보 초기화
           palCancelOutbound();
@@ -2388,10 +2473,16 @@
         selectedInfo.style.display = 'none';
       }
       
-      // 라디오 버튼 선택 해제
-      document.querySelectorAll('input[name="palOutboundSelected"]').forEach(radio => {
-        radio.checked = false;
+      // 체크박스 선택 해제
+      document.querySelectorAll('.palOutboundCheckbox').forEach(cb => {
+        cb.checked = false;
       });
+      
+      // 전체 선택 체크박스 해제
+      const selectAllCheckbox = document.getElementById('palOutboundSelectAll');
+      if (selectAllCheckbox) {
+        selectAllCheckbox.checked = false;
+      }
       
       // 입력 필드 초기화
       const outboundDateEl = document.getElementById('palOutboundDate');
@@ -4840,4 +4931,5 @@
   <!-- Chart.js는 dashboard_server.html의 head에서 이미 로드되므로 여기서는 제거 -->
 </body>
 </html>
+
 

@@ -223,6 +223,121 @@ def update_pallet_status(pallet_id: str, out_date: date = None,
         conn.close()
 
 
+def update_pallet_status_batch(pallet_ids: List[str], out_date: date = None, processed_by: str = None, notes: str = None) -> Dict:
+    """
+    파레트 보관종료 대량 처리
+    
+    Args:
+        pallet_ids: 파레트 ID 리스트
+        out_date: 보관종료일 (없으면 오늘)
+        processed_by: 처리자
+        notes: 비고
+    
+    Returns:
+        {
+            'success_count': int,
+            'failed_count': int,
+            'processed': List[str],
+            'failed': List[str],
+            'errors': List[str]
+        }
+    """
+    if out_date is None:
+        out_date = date.today()
+    
+    if not pallet_ids or len(pallet_ids) == 0:
+        return {
+            'success_count': 0,
+            'failed_count': 0,
+            'processed': [],
+            'failed': [],
+            'errors': ['파레트 ID가 없습니다.']
+        }
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    processed = []
+    failed = []
+    errors = []
+    
+    try:
+        for pallet_id in pallet_ids:
+            try:
+                # 파레트 정보 조회
+                pallet = get_pallet_by_id(pallet_id)
+                if not pallet:
+                    failed.append(pallet_id)
+                    errors.append(f'{pallet_id}: 파레트를 찾을 수 없습니다')
+                    continue
+                
+                if pallet['status'] == '보관종료':
+                    failed.append(pallet_id)
+                    errors.append(f'{pallet_id}: 이미 보관종료된 파레트입니다')
+                    continue
+                
+                # 보관종료 처리
+                if USE_POSTGRESQL:
+                    cursor.execute('''
+                        UPDATE pallets 
+                        SET status = %s, out_date = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE pallet_id = %s
+                    ''', ('보관종료', out_date, pallet_id))
+                    
+                    # 트랜잭션 이력 저장
+                    cursor.execute('''
+                        INSERT INTO pallet_transactions (
+                            pallet_id, transaction_type, quantity, transaction_date,
+                            processed_by, notes, created_at
+                        ) VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, CURRENT_TIMESTAMP)
+                    ''', (pallet_id, '보관종료', pallet.get('quantity', 1), processed_by, notes))
+                else:
+                    cursor.execute('''
+                        UPDATE pallets 
+                        SET status = ?, out_date = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE pallet_id = ?
+                    ''', ('보관종료', out_date, pallet_id))
+                    
+                    # 트랜잭션 이력 저장
+                    cursor.execute('''
+                        INSERT INTO pallet_transactions (
+                            pallet_id, transaction_type, quantity, transaction_date,
+                            processed_by, notes, created_at
+                        ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, CURRENT_TIMESTAMP)
+                    ''', (pallet_id, '보관종료', pallet.get('quantity', 1), processed_by, notes))
+                
+                processed.append(pallet_id)
+                
+            except Exception as e:
+                failed.append(pallet_id)
+                errors.append(f'{pallet_id}: {str(e)}')
+                continue
+        
+        # 모든 처리 완료 후 커밋
+        conn.commit()
+        
+        return {
+            'success_count': len(processed),
+            'failed_count': len(failed),
+            'processed': processed,
+            'failed': failed,
+            'errors': errors
+        }
+        
+    except Exception as e:
+        conn.rollback() if USE_POSTGRESQL else None
+        return {
+            'success_count': len(processed),
+            'failed_count': len(failed) + (len(pallet_ids) - len(processed) - len(failed)),
+            'processed': processed,
+            'failed': failed + [pid for pid in pallet_ids if pid not in processed and pid not in failed],
+            'errors': errors + [f'대량 처리 중 오류: {str(e)}']
+        }
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def get_pallet_by_id(pallet_id: str) -> Optional[Dict]:
     """
     파레트 상세 조회
