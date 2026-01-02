@@ -13273,6 +13273,18 @@
     }
     window.toggleAddCompanyForm = toggleAddCompanyForm;
     
+    // 관리자 목록 접기/펼치기
+    function toggleAdminList() {
+      const content = document.getElementById('adminListContent');
+      const icon = document.getElementById('adminListIcon');
+      if (content && icon) {
+        const isHidden = content.style.display === 'none';
+        content.style.display = isHidden ? 'block' : 'none';
+        icon.textContent = isHidden ? '▼' : '▶';
+      }
+    }
+    window.toggleAdminList = toggleAdminList;
+    
     // 화주사 등록
     async function registerCompany() {
       const companyName = document.getElementById('adminRegCompanyName').value.trim();
