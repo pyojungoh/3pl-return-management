@@ -652,7 +652,7 @@ def get_cs_list():
 
 @cs_bp.route('/available-months', methods=['GET'])
 def get_available_months():
-    """C/S 접수가 있는 월 목록 조회"""
+    """C/S 접수가 있는 월 목록 조회 (현재 월 자동 포함)"""
     try:
         company_name = request.args.get('company', '').strip()
         role = request.args.get('role', '화주사').strip()
@@ -676,10 +676,6 @@ def get_available_months():
                 
                 rows = cursor.fetchall()
                 months = [row[0] for row in rows if row[0]]
-                return jsonify({
-                    'success': True,
-                    'months': months
-                })
             finally:
                 cursor.close()
                 conn.close()
