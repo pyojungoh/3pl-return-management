@@ -3626,6 +3626,41 @@
       }
     }
     
+    /* ========== 반품 내역 전달 조회 ========== */
+    function loadPreviousMonthReturns() {
+      const monthSelect = document.getElementById('monthSelect');
+      if (!monthSelect) return;
+      
+      const today = new Date();
+      let prevYear = today.getFullYear();
+      let prevMonth = today.getMonth(); // 0-11 (현재 월 - 1)
+      
+      if (prevMonth === 0) {
+        // 1월이면 전년도 12월
+        prevYear -= 1;
+        prevMonth = 12;
+      }
+      
+      const previousMonthStr = `${prevYear}년${String(prevMonth).padStart(2, '0')}월`;
+      
+      // 전달 월이 목록에 있는지 확인
+      const options = Array.from(monthSelect.options);
+      const foundOption = options.find(opt => opt.value === previousMonthStr);
+      
+      if (foundOption) {
+        monthSelect.value = previousMonthStr;
+        if (monthSelect.onchange) {
+          monthSelect.onchange(); // 월 변경 이벤트 트리거
+        } else {
+          refreshReturnsData(); // 대체 방법
+        }
+      } else {
+        // 전달 월이 목록에 없으면 알림
+        alert(`전달(${previousMonthStr}) 데이터가 없습니다.`);
+      }
+    }
+    window.loadPreviousMonthReturns = loadPreviousMonthReturns;
+    
     /* ========== 반품 내역 새로고침 ========== */
     function refreshReturnsData() {
       console.log('반품 내역 새로고침');
