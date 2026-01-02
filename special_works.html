@@ -706,6 +706,7 @@
           </select>
         </div>
         <button class="sw-btn" onclick="swAdminLoadWorks()">조회</button>
+        <button class="sw-btn" onclick="swAdminLoadPreviousMonth()" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);">📅 전달조회</button>
       </div>
     </div>
     
@@ -717,6 +718,7 @@
           <input type="month" id="swConsignorFilterMonth">
         </div>
         <button class="sw-btn" onclick="swConsignorLoadWorks()">조회</button>
+        <button class="sw-btn" onclick="swConsignorLoadPreviousMonth()" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);">📅 전달조회</button>
       </div>
     </div>
     
@@ -1962,6 +1964,34 @@
     }
     
     /**
+     * 관리자 전달 조회
+     */
+    function swAdminLoadPreviousMonth() {
+      const container = document.getElementById('swContainer');
+      if (!container) return;
+      
+      const monthInput = container.querySelector('#swAdminFilterMonth');
+      if (!monthInput) return;
+      
+      const today = new Date();
+      let prevYear = today.getFullYear();
+      let prevMonth = today.getMonth(); // 0-11 (현재 월 - 1)
+      
+      if (prevMonth === 0) {
+        // 1월이면 전년도 12월
+        prevYear -= 1;
+        prevMonth = 12;
+      }
+      
+      const previousMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+      monthInput.value = previousMonthStr;
+      
+      // 조회 실행
+      swAdminLoadWorks();
+    }
+    window.swAdminLoadPreviousMonth = swAdminLoadPreviousMonth;
+    
+    /**
      * 관리자 작업 목록 로드
      * 관리자 필터 기준으로 데이터 조회
      */
@@ -3091,6 +3121,34 @@
      * 화주사 모드 작업 목록 로드
      * 화주사 필터 기준으로 데이터 조회
      */
+    /**
+     * 화주사 전달 조회
+     */
+    function swConsignorLoadPreviousMonth() {
+      const container = document.getElementById('swContainer');
+      if (!container) return;
+      
+      const monthInput = container.querySelector('#swConsignorFilterMonth');
+      if (!monthInput) return;
+      
+      const today = new Date();
+      let prevYear = today.getFullYear();
+      let prevMonth = today.getMonth(); // 0-11 (현재 월 - 1)
+      
+      if (prevMonth === 0) {
+        // 1월이면 전년도 12월
+        prevYear -= 1;
+        prevMonth = 12;
+      }
+      
+      const previousMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+      monthInput.value = previousMonthStr;
+      
+      // 조회 실행
+      swConsignorLoadWorks();
+    }
+    window.swConsignorLoadPreviousMonth = swConsignorLoadPreviousMonth;
+    
     function swConsignorLoadWorks() {
       const container = document.getElementById('swContainer');
       if (!container) return;
