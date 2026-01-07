@@ -226,13 +226,8 @@
       overflow-y: auto !important;
       overflow-x: hidden !important;
       -webkit-overflow-scrolling: touch;
-      height: 100% !important;
       scrollbar-width: thin;
       scrollbar-color: #ffa502 #fff9e6;
-    }
-    
-    #palCompaniesList {
-      min-height: min-content !important;
     }
     
     #palCompaniesScrollArea::-webkit-scrollbar {
@@ -700,7 +695,7 @@
             <div class="pal-table-header" style="flex-shrink: 0; padding: 12px 15px;">
               <h3 style="font-size: 14px; margin: 0;">화주사 목록 <span id="palCompaniesCount" style="font-size: 11px; color: #636e72;">(0개)</span></h3>
             </div>
-            <div id="palCompaniesScrollArea" style="flex: 1; overflow-y: auto !important; overflow-x: hidden; padding: 6px; min-height: 0; height: 100%;">
+            <div id="palCompaniesScrollArea" style="flex: 1; overflow-y: auto !important; overflow-x: hidden; padding: 6px; min-height: 0;">
               <div id="palCompaniesList" style="display: flex; flex-direction: column; gap: 3px; min-height: min-content;">
                 <!-- 화주사 목록이 여기에 동적으로 추가됨 -->
               </div>
