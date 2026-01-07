@@ -656,6 +656,13 @@ def get_cs_list():
 def get_available_months():
     """C/S 접수가 있는 월 목록 조회 (현재 월 자동 포함)"""
     try:
+        # DB 초기화 확인 (lazy loading)
+        try:
+            from app import ensure_db_ready
+            ensure_db_ready()
+        except Exception as db_error:
+            print(f"[경고] C/S 월 목록 조회 시 DB 초기화 확인 중 오류 (무시하고 계속): {db_error}")
+        
         company_name = request.args.get('company', '').strip()
         role = request.args.get('role', '화주사').strip()
         
