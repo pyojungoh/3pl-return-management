@@ -960,6 +960,9 @@ def settlements_list():
                 if final_company:
                     pallets = [p for p in pallets if p['company_name'] == final_company]
                 
+                # 화주사별 일일 보관료 캐시 (성능 최적화)
+                daily_fee_cache = {}
+                
                 # 각 월별로 임시 정산 내역 생성
                 for month_str in missing_months:
                     year, month = map(int, month_str.split('-'))
@@ -1007,8 +1010,13 @@ def settlements_list():
                                 pallet_storage_days = max(0, (storage_end - storage_start).days + 1)
                                 total_storage_days += pallet_storage_days
                                 
-                                # 보관료 계산
-                                daily_fee = calculate_daily_fee(pallet['company_name'], storage_start)
+                                # 보관료 계산 (캐시 사용)
+                                company_name = pallet['company_name']
+                                cache_key = f"{company_name}_{storage_start}"
+                                if cache_key not in daily_fee_cache:
+                                    daily_fee_cache[cache_key] = calculate_daily_fee(company_name, storage_start)
+                                daily_fee = daily_fee_cache[cache_key]
+                                
                                 calculated_fee = daily_fee * pallet_storage_days
                                 fee = math.ceil(calculated_fee / 100) * 100
                                 total_fee += fee
