@@ -2719,8 +2719,13 @@
     }
     
     // QR 코드 관련 전역 변수
-    let palCurrentQRPalletId = null;
-    let palCurrentQRInDate = null;
+    // QR 관련 변수 (중복 선언 방지)
+    if (typeof palCurrentQRPalletId === 'undefined') {
+      var palCurrentQRPalletId = null;
+    }
+    if (typeof palCurrentQRInDate === 'undefined') {
+      var palCurrentQRInDate = null;
+    }
     
     // QR 코드 보기 모달 열기
     async function palViewQRCode(palletId, inDate) {
@@ -3356,7 +3361,10 @@
     }
     
     // 화주사 선택
-    let palSelectedCompany = null;
+    // 화주사 선택 변수 (중복 선언 방지)
+    if (typeof palSelectedCompany === 'undefined') {
+      var palSelectedCompany = null;
+    }
     
     function palSelectCompany(companyName) {
       palSelectedCompany = companyName;
@@ -4822,9 +4830,16 @@
     }
     
     // 월별 수입 현황 관련 변수
-    let palRevenueMonthlyChart = null;
-    let palRevenueCompanyChart = null;
-    let palCurrentRevenueData = null;
+    // 차트 관련 변수 (중복 선언 방지)
+    if (typeof palRevenueMonthlyChart === 'undefined') {
+      var palRevenueMonthlyChart = null;
+    }
+    if (typeof palRevenueCompanyChart === 'undefined') {
+      var palRevenueCompanyChart = null;
+    }
+    if (typeof palCurrentRevenueData === 'undefined') {
+      var palCurrentRevenueData = null;
+    }
     
     // Chart.js 로드 대기 함수
     function palWaitForChartJS(callback, maxAttempts = 10) {
