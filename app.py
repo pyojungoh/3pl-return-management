@@ -41,42 +41,58 @@ from api.database.models import init_db, get_company_by_username, create_company
 # NOTE:
 # - Vercel(Serverless)에서는 import 시점에 예외가 발생하면 함수 자체가 크래시하여 사이트 접속이 불가해집니다.
 # - DB(Neon) 과금/쿼터/네트워크 이슈 등으로 연결이 실패하더라도, 최소한 HTML은 서빙되도록 부팅을 계속합니다.
-# - init_db()는 타임아웃을 방지하기 위해 최소한의 작업만 수행하도록 최적화되었습니다.
-DB_READY = True
-try:
-    # 타임아웃 방지를 위해 init_db() 실행 시간 제한
-    import signal
-    import sys
+# - init_db()는 lazy loading으로 변경하여 첫 요청 시에만 실행되도록 합니다 (타임아웃 방지).
+DB_READY = False
+_db_initialized = False
+
+def ensure_db_ready():
+    """DB가 준비되었는지 확인하고, 필요시 초기화 (lazy loading)"""
+    global DB_READY, _db_initialized
     
-    def timeout_handler(signum, frame):
-        raise TimeoutError("DB 초기화 타임아웃")
+    if _db_initialized:
+        return DB_READY
     
-    # Windows에서는 signal.alarm이 지원되지 않으므로, try-except로만 처리
+    _db_initialized = True
+    DB_READY = True
+    
     try:
-        # Unix/Linux에서만 signal.alarm 사용
-        if hasattr(signal, 'SIGALRM'):
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(30)  # 30초 타임아웃
-            try:
-                init_db()
-            finally:
-                signal.alarm(0)  # 타임아웃 해제
-        else:
-            # Windows 또는 signal.alarm이 없는 경우: 그냥 실행 (타임아웃은 DB 연결 레벨에서 처리)
-            init_db()
-    except TimeoutError:
-        DB_READY = False
-        print(f"[경고] DB 초기화 타임아웃 (부팅은 계속 진행)")
+        init_db()
+        print("[성공] DB 초기화 완료")
     except Exception as e:
         DB_READY = False
         print(f"[오류] DB 초기화 실패 (부팅은 계속 진행): {e}")
         import traceback
         traceback.print_exc()
-except Exception as e:
-    DB_READY = False
-    print(f"[오류] DB 초기화 실패 (부팅은 계속 진행): {e}")
-    import traceback
-    traceback.print_exc()
+    
+    # 기존 반품 데이터에 ID가 없는 경우 ID 생성
+    if DB_READY:
+        try:
+            fix_missing_return_ids()
+        except Exception as e:
+            print(f"[경고] 반품 ID 생성 중 오류 발생 (무시하고 계속 진행): {e}")
+    
+    # 초기 관리자 계정 자동 생성 (없는 경우에만)
+    if DB_READY:
+        try:
+            admin_user = get_company_by_username('admin')
+            if not admin_user:
+                print("[정보] 초기 관리자 계정이 없습니다. 생성 중...")
+                create_company(
+                    company_name='관리자',
+                    username='admin',
+                    password='admin123',  # [주의] 배포 후 비밀번호 변경 권장
+                    role='관리자'
+                )
+                print("[성공] 초기 관리자 계정이 생성되었습니다.")
+                print("   아이디: admin")
+                print("   비밀번호: admin123")
+                print("   [주의] 보안을 위해 배포 후 비밀번호를 변경하세요!")
+            else:
+                print("[성공] 관리자 계정이 이미 존재합니다.")
+        except Exception as e:
+            print(f"[경고] 초기 관리자 계정 생성 중 오류 (무시 가능): {e}")
+    
+    return DB_READY
 
 # 기존 반품 데이터에 ID가 없는 경우 ID 생성
 if DB_READY:
@@ -182,6 +198,14 @@ def health():
 def index():
     """화주사 대시보드 (로그인 포함)"""
     try:
+        # DB 초기화는 백그라운드에서 처리 (타임아웃 방지)
+        # 첫 요청 시에만 초기화 시도
+        if not _db_initialized:
+            try:
+                ensure_db_ready()
+            except Exception:
+                pass  # DB 초기화 실패해도 HTML은 서빙
+        
         # dashboard_server.html 파일 사용
         return send_file('dashboard_server.html')
     except FileNotFoundError:
