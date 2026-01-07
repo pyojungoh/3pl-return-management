@@ -1307,16 +1307,13 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
     """
     파레트를 보관 중인 화주사 목록 조회
     
-    ✅ 개선사항:
-    - 화주사명 정규화 (대소문자 무시, 공백 제거)
-    - 해시태그 기능 지원 (search_keywords 필드 활용)
-    - 같은 화주사는 하나로 통합 (TKS 컴퍼니, tks컴퍼니, TKS컴퍼니 → 하나로 통합)
+    ✅ 성능 최적화:
+    - 단순 DISTINCT 쿼리로 변경 (N+1 쿼리 문제 해결)
+    - 정규화 로직은 필요시 프론트엔드에서 처리
     
     Args:
         settlement_month: 정산월 (YYYY-MM 형식). 지정되면 해당 월에 보관했던 화주사만 조회
     """
-    from api.database.models import normalize_company_name, get_company_search_keywords
-    
     conn = get_db_connection()
     
     try:
@@ -1326,71 +1323,32 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
         else:
             cursor = conn.cursor()
         
-        # 월 필터가 있어도 전체 화주사 목록을 반환 (해당 월에 파레트가 없어도 포함)
-        # 정산 페이지에서 모든 화주사를 선택할 수 있도록 함
+        # 단순 DISTINCT 쿼리로 성능 최적화
         if USE_POSTGRESQL:
             cursor.execute('''
                 SELECT DISTINCT company_name 
                 FROM pallets 
+                WHERE company_name IS NOT NULL AND company_name != ''
                 ORDER BY company_name
             ''')
         else:
             cursor.execute('''
                 SELECT DISTINCT company_name 
                 FROM pallets 
+                WHERE company_name IS NOT NULL AND company_name != ''
                 ORDER BY company_name
             ''')
         
         rows = cursor.fetchall()
         
-        # 원본 화주사명 목록
-        raw_companies = []
+        # 화주사명 목록 추출
+        companies = []
         if USE_POSTGRESQL:
-            raw_companies = [row['company_name'] for row in rows]
+            companies = [row['company_name'] for row in rows if row.get('company_name')]
         else:
-            raw_companies = [row[0] for row in rows]
+            companies = [row[0] for row in rows if row[0]]
         
-        # 화주사명 정규화 및 통합
-        # 1. 각 화주사명에 대해 정규화된 키워드 목록 생성 (본인 이름 + 해시태그)
-        company_keywords_map = {}  # 정규화된 키워드 -> 원본 화주사명 매핑
-        company_representatives = {}  # 정규화된 키워드 -> 대표 화주사명
-        
-        for company_name in raw_companies:
-            if not company_name:
-                continue
-            
-            # 검색 가능한 키워드 목록 가져오기 (본인 이름 + 해시태그)
-            keywords = get_company_search_keywords(company_name)
-            
-            # 각 키워드에 대해 매핑 생성
-            normalized_company = normalize_company_name(company_name)
-            
-            for keyword in keywords:
-                normalized_keyword = normalize_company_name(keyword)
-                
-                # 이미 다른 화주사가 이 키워드를 사용하고 있는지 확인
-                if normalized_keyword in company_keywords_map:
-                    # 기존 대표 화주사명과 비교하여 우선순위 결정 (더 짧거나 알파벳 순서가 앞서는 것)
-                    existing_rep = company_representatives[normalized_keyword]
-                    if len(company_name) < len(existing_rep) or (len(company_name) == len(existing_rep) and company_name < existing_rep):
-                        company_representatives[normalized_keyword] = company_name
-                        company_keywords_map[normalized_keyword] = company_name
-                else:
-                    company_keywords_map[normalized_keyword] = company_name
-                    company_representatives[normalized_keyword] = company_name
-        
-        # 2. 각 원본 화주사명에 대해 대표 화주사명 찾기
-        final_companies = {}
-        for company_name in raw_companies:
-            if not company_name:
-                continue
-            
-            normalized = normalize_company_name(company_name)
-            representative = company_representatives.get(normalized, company_name)
-            final_companies[representative] = True
-        
-        # 3. 정렬된 목록 반환
-        return sorted(final_companies.keys())
+        return companies
     finally:
         cursor.close()
         conn.close()
