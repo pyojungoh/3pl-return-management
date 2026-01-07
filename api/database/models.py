@@ -4676,44 +4676,49 @@ def get_all_popups() -> List[Dict]:
 
 
 def get_active_popup() -> Optional[Dict]:
-    """현재 날짜에 활성화된 팝업 조회"""
+    """현재 날짜에 활성화된 팝업 조회 (타임아웃 방지)"""
     from datetime import date
     today = date.today().isoformat()
     
-    conn = get_db_connection()
-    
-    if USE_POSTGRESQL:
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        try:
-            cursor.execute('''
-                SELECT * FROM popups 
-                WHERE is_active = TRUE 
-                AND start_date <= %s 
-                AND end_date >= %s
-                ORDER BY created_at DESC
-                LIMIT 1
-            ''', (today, today))
-            row = cursor.fetchone()
-            return dict(row) if row else None
-        finally:
-            cursor.close()
-            conn.close()
-    else:
-        cursor = conn.cursor()
-        try:
-            cursor.execute('''
-                SELECT * FROM popups 
-                WHERE is_active = 1 
-                AND start_date <= ? 
-                AND end_date >= ?
-                ORDER BY created_at DESC
-                LIMIT 1
-            ''', (today, today))
-            row = cursor.fetchone()
-            # SQLite Row 객체를 딕셔너리로 변환
-            return {key: row[key] for key in row.keys()} if row else None
-        finally:
-            conn.close()
+    try:
+        conn = get_db_connection()
+        
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            try:
+                cursor.execute('''
+                    SELECT * FROM popups 
+                    WHERE is_active = TRUE 
+                    AND start_date <= %s 
+                    AND end_date >= %s
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ''', (today, today))
+                row = cursor.fetchone()
+                return dict(row) if row else None
+            finally:
+                cursor.close()
+                conn.close()
+        else:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('''
+                    SELECT * FROM popups 
+                    WHERE is_active = 1 
+                    AND start_date <= ? 
+                    AND end_date >= ?
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ''', (today, today))
+                row = cursor.fetchone()
+                # SQLite Row 객체를 딕셔너리로 변환
+                return {key: row[key] for key in row.keys()} if row else None
+            finally:
+                conn.close()
+    except Exception as e:
+        # 타임아웃이나 연결 오류 시 빈 결과 반환 (사이트 로딩 방지)
+        print(f"[경고] 활성 팝업 조회 오류 (무시): {e}")
+        return None
 
 
 def get_popup_by_id(popup_id: int) -> Optional[Dict]:
