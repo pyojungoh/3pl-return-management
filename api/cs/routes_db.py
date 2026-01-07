@@ -550,27 +550,22 @@ def create_cs():
         data = request.get_json()
         company_name = data.get('company_name', '').strip()
         username = data.get('username', '').strip()
-        date = data.get('date', '').strip()
         issue_type = data.get('issue_type', '').strip()
         content = data.get('content', '').strip()
         management_number = data.get('management_number', '').strip() if data.get('management_number') else None
         customer_name = data.get('customer_name', '').strip() if data.get('customer_name') else None
         
-        if not company_name or not username or not date or not issue_type or not content or not management_number:
+        if not company_name or not username or not issue_type or not content or not management_number:
             return jsonify({
                 'success': False,
                 'message': '모든 필수 필드를 입력해주세요.'
             }), 400
         
-        # 날짜에서 년월 추출 (YYYY-MM-DD 형식에서)
-        try:
-            date_obj = datetime.strptime(date, '%Y-%m-%d')
-            # 월을 2자리 형식으로 (01월, 02월, ...)
-            month = f"{date_obj.year}년{date_obj.month:02d}월"
-        except:
-            # 이미 년월 형식인 경우
-            kst_now = get_kst_now()
-            month = date if '년' in date and '월' in date else f"{kst_now.year}년{kst_now.month:02d}월"
+        # 접수 등록 날짜를 현재 날짜로 설정 (한국 시간)
+        kst_now = get_kst_now()
+        date = kst_now.strftime('%Y-%m-%d')
+        # 월을 2자리 형식으로 (01월, 02월, ...)
+        month = f"{kst_now.year}년{kst_now.month:02d}월"
         
         # C/S 접수 생성
         cs_id = create_cs_request(company_name, username, date, month, issue_type, content, management_number, customer_name)

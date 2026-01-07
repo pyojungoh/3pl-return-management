@@ -2231,11 +2231,6 @@
                 </div>
                 
                 <div>
-                  <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">날짜 *</label>
-                  <input type="date" id="csDate" class="request-input" style="min-height: auto;" required>
-                </div>
-                
-                <div>
                   <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">관리번호 *</label>
                   <input type="text" id="csManagementNumber" class="request-input" style="min-height: auto;" placeholder="관리번호를 입력하세요" required>
                 </div>
@@ -8772,14 +8767,8 @@
         form.style.display = isHidden ? 'block' : 'none';
         icon.textContent = isHidden ? '▲' : '▼';
         
-        // 폼이 열릴 때 오늘 날짜를 기본값으로 설정
+        // 폼이 열릴 때
         if (isHidden) {
-          const today = new Date();
-          const year = today.getFullYear();
-          const month = String(today.getMonth() + 1).padStart(2, '0');
-          const day = String(today.getDate()).padStart(2, '0');
-          document.getElementById('csDate').value = `${year}-${month}-${day}`;
-          
           // 관리자 모드일 때 화주사 목록 로드
           if (currentRole === '관리자') {
             loadCsCompanyList();
@@ -8832,11 +8821,6 @@
     
     // C/S 폼 초기화
     function resetCsForm() {
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const day = String(today.getDate()).padStart(2, '0');
-      document.getElementById('csDate').value = `${year}-${month}-${day}`;
       document.getElementById('csManagementNumber').value = '';
       document.getElementById('csCustomerName').value = '';
       document.getElementById('csIssueType').value = '';
@@ -8860,7 +8844,6 @@
         messageDiv.innerHTML = '<span style="color: #636e72;">등록 중...</span>';
       }
       
-      const date = document.getElementById('csDate').value;
       const managementNumber = document.getElementById('csManagementNumber').value.trim();
       const customerName = document.getElementById('csCustomerName').value.trim();
       const issueType = document.getElementById('csIssueType').value.trim();
@@ -8882,9 +8865,9 @@
         username = selectedCompany;
       }
       
-      if (!date || !managementNumber || !issueType || !content) {
+      if (!managementNumber || !issueType || !content) {
         if (messageDiv) {
-          messageDiv.innerHTML = '<span style="color: #e74c3c;">❌ 모든 필드를 입력해주세요.</span>';
+          messageDiv.innerHTML = '<span style="color: #e74c3c;">❌ 모든 필수 필드를 입력해주세요.</span>';
         }
         return;
       }
@@ -8896,7 +8879,6 @@
           body: JSON.stringify({
             company_name: companyName,
             username: username,
-            date: date,
             management_number: managementNumber,
             customer_name: customerName || null,
             issue_type: issueType,
