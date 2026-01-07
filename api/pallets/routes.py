@@ -950,15 +950,12 @@ def settlements_list():
                 import math
                 from datetime import timedelta
                 
-                # 파레트 전체 목록 한 번만 조회
+                # 파레트 전체 목록 한 번만 조회 (화주사 필터링은 함수 내부에서 처리)
                 pallets = get_pallets_for_settlement(
                     company_name=final_company if final_company else None,
                     start_date=None,
                     end_date=None
                 )
-                
-                if final_company:
-                    pallets = [p for p in pallets if p['company_name'] == final_company]
                 
                 # 화주사별 일일 보관료 캐시 (성능 최적화)
                 daily_fee_cache = {}

@@ -805,62 +805,89 @@ def get_pallets_for_settlement(company_name: str = None,
         query = "SELECT * FROM pallets WHERE 1=1"
         params = []
         
-        # 화주사 필터링 (정규화 및 해시태그 지원)
+        # 화주사 필터링 (성능 최적화: DB 레벨에서 필터링)
         if company_name:
-            # 검색 가능한 키워드 목록 가져오기 (본인 이름 + 해시태그)
-            search_keywords = get_company_search_keywords(company_name)
-            normalized_keywords = [normalize_company_name(kw) for kw in search_keywords]
-            
-            # 모든 파레트를 가져온 후 필터링 (정규화된 키워드로 매칭)
+            # 단순 문자열 매칭으로 변경 (정규화 로직 제거로 성능 향상)
+            # 정산 계산 시에는 정확한 화주사명 매칭만 필요
             if start_date and end_date:
                 if USE_POSTGRESQL:
                     cursor.execute('''
-                        SELECT * FROM pallets 
+                        SELECT id, pallet_id, company_name, product_name, in_date, out_date, 
+                               status, is_service, created_at, updated_at
+                        FROM pallets 
+                        WHERE company_name = %s 
+                          AND in_date <= %s 
+                          AND (out_date IS NULL OR out_date >= %s)
+                        ORDER BY in_date
+                    ''', (company_name, end_date, start_date))
+                else:
+                    cursor.execute('''
+                        SELECT id, pallet_id, company_name, product_name, in_date, out_date, 
+                               status, is_service, created_at, updated_at
+                        FROM pallets 
+                        WHERE company_name = ? 
+                          AND in_date <= ? 
+                          AND (out_date IS NULL OR out_date >= ?)
+                        ORDER BY in_date
+                    ''', (company_name, end_date, start_date))
+            else:
+                if USE_POSTGRESQL:
+                    cursor.execute('''
+                        SELECT id, pallet_id, company_name, product_name, in_date, out_date, 
+                               status, is_service, created_at, updated_at
+                        FROM pallets 
+                        WHERE company_name = %s
+                        ORDER BY in_date
+                    ''', (company_name,))
+                else:
+                    cursor.execute('''
+                        SELECT id, pallet_id, company_name, product_name, in_date, out_date, 
+                               status, is_service, created_at, updated_at
+                        FROM pallets 
+                        WHERE company_name = ?
+                        ORDER BY in_date
+                    ''', (company_name,))
+            
+            rows = cursor.fetchall()
+            
+            if USE_POSTGRESQL:
+                return [dict(row) for row in rows]
+            else:
+                return [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+        else:
+            # 화주사 필터링 없음 (필요한 컬럼만 선택하여 성능 향상)
+            if start_date and end_date:
+                if USE_POSTGRESQL:
+                    cursor.execute('''
+                        SELECT id, pallet_id, company_name, product_name, in_date, out_date, 
+                               status, is_service, created_at, updated_at
+                        FROM pallets 
                         WHERE in_date <= %s AND (out_date IS NULL OR out_date >= %s)
                         ORDER BY company_name, in_date
                     ''', (end_date, start_date))
                 else:
                     cursor.execute('''
-                        SELECT * FROM pallets 
+                        SELECT id, pallet_id, company_name, product_name, in_date, out_date, 
+                               status, is_service, created_at, updated_at
+                        FROM pallets 
                         WHERE in_date <= ? AND (out_date IS NULL OR out_date >= ?)
                         ORDER BY company_name, in_date
                     ''', (end_date, start_date))
             else:
                 if USE_POSTGRESQL:
-                    cursor.execute('SELECT * FROM pallets ORDER BY company_name, in_date')
+                    cursor.execute('''
+                        SELECT id, pallet_id, company_name, product_name, in_date, out_date, 
+                               status, is_service, created_at, updated_at
+                        FROM pallets 
+                        ORDER BY company_name, in_date
+                    ''')
                 else:
-                    cursor.execute('SELECT * FROM pallets ORDER BY company_name, in_date')
-            
-            rows = cursor.fetchall()
-            
-            # 정규화된 키워드로 필터링
-            result = []
-            for row in rows:
-                if USE_POSTGRESQL:
-                    pallet = dict(row)
-                else:
-                    pallet = dict(zip([col[0] for col in cursor.description], row))
-                
-                pallet_company_normalized = normalize_company_name(pallet.get('company_name', ''))
-                if pallet_company_normalized in normalized_keywords:
-                    result.append(pallet)
-            
-            return result
-        else:
-            # 화주사 필터링 없음
-            if start_date and end_date:
-                if USE_POSTGRESQL:
-                    query += " AND in_date <= %s AND (out_date IS NULL OR out_date >= %s)"
-                else:
-                    query += " AND in_date <= ? AND (out_date IS NULL OR out_date >= ?)"
-                params.extend([end_date, start_date])
-            
-            query += " ORDER BY company_name, in_date"
-            
-            if USE_POSTGRESQL:
-                cursor.execute(query, params)
-            else:
-                cursor.execute(query, params)
+                    cursor.execute('''
+                        SELECT id, pallet_id, company_name, product_name, in_date, out_date, 
+                               status, is_service, created_at, updated_at
+                        FROM pallets 
+                        ORDER BY company_name, in_date
+                    ''')
             
             rows = cursor.fetchall()
             
