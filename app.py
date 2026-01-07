@@ -161,6 +161,7 @@ except Exception as e:
 @app.route('/api/health', methods=['GET'])
 def health():
     """헬스체크 (서버리스 부팅/DB 상태 확인용)"""
+    ensure_db_ready()  # DB 초기화 확인
     return jsonify({
         'success': True,
         'db_ready': DB_READY
