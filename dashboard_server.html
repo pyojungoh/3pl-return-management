@@ -12588,7 +12588,15 @@
       }
       
       try {
-        const response = await fetch('/api/popups/active');
+        const response = await fetch('/api/popups/active', {
+          signal: AbortSignal.timeout(5000) // 5초 타임아웃
+        });
+        
+        if (!response.ok) {
+          // 504 타임아웃 등 오류 시 무시하고 계속 진행
+          return;
+        }
+        
         const result = await response.json();
         
         if (result.success && result.data) {
@@ -12603,7 +12611,12 @@
           showPopup(popup);
         }
       } catch (error) {
-        console.error('활성 팝업 확인 오류:', error);
+        // 타임아웃이나 네트워크 오류 시 무시 (사이트 로딩 방지)
+        if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+          console.warn('팝업 조회 타임아웃 (무시)');
+        } else {
+          console.error('활성 팝업 확인 오류:', error);
+        }
       }
     }
     window.checkAndShowPopup = checkAndShowPopup;
