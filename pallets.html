@@ -223,12 +223,31 @@
     
     /* 화주사 목록 스크롤 강제 적용 */
     #palCompaniesScrollArea {
-      overflow-y: scroll !important;
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
       -webkit-overflow-scrolling: touch;
+      max-height: 100%;
+      scrollbar-width: thin;
+      scrollbar-color: #ffa502 #fff9e6;
     }
     
     #palCompaniesScrollArea::-webkit-scrollbar {
-      width: 6px;
+      width: 8px;
+    }
+    
+    #palCompaniesScrollArea::-webkit-scrollbar-track {
+      background: #fff9e6;
+      border-radius: 4px;
+    }
+    
+    #palCompaniesScrollArea::-webkit-scrollbar-thumb {
+      background: #ffa502;
+      border-radius: 4px;
+      border: 1px solid #fff9e6;
+    }
+    
+    #palCompaniesScrollArea::-webkit-scrollbar-thumb:hover {
+      background: #ff6b35;
     }
     
     #palCompaniesScrollArea::-webkit-scrollbar-track {
