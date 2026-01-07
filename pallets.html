@@ -1296,14 +1296,28 @@
       var PAL_API_BASE_URL = window.location.origin;
     }
     
-    // 전역 변수
-    let palCurrentRole = '';
-    let palCurrentCompany = '';
-    let palCurrentUsername = '';
-    let palQRStream = null;
-    let palQRScanning = false;
-    let palScannedPalletId = null;
-    let palCompanies = [];
+    // 전역 변수 (중복 선언 방지)
+    if (typeof palCurrentRole === 'undefined') {
+      var palCurrentRole = '';
+    }
+    if (typeof palCurrentCompany === 'undefined') {
+      var palCurrentCompany = '';
+    }
+    if (typeof palCurrentUsername === 'undefined') {
+      var palCurrentUsername = '';
+    }
+    if (typeof palQRStream === 'undefined') {
+      var palQRStream = null;
+    }
+    if (typeof palQRScanning === 'undefined') {
+      var palQRScanning = false;
+    }
+    if (typeof palScannedPalletId === 'undefined') {
+      var palScannedPalletId = null;
+    }
+    if (typeof palCompanies === 'undefined') {
+      var palCompanies = [];
+    }
     
     // 헤더 인코딩 함수 (special_works.html과 동일)
     function palGetUserHeaders() {
