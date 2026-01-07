@@ -615,6 +615,13 @@ def create_cs():
 def get_cs_list():
     """C/S 접수 목록 조회"""
     try:
+        # DB 초기화 확인 (lazy loading)
+        try:
+            from app import ensure_db_ready
+            ensure_db_ready()
+        except Exception as db_error:
+            print(f"[경고] C/S 목록 조회 시 DB 초기화 확인 중 오류 (무시하고 계속): {db_error}")
+        
         company_name = request.args.get('company', '').strip()
         role = request.args.get('role', '화주사').strip()
         month = request.args.get('month', '').strip()
