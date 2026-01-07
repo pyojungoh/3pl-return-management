@@ -41,9 +41,37 @@ from api.database.models import init_db, get_company_by_username, create_company
 # NOTE:
 # - Vercel(Serverless)에서는 import 시점에 예외가 발생하면 함수 자체가 크래시하여 사이트 접속이 불가해집니다.
 # - DB(Neon) 과금/쿼터/네트워크 이슈 등으로 연결이 실패하더라도, 최소한 HTML은 서빙되도록 부팅을 계속합니다.
+# - init_db()는 타임아웃을 방지하기 위해 최소한의 작업만 수행하도록 최적화되었습니다.
 DB_READY = True
 try:
-    init_db()
+    # 타임아웃 방지를 위해 init_db() 실행 시간 제한
+    import signal
+    import sys
+    
+    def timeout_handler(signum, frame):
+        raise TimeoutError("DB 초기화 타임아웃")
+    
+    # Windows에서는 signal.alarm이 지원되지 않으므로, try-except로만 처리
+    try:
+        # Unix/Linux에서만 signal.alarm 사용
+        if hasattr(signal, 'SIGALRM'):
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(30)  # 30초 타임아웃
+            try:
+                init_db()
+            finally:
+                signal.alarm(0)  # 타임아웃 해제
+        else:
+            # Windows 또는 signal.alarm이 없는 경우: 그냥 실행 (타임아웃은 DB 연결 레벨에서 처리)
+            init_db()
+    except TimeoutError:
+        DB_READY = False
+        print(f"[경고] DB 초기화 타임아웃 (부팅은 계속 진행)")
+    except Exception as e:
+        DB_READY = False
+        print(f"[오류] DB 초기화 실패 (부팅은 계속 진행): {e}")
+        import traceback
+        traceback.print_exc()
 except Exception as e:
     DB_READY = False
     print(f"[오류] DB 초기화 실패 (부팅은 계속 진행): {e}")
