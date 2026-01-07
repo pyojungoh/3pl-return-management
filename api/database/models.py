@@ -33,20 +33,34 @@ else:
 
 
 def get_db_connection():
-    """데이터베이스 연결 가져오기"""
+    """데이터베이스 연결 가져오기 (Vercel 서버리스 환경 최적화)"""
     if USE_POSTGRESQL:
         # PostgreSQL 연결 (Neon의 경우 SSL 필요)
         try:
+            # 연결 파라미터 최적화 (Vercel 서버리스 환경)
+            # connect_timeout: 5초로 단축 (기본 10초는 너무 김)
+            # keepalive: 연결 유지 설정
+            connect_params = {
+                'connect_timeout': 5,
+                'keepalives': 1,
+                'keepalives_idle': 30,
+                'keepalives_interval': 10,
+                'keepalives_count': 3
+            }
+            
             # DATABASE_URL에 이미 SSL 정보가 포함되어 있을 수 있음
             # Neon은 기본적으로 SSL을 요구하므로, URL에 sslmode가 없으면 추가
             if 'sslmode' not in DATABASE_URL and 'sslmode=' not in DATABASE_URL:
                 # URL에 쿼리 파라미터가 있는지 확인
                 if '?' in DATABASE_URL:
-                    conn = psycopg2.connect(DATABASE_URL + '&sslmode=require', connect_timeout=10)
+                    db_url = DATABASE_URL + '&sslmode=require'
                 else:
-                    conn = psycopg2.connect(DATABASE_URL + '?sslmode=require', connect_timeout=10)
+                    db_url = DATABASE_URL + '?sslmode=require'
             else:
-                conn = psycopg2.connect(DATABASE_URL, connect_timeout=10)
+                db_url = DATABASE_URL
+            
+            # 연결 생성 (최적화된 파라미터 사용)
+            conn = psycopg2.connect(db_url, **connect_params)
             
             # PostgreSQL은 기본적으로 autocommit=True이므로 명시적으로 설정하지 않음
             # 트랜잭션은 각 함수에서 명시적으로 commit/rollback 처리
