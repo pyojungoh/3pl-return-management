@@ -283,6 +283,61 @@ def update_photo_links_route():
         }), 500
 
 
+@uploads_bp.route('/certificate-proxy', methods=['GET'])
+def proxy_certificate():
+    """
+    사업자 등록증 PDF 프록시 (CORS 및 401 오류 해결)
+    
+    Query Parameters:
+        url: Cloudinary PDF URL
+    
+    Returns:
+        PDF 파일 스트림
+    """
+    try:
+        pdf_url = request.args.get('url')
+        if not pdf_url:
+            return jsonify({
+                'success': False,
+                'message': 'URL 파라미터가 필요합니다.'
+            }), 400
+        
+        # URL 디코딩
+        from urllib.parse import unquote
+        pdf_url = unquote(pdf_url)
+        
+        # PDF 파일 다운로드
+        import requests
+        response = requests.get(pdf_url, stream=True, timeout=30)
+        
+        if response.status_code != 200:
+            return jsonify({
+                'success': False,
+                'message': f'PDF를 가져올 수 없습니다. (HTTP {response.status_code})'
+            }), response.status_code
+        
+        # PDF 파일을 스트림으로 반환
+        from flask import Response
+        return Response(
+            response.iter_content(chunk_size=8192),
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': 'inline; filename="certificate.pdf"',
+                'Access-Control-Allow-Origin': '*',
+                'Cache-Control': 'public, max-age=3600'
+            }
+        )
+        
+    except Exception as e:
+        print(f'[오류] PDF 프록시 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'PDF 프록시 중 오류가 발생했습니다: {str(e)}'
+        }), 500
+
+
 @uploads_bp.route('/certificate', methods=['POST'])
 def upload_certificate():
     """

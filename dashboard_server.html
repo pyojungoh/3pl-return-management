@@ -13774,7 +13774,7 @@
         loadingDiv.innerHTML = '<div style="font-size: 16px; margin-bottom: 10px;">📄 PDF를 불러오는 중...</div>';
         pdfContainer.appendChild(loadingDiv);
         
-        // PDF.js를 사용하여 PDF 표시
+        // PDF.js를 사용하여 PDF 표시 (서버 프록시를 통해)
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
         script.onload = function() {
@@ -13782,8 +13782,11 @@
           if (typeof pdfjsLib !== 'undefined') {
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
             
+            // 서버 프록시를 통해 PDF 로드 (CORS 및 401 오류 해결)
+            const proxyUrl = '/api/uploads/certificate-proxy?url=' + encodeURIComponent(certificateUrl);
+            
             // PDF 로드
-            pdfjsLib.getDocument(certificateUrl).promise.then(function(pdf) {
+            pdfjsLib.getDocument(proxyUrl).promise.then(function(pdf) {
               const loading = document.getElementById('pdfLoading');
               if (loading) {
                 loading.style.display = 'none';
