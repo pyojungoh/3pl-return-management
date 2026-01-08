@@ -1321,6 +1321,42 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                 all_settlements = [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
             
             # 화주사명 정규화 및 통합
+            # 성능 최적화: 배치 쿼리로 모든 화주사 키워드를 한 번에 조회
+            unique_companies = list(set([s.get('company_name', '') for s in all_settlements if s.get('company_name')]))
+            
+            # 배치로 모든 화주사 키워드 조회
+            company_keywords_cache = {}  # {화주사명: [키워드 목록]}
+            if unique_companies:
+                if USE_POSTGRESQL:
+                    placeholders = ','.join(['%s' for _ in unique_companies])
+                    cursor.execute(f'''
+                        SELECT company_name, search_keywords 
+                        FROM companies 
+                        WHERE company_name IN ({placeholders}) OR username IN ({placeholders})
+                    ''', unique_companies + unique_companies)
+                else:
+                    placeholders = ','.join(['?' for _ in unique_companies])
+                    cursor.execute(f'''
+                        SELECT company_name, search_keywords 
+                        FROM companies 
+                        WHERE company_name IN ({placeholders}) OR username IN ({placeholders})
+                    ''', unique_companies + unique_companies)
+                
+                keyword_rows = cursor.fetchall()
+                for row in keyword_rows:
+                    if USE_POSTGRESQL:
+                        comp_name = row['company_name']
+                        search_keywords = row.get('search_keywords', '')
+                    else:
+                        comp_name = row[0]
+                        search_keywords = row[1] if len(row) > 1 else ''
+                    
+                    keywords = [comp_name]
+                    if search_keywords:
+                        aliases = [alias.strip() for alias in search_keywords.replace('\n', ',').split(',') if alias.strip()]
+                        keywords.extend(aliases)
+                    company_keywords_cache[comp_name] = keywords
+            
             # 1. 각 화주사명에 대해 정규화된 키워드 목록 생성 (본인 이름 + 해시태그)
             company_keywords_map = {}  # 정규화된 키워드 -> 원본 화주사명 매핑
             company_representatives = {}  # 정규화된 키워드 -> 대표 화주사명
@@ -1330,14 +1366,8 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                 if not raw_company:
                     continue
                 
-                # 검색 가능한 키워드 목록 가져오기 (본인 이름 + 해시태그)
-                try:
-                    keywords = get_company_search_keywords(raw_company)
-                    if not keywords:
-                        keywords = [raw_company]
-                except Exception as e:
-                    print(f"[경고] 화주사 '{raw_company}' 키워드 조회 실패: {e}")
-                    keywords = [raw_company]
+                # 캐시에서 키워드 가져오기 (없으면 기본값)
+                keywords = company_keywords_cache.get(raw_company, [raw_company])
                 
                 # 각 키워드에 대해 매핑 생성
                 normalized_company = normalize_company_name(raw_company)
