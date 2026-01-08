@@ -932,13 +932,40 @@ def generate_monthly_settlement(settlement_month: str = None,
     company_settlements = {}
     company_normalized_map = {}  # 정규화된 이름 -> 대표 화주사명 매핑
     
+    # 특정 화주사의 정산 생성 시 해당 화주사의 키워드 목록 가져오기
+    target_company_keywords = None
+    target_company_normalized = None
+    if company_name:
+        try:
+            target_company_keywords = get_company_search_keywords(company_name)
+            if not target_company_keywords:
+                target_company_keywords = [company_name]
+        except Exception as e:
+            print(f"[경고] 대상 화주사 '{company_name}' 키워드 조회 실패: {e}")
+            target_company_keywords = [company_name]
+        target_company_normalized = [normalize_company_name(kw) for kw in target_company_keywords]
+    
     for pallet in pallets:
         raw_company = pallet['company_name']
         if not raw_company:
             continue
         
+        # 특정 화주사의 정산 생성 시, 해당 화주사의 파레트만 포함
+        if company_name:
+            pallet_company_normalized = normalize_company_name(raw_company)
+            if pallet_company_normalized not in target_company_normalized:
+                # 해당 화주사가 아닌 파레트는 건너뜀
+                continue
+        
         # 정규화된 키워드 목록 가져오기 (본인 이름 + 해시태그)
-        search_keywords = get_company_search_keywords(raw_company)
+        try:
+            search_keywords = get_company_search_keywords(raw_company)
+            if not search_keywords:
+                search_keywords = [raw_company]
+        except Exception as e:
+            print(f"[경고] 화주사 '{raw_company}' 키워드 조회 실패: {e}")
+            search_keywords = [raw_company]
+        
         normalized_keywords = [normalize_company_name(kw) for kw in search_keywords]
         
         # 대표 화주사명 결정 (이미 매핑된 것이 있으면 사용, 없으면 원본 사용)
@@ -1708,6 +1735,9 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
             settlement = dict(zip([col[0] for col in cursor.description], row))
         
         # 파레트별 상세 내역 조회 (pallets 테이블과 조인)
+        # 정산 내역의 화주사명과 일치하는 파레트만 조회
+        settlement_company = settlement.get('company_name', '')
+        
         if USE_POSTGRESQL:
             cursor.execute('''
                 SELECT 
@@ -1721,12 +1751,13 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
                     p.out_date,
                     p.status,
                     p.product_name,
+                    p.company_name,
                     p.created_at
                 FROM pallet_fee_calculations pfc
                 JOIN pallets p ON pfc.pallet_id = p.pallet_id
-                WHERE pfc.settlement_month = %s
+                WHERE pfc.settlement_month = %s AND p.company_name = %s
                 ORDER BY pfc.pallet_id
-            ''', (settlement['settlement_month'],))
+            ''', (settlement['settlement_month'], settlement_company))
         else:
             cursor.execute('''
                 SELECT 
@@ -1740,12 +1771,13 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
                     p.out_date,
                     p.status,
                     p.product_name,
+                    p.company_name,
                     p.created_at
                 FROM pallet_fee_calculations pfc
                 JOIN pallets p ON pfc.pallet_id = p.pallet_id
-                WHERE pfc.settlement_month = ?
+                WHERE pfc.settlement_month = ? AND p.company_name = ?
                 ORDER BY pfc.pallet_id
-            ''', (settlement['settlement_month'],))
+            ''', (settlement['settlement_month'], settlement_company))
         
         rows = cursor.fetchall()
         
