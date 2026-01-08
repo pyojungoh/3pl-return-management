@@ -3388,6 +3388,54 @@
     }
     
     
+    // 정산 생성
+    async function palGenerateSettlement(settlementMonth, companyName = null) {
+      if (!confirm(`${settlementMonth} 정산을 생성하시겠습니까?`)) {
+        return;
+      }
+      
+      try {
+        if (!settlementMonth) {
+          alert('❌ 정산월 정보가 없습니다.');
+          return;
+        }
+        
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/settlements/generate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...palGetUserHeaders()
+          },
+          body: JSON.stringify({
+            settlement_month: settlementMonth,
+            company_name: companyName || null
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('✅ ' + (result.message || '정산이 생성되었습니다.'));
+          // 정산 내역 새로고침
+          const companyNameToLoad = companyName || palSelectedCompany || (palCurrentRole !== '관리자' ? palCurrentCompany : null);
+          palLoadSettlements(companyNameToLoad);
+          // 화주사 목록도 새로고침 (정산 생성 시 화주사 목록 캐시도 업데이트됨)
+          if (palCurrentRole === '관리자') {
+            palLoadCompanyList();
+          }
+        } else {
+          alert('❌ ' + (result.message || '정산 생성에 실패했습니다.'));
+        }
+      } catch (error) {
+        console.error('정산 생성 오류:', error);
+        alert('❌ 정산 생성 중 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류'));
+      }
+    }
+    
     // 정산 확정
     async function palConfirmSettlement(settlementId) {
       if (!confirm('정산을 확정하시겠습니까?')) {
@@ -3603,7 +3651,7 @@
         } else {
           // 헤더 추가
           const headerHTML = `
-            <div style="padding: 12px 15px; background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white; font-weight: 700; border-radius: 8px 8px 0 0; display: grid; grid-template-columns: 100px 120px 80px 120px 80px 80px 80px 120px; gap: 10px; align-items: center; margin-bottom: 10px;">
+            <div style="padding: 12px 15px; background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white; font-weight: 700; border-radius: 8px 8px 0 0; display: grid; grid-template-columns: 100px 120px 80px 120px 80px 80px 80px 80px 120px; gap: 10px; align-items: center; margin-bottom: 10px;">
               <div>정산월</div>
               <div>화주사</div>
               <div style="text-align: center;">파레트 수</div>
@@ -3611,6 +3659,7 @@
               <div style="text-align: center;">상태</div>
               <div style="text-align: center;">펼침</div>
               <div style="text-align: center;">다운로드</div>
+              <div style="text-align: center;">생성</div>
               <div style="text-align: center;">관리</div>
             </div>
           `;
@@ -3623,7 +3672,7 @@
             return `
               <div class="pal-settlement-item" style="margin-bottom: 15px; border: 2px solid #ffeaa7; border-radius: 12px; overflow: hidden; background: #ffffff;">
                 <!-- 정산 내역 요약 (클릭 가능) -->
-                <div class="pal-settlement-header" onclick="palToggleSettlementDetail('${settlementId}', '${settlementMonth || ''}')" style="padding: 15px; background: ${isTotal ? 'linear-gradient(135deg, #fff3d4 0%, #fffef9 100%)' : 'linear-gradient(135deg, #fffef9 0%, #ffffff 100%)'}; cursor: pointer; display: grid; grid-template-columns: 100px 120px 80px 120px 80px 80px 80px 120px; gap: 10px; align-items: center; transition: all 0.2s;">
+                <div class="pal-settlement-header" onclick="palToggleSettlementDetail('${settlementId}', '${settlementMonth || ''}')" style="padding: 15px; background: ${isTotal ? 'linear-gradient(135deg, #fff3d4 0%, #fffef9 100%)' : 'linear-gradient(135deg, #fffef9 0%, #ffffff 100%)'}; cursor: pointer; display: grid; grid-template-columns: 100px 120px 80px 120px 80px 80px 80px 80px 120px; gap: 10px; align-items: center; transition: all 0.2s;">
                   <div style="font-weight: ${isTotal ? '700' : '600'}; color: #ff6b35; font-size: ${isTotal ? '15px' : '14px'};">${isTotal ? '📊 전체' : palEscapeHtml(settlement.settlement_month)}</div>
                   <div style="font-weight: 600;">${palEscapeHtml(settlement.company_name)}</div>
                   <div style="text-align: center;">${settlement.total_pallets}개</div>
@@ -3637,6 +3686,11 @@
                   <div onclick="event.stopPropagation();" style="display: flex; gap: 5px; flex-wrap: wrap;">
                     ${!isTotal ? `
                       <button class="pal-btn" onclick="event.stopPropagation(); palExportSettlementMonth('${settlementMonth || ''}')" style="padding: 4px 8px; font-size: 11px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;" title="엑셀 다운로드">📥 엑셀</button>
+                    ` : ''}
+                  </div>
+                  <div onclick="event.stopPropagation();" style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: center;">
+                    ${!isTotal && settlementMonth && palCurrentRole === '관리자' && (!settlement.id || settlement.status === '미생성') ? `
+                      <button class="pal-btn" onclick="event.stopPropagation(); palGenerateSettlement('${settlementMonth}', '${palEscapeHtml(settlement.company_name)}')" style="padding: 4px 8px; font-size: 11px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;" title="정산 생성">✨ 생성</button>
                     ` : ''}
                   </div>
                   <div onclick="event.stopPropagation();" style="display: flex; gap: 5px; flex-wrap: wrap;">
