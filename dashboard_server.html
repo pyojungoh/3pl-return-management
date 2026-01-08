@@ -13701,8 +13701,79 @@
     
     /* ========== 사업자 등록증 보기 ========== */
     function viewCertificate(companyId, certificateUrl) {
-      // 새 창에서 사업자 등록증 열기
-      window.open(certificateUrl, '_blank');
+      // PDF 파일인지 확인
+      const isPdf = certificateUrl.toLowerCase().endsWith('.pdf') || certificateUrl.includes('.pdf') || certificateUrl.includes('application/pdf');
+      
+      if (isPdf) {
+        // PDF 파일은 모달로 표시
+        const modal = document.createElement('div');
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 10000; display: flex; justify-content: center; align-items: center;';
+        
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = 'background: white; border-radius: 12px; padding: 20px; max-width: 90%; max-height: 90%; width: 1000px; height: 90vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);';
+        
+        const header = document.createElement('div');
+        header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #e0e0e0;';
+        
+        const title = document.createElement('h3');
+        title.textContent = '사업자 등록증 미리보기';
+        title.style.cssText = 'margin: 0; color: #2d3436; font-size: 18px; font-weight: 600;';
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '✕ 닫기';
+        closeBtn.style.cssText = 'padding: 8px 16px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;';
+        closeBtn.onclick = function() {
+          document.body.removeChild(modal);
+        };
+        
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+        
+        const iframeContainer = document.createElement('div');
+        iframeContainer.style.cssText = 'flex: 1; overflow: hidden; border-radius: 8px; border: 2px solid #e0e0e0;';
+        
+        const iframe = document.createElement('iframe');
+        iframe.src = certificateUrl;
+        iframe.style.cssText = 'width: 100%; height: 100%; border: none;';
+        iframe.setAttribute('type', 'application/pdf');
+        
+        // PDF가 로드되지 않으면 다운로드 링크 표시
+        iframe.onerror = function() {
+          iframeContainer.innerHTML = `
+            <div style="padding: 40px; text-align: center;">
+              <p style="color: #636e72; font-size: 16px; margin-bottom: 20px;">PDF 미리보기를 불러올 수 없습니다.</p>
+              <a href="${certificateUrl}" target="_blank" style="padding: 12px 24px; background: #74b9ff; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">새 창에서 열기</a>
+            </div>
+          `;
+        };
+        
+        iframeContainer.appendChild(iframe);
+        
+        modalContent.appendChild(header);
+        modalContent.appendChild(iframeContainer);
+        modal.appendChild(modalContent);
+        
+        // 모달 외부 클릭 시 닫기
+        modal.onclick = function(e) {
+          if (e.target === modal) {
+            document.body.removeChild(modal);
+          }
+        };
+        
+        // ESC 키로 닫기
+        const escHandler = function(e) {
+          if (e.key === 'Escape') {
+            document.body.removeChild(modal);
+            document.removeEventListener('keydown', escHandler);
+          }
+        };
+        document.addEventListener('keydown', escHandler);
+        
+        document.body.appendChild(modal);
+      } else {
+        // 이미지 파일은 새 창에서 열기
+        window.open(certificateUrl, '_blank');
+      }
     }
     window.viewCertificate = viewCertificate;
     
