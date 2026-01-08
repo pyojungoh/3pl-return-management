@@ -13775,7 +13775,9 @@
         pdfContainer.appendChild(loadingDiv);
         
         // 서버 프록시를 통해 PDF URL 생성 (CORS 및 401 오류 해결)
+        // 프록시가 실패하면 직접 URL 사용
         const proxyUrl = '/api/uploads/certificate-proxy?url=' + encodeURIComponent(certificateUrl);
+        const directUrl = certificateUrl; // 백업용 직접 URL
         
         // 브라우저 기본 PDF 뷰어 사용 (iframe)
         const iframe = document.createElement('iframe');
