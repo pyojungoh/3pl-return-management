@@ -1263,6 +1263,8 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                     search_keywords = [company_name]
             except Exception as e:
                 print(f"[경고] 화주사 '{company_name}' 키워드 조회 실패: {e}")
+                import traceback
+                traceback.print_exc()
                 search_keywords = [company_name]
             
             normalized_keywords = [normalize_company_name(kw) for kw in search_keywords]
@@ -1284,14 +1286,24 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
             # 정규화된 키워드로 필터링
             result = []
             for row in rows:
-                if USE_POSTGRESQL:
-                    settlement = dict(row)
-                else:
-                    settlement = dict(zip([col[0] for col in cursor.description], row))
-                
-                settlement_company_normalized = normalize_company_name(settlement.get('company_name', ''))
-                if settlement_company_normalized in normalized_keywords:
-                    result.append(settlement)
+                try:
+                    if USE_POSTGRESQL:
+                        settlement = dict(row)
+                    else:
+                        settlement = dict(zip([col[0] for col in cursor.description], row))
+                    
+                    settlement_company = settlement.get('company_name', '')
+                    if not settlement_company:
+                        continue
+                    
+                    settlement_company_normalized = normalize_company_name(settlement_company)
+                    if settlement_company_normalized in normalized_keywords:
+                        result.append(settlement)
+                except Exception as e:
+                    print(f"[경고] 정산 내역 처리 중 오류: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
             
             return result
         else:
@@ -1328,121 +1340,161 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
             company_keywords_cache = {}  # {정규화된_화주사명: [키워드 목록]}
             
             if unique_companies:
-                # 모든 화주사 조회 (대소문자 무시를 위해 Python에서 필터링)
-                if USE_POSTGRESQL:
-                    cursor.execute('''
-                        SELECT company_name, search_keywords 
-                        FROM companies
-                    ''')
-                else:
-                    cursor.execute('''
-                        SELECT company_name, search_keywords 
-                        FROM companies
-                    ''')
-                
-                keyword_rows = cursor.fetchall()
-                
-                # 정규화된 화주사명 목록 생성 (정산 내역의 화주사명들)
-                normalized_unique_companies = {normalize_company_name(comp) for comp in unique_companies}
-                
-                # 원본 화주사명 -> 정규화된 이름 매핑 (정산 내역 기준)
-                original_to_normalized = {comp: normalize_company_name(comp) for comp in unique_companies}
-                
-                for row in keyword_rows:
+                try:
+                    # 모든 화주사 조회 (대소문자 무시를 위해 Python에서 필터링)
                     if USE_POSTGRESQL:
-                        comp_name = row['company_name']
-                        search_keywords = row.get('search_keywords', '')
+                        cursor.execute('''
+                            SELECT company_name, search_keywords 
+                            FROM companies
+                        ''')
                     else:
-                        comp_name = row[0]
-                        search_keywords = row[1] if len(row) > 1 else ''
+                        cursor.execute('''
+                            SELECT company_name, search_keywords 
+                            FROM companies
+                        ''')
                     
-                    # 정규화된 이름으로 비교 (대소문자 무시)
-                    norm_comp_name = normalize_company_name(comp_name)
+                    keyword_rows = cursor.fetchall()
                     
-                    # 정규화된 화주사명 목록에 포함되는지 확인
-                    if norm_comp_name in normalized_unique_companies:
-                        keywords = [comp_name]
-                        if search_keywords:
-                            aliases = [alias.strip() for alias in search_keywords.replace('\n', ',').split(',') if alias.strip()]
-                            keywords.extend(aliases)
-                        
-                        # 정규화된 이름으로 캐시 저장 (대소문자 무시)
-                        # 같은 정규화된 이름이 여러 개 있으면 키워드를 합침
-                        if norm_comp_name in company_keywords_cache:
-                            # 기존 키워드와 합치기 (중복 제거)
-                            existing_keywords = company_keywords_cache[norm_comp_name]
-                            all_keywords = list(set(existing_keywords + keywords))
-                            company_keywords_cache[norm_comp_name] = all_keywords
-                        else:
-                            company_keywords_cache[norm_comp_name] = keywords
-                
-                # 캐시에 없는 정산 내역 화주사명도 추가 (기본값)
-                for orig_comp in unique_companies:
-                    norm_comp = normalize_company_name(orig_comp)
-                    if norm_comp not in company_keywords_cache:
-                        company_keywords_cache[norm_comp] = [orig_comp]
+                    # 정규화된 화주사명 목록 생성 (정산 내역의 화주사명들)
+                    normalized_unique_companies = {normalize_company_name(comp) for comp in unique_companies}
+                    
+                    for row in keyword_rows:
+                        try:
+                            if USE_POSTGRESQL:
+                                comp_name = row['company_name']
+                                search_keywords = row.get('search_keywords', '')
+                            else:
+                                comp_name = row[0]
+                                search_keywords = row[1] if len(row) > 1 else ''
+                            
+                            if not comp_name:
+                                continue
+                            
+                            # 정규화된 이름으로 비교 (대소문자 무시)
+                            norm_comp_name = normalize_company_name(comp_name)
+                            
+                            # 정규화된 화주사명 목록에 포함되는지 확인
+                            if norm_comp_name in normalized_unique_companies:
+                                keywords = [comp_name]
+                                if search_keywords:
+                                    aliases = [alias.strip() for alias in search_keywords.replace('\n', ',').split(',') if alias.strip()]
+                                    keywords.extend(aliases)
+                                
+                                # 정규화된 이름으로 캐시 저장 (대소문자 무시)
+                                # 같은 정규화된 이름이 여러 개 있으면 키워드를 합침
+                                if norm_comp_name in company_keywords_cache:
+                                    # 기존 키워드와 합치기 (중복 제거)
+                                    existing_keywords = company_keywords_cache[norm_comp_name]
+                                    all_keywords = list(set(existing_keywords + keywords))
+                                    company_keywords_cache[norm_comp_name] = all_keywords
+                                else:
+                                    company_keywords_cache[norm_comp_name] = keywords
+                        except Exception as e:
+                            print(f"[경고] 화주사 키워드 처리 중 오류: {e}")
+                            continue
+                    
+                    # 캐시에 없는 정산 내역 화주사명도 추가 (기본값)
+                    for orig_comp in unique_companies:
+                        if not orig_comp:
+                            continue
+                        try:
+                            norm_comp = normalize_company_name(orig_comp)
+                            if norm_comp not in company_keywords_cache:
+                                company_keywords_cache[norm_comp] = [orig_comp]
+                        except Exception as e:
+                            print(f"[경고] 화주사명 정규화 중 오류: {e}")
+                            continue
+                except Exception as e:
+                    print(f"[경고] 화주사 키워드 조회 중 오류: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    # 오류 발생 시 기본값으로 진행
+                    for orig_comp in unique_companies:
+                        if orig_comp:
+                            try:
+                                norm_comp = normalize_company_name(orig_comp)
+                                company_keywords_cache[norm_comp] = [orig_comp]
+                            except:
+                                pass
             
             # 1. 각 화주사명에 대해 정규화된 키워드 목록 생성 (본인 이름 + 해시태그)
             company_keywords_map = {}  # 정규화된 키워드 -> 원본 화주사명 매핑
             company_representatives = {}  # 정규화된 키워드 -> 대표 화주사명
             
             for settlement in all_settlements:
-                raw_company = settlement.get('company_name', '')
-                if not raw_company:
-                    continue
-                
-                # 캐시에서 키워드 가져오기 (정규화된 이름으로 조회 - 대소문자 무시)
-                normalized_raw_company = normalize_company_name(raw_company)
-                keywords = company_keywords_cache.get(normalized_raw_company, [raw_company])
-                
-                # 각 키워드에 대해 매핑 생성
-                normalized_company = normalize_company_name(raw_company)
-                
-                for keyword in keywords:
-                    normalized_keyword = normalize_company_name(keyword)
+                try:
+                    raw_company = settlement.get('company_name', '')
+                    if not raw_company:
+                        continue
                     
-                    # 이미 다른 화주사가 이 키워드를 사용하고 있는지 확인
-                    if normalized_keyword in company_keywords_map:
-                        # 기존 대표 화주사명과 비교하여 우선순위 결정 (더 짧거나 알파벳 순서가 앞서는 것)
-                        existing_rep = company_representatives[normalized_keyword]
-                        if len(raw_company) < len(existing_rep) or (len(raw_company) == len(existing_rep) and raw_company < existing_rep):
-                            company_representatives[normalized_keyword] = raw_company
-                            company_keywords_map[normalized_keyword] = raw_company
-                    else:
-                        company_keywords_map[normalized_keyword] = raw_company
-                        company_representatives[normalized_keyword] = raw_company
+                    # 캐시에서 키워드 가져오기 (정규화된 이름으로 조회 - 대소문자 무시)
+                    normalized_raw_company = normalize_company_name(raw_company)
+                    keywords = company_keywords_cache.get(normalized_raw_company, [raw_company])
+                    
+                    # 각 키워드에 대해 매핑 생성
+                    normalized_company = normalize_company_name(raw_company)
+                    
+                    for keyword in keywords:
+                        try:
+                            normalized_keyword = normalize_company_name(keyword)
+                            
+                            # 이미 다른 화주사가 이 키워드를 사용하고 있는지 확인
+                            if normalized_keyword in company_keywords_map:
+                                # 기존 대표 화주사명과 비교하여 우선순위 결정 (더 짧거나 알파벳 순서가 앞서는 것)
+                                existing_rep = company_representatives[normalized_keyword]
+                                if len(raw_company) < len(existing_rep) or (len(raw_company) == len(existing_rep) and raw_company < existing_rep):
+                                    company_representatives[normalized_keyword] = raw_company
+                                    company_keywords_map[normalized_keyword] = raw_company
+                            else:
+                                company_keywords_map[normalized_keyword] = raw_company
+                                company_representatives[normalized_keyword] = raw_company
+                        except Exception as e:
+                            print(f"[경고] 키워드 처리 중 오류: {e}")
+                            continue
+                except Exception as e:
+                    print(f"[경고] 정산 내역 처리 중 오류: {e}")
+                    continue
             
             # 2. 각 정산 내역에 대해 대표 화주사명 찾기 및 통합
             merged_settlements = {}  # (settlement_month, representative_company) -> 통합된 정산 내역
             
             for settlement in all_settlements:
-                raw_company = settlement.get('company_name', '')
-                if not raw_company:
+                try:
+                    raw_company = settlement.get('company_name', '')
+                    if not raw_company:
+                        continue
+                    
+                    normalized = normalize_company_name(raw_company)
+                    representative = company_representatives.get(normalized, raw_company)
+                    
+                    # 정산월과 대표 화주사명으로 키 생성
+                    settlement_month_key = settlement.get('settlement_month', '')
+                    merge_key = (settlement_month_key, representative)
+                    
+                    if merge_key not in merged_settlements:
+                        # 새로운 정산 내역 생성 (대표 화주사명으로)
+                        merged_settlement = settlement.copy()
+                        merged_settlement['company_name'] = representative
+                        merged_settlements[merge_key] = merged_settlement
+                    else:
+                        # 기존 정산 내역에 통합 (파레트 수, 보관일수, 보관료 합산)
+                        existing = merged_settlements[merge_key]
+                        existing['total_pallets'] = existing.get('total_pallets', 0) + settlement.get('total_pallets', 0)
+                        existing['total_storage_days'] = existing.get('total_storage_days', 0) + settlement.get('total_storage_days', 0)
+                        existing['total_fee'] = existing.get('total_fee', 0) + settlement.get('total_fee', 0)
+                except Exception as e:
+                    print(f"[경고] 정산 내역 통합 중 오류: {e}")
                     continue
-                
-                normalized = normalize_company_name(raw_company)
-                representative = company_representatives.get(normalized, raw_company)
-                
-                # 정산월과 대표 화주사명으로 키 생성
-                settlement_month_key = settlement.get('settlement_month', '')
-                merge_key = (settlement_month_key, representative)
-                
-                if merge_key not in merged_settlements:
-                    # 새로운 정산 내역 생성 (대표 화주사명으로)
-                    merged_settlement = settlement.copy()
-                    merged_settlement['company_name'] = representative
-                    merged_settlements[merge_key] = merged_settlement
-                else:
-                    # 기존 정산 내역에 통합 (파레트 수, 보관일수, 보관료 합산)
-                    existing = merged_settlements[merge_key]
-                    existing['total_pallets'] = existing.get('total_pallets', 0) + settlement.get('total_pallets', 0)
-                    existing['total_storage_days'] = existing.get('total_storage_days', 0) + settlement.get('total_storage_days', 0)
-                    existing['total_fee'] = existing.get('total_fee', 0) + settlement.get('total_fee', 0)
             
             # 3. 정렬된 목록 반환
             result = list(merged_settlements.values())
             result.sort(key=lambda x: (x.get('settlement_month') or '', x.get('company_name', '')))
             return result
+    except Exception as e:
+        print(f"[오류] get_settlements 함수 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return []  # 오류 발생 시 빈 리스트 반환
     finally:
         cursor.close()
         conn.close()
