@@ -2101,45 +2101,65 @@ def normalize_company_name(name: str) -> str:
 
 
 def get_company_search_keywords(company_name: str) -> List[str]:
-    """화주사명으로 검색 가능한 키워드 목록 가져오기 (본인 이름 + 별칭)"""
+    """화주사명으로 검색 가능한 키워드 목록 가져오기 (본인 이름 + 별칭)
+    
+    정규화된 비교를 통해 "TKS 컴퍼니"와 "TKS컴퍼니"를 동일하게 처리
+    """
     if not company_name:
         return []
     
     # 화주사 정보 조회
     conn = get_db_connection()
     try:
+        # 정규화된 이름으로도 검색 가능하도록 모든 회사 조회 후 Python에서 필터링
         if USE_POSTGRESQL:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
-            # company_name 또는 username으로 검색
-            cursor.execute('''
-                SELECT company_name, search_keywords 
-                FROM companies 
-                WHERE company_name = %s OR username = %s
-                LIMIT 1
-            ''', (company_name, company_name))
+            cursor.execute('SELECT company_name, search_keywords, username FROM companies')
         else:
             cursor = conn.cursor()
-            cursor.execute('''
-                SELECT company_name, search_keywords 
-                FROM companies 
-                WHERE company_name = ? OR username = ?
-                LIMIT 1
-            ''', (company_name, company_name))
+            cursor.execute('SELECT company_name, search_keywords, username FROM companies')
         
-        row = cursor.fetchone()
-        if row:
+        rows = cursor.fetchall()
+        company_name_normalized = normalize_company_name(company_name)
+        
+        # 정규화된 이름으로 매칭되는 회사 찾기
+        matched_company = None
+        for row in rows:
             if USE_POSTGRESQL:
-                company_data = dict(row)
+                row_data = dict(row)
             else:
-                company_data = dict(row) if hasattr(row, 'keys') else {
+                row_data = {
                     'company_name': row[0],
-                    'search_keywords': row[1] if len(row) > 1 else None
+                    'search_keywords': row[1] if len(row) > 1 else None,
+                    'username': row[2] if len(row) > 2 else None
                 }
             
-            keywords = [normalize_company_name(company_data.get('company_name', ''))]
+            # company_name, username, search_keywords 모두 확인
+            row_company_name = row_data.get('company_name', '')
+            row_username = row_data.get('username', '')
+            row_search_keywords = row_data.get('search_keywords', '')
+            
+            # 정규화된 이름으로 비교
+            if (normalize_company_name(row_company_name) == company_name_normalized or
+                (row_username and normalize_company_name(row_username) == company_name_normalized)):
+                matched_company = row_data
+                break
+            
+            # search_keywords에서도 확인
+            if row_search_keywords:
+                aliases = [alias.strip() for alias in row_search_keywords.replace('\n', ',').split(',') if alias.strip()]
+                for alias in aliases:
+                    if normalize_company_name(alias) == company_name_normalized:
+                        matched_company = row_data
+                        break
+                if matched_company:
+                    break
+        
+        if matched_company:
+            keywords = [normalize_company_name(matched_company.get('company_name', ''))]
             
             # search_keywords 필드에서 별칭 추가
-            search_keywords = company_data.get('search_keywords', '')
+            search_keywords = matched_company.get('search_keywords', '')
             if search_keywords:
                 # 쉼표나 줄바꿈으로 구분된 별칭들
                 aliases = [alias.strip() for alias in search_keywords.replace('\n', ',').split(',') if alias.strip()]
@@ -2149,6 +2169,8 @@ def get_company_search_keywords(company_name: str) -> List[str]:
         return [normalize_company_name(company_name)]
     except Exception as e:
         print(f"[경고] get_company_search_keywords 오류: {e}")
+        import traceback
+        traceback.print_exc()
         return [normalize_company_name(company_name)]
     finally:
         if 'cursor' in locals():
