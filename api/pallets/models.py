@@ -967,11 +967,24 @@ def generate_monthly_settlement(settlement_month: str = None,
             pallet_company_normalized = normalize_company_name(raw_company)
             
             # 정산 대상 화주사명의 키워드와 파레트 화주사명의 키워드가 하나라도 일치하는지 확인
+            # 양방향 비교: 정산 화주사 키워드 ↔ 파레트 화주사 키워드
             is_match = False
+            
+            # 1. 정산 화주사 키워드가 파레트 화주사 키워드에 포함되는지 확인
             for norm_kw in target_company_normalized:
-                if norm_kw in pallet_normalized_keywords or pallet_company_normalized == norm_kw:
+                if norm_kw in pallet_normalized_keywords:
                     is_match = True
                     break
+                if pallet_company_normalized == norm_kw:
+                    is_match = True
+                    break
+            
+            # 2. 파레트 화주사 키워드가 정산 화주사 키워드에 포함되는지 확인 (양방향)
+            if not is_match:
+                for pallet_norm_kw in pallet_normalized_keywords:
+                    if pallet_norm_kw in target_company_normalized:
+                        is_match = True
+                        break
             
             if not is_match:
                 # 해당 화주사가 아닌 파레트는 건너뜀
@@ -2066,11 +2079,24 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
                 pallet_normalized_keywords = [normalize_company_name(kw) for kw in pallet_keywords]
                 
                 # 정산 화주사명의 키워드와 파레트 화주사명의 키워드가 하나라도 일치하는지 확인
+                # 양방향 비교: 정산 화주사 키워드 ↔ 파레트 화주사 키워드
                 is_match = False
+                
+                # 1. 정산 화주사 키워드가 파레트 화주사 키워드에 포함되는지 확인
                 for norm_kw in normalized_keywords:
-                    if norm_kw in pallet_normalized_keywords or pallet_company_normalized == norm_kw:
+                    if norm_kw in pallet_normalized_keywords:
                         is_match = True
                         break
+                    if pallet_company_normalized == norm_kw:
+                        is_match = True
+                        break
+                
+                # 2. 파레트 화주사 키워드가 정산 화주사 키워드에 포함되는지 확인 (양방향)
+                if not is_match:
+                    for pallet_norm_kw in pallet_normalized_keywords:
+                        if pallet_norm_kw in normalized_keywords:
+                            is_match = True
+                            break
                 
                 if not is_match:
                     # 화주사명이 일치하지 않으면 건너뜀
