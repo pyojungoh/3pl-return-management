@@ -1724,6 +1724,29 @@ def toggle_company_active_status(company_name: str, is_active: bool) -> Tuple[bo
         if not cursor.fetchone():
             return False, f"화주사 '{company_name}'를 찾을 수 없습니다."
         
+        # is_active 컬럼 존재 여부 확인 및 생성
+        if USE_POSTGRESQL:
+            cursor.execute('''
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'companies' AND column_name = 'is_active'
+            ''')
+            has_is_active = cursor.fetchone() is not None
+            
+            if not has_is_active:
+                # 컬럼이 없으면 생성
+                cursor.execute('ALTER TABLE companies ADD COLUMN is_active BOOLEAN DEFAULT TRUE')
+        else:
+            # SQLite에서 컬럼 존재 여부 확인
+            cursor.execute("PRAGMA table_info(companies)")
+            columns_info = cursor.fetchall()
+            available_columns = [col[1] for col in columns_info]
+            has_is_active = 'is_active' in available_columns
+            
+            if not has_is_active:
+                # 컬럼이 없으면 생성
+                cursor.execute('ALTER TABLE companies ADD COLUMN is_active INTEGER DEFAULT 1')
+        
         # 상태 업데이트
         if USE_POSTGRESQL:
             cursor.execute('''
@@ -1746,6 +1769,9 @@ def toggle_company_active_status(company_name: str, is_active: bool) -> Tuple[bo
         return True, f"화주사 '{company_name}'가 {status_text}되었습니다."
     except Exception as e:
         conn.rollback() if USE_POSTGRESQL else None
+        print(f"[오류] toggle_company_active_status 실패: {e}")
+        import traceback
+        traceback.print_exc()
         return False, f"화주사 상태 변경 실패: {str(e)}"
     finally:
         cursor.close()
