@@ -666,14 +666,6 @@
       <div id="palPageList" class="pal-content-page active">
         <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 20px;">📋 화주사별 현황</h2>
         
-        <!-- 기간 설정 (관리자만 표시) -->
-        <div class="pal-filters pal-admin-only" style="margin-bottom: 15px; display: flex; align-items: flex-end; gap: 8px; flex-wrap: nowrap;">
-          <div class="pal-filter-group" style="margin-bottom: 0; flex: 0 0 auto;">
-            <label style="font-size: 12px; margin-bottom: 4px;">정산월</label>
-            <input type="month" id="palSettlementMonth" class="pal-form-input" onchange="palLoadCompanyList()" style="padding: 6px 10px; font-size: 13px; width: 140px;">
-          </div>
-        </div>
-        
         <!-- 통계 박스 (화주사 모드일 때만 표시) -->
         <div class="pal-stats-container" id="palListStatsContainer" style="display: none; margin-bottom: 20px;">
           <div class="pal-stat-box">
@@ -697,11 +689,11 @@
         <!-- 왼쪽: 화주사 목록 (관리자만), 오른쪽: 정산 내역 -->
         <div style="display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: start;" id="palListLayout">
           <!-- 왼쪽: 화주사 목록 (관리자만 표시) -->
-          <div class="pal-table-container pal-admin-only" id="palCompaniesContainer" style="height: calc(100vh - 300px); min-height: 500px; max-height: calc(100vh - 300px); display: flex; flex-direction: column; overflow: hidden;">
+          <div class="pal-table-container pal-admin-only" id="palCompaniesContainer" style="display: flex; flex-direction: column; overflow: hidden;">
             <div class="pal-table-header" style="flex-shrink: 0; padding: 12px 15px;">
               <h3 style="font-size: 14px; margin: 0;">화주사 목록 <span id="palCompaniesCount" style="font-size: 11px; color: #636e72;">(0개)</span></h3>
             </div>
-            <div id="palCompaniesScrollArea" style="flex: 1; overflow-y: auto !important; overflow-x: hidden !important; padding: 6px; min-height: 0; max-height: 100%; position: relative;">
+            <div id="palCompaniesScrollArea" style="flex: 1; overflow-y: auto !important; overflow-x: hidden !important; padding: 6px; position: relative;">
               <div id="palCompaniesList" style="display: flex; flex-direction: column; gap: 3px; width: 100%;">
                 <!-- 화주사 목록이 여기에 동적으로 추가됨 -->
               </div>
@@ -709,7 +701,7 @@
           </div>
           
           <!-- 오른쪽: 정산 내역 -->
-          <div class="pal-table-container" style="height: calc(100vh - 300px); min-height: 500px; display: flex; flex-direction: column;" id="palSettlementsContainer">
+          <div class="pal-table-container" style="display: flex; flex-direction: column;" id="palSettlementsContainer">
             <div class="pal-table-header" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
               <h3>정산 내역 <span id="palSettlementsCount" style="font-size: 14px; color: #636e72;">(0개)</span></h3>
               <button class="pal-btn" onclick="palExportSettlements()" style="padding: 8px 16px; font-size: 13px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; display: none;" id="palExportSettlementsBtn">
@@ -1379,9 +1371,6 @@
           
           if (statsContainer) statsContainer.style.display = 'flex';
           if (listLayout) listLayout.style.gridTemplateColumns = '1fr'; // 화주사 목록 제거
-          if (settlementsContainer) {
-            settlementsContainer.style.height = 'calc(100vh - 350px)'; // 통계 박스 공간 확보
-          }
           
           // 통계 업데이트 및 정산 내역 자동 로드
           palUpdateListStats();
@@ -1649,9 +1638,6 @@
         
         if (statsContainer) statsContainer.style.display = 'flex';
         if (listLayout) listLayout.style.gridTemplateColumns = '1fr'; // 화주사 목록 제거
-        if (settlementsContainer) {
-          settlementsContainer.style.height = 'calc(100vh - 350px)'; // 통계 박스 공간 확보
-        }
         
         // 통계 업데이트 및 정산 내역 자동 로드
         palUpdateListStats();
@@ -3334,14 +3320,7 @@
       listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">데이터를 불러오는 중...</div>';
       
       try {
-        const month = document.getElementById('palSettlementMonth').value;
-        
-        const params = new URLSearchParams();
-        if (month) {
-          params.append('month', month);
-        }
-        
-        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/companies?${params}`, {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/companies`, {
           headers: palGetUserHeaders()
         });
         
