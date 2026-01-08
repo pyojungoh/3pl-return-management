@@ -2393,7 +2393,7 @@ def print_labels():
 @pallets_bp.route('/companies', methods=['GET'])
 def get_companies():
     """
-    파레트를 보관 중인 화주사 목록 조회
+    파레트를 보관 중인 화주사 목록 조회 (비활성화 상태 포함)
     """
     try:
         role, company_name, username = get_user_context()
@@ -2401,12 +2401,40 @@ def get_companies():
         settlement_month = request.args.get('month')
         
         from api.pallets.models import get_companies_with_pallets
-        companies = get_companies_with_pallets(settlement_month=settlement_month)
+        from api.database.models import get_all_companies
+        
+        # 파레트를 보관 중인 화주사 목록
+        companies_with_pallets = get_companies_with_pallets(settlement_month=settlement_month)
+        
+        # 모든 화주사 정보 조회 (비활성화 상태 포함)
+        all_companies = get_all_companies()
+        
+        # 화주사명을 키로 하는 딕셔너리 생성 (비활성화 상태 포함)
+        companies_dict = {}
+        for comp in all_companies:
+            comp_name = comp.get('company_name', '')
+            if comp_name:
+                # is_active 처리 (SQLite는 INTEGER, PostgreSQL은 BOOLEAN)
+                is_active = comp.get('is_active')
+                if is_active is None:
+                    is_active = True  # 기본값
+                elif isinstance(is_active, int):
+                    is_active = bool(is_active)  # SQLite: 1/0 -> True/False
+                companies_dict[comp_name] = {
+                    'company_name': comp_name,
+                    'is_active': is_active
+                }
+        
+        # 화주사 목록에 비활성화 상태 추가
+        companies_list = []
+        for comp_name in companies_with_pallets:
+            company_info = companies_dict.get(comp_name, {'company_name': comp_name, 'is_active': True})
+            companies_list.append(company_info)
         
         return jsonify({
             'success': True,
             'data': {
-                'companies': companies
+                'companies': companies_list
             }
         }), 200
         
@@ -2417,6 +2445,57 @@ def get_companies():
         return jsonify({
             'success': False,
             'message': f'화주사 목록 조회 실패: {str(e)}'
+        }), 500
+
+
+@pallets_bp.route('/companies/<company_name>/toggle-active', methods=['PUT'])
+def toggle_company_active(company_name):
+    """
+    화주사 비활성화/활성화 토글
+    """
+    try:
+        role, current_company, username = get_user_context()
+        
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 화주사를 비활성화할 수 있습니다.'
+            }), 403
+        
+        from urllib.parse import unquote
+        company_name = unquote(company_name)
+        
+        data = request.get_json() or {}
+        is_active = data.get('is_active')
+        
+        if is_active is None:
+            return jsonify({
+                'success': False,
+                'message': 'is_active 파라미터가 필요합니다.'
+            }), 400
+        
+        from api.database.models import toggle_company_active_status
+        
+        success, message = toggle_company_active_status(company_name, is_active)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': message
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 400
+            
+    except Exception as e:
+        print(f"화주사 비활성화/활성화 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'화주사 비활성화/활성화 실패: {str(e)}'
         }), 500
 
 

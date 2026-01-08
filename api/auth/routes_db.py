@@ -78,6 +78,17 @@ def login():
                 'message': '아이디 또는 비밀번호가 일치하지 않습니다.'
             }), 401
         
+        # 비활성화된 계정 체크
+        is_active = company.get('is_active')
+        # SQLite는 INTEGER (1/0), PostgreSQL은 BOOLEAN (True/False)
+        if is_active is False or is_active == 0 or (is_active is None and company.get('id')):
+            # is_active가 None인 경우 기본값은 True이므로, 명시적으로 False나 0인 경우만 비활성화
+            if is_active is False or is_active == 0:
+                return jsonify({
+                    'success': False,
+                    'message': '계약이 종료되었거나 비활성화된 계정입니다.'
+                }), 403
+        
         # 비밀번호 확인
         print(f"🔐 비밀번호 확인: 입력된 비밀번호 길이={len(password)}, 저장된 비밀번호 길이={len(company.get('password', ''))}")
         if company.get('password') != password:

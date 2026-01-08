@@ -114,6 +114,12 @@ def init_db():
             except Exception:
                 pass
             
+            # companies 테이블에 is_active 필드 추가 (마이그레이션)
+            try:
+                cursor.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE')
+            except Exception:
+                pass
+            
             # 반품 내역 테이블
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS returns (
@@ -1545,7 +1551,7 @@ def get_company_by_username(username: str) -> Optional[Dict]:
                         return dict(row)
                     else:
                         # 튜플인 경우 수동 변환
-                        return {
+                        result_dict = {
                             'id': row[0],
                             'company_name': row[1],
                             'username': row[2],
@@ -1561,6 +1567,13 @@ def get_company_by_username(username: str) -> Optional[Dict]:
                             'created_at': row[12] if len(row) > 12 else None,
                             'updated_at': row[13] if len(row) > 13 else None
                         }
+                        # is_active 처리 (SQLite는 INTEGER, 없을 수도 있음)
+                        if len(row) > 14:
+                            is_active = row[14]
+                            result_dict['is_active'] = bool(is_active) if is_active is not None else True
+                        else:
+                            result_dict['is_active'] = True  # 기본값
+                        return result_dict
                 except Exception as e:
                     print(f"[오류] SQLite row 변환 오류: {e}")
                     print(f"   Row 타입: {type(row)}, Row 내용: {row}")
@@ -1586,7 +1599,8 @@ def get_all_companies() -> List[Dict]:
                 SELECT id, company_name, username, role, 
                        business_number, business_name, business_address, 
                        business_tel, business_email, business_certificate_url,
-                       search_keywords, last_login, created_at, updated_at
+                       search_keywords, last_login, created_at, updated_at,
+                       COALESCE(is_active, TRUE) as is_active
                 FROM companies
                 ORDER BY created_at DESC
             ''')
@@ -1616,7 +1630,8 @@ def get_all_companies() -> List[Dict]:
                 'id', 'company_name', 'username', 'role',
                 'business_number', 'business_name', 'business_address',
                 'business_tel', 'business_email', 'business_certificate_url',
-                'search_keywords', 'last_login', 'created_at', 'updated_at'
+                'search_keywords', 'last_login', 'created_at', 'updated_at',
+                'is_active'
             ]
             
             # 존재하는 컬럼만 선택
@@ -1652,6 +1667,58 @@ def get_all_companies() -> List[Dict]:
             return []
         finally:
             conn.close()
+
+
+def toggle_company_active_status(company_name: str, is_active: bool) -> Tuple[bool, str]:
+    """
+    화주사 비활성화/활성화 상태 변경
+    
+    Args:
+        company_name: 화주사명
+        is_active: 활성화 여부 (True: 활성화, False: 비활성화)
+    
+    Returns:
+        (success, message)
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 화주사 존재 확인
+        if USE_POSTGRESQL:
+            cursor.execute('SELECT id FROM companies WHERE company_name = %s', (company_name,))
+        else:
+            cursor.execute('SELECT id FROM companies WHERE company_name = ?', (company_name,))
+        
+        if not cursor.fetchone():
+            return False, f"화주사 '{company_name}'를 찾을 수 없습니다."
+        
+        # 상태 업데이트
+        if USE_POSTGRESQL:
+            cursor.execute('''
+                UPDATE companies 
+                SET is_active = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE company_name = %s
+            ''', (is_active, company_name))
+        else:
+            # SQLite는 INTEGER 사용 (1: 활성, 0: 비활성)
+            active_value = 1 if is_active else 0
+            cursor.execute('''
+                UPDATE companies 
+                SET is_active = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE company_name = ?
+            ''', (active_value, company_name))
+        
+        conn.commit()
+        
+        status_text = '활성화' if is_active else '비활성화'
+        return True, f"화주사 '{company_name}'가 {status_text}되었습니다."
+    except Exception as e:
+        conn.rollback() if USE_POSTGRESQL else None
+        return False, f"화주사 상태 변경 실패: {str(e)}"
+    finally:
+        cursor.close()
+        conn.close()
 
 
 def create_company(company_name: str, username: str, password: str, role: str = '화주사',
