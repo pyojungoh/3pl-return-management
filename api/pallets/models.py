@@ -1966,8 +1966,25 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
             settlement = dict(zip([col[0] for col in cursor.description], row))
         
         # 파레트별 상세 내역 조회 (pallets 테이블과 조인)
-        # 정산 생성 시 이미 해당 화주사의 파레트만 pallet_fee_calculations에 저장되었으므로
-        # 정산월의 모든 파레트를 조회하면 됨 (추가 화주사 필터링 불필요)
+        # 정산 생성 시 이미 해당 화주사의 파레트만 pallet_fee_calculations에 저장되었지만,
+        # 화주사 태그를 고려하여 정확한 매칭을 위해 추가 필터링 적용
+        settlement_company = settlement.get('company_name', '')
+        
+        # 화주사 태그를 고려한 키워드 목록 가져오기
+        from api.database.models import normalize_company_name, get_company_search_keywords
+        
+        search_keywords = []
+        try:
+            search_keywords = get_company_search_keywords(settlement_company)
+            if not search_keywords:
+                search_keywords = [settlement_company]
+        except Exception as e:
+            print(f"[경고] 화주사 '{settlement_company}' 키워드 조회 실패: {e}")
+            search_keywords = [settlement_company]
+        
+        # 정규화된 키워드 목록 생성 (띄어쓰기 무시)
+        normalized_keywords = [normalize_company_name(kw) for kw in search_keywords]
+        
         if USE_POSTGRESQL:
             cursor.execute('''
                 SELECT 
@@ -2030,8 +2047,34 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
             else:
                 pallet = dict(zip([col[0] for col in cursor.description], row))
             
-            # 정산 생성 시 이미 해당 화주사의 파레트만 저장되었으므로
-            # 추가 화주사 필터링 불필요 (모든 파레트 포함)
+            # 화주사명 태그 필터링 (정규화된 키워드로 비교 - 띄어쓰기 무시)
+            pallet_company = pallet.get('company_name', '')
+            if pallet_company:
+                # 파레트의 화주사명을 정규화하여 비교
+                pallet_company_normalized = normalize_company_name(pallet_company)
+                
+                # 파레트 화주사명의 키워드도 확인 (태그 포함)
+                pallet_keywords = []
+                try:
+                    pallet_keywords = get_company_search_keywords(pallet_company)
+                    if not pallet_keywords:
+                        pallet_keywords = [pallet_company]
+                except Exception as e:
+                    print(f"[경고] 파레트 화주사 '{pallet_company}' 키워드 조회 실패: {e}")
+                    pallet_keywords = [pallet_company]
+                
+                pallet_normalized_keywords = [normalize_company_name(kw) for kw in pallet_keywords]
+                
+                # 정산 화주사명의 키워드와 파레트 화주사명의 키워드가 하나라도 일치하는지 확인
+                is_match = False
+                for norm_kw in normalized_keywords:
+                    if norm_kw in pallet_normalized_keywords or pallet_company_normalized == norm_kw:
+                        is_match = True
+                        break
+                
+                if not is_match:
+                    # 화주사명이 일치하지 않으면 건너뜀
+                    continue
             
             # 해당 월 내 보관일수 재계산
             in_date_str = pallet.get('in_date')
