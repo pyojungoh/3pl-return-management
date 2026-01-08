@@ -13255,7 +13255,11 @@
                 <td style="text-align: center;">${escapeHtml(company.business_email || '-')}</td>
                 <td style="text-align: center;">
                   ${company.business_certificate_url ? 
-                    `<button onclick="viewCertificate(${company.id}, '${escapeHtml(company.business_certificate_url)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">보기</button>` : 
+                    `<div style="display: inline-flex; gap: 4px; justify-content: center; align-items: center;">
+                      <button onclick="viewCertificate(${company.id}, '${escapeHtml(company.business_certificate_url)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">보기</button>
+                      <button onclick="uploadCertificate(${company.id})" style="padding: 4px 8px; background: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">변경</button>
+                      <button onclick="deleteCertificate(${company.id})" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
+                    </div>` : 
                     `<button onclick="uploadCertificate(${company.id})" style="padding: 4px 8px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">업로드</button>`
                   }
                 </td>
@@ -13300,7 +13304,11 @@
                 <td style="text-align: center;">${escapeHtml(company.business_email || '-')}</td>
                 <td style="text-align: center;">
                   ${company.business_certificate_url ? 
-                    `<button onclick="viewCertificate(${company.id}, '${escapeHtml(company.business_certificate_url)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">보기</button>` : 
+                    `<div style="display: inline-flex; gap: 4px; justify-content: center; align-items: center;">
+                      <button onclick="viewCertificate(${company.id}, '${escapeHtml(company.business_certificate_url)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">보기</button>
+                      <button onclick="uploadCertificate(${company.id})" style="padding: 4px 8px; background: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">변경</button>
+                      <button onclick="deleteCertificate(${company.id})" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
+                    </div>` : 
                     `<button onclick="uploadCertificate(${company.id})" style="padding: 4px 8px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">업로드</button>`
                   }
                 </td>
