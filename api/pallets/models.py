@@ -1279,6 +1279,7 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
             
             # 디버깅: 키워드 목록 확인
             print(f"[정산조회] 화주사 '{company_name}' 정규화된 키워드: {normalized_keywords}")
+            print(f"[정산조회] 정규화된 화주사명: {company_name_normalized}")
             
             # 모든 정산 내역을 가져온 후 필터링
             if settlement_month:
@@ -1310,8 +1311,15 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                     # 1. 정산 내역 화주사명을 정규화하여 직접 비교
                     settlement_company_normalized = normalize_company_name(settlement_company)
                     
+                    # 디버깅: 각 정산 내역의 매칭 과정 로그
+                    print(f"[정산조회] 정산 내역 화주사명: '{settlement_company}' → 정규화: '{settlement_company_normalized}'")
+                    
                     # 직접 비교: 정규화된 이름이 일치하거나 키워드 목록에 포함되는지 확인
-                    is_match = (settlement_company_normalized == company_name_normalized) or (settlement_company_normalized in normalized_keywords)
+                    direct_match = (settlement_company_normalized == company_name_normalized)
+                    keyword_match = (settlement_company_normalized in normalized_keywords)
+                    is_match = direct_match or keyword_match
+                    
+                    print(f"[정산조회] 직접 매칭: {direct_match}, 키워드 매칭: {keyword_match}, 최종: {is_match}")
                     
                     # 2. 직접 매칭이 안 되면 정산 내역 화주사명의 키워드도 확인 (양방향)
                     if not is_match:
@@ -1329,8 +1337,12 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                         
                         # 양방향 비교: 조회 대상 키워드 ↔ 정산 내역 키워드
                         # 집합 교집합으로 빠르게 확인
-                        if set(normalized_keywords) & set(settlement_normalized_keywords):
+                        intersection = set(normalized_keywords) & set(settlement_normalized_keywords)
+                        if intersection:
                             is_match = True
+                            print(f"[정산조회] 키워드 교집합 발견: {intersection}")
+                        else:
+                            print(f"[정산조회] 키워드 교집합 없음 - 조회 대상: {normalized_keywords}, 정산 내역: {settlement_normalized_keywords}")
                     
                     if is_match:
                         result.append(settlement)
