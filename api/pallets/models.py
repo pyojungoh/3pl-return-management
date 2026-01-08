@@ -951,40 +951,39 @@ def generate_monthly_settlement(settlement_month: str = None,
             continue
         
         # 특정 화주사의 정산 생성 시, 해당 화주사의 파레트만 포함
-        # 화주사 태그를 고려하여 정확한 매칭
+        # 화주사 태그를 고려하여 정확한 매칭 (띄어쓰기 무시)
         if company_name:
-            # 파레트 화주사명의 키워드 목록 가져오기 (태그 포함)
-            pallet_keywords = []
-            try:
-                pallet_keywords = get_company_search_keywords(raw_company)
-                if not pallet_keywords:
-                    pallet_keywords = [raw_company]
-            except Exception as e:
-                print(f"[경고] 파레트 화주사 '{raw_company}' 키워드 조회 실패: {e}")
-                pallet_keywords = [raw_company]
-            
-            pallet_normalized_keywords = [normalize_company_name(kw) for kw in pallet_keywords]
+            # 파레트 화주사명을 정규화 (띄어쓰기 제거)
             pallet_company_normalized = normalize_company_name(raw_company)
             
-            # 정산 대상 화주사명의 키워드와 파레트 화주사명의 키워드가 하나라도 일치하는지 확인
-            # 양방향 비교: 정산 화주사 키워드 ↔ 파레트 화주사 키워드
-            is_match = False
+            # 정산 대상 화주사명의 정규화된 키워드와 직접 비교
+            # normalize_company_name은 띄어쓰기를 제거하므로 "TKS 컴퍼니"와 "TKS컴퍼니"는 동일하게 처리됨
+            is_match = pallet_company_normalized in target_company_normalized
             
-            # 1. 정산 화주사 키워드가 파레트 화주사 키워드에 포함되는지 확인
-            for norm_kw in target_company_normalized:
-                if norm_kw in pallet_normalized_keywords:
-                    is_match = True
-                    break
-                if pallet_company_normalized == norm_kw:
-                    is_match = True
-                    break
-            
-            # 2. 파레트 화주사 키워드가 정산 화주사 키워드에 포함되는지 확인 (양방향)
+            # 직접 매칭이 안 되면 파레트 화주사명의 키워드도 확인 (태그 포함)
             if not is_match:
-                for pallet_norm_kw in pallet_normalized_keywords:
-                    if pallet_norm_kw in target_company_normalized:
+                pallet_keywords = []
+                try:
+                    pallet_keywords = get_company_search_keywords(raw_company)
+                    if not pallet_keywords:
+                        pallet_keywords = [raw_company]
+                except Exception as e:
+                    print(f"[경고] 파레트 화주사 '{raw_company}' 키워드 조회 실패: {e}")
+                    pallet_keywords = [raw_company]
+                
+                pallet_normalized_keywords = [normalize_company_name(kw) for kw in pallet_keywords]
+                
+                # 양방향 비교
+                for norm_kw in target_company_normalized:
+                    if norm_kw in pallet_normalized_keywords:
                         is_match = True
                         break
+                
+                if not is_match:
+                    for pallet_norm_kw in pallet_normalized_keywords:
+                        if pallet_norm_kw in target_company_normalized:
+                            is_match = True
+                            break
             
             if not is_match:
                 # 해당 화주사가 아닌 파레트는 건너뜀
