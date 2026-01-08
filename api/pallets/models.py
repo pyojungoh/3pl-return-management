@@ -1430,9 +1430,9 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
                     ORDER BY company_name
                 ''')
         
-        print(f"[화주사 목록] 파레트 테이블에서 조회 (정산월: {settlement_month or '전체'})")
-        
         rows = cursor.fetchall()
+        
+        print(f"[화주사 목록] 파레트 테이블에서 조회 완료 (정산월: {settlement_month or '전체'}, 조회 건수: {len(rows) if rows else 0})")
         
         # 화주사명 목록 추출
         raw_companies = []
@@ -1440,6 +1440,10 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
             raw_companies = [row['company_name'] for row in rows if row.get('company_name')]
         else:
             raw_companies = [row[0] for row in rows if row[0]]
+        
+        if not raw_companies:
+            print("[경고] 화주사 목록이 비어있습니다.")
+            return []
         
         # 화주사 태그를 고려하여 동일 화주사 통합
         # Union-Find 방식으로 동일 그룹 통합
@@ -1449,20 +1453,37 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
         
         # 1단계: 각 화주사명에 대해 키워드 수집 및 그룹 생성
         for company in raw_companies:
-            # 화주사 등록 정보에서 키워드 가져오기 (본인 이름 + 태그)
-            keywords = get_company_search_keywords(company)
+            try:
+                # 화주사 등록 정보에서 키워드 가져오기 (본인 이름 + 태그)
+                keywords = get_company_search_keywords(company)
+                if not keywords:
+                    keywords = [company]  # 키워드가 없으면 본인 이름만 사용
+            except Exception as e:
+                print(f"[경고] 화주사 '{company}' 키워드 조회 실패: {e}")
+                keywords = [company]  # 오류 시 본인 이름만 사용
             
             # 이미 그룹에 속해있는지 확인
             found_group = None
             for keyword_normalized in keywords:
-                # 이 키워드와 연결된 화주사 찾기
-                for existing_company, existing_group in company_to_group.items():
-                    existing_keywords = get_company_search_keywords(existing_company)
-                    if keyword_normalized in existing_keywords:
-                        found_group = existing_group
+                try:
+                    # 이 키워드와 연결된 화주사 찾기
+                    for existing_company, existing_group in company_to_group.items():
+                        try:
+                            existing_keywords = get_company_search_keywords(existing_company)
+                            if not existing_keywords:
+                                existing_keywords = [existing_company]
+                        except Exception as e:
+                            print(f"[경고] 화주사 '{existing_company}' 키워드 조회 실패: {e}")
+                            existing_keywords = [existing_company]
+                        
+                        if keyword_normalized in existing_keywords:
+                            found_group = existing_group
+                            break
+                    if found_group:
                         break
-                if found_group:
-                    break
+                except Exception as e:
+                    print(f"[경고] 화주사 그룹 찾기 중 오류: {e}")
+                    continue
             
             # 그룹에 추가
             if found_group is not None:
