@@ -2424,3 +2424,166 @@ def get_monthly_revenue_route():
             'success': False,
             'message': f'월별 수입 현황 조회 실패: {str(e)}'
         }), 500
+
+
+@pallets_bp.route('/debug/company-check', methods=['GET'])
+def debug_company_check():
+    """
+    디버깅: 화주사명 관련 DB 상태 확인
+    """
+    try:
+        from api.database.models import get_db_connection, normalize_company_name, get_company_search_keywords
+        from api.database.models import USE_POSTGRESQL
+        
+        company_name = request.args.get('company', 'TKS 컴퍼니')
+        
+        result = {
+            'input_company': company_name,
+            'normalized_input': normalize_company_name(company_name),
+            'companies_table': [],
+            'pallets_table': [],
+            'settlements_table': [],
+            'search_keywords': []
+        }
+        
+        conn = get_db_connection()
+        
+        try:
+            if USE_POSTGRESQL:
+                from psycopg2.extras import RealDictCursor
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+            else:
+                cursor = conn.cursor()
+            
+            # 1. companies 테이블에서 관련 화주사 조회
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    SELECT company_name, username, search_keywords 
+                    FROM companies 
+                    WHERE LOWER(REPLACE(company_name, ' ', '')) LIKE %s 
+                       OR LOWER(REPLACE(username, ' ', '')) LIKE %s
+                    LIMIT 20
+                ''', (f'%{normalize_company_name(company_name)}%', f'%{normalize_company_name(company_name)}%'))
+            else:
+                cursor.execute('''
+                    SELECT company_name, username, search_keywords 
+                    FROM companies 
+                    WHERE LOWER(REPLACE(company_name, ' ', '')) LIKE ?
+                       OR LOWER(REPLACE(username, ' ', '')) LIKE ?
+                    LIMIT 20
+                ''', (f'%{normalize_company_name(company_name)}%', f'%{normalize_company_name(company_name)}%'))
+            
+            companies_rows = cursor.fetchall()
+            if USE_POSTGRESQL:
+                result['companies_table'] = [dict(row) for row in companies_rows]
+            else:
+                result['companies_table'] = [
+                    {
+                        'company_name': row[0],
+                        'username': row[1] if len(row) > 1 else None,
+                        'search_keywords': row[2] if len(row) > 2 else None
+                    }
+                    for row in companies_rows
+                ]
+            
+            # 2. pallets 테이블에서 관련 화주사 조회
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    SELECT DISTINCT company_name, COUNT(*) as pallet_count
+                    FROM pallets 
+                    WHERE LOWER(REPLACE(company_name, ' ', '')) LIKE %s
+                    GROUP BY company_name
+                    ORDER BY company_name
+                    LIMIT 20
+                ''', (f'%{normalize_company_name(company_name)}%',))
+            else:
+                cursor.execute('''
+                    SELECT DISTINCT company_name, COUNT(*) as pallet_count
+                    FROM pallets 
+                    WHERE LOWER(REPLACE(company_name, ' ', '')) LIKE ?
+                    GROUP BY company_name
+                    ORDER BY company_name
+                    LIMIT 20
+                ''', (f'%{normalize_company_name(company_name)}%',))
+            
+            pallets_rows = cursor.fetchall()
+            if USE_POSTGRESQL:
+                result['pallets_table'] = [dict(row) for row in pallets_rows]
+            else:
+                result['pallets_table'] = [
+                    {
+                        'company_name': row[0],
+                        'pallet_count': row[1]
+                    }
+                    for row in pallets_rows
+                ]
+            
+            # 3. pallet_monthly_settlements 테이블에서 관련 정산 내역 조회
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    SELECT company_name, settlement_month, total_pallets, total_fee, id
+                    FROM pallet_monthly_settlements 
+                    WHERE LOWER(REPLACE(company_name, ' ', '')) LIKE %s
+                    ORDER BY settlement_month DESC, company_name
+                    LIMIT 20
+                ''', (f'%{normalize_company_name(company_name)}%',))
+            else:
+                cursor.execute('''
+                    SELECT company_name, settlement_month, total_pallets, total_fee, id
+                    FROM pallet_monthly_settlements 
+                    WHERE LOWER(REPLACE(company_name, ' ', '')) LIKE ?
+                    ORDER BY settlement_month DESC, company_name
+                    LIMIT 20
+                ''', (f'%{normalize_company_name(company_name)}%',))
+            
+            settlements_rows = cursor.fetchall()
+            if USE_POSTGRESQL:
+                result['settlements_table'] = [dict(row) for row in settlements_rows]
+            else:
+                result['settlements_table'] = [
+                    {
+                        'company_name': row[0],
+                        'settlement_month': row[1],
+                        'total_pallets': row[2],
+                        'total_fee': row[3],
+                        'id': row[4]
+                    }
+                    for row in settlements_rows
+                ]
+            
+            # 4. get_company_search_keywords 결과 확인
+            try:
+                keywords = get_company_search_keywords(company_name)
+                result['search_keywords'] = keywords
+            except Exception as e:
+                result['search_keywords'] = f'오류: {str(e)}'
+            
+            # 5. 각 정산 내역의 화주사명으로 키워드 조회
+            result['settlement_keywords'] = {}
+            for settlement in result['settlements_table']:
+                settlement_company = settlement.get('company_name', '')
+                if settlement_company:
+                    try:
+                        keywords = get_company_search_keywords(settlement_company)
+                        result['settlement_keywords'][settlement_company] = keywords
+                    except Exception as e:
+                        result['settlement_keywords'][settlement_company] = f'오류: {str(e)}'
+            
+        finally:
+            cursor.close()
+            conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        }), 200
+        
+    except Exception as e:
+        print(f"디버깅 화주사 확인 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'디버깅 화주사 확인 실패: {str(e)}',
+            'error': str(e)
+        }), 500
