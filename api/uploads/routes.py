@@ -294,11 +294,11 @@ def proxy_certificate():
     Returns:
         PDF 파일 스트림
     """
+    from flask import Response
+    
     try:
         pdf_url = request.args.get('url')
         if not pdf_url:
-            # 에러 시 HTML 페이지로 반환 (iframe에서 표시)
-            from flask import Response
             error_html = '''
             <!DOCTYPE html>
             <html>
@@ -315,24 +315,48 @@ def proxy_certificate():
         from urllib.parse import unquote
         pdf_url = unquote(pdf_url)
         
-        print(f'[PDF 프록시] PDF URL: {pdf_url[:100]}...')
+        print(f'[PDF 프록시] 시작 - URL: {pdf_url[:150]}...')
         
         # PDF 파일 다운로드 (urllib 사용 - requests 의존성 없이)
         import urllib.request
         import urllib.error
+        import io
         
         try:
             req = urllib.request.Request(pdf_url)
-            req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+            req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
             req.add_header('Accept', 'application/pdf,application/octet-stream,*/*')
+            req.add_header('Accept-Language', 'ko-KR,ko;q=0.9,en;q=0.8')
             
-            with urllib.request.urlopen(req, timeout=30) as response:
-                pdf_data = response.read()
+            print(f'[PDF 프록시] Cloudinary에 요청 중...')
+            
+            # 타임아웃을 더 길게 설정하고 청크 단위로 읽기
+            with urllib.request.urlopen(req, timeout=60) as response:
+                # Content-Type 확인
+                content_type = response.headers.get('Content-Type', '')
+                print(f'[PDF 프록시] 응답 받음 - Content-Type: {content_type}, Status: {response.status}')
+                
+                # 청크 단위로 읽기 (메모리 효율성)
+                chunk_size = 8192
+                pdf_chunks = []
+                total_size = 0
+                max_size = 50 * 1024 * 1024  # 50MB 제한
+                
+                while True:
+                    chunk = response.read(chunk_size)
+                    if not chunk:
+                        break
+                    pdf_chunks.append(chunk)
+                    total_size += len(chunk)
+                    
+                    if total_size > max_size:
+                        raise Exception(f'PDF 파일이 너무 큽니다. (최대 {max_size // 1024 // 1024}MB)')
+                
+                pdf_data = b''.join(pdf_chunks)
                 
                 print(f'[PDF 프록시] PDF 다운로드 성공: {len(pdf_data)} bytes')
                 
                 # PDF 파일을 스트림으로 반환
-                from flask import Response
                 return Response(
                     pdf_data,
                     mimetype='application/pdf',
@@ -340,56 +364,76 @@ def proxy_certificate():
                         'Content-Disposition': 'inline; filename="certificate.pdf"',
                         'Access-Control-Allow-Origin': '*',
                         'Cache-Control': 'public, max-age=3600',
-                        'Content-Length': str(len(pdf_data))
+                        'Content-Length': str(len(pdf_data)),
+                        'Content-Type': 'application/pdf'
                     }
                 )
+                
         except urllib.error.HTTPError as e:
+            error_msg = f'HTTP {e.code}'
+            if e.code == 401:
+                error_msg += ' (인증 오류 - Cloudinary 접근 권한이 없습니다)'
+            elif e.code == 403:
+                error_msg += ' (접근 거부)'
+            elif e.code == 404:
+                error_msg += ' (파일을 찾을 수 없습니다)'
+            
             print(f'[PDF 프록시] HTTP 오류: {e.code} - {e.reason}')
-            # 에러 시 HTML 페이지로 반환
-            from flask import Response
+            print(f'[PDF 프록시] 오류 URL: {pdf_url[:150]}...')
+            
+            # 에러 응답 본문 읽기 (있는 경우)
+            try:
+                error_body = e.read().decode('utf-8', errors='ignore')[:500]
+                print(f'[PDF 프록시] 오류 응답 본문: {error_body}')
+            except:
+                pass
+            
             error_html = f'''
             <!DOCTYPE html>
             <html>
             <head><title>오류</title></head>
             <body style="font-family: Arial; padding: 40px; text-align: center;">
                 <h2 style="color: #e74c3c;">❌ PDF를 불러올 수 없습니다</h2>
-                <p>HTTP 오류 {e.code}: {e.reason}</p>
-                <p style="color: #95a5a6; font-size: 14px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
+                <p style="font-size: 16px; margin: 20px 0;">{error_msg}</p>
+                <p style="color: #95a5a6; font-size: 14px; margin-top: 30px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
             </body>
             </html>
             '''
             return Response(error_html, mimetype='text/html'), e.code
+            
         except urllib.error.URLError as e:
-            print(f'[PDF 프록시] URL 오류: {e.reason}')
-            # 에러 시 HTML 페이지로 반환
-            from flask import Response
+            error_reason = str(e.reason) if e.reason else '알 수 없는 오류'
+            print(f'[PDF 프록시] URL 오류: {error_reason}')
+            print(f'[PDF 프록시] 오류 URL: {pdf_url[:150]}...')
+            
             error_html = f'''
             <!DOCTYPE html>
             <html>
             <head><title>오류</title></head>
             <body style="font-family: Arial; padding: 40px; text-align: center;">
                 <h2 style="color: #e74c3c;">❌ PDF를 불러올 수 없습니다</h2>
-                <p>URL 오류: {str(e.reason)}</p>
-                <p style="color: #95a5a6; font-size: 14px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
+                <p style="font-size: 16px; margin: 20px 0;">연결 오류: {error_reason}</p>
+                <p style="color: #95a5a6; font-size: 14px; margin-top: 30px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
             </body>
             </html>
             '''
             return Response(error_html, mimetype='text/html'), 500
         
     except Exception as e:
-        print(f'[오류] PDF 프록시 오류: {e}')
+        error_type = type(e).__name__
+        error_msg = str(e)
+        print(f'[오류] PDF 프록시 오류 ({error_type}): {error_msg}')
         import traceback
         traceback.print_exc()
-        # 에러 시 HTML 페이지로 반환
-        from flask import Response
+        
         error_html = f'''
         <!DOCTYPE html>
         <html>
         <head><title>오류</title></head>
         <body style="font-family: Arial; padding: 40px; text-align: center;">
             <h2 style="color: #e74c3c;">❌ PDF 프록시 중 오류가 발생했습니다</h2>
-            <p>{str(e)}</p>
-            <p style="color: #95a5a6; font-size: 14px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
+            <p style="font-size: 16px; margin: 20px 0;">오류 유형: {error_type}</p>
+            <p style="color: #95a5a6; font-size: 14px; margin-top: 30px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
         </body>
         </html>
         '''
