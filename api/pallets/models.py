@@ -1534,18 +1534,19 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
     """
     파레트를 보관 중인 화주사 목록 조회
     
+    ✅ 성능 최적화:
+    - 저장된 화주사 목록(`pallet_settlement_companies`) 우선 사용
+    - 배치 쿼리로 모든 화주사 키워드를 한 번에 조회 (N+1 문제 해결)
+    - 키워드 캐싱으로 중복 쿼리 제거
+    
     ✅ 화주사 태그 동기화 지원:
     - search_keywords 필드를 고려하여 동일 화주사 통합
     - "TKS 컴퍼니"와 "TKS컴퍼니" 같은 동일 화주사를 하나로 통합
     
-    ⚠️ 중요: 화주사 목록은 항상 파레트 테이블에서 전체를 조회합니다.
-    - 정산월 지정이 있으면 해당 월의 파레트에서 조회
-    - 정산월 지정이 없으면 모든 파레트에서 조회
-    
     Args:
         settlement_month: 정산월 (YYYY-MM 형식). 지정되면 해당 월에 보관했던 화주사만 조회
     """
-    from api.database.models import normalize_company_name, get_company_search_keywords
+    from api.database.models import normalize_company_name
     
     conn = get_db_connection()
     
@@ -1556,8 +1557,54 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
         else:
             cursor = conn.cursor()
         
-        # 파레트 테이블에서 화주사명 목록 조회 (항상 전체 조회)
-        # settlement_month가 지정된 경우만 해당 월의 파레트 필터링
+        # 1단계: 저장된 화주사 목록 우선 사용 (성능 최적화)
+        stored_companies = []
+        if settlement_month:
+            # 지정된 정산월의 화주사 목록 조회
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    SELECT DISTINCT company_name 
+                    FROM pallet_settlement_companies 
+                    WHERE settlement_month = %s
+                    ORDER BY company_name
+                ''', (settlement_month,))
+            else:
+                cursor.execute('''
+                    SELECT DISTINCT company_name 
+                    FROM pallet_settlement_companies 
+                    WHERE settlement_month = ?
+                    ORDER BY company_name
+                ''', (settlement_month,))
+        else:
+            # 정산월이 없으면 모든 정산월의 화주사 목록 합집합 조회
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    SELECT DISTINCT company_name 
+                    FROM pallet_settlement_companies 
+                    ORDER BY company_name
+                ''')
+            else:
+                cursor.execute('''
+                    SELECT DISTINCT company_name 
+                    FROM pallet_settlement_companies 
+                    ORDER BY company_name
+                ''')
+        
+        stored_rows = cursor.fetchall()
+        if USE_POSTGRESQL:
+            stored_companies = [row['company_name'] for row in stored_rows if row.get('company_name')]
+        else:
+            stored_companies = [row[0] for row in stored_rows if row[0]]
+        
+        # 저장된 목록이 있으면 그것을 사용 (이미 정산 생성 시 통합되어 있음)
+        if stored_companies:
+            print(f"[화주사 목록 최적화] 저장된 목록 사용: {len(stored_companies)}개 (정산월: {settlement_month or '전체'})")
+            return sorted(stored_companies)
+        
+        # 2단계: 저장된 목록이 없으면 파레트 테이블에서 조회
+        print(f"[화주사 목록] 저장된 목록 없음, 파레트 테이블에서 조회")
+        
+        # 파레트 테이블에서 화주사명 목록 조회
         if settlement_month:
             # 정산월이 지정된 경우: 해당 월에 보관했던 파레트만 조회
             year, month = map(int, settlement_month.split('-'))
@@ -1619,44 +1666,75 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
             return []
         
         # 화주사 태그를 고려하여 동일 화주사 통합
+        # 성능 최적화: 배치 쿼리로 모든 화주사 키워드를 한 번에 조회 (N+1 문제 해결)
+        from api.database.models import get_company_search_keywords
+        
+        # 모든 화주사 키워드를 배치로 조회
+        if USE_POSTGRESQL:
+            placeholders = ','.join(['%s' for _ in raw_companies])
+            cursor.execute(f'''
+                SELECT company_name, search_keywords 
+                FROM companies 
+                WHERE company_name IN ({placeholders}) OR username IN ({placeholders})
+            ''', raw_companies + raw_companies)
+        else:
+            placeholders = ','.join(['?' for _ in raw_companies])
+            cursor.execute(f'''
+                SELECT company_name, search_keywords 
+                FROM companies 
+                WHERE company_name IN ({placeholders}) OR username IN ({placeholders})
+            ''', raw_companies + raw_companies)
+        
+        company_keywords_map = {}  # {화주사명: [정규화된_키워드_목록]}
+        
+        keyword_rows = cursor.fetchall()
+        for row in keyword_rows:
+            if USE_POSTGRESQL:
+                company_name = row['company_name']
+                search_keywords = row.get('search_keywords', '')
+            else:
+                company_name = row[0]
+                search_keywords = row[1] if len(row) > 1 else ''
+            
+            keywords = [normalize_company_name(company_name)]
+            if search_keywords:
+                aliases = [alias.strip() for alias in search_keywords.replace('\n', ',').split(',') if alias.strip()]
+                keywords.extend([normalize_company_name(alias) for alias in aliases])
+            company_keywords_map[company_name] = keywords
+        
+        # 모든 화주사에 대해 키워드 설정 (없는 경우 기본값)
+        for company in raw_companies:
+            if company not in company_keywords_map:
+                company_keywords_map[company] = [normalize_company_name(company)]
+        
         # Union-Find 방식으로 동일 그룹 통합
         company_to_group = {}  # {화주사명: 그룹_ID}
         group_to_companies = {}  # {그룹_ID: [화주사명들]}
         group_id_counter = 0
+        keyword_to_companies = {}  # {정규화된_키워드: [화주사명들]} - 빠른 검색용
         
-        # 1단계: 각 화주사명에 대해 키워드 수집 및 그룹 생성
+        # 1단계: 키워드 인덱스 생성 (O(N))
+        for company, keywords in company_keywords_map.items():
+            for keyword in keywords:
+                if keyword not in keyword_to_companies:
+                    keyword_to_companies[keyword] = []
+                keyword_to_companies[keyword].append(company)
+        
+        # 2단계: 그룹 할당 (O(N))
         for company in raw_companies:
-            try:
-                # 화주사 등록 정보에서 키워드 가져오기 (본인 이름 + 태그)
-                keywords = get_company_search_keywords(company)
-                if not keywords:
-                    keywords = [company]  # 키워드가 없으면 본인 이름만 사용
-            except Exception as e:
-                print(f"[경고] 화주사 '{company}' 키워드 조회 실패: {e}")
-                keywords = [company]  # 오류 시 본인 이름만 사용
+            keywords = company_keywords_map.get(company, [normalize_company_name(company)])
             
-            # 이미 그룹에 속해있는지 확인
+            # 이미 그룹에 속한 화주사 찾기
             found_group = None
-            for keyword_normalized in keywords:
-                try:
-                    # 이 키워드와 연결된 화주사 찾기
-                    for existing_company, existing_group in company_to_group.items():
-                        try:
-                            existing_keywords = get_company_search_keywords(existing_company)
-                            if not existing_keywords:
-                                existing_keywords = [existing_company]
-                        except Exception as e:
-                            print(f"[경고] 화주사 '{existing_company}' 키워드 조회 실패: {e}")
-                            existing_keywords = [existing_company]
-                        
-                        if keyword_normalized in existing_keywords:
-                            found_group = existing_group
-                            break
-                    if found_group:
+            for keyword in keywords:
+                # 같은 키워드를 가진 다른 화주사 찾기
+                other_companies = keyword_to_companies.get(keyword, [])
+                for other_company in other_companies:
+                    if other_company != company and other_company in company_to_group:
+                        found_group = company_to_group[other_company]
                         break
-                except Exception as e:
-                    print(f"[경고] 화주사 그룹 찾기 중 오류: {e}")
-                    continue
+                if found_group:
+                    break
             
             # 그룹에 추가
             if found_group is not None:
@@ -1885,7 +1963,8 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
                     p.status,
                     p.product_name,
                     p.company_name,
-                    p.created_at
+                    p.created_at,
+                    p.updated_at
                 FROM pallet_fee_calculations pfc
                 JOIN pallets p ON pfc.pallet_id = p.pallet_id
                 WHERE pfc.settlement_month = %s AND p.company_name = %s
@@ -1905,7 +1984,8 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
                     p.status,
                     p.product_name,
                     p.company_name,
-                    p.created_at
+                    p.created_at,
+                    p.updated_at
                 FROM pallet_fee_calculations pfc
                 JOIN pallets p ON pfc.pallet_id = p.pallet_id
                 WHERE pfc.settlement_month = ? AND p.company_name = ?
@@ -1932,21 +2012,56 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
                 pallet = dict(zip([col[0] for col in cursor.description], row))
             
             # 해당 월 내 보관일수 재계산
-            in_date = pallet.get('in_date')
-            out_date = pallet.get('out_date')
+            in_date_str = pallet.get('in_date')
+            out_date_str = pallet.get('out_date')
             is_service = pallet.get('is_service', 0) == 1
             
-            # 날짜 문자열을 date 객체로 변환
-            if isinstance(in_date, str):
-                in_date = datetime.strptime(in_date, '%Y-%m-%d').date()
-            if out_date and isinstance(out_date, str):
-                out_date = datetime.strptime(out_date, '%Y-%m-%d').date()
+            # 날짜 문자열을 date 객체로 변환 (계산용)
+            in_date_obj = None
+            out_date_obj = None
+            
+            if in_date_str:
+                if isinstance(in_date_str, str):
+                    try:
+                        in_date_obj = datetime.strptime(in_date_str, '%Y-%m-%d').date()
+                    except:
+                        # 날짜 형식이 다를 수 있으므로 다른 형식 시도
+                        try:
+                            in_date_obj = datetime.strptime(in_date_str.split()[0], '%Y-%m-%d').date()
+                        except:
+                            pass
+                elif isinstance(in_date_str, date):
+                    in_date_obj = in_date_str
+                elif hasattr(in_date_str, 'date'):
+                    in_date_obj = in_date_str.date()
+                
+                # 원본 문자열이 없으면 date 객체에서 문자열 생성
+                if not isinstance(in_date_str, str) and in_date_obj:
+                    pallet['in_date'] = in_date_obj.strftime('%Y-%m-%d')
+            
+            if out_date_str:
+                if isinstance(out_date_str, str):
+                    try:
+                        out_date_obj = datetime.strptime(out_date_str, '%Y-%m-%d').date()
+                    except:
+                        try:
+                            out_date_obj = datetime.strptime(out_date_str.split()[0], '%Y-%m-%d').date()
+                        except:
+                            pass
+                elif isinstance(out_date_str, date):
+                    out_date_obj = out_date_str
+                elif hasattr(out_date_str, 'date'):
+                    out_date_obj = out_date_str.date()
+                
+                # 원본 문자열이 없으면 date 객체에서 문자열 생성
+                if not isinstance(out_date_str, str) and out_date_obj:
+                    pallet['out_date'] = out_date_obj.strftime('%Y-%m-%d')
             
             # 해당 월 내 보관일수 계산
-            if in_date:
-                storage_start = max(in_date, start_date)
-                if out_date:
-                    storage_end = min(out_date, end_date)
+            if in_date_obj:
+                storage_start = max(in_date_obj, start_date)
+                if out_date_obj:
+                    storage_end = min(out_date_obj, end_date)
                 else:
                     storage_end = min(end_date, date.today())
                 
@@ -1966,6 +2081,22 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
                 rounded_fee = math.ceil(calculated_fee / 100) * 100
             
             pallet['rounded_fee'] = int(rounded_fee)
+            
+            # 날짜 필드가 문자열이 아닌 경우 문자열로 변환 (프론트엔드에서 사용)
+            if 'created_at' in pallet and pallet['created_at']:
+                if not isinstance(pallet['created_at'], str):
+                    if isinstance(pallet['created_at'], date):
+                        pallet['created_at'] = pallet['created_at'].strftime('%Y-%m-%d')
+                    elif hasattr(pallet['created_at'], 'strftime'):
+                        pallet['created_at'] = pallet['created_at'].strftime('%Y-%m-%d')
+            
+            if 'updated_at' in pallet and pallet['updated_at']:
+                if not isinstance(pallet['updated_at'], str):
+                    if isinstance(pallet['updated_at'], date):
+                        pallet['updated_at'] = pallet['updated_at'].strftime('%Y-%m-%d')
+                    elif hasattr(pallet['updated_at'], 'strftime'):
+                        pallet['updated_at'] = pallet['updated_at'].strftime('%Y-%m-%d')
+            
             pallets_list.append(pallet)
         
         settlement['pallets'] = pallets_list
