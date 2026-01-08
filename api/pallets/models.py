@@ -1040,6 +1040,38 @@ def generate_monthly_settlement(settlement_month: str = None,
     cursor = conn.cursor()
     
     try:
+        # 정산 생성 전 기존 파레트 상세 데이터 삭제 (중복 방지)
+        # 특정 화주사의 정산 생성 시: 해당 화주사의 파레트만 삭제
+        # 전체 정산 생성 시: 해당 정산월의 모든 파레트 상세 삭제
+        if company_name:
+            # 특정 화주사의 정산 생성: 해당 화주사의 파레트만 삭제
+            # 정산 내역에서 해당 화주사의 파레트 ID 목록 가져오기
+            pallet_ids_to_delete = []
+            for settlement in company_settlements.values():
+                for pallet_detail in settlement['pallets']:
+                    pallet_ids_to_delete.append(pallet_detail['pallet_id'])
+            
+            if pallet_ids_to_delete:
+                if USE_POSTGRESQL:
+                    # PostgreSQL: ANY 대신 IN 사용
+                    placeholders = ','.join(['%s' for _ in pallet_ids_to_delete])
+                    cursor.execute(f'''
+                        DELETE FROM pallet_fee_calculations 
+                        WHERE settlement_month = %s AND pallet_id IN ({placeholders})
+                    ''', [settlement_month] + pallet_ids_to_delete)
+                else:
+                    placeholders = ','.join(['?' for _ in pallet_ids_to_delete])
+                    cursor.execute(f'''
+                        DELETE FROM pallet_fee_calculations 
+                        WHERE settlement_month = ? AND pallet_id IN ({placeholders})
+                    ''', [settlement_month] + pallet_ids_to_delete)
+        else:
+            # 전체 정산 생성: 해당 정산월의 모든 파레트 상세 삭제
+            if USE_POSTGRESQL:
+                cursor.execute('DELETE FROM pallet_fee_calculations WHERE settlement_month = %s', (settlement_month,))
+            else:
+                cursor.execute('DELETE FROM pallet_fee_calculations WHERE settlement_month = ?', (settlement_month,))
+        
         for company, settlement in company_settlements.items():
             # 정산 내역 저장
             if USE_POSTGRESQL:
@@ -1094,13 +1126,50 @@ def generate_monthly_settlement(settlement_month: str = None,
                           1 if pallet_detail['is_service'] else 0))
         
         # 정산월별 화주사 목록 저장 (성능 최적화)
-        # 해당 정산월의 기존 화주사 목록 삭제 후 새로 저장
-        if USE_POSTGRESQL:
-            cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = %s', (settlement_month,))
+        # 특정 화주사의 정산 생성 시: 해당 화주사만 삭제 후 재저장
+        # 전체 정산 생성 시: 해당 정산월의 모든 화주사 목록 삭제 후 새로 저장
+        if company_name:
+            # 특정 화주사의 정산 생성: 해당 화주사만 삭제 후 재저장
+            # 대상 화주사와 관련된 모든 키워드를 고려하여 삭제
+            try:
+                target_keywords = get_company_search_keywords(company_name)
+                if not target_keywords:
+                    target_keywords = [company_name]
+            except Exception as e:
+                print(f"[경고] 화주사 키워드 조회 실패: {e}")
+                target_keywords = [company_name]
+            
+            # 정규화된 키워드로 해당 화주사 찾기
+            target_normalized = [normalize_company_name(kw) for kw in target_keywords]
+            
+            if USE_POSTGRESQL:
+                # 해당 정산월의 모든 화주사 목록 조회
+                cursor.execute('SELECT DISTINCT company_name FROM pallet_settlement_companies WHERE settlement_month = %s', (settlement_month,))
+                existing_companies = [row[0] for row in cursor.fetchall() if row[0]]
+                
+                # 정규화된 키워드와 일치하는 화주사만 삭제
+                for existing_company in existing_companies:
+                    existing_normalized = normalize_company_name(existing_company)
+                    if existing_normalized in target_normalized:
+                        cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = %s AND company_name = %s', 
+                                     (settlement_month, existing_company))
+            else:
+                cursor.execute('SELECT DISTINCT company_name FROM pallet_settlement_companies WHERE settlement_month = ?', (settlement_month,))
+                existing_companies = [row[0] for row in cursor.fetchall() if row[0]]
+                
+                for existing_company in existing_companies:
+                    existing_normalized = normalize_company_name(existing_company)
+                    if existing_normalized in target_normalized:
+                        cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = ? AND company_name = ?', 
+                                     (settlement_month, existing_company))
         else:
-            cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = ?', (settlement_month,))
+            # 전체 정산 생성: 해당 정산월의 모든 화주사 목록 삭제 후 새로 저장
+            if USE_POSTGRESQL:
+                cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = %s', (settlement_month,))
+            else:
+                cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = ?', (settlement_month,))
         
-        # 화주사 목록 저장
+        # 화주사 목록 저장 (ON CONFLICT로 중복 방지)
         for company in company_settlements.keys():
             if USE_POSTGRESQL:
                 cursor.execute('''
