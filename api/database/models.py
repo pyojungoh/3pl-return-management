@@ -1886,29 +1886,40 @@ def is_company_deactivated(company_name: str) -> bool:
             ''', (company_name,))
         
         company_row = cursor.fetchone()
-        if company_row:
-            # companies 테이블에 있는 경우
-            is_active = company_row[0] if USE_POSTGRESQL else company_row[0]
-            print(f"[비활성화확인] companies 테이블에 있음, is_active 값: {is_active} (타입: {type(is_active)})")
-            # SQLite는 INTEGER (1/0), PostgreSQL은 BOOLEAN
-            if isinstance(is_active, int):
-                result = is_active == 0
-            else:
-                result = not bool(is_active)
-            print(f"[비활성화확인] companies 테이블 결과: {result}")
-            return result
+        company_exists = company_row is not None
         
-        # 2. companies 테이블에 없는 경우: deactivated_companies 테이블 확인
-        print(f"[비활성화확인] companies 테이블에 없음, deactivated_companies 테이블 확인")
+        # deactivated_companies 테이블 확인 (companies 테이블에 있든 없든 모두 확인)
         if USE_POSTGRESQL:
             cursor.execute('SELECT id FROM deactivated_companies WHERE company_name = %s', (company_name,))
         else:
             cursor.execute('SELECT id FROM deactivated_companies WHERE company_name = ?', (company_name,))
         
         deactivated_row = cursor.fetchone()
-        result = deactivated_row is not None
-        print(f"[비활성화확인] deactivated_companies 테이블 결과: {result}")
-        return result
+        is_in_deactivated_table = deactivated_row is not None
+        
+        if company_exists:
+            # companies 테이블에 있는 경우: is_active 필드와 deactivated_companies 테이블 모두 확인
+            is_active = company_row[0] if USE_POSTGRESQL else company_row[0]
+            print(f"[비활성화확인] companies 테이블에 있음, is_active 값: {is_active} (타입: {type(is_active)}), deactivated_companies: {is_in_deactivated_table}")
+            
+            # is_active가 NULL인 경우 deactivated_companies 테이블 확인
+            if is_active is None:
+                result = is_in_deactivated_table
+            else:
+                # SQLite는 INTEGER (1/0), PostgreSQL은 BOOLEAN
+                if isinstance(is_active, int):
+                    company_is_inactive = is_active == 0
+                else:
+                    company_is_inactive = not bool(is_active)
+                # companies 테이블의 is_active 또는 deactivated_companies 테이블에 있으면 비활성화
+                result = company_is_inactive or is_in_deactivated_table
+            
+            print(f"[비활성화확인] companies 테이블 결과: {result}")
+            return result
+        else:
+            # companies 테이블에 없는 경우: deactivated_companies 테이블만 확인
+            print(f"[비활성화확인] companies 테이블에 없음, deactivated_companies 테이블 결과: {is_in_deactivated_table}")
+            return is_in_deactivated_table
         
     except Exception as e:
         print(f"[오류] is_company_deactivated 실패: {e}")
