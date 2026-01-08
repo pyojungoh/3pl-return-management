@@ -545,15 +545,19 @@ def change_company_password_by_id(company_id):
         }), 500
 
 
-@auth_bp.route('/company/<int:company_id>/certificate', methods=['POST'])
+@auth_bp.route('/company/<int:company_id>/certificate', methods=['POST', 'DELETE'])
 def upload_company_certificate(company_id):
     """
-    화주사 사업자 등록증 업로드 API
+    화주사 사업자 등록증 업로드/삭제 API
     
-    Body:
-        {
-            "certificate_url": str
-        }
+    POST - 업로드/변경:
+        Body:
+            {
+                "certificate_url": str
+            }
+    
+    DELETE - 삭제:
+        Body 없음
     
     Returns:
         {
@@ -562,35 +566,51 @@ def upload_company_certificate(company_id):
         }
     """
     try:
-        data = request.get_json()
-        certificate_url = data.get('certificate_url')
-        
-        if not certificate_url:
-            return jsonify({
-                'success': False,
-                'message': '사업자 등록증 URL이 필요합니다.'
-            }), 400
-        
-        success = update_company_certificate(company_id, certificate_url)
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': '사업자 등록증이 업로드되었습니다.'
-            })
+        if request.method == 'DELETE':
+            # 삭제: certificate_url을 NULL로 설정
+            success = update_company_certificate(company_id, None)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': '사업자 등록증이 삭제되었습니다.'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '사업자 등록증 삭제에 실패했습니다.'
+                }), 400
         else:
-            return jsonify({
-                'success': False,
-                'message': '사업자 등록증 업로드에 실패했습니다.'
-            }), 400
+            # 업로드/변경
+            data = request.get_json()
+            certificate_url = data.get('certificate_url') if data else None
+            
+            if certificate_url is None:
+                return jsonify({
+                    'success': False,
+                    'message': '사업자 등록증 URL이 필요합니다.'
+                }), 400
+            
+            success = update_company_certificate(company_id, certificate_url)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': '사업자 등록증이 업로드되었습니다.'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '사업자 등록증 업로드에 실패했습니다.'
+                }), 400
         
     except Exception as e:
-        print(f"❌ 사업자 등록증 업로드 오류: {e}")
+        print(f"❌ 사업자 등록증 처리 오류: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
             'success': False,
-            'message': f'사업자 등록증 업로드 중 오류가 발생했습니다: {str(e)}'
+            'message': f'사업자 등록증 처리 중 오류가 발생했습니다: {str(e)}'
         }), 500
 
 

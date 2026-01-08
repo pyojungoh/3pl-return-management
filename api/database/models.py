@@ -2109,8 +2109,17 @@ def update_company_password_by_id(company_id: int, new_password: str) -> bool:
             conn.close()
 
 
-def update_company_certificate(company_id: int, certificate_url: str) -> bool:
-    """화주사 사업자 등록증 URL 업데이트"""
+def update_company_certificate(company_id: int, certificate_url: str = None) -> bool:
+    """
+    화주사 사업자 등록증 URL 업데이트/삭제
+    
+    Args:
+        company_id: 화주사 ID
+        certificate_url: 사업자 등록증 URL (None이면 삭제)
+    
+    Returns:
+        성공 여부
+    """
     conn = get_db_connection()
     
     if USE_POSTGRESQL:

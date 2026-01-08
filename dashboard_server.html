@@ -13698,6 +13698,36 @@
     }
     window.viewCertificate = viewCertificate;
     
+    /* ========== 사업자 등록증 삭제 ========== */
+    function deleteCertificate(companyId) {
+      if (!confirm('사업자 등록증을 삭제하시겠습니까?')) {
+        return;
+      }
+      
+      showMessage('사업자 등록증 삭제 중...', 'success');
+      
+      fetch(`/api/auth/company/${companyId}/certificate`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showMessage('✅ 사업자 등록증이 삭제되었습니다.', 'success');
+          loadCompanies();
+        } else {
+          showMessage('❌ ' + (data.message || '삭제 실패'), 'error');
+        }
+      })
+      .catch(error => {
+        console.error('사업자 등록증 삭제 오류:', error);
+        showMessage('❌ 사업자 등록증 삭제 중 오류가 발생했습니다: ' + error.message, 'error');
+      });
+    }
+    window.deleteCertificate = deleteCertificate;
+    
     
     // 페이지 로드 시 초기화
     window.addEventListener('DOMContentLoaded', function() {
