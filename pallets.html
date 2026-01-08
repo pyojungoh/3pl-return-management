@@ -4063,6 +4063,7 @@
                       
                       return `
                         <tr style="border-bottom: 1px solid #f0f0f0;">
+                          <td style="padding: 8px; text-align: center; font-size: 12px; color: #636e72;">${index + 1}</td>
                           <td style="padding: 8px; font-size: 12px;">${palEscapeHtml(p.pallet_id)}</td>
                           <td style="padding: 8px;">${palEscapeHtml(p.product_name || '-')}</td>
                           <td style="padding: 8px; text-align: center; font-size: 12px;">${inDateStr}</td>
@@ -4072,7 +4073,7 @@
                           <td style="padding: 8px; text-align: center;">
                             <span style="padding: 4px 8px; border-radius: 4px; background: ${statusColor}; color: white; font-size: 11px; font-weight: 600;">${statusText}</span>
                           </td>
-                          <td style="padding: 8px; text-align: right;">${(p.current_fee || 0).toLocaleString()}원</td>
+                          <td style="padding: 8px; text-align: right;">${(p.rounded_fee || p.current_fee || 0).toLocaleString()}원</td>
                         </tr>
                       `;
                     }).join('')}
@@ -4100,6 +4101,7 @@
                 <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                   <thead>
                     <tr style="background: #f5f5f5; border-bottom: 2px solid #dee2e6;">
+                      <th style="padding: 8px; text-align: center; font-weight: 600; width: 60px;">순번</th>
                       <th style="padding: 8px; text-align: left; font-weight: 600; width: 100px;">파레트 ID</th>
                       <th style="padding: 8px; text-align: left; font-weight: 600; width: 120px;">품목명</th>
                       <th style="padding: 8px; text-align: center; font-weight: 600; width: 140px;">최초 입고일</th>
@@ -4111,7 +4113,7 @@
                     </tr>
                   </thead>
                   <tbody>
-                    ${pallets.map(p => {
+                    ${pallets.map((p, index) => {
                       // 최초 입고일 포맷팅 (한국 시간)
                       // 실제 입고일(in_date)을 사용 (created_at은 데이터 입력 시간이므로 사용하지 않음)
                       let inDate = null;
@@ -4190,6 +4192,7 @@
                       
                       return `
                         <tr style="border-bottom: 1px solid #f0f0f0;">
+                          <td style="padding: 8px; text-align: center; font-size: 12px; color: #636e72;">${index + 1}</td>
                           <td style="padding: 8px; font-size: 12px;">${palEscapeHtml(p.pallet_id)}</td>
                           <td style="padding: 8px;">${palEscapeHtml(p.product_name || '-')}</td>
                           <td style="padding: 8px; text-align: center; font-size: 12px;">${inDateStr}</td>
