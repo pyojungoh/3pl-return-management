@@ -951,9 +951,29 @@ def generate_monthly_settlement(settlement_month: str = None,
             continue
         
         # 특정 화주사의 정산 생성 시, 해당 화주사의 파레트만 포함
+        # 화주사 태그를 고려하여 정확한 매칭
         if company_name:
+            # 파레트 화주사명의 키워드 목록 가져오기 (태그 포함)
+            pallet_keywords = []
+            try:
+                pallet_keywords = get_company_search_keywords(raw_company)
+                if not pallet_keywords:
+                    pallet_keywords = [raw_company]
+            except Exception as e:
+                print(f"[경고] 파레트 화주사 '{raw_company}' 키워드 조회 실패: {e}")
+                pallet_keywords = [raw_company]
+            
+            pallet_normalized_keywords = [normalize_company_name(kw) for kw in pallet_keywords]
             pallet_company_normalized = normalize_company_name(raw_company)
-            if pallet_company_normalized not in target_company_normalized:
+            
+            # 정산 대상 화주사명의 키워드와 파레트 화주사명의 키워드가 하나라도 일치하는지 확인
+            is_match = False
+            for norm_kw in target_company_normalized:
+                if norm_kw in pallet_normalized_keywords or pallet_company_normalized == norm_kw:
+                    is_match = True
+                    break
+            
+            if not is_match:
                 # 해당 화주사가 아닌 파레트는 건너뜀
                 continue
         
