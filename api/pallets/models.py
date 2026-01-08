@@ -1283,7 +1283,7 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
             
             rows = cursor.fetchall()
             
-            # 정규화된 키워드로 필터링
+            # 정규화된 키워드로 필터링 (양방향 비교)
             result = []
             for row in rows:
                 try:
@@ -1296,8 +1296,35 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                     if not settlement_company:
                         continue
                     
+                    # 1. 정산 내역 화주사명을 정규화하여 직접 비교
                     settlement_company_normalized = normalize_company_name(settlement_company)
-                    if settlement_company_normalized in normalized_keywords:
+                    is_match = settlement_company_normalized in normalized_keywords
+                    
+                    # 2. 직접 매칭이 안 되면 정산 내역 화주사명의 키워드도 확인 (양방향)
+                    if not is_match:
+                        try:
+                            settlement_keywords = get_company_search_keywords(settlement_company)
+                            if not settlement_keywords:
+                                settlement_keywords = [settlement_company]
+                        except Exception as e:
+                            print(f"[경고] 정산 내역 화주사 '{settlement_company}' 키워드 조회 실패: {e}")
+                            settlement_keywords = [settlement_company]
+                        
+                        settlement_normalized_keywords = [normalize_company_name(kw) for kw in settlement_keywords]
+                        
+                        # 양방향 비교: 조회 대상 키워드 ↔ 정산 내역 키워드
+                        for norm_kw in normalized_keywords:
+                            if norm_kw in settlement_normalized_keywords:
+                                is_match = True
+                                break
+                        
+                        if not is_match:
+                            for settlement_norm_kw in settlement_normalized_keywords:
+                                if settlement_norm_kw in normalized_keywords:
+                                    is_match = True
+                                    break
+                    
+                    if is_match:
                         result.append(settlement)
                 except Exception as e:
                     print(f"[경고] 정산 내역 처리 중 오류: {e}")
