@@ -1489,6 +1489,21 @@ def init_db():
                 ON pallet_settlement_companies(company_name)
             ''')
             
+            # deactivated_companies 테이블 (companies 테이블에 없는 화주사도 비활성화 관리)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS deactivated_companies (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    company_name TEXT NOT NULL UNIQUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_deactivated_companies_name 
+                ON deactivated_companies(company_name)
+            ''')
+            
             print("[성공] 파레트 보관료 관리 시스템 테이블 생성 완료 (SQLite)")
         
         conn.commit()
