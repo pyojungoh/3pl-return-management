@@ -13705,7 +13705,7 @@
       const isPdf = certificateUrl.toLowerCase().endsWith('.pdf') || certificateUrl.includes('.pdf') || certificateUrl.includes('application/pdf');
       
       if (isPdf) {
-        // PDF 파일은 모달로 표시
+        // PDF 파일은 모달로 표시 (PDF.js 사용)
         const modal = document.createElement('div');
         modal.id = 'certificateModal';
         modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 10000; display: flex; justify-content: center; align-items: center;';
@@ -13763,37 +13763,110 @@
         header.appendChild(title);
         header.appendChild(buttonGroup);
         
-        const iframeContainer = document.createElement('div');
-        iframeContainer.style.cssText = 'flex: 1; overflow: hidden; border-radius: 8px; border: 2px solid #e0e0e0; background: #f5f5f5; position: relative; min-height: 0;';
+        const pdfContainer = document.createElement('div');
+        pdfContainer.id = 'pdfContainer';
+        pdfContainer.style.cssText = 'flex: 1; overflow-y: auto; overflow-x: hidden; border-radius: 8px; border: 2px solid #e0e0e0; background: #f5f5f5; position: relative; min-height: 0; padding: 20px; display: flex; justify-content: center; align-items: flex-start;';
         
         // 로딩 표시
         const loadingDiv = document.createElement('div');
         loadingDiv.id = 'pdfLoading';
         loadingDiv.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #636e72; z-index: 10; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);';
         loadingDiv.innerHTML = '<div style="font-size: 16px; margin-bottom: 10px;">📄 PDF를 불러오는 중...</div>';
-        iframeContainer.appendChild(loadingDiv);
+        pdfContainer.appendChild(loadingDiv);
         
-        // PDF를 직접 iframe으로 표시 시도
-        const iframe = document.createElement('iframe');
-        iframe.id = 'pdfIframe';
-        iframe.src = certificateUrl + '#toolbar=0';
-        iframe.style.cssText = 'width: 100%; height: 100%; border: none; position: absolute; top: 0; left: 0;';
-        iframe.setAttribute('type', 'application/pdf');
-        
-        // iframe 로드 완료 시 로딩 숨기기
-        iframe.onload = function() {
-          setTimeout(function() {
-            const loading = document.getElementById('pdfLoading');
-            if (loading) {
-              loading.style.display = 'none';
-            }
-          }, 1000);
+        // PDF.js를 사용하여 PDF 표시
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        script.onload = function() {
+          // PDF.js worker 설정
+          if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            
+            // PDF 로드
+            pdfjsLib.getDocument(certificateUrl).promise.then(function(pdf) {
+              const loading = document.getElementById('pdfLoading');
+              if (loading) {
+                loading.style.display = 'none';
+              }
+              
+              // 첫 페이지 렌더링
+              pdf.getPage(1).then(function(page) {
+                const scale = 1.5;
+                const viewport = page.getViewport({ scale: scale });
+                
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                canvas.style.cssText = 'max-width: 100%; height: auto; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);';
+                
+                const renderContext = {
+                  canvasContext: context,
+                  viewport: viewport
+                };
+                
+                page.render(renderContext).promise.then(function() {
+                  pdfContainer.appendChild(canvas);
+                  
+                  // 여러 페이지가 있으면 모두 렌더링
+                  if (pdf.numPages > 1) {
+                    for (let i = 2; i <= pdf.numPages; i++) {
+                      pdf.getPage(i).then(function(page) {
+                        const viewport = page.getViewport({ scale: scale });
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        canvas.style.cssText = 'max-width: 100%; height: auto; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);';
+                        
+                        const renderContext = {
+                          canvasContext: context,
+                          viewport: viewport
+                        };
+                        
+                        page.render(renderContext).promise.then(function() {
+                          pdfContainer.appendChild(canvas);
+                        });
+                      });
+                    }
+                  }
+                });
+              });
+            }).catch(function(error) {
+              console.error('PDF 로드 오류:', error);
+              const loading = document.getElementById('pdfLoading');
+              if (loading) {
+                loading.innerHTML = `
+                  <div style="padding: 20px; text-align: center;">
+                    <p style="color: #e74c3c; font-size: 16px; margin-bottom: 20px;">❌ PDF를 불러올 수 없습니다.</p>
+                    <p style="color: #95a5a6; font-size: 14px; margin-bottom: 20px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
+                  </div>
+                `;
+              }
+            });
+          }
+        };
+        script.onerror = function() {
+          const loading = document.getElementById('pdfLoading');
+          if (loading) {
+            loading.innerHTML = `
+              <div style="padding: 20px; text-align: center;">
+                <p style="color: #e74c3c; font-size: 16px; margin-bottom: 20px;">❌ PDF 뷰어를 불러올 수 없습니다.</p>
+                <p style="color: #95a5a6; font-size: 14px; margin-bottom: 20px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
+              </div>
+            `;
+          }
         };
         
-        iframeContainer.appendChild(iframe);
+        // PDF.js 스크립트가 이미 로드되어 있는지 확인
+        if (typeof pdfjsLib === 'undefined') {
+          document.head.appendChild(script);
+        } else {
+          script.onload();
+        }
         
         modalContent.appendChild(header);
-        modalContent.appendChild(iframeContainer);
+        modalContent.appendChild(pdfContainer);
         modal.appendChild(modalContent);
         
         // 모달 외부 클릭 시 닫기
@@ -13817,20 +13890,6 @@
           }
         };
         document.addEventListener('keydown', escHandler);
-        
-        // 3초 후에도 로딩이 계속되면 대체 메시지 표시
-        setTimeout(function() {
-          const loading = document.getElementById('pdfLoading');
-          const iframeEl = document.getElementById('pdfIframe');
-          if (loading && loading.style.display !== 'none') {
-            loading.innerHTML = `
-              <div style="padding: 20px; text-align: center;">
-                <p style="color: #636e72; font-size: 16px; margin-bottom: 20px;">PDF 미리보기를 불러올 수 없습니다.</p>
-                <p style="color: #95a5a6; font-size: 14px; margin-bottom: 20px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
-              </div>
-            `;
-          }
-        }, 3000);
         
         document.body.appendChild(modal);
       } else {
