@@ -2401,7 +2401,7 @@ def get_companies():
         settlement_month = request.args.get('month')
         
         from api.pallets.models import get_companies_with_pallets
-        from api.database.models import get_all_companies
+        from api.database.models import get_all_companies, is_company_deactivated
         
         # 파레트를 보관 중인 화주사 목록
         companies_with_pallets = get_companies_with_pallets(settlement_month=settlement_month)
@@ -2428,7 +2428,16 @@ def get_companies():
         # 화주사 목록에 비활성화 상태 추가
         companies_list = []
         for comp_name in companies_with_pallets:
-            company_info = companies_dict.get(comp_name, {'company_name': comp_name, 'is_active': True})
+            # companies 테이블에 있는 경우 딕셔너리에서 가져오기
+            if comp_name in companies_dict:
+                company_info = companies_dict[comp_name]
+            else:
+                # companies 테이블에 없는 경우: deactivated_companies 테이블 확인
+                is_deactivated = is_company_deactivated(comp_name)
+                company_info = {
+                    'company_name': comp_name,
+                    'is_active': not is_deactivated  # 비활성화되어 있으면 False
+                }
             companies_list.append(company_info)
         
         return jsonify({

@@ -782,6 +782,21 @@ def init_db():
                 ON pallet_settlement_companies(company_name)
             ''')
             
+            # deactivated_companies 테이블 (companies 테이블에 없는 화주사도 비활성화 관리)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS deactivated_companies (
+                    id SERIAL PRIMARY KEY,
+                    company_name TEXT NOT NULL UNIQUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_deactivated_companies_name 
+                ON deactivated_companies(company_name)
+            ''')
+            
             print("[성공] 파레트 보관료 관리 시스템 테이블 생성 완료 (PostgreSQL)")
             
         else:
@@ -1704,6 +1719,10 @@ def toggle_company_active_status(company_name: str, is_active: bool) -> Tuple[bo
     """
     화주사 비활성화/활성화 상태 변경
     
+    ✅ companies 테이블에 없는 화주사도 비활성화 가능
+    - companies 테이블에 있으면: is_active 필드 업데이트
+    - companies 테이블에 없으면: deactivated_companies 테이블에 저장/삭제
+    
     Args:
         company_name: 화주사명
         is_active: 활성화 여부 (True: 활성화, False: 비활성화)
@@ -1717,63 +1736,91 @@ def toggle_company_active_status(company_name: str, is_active: bool) -> Tuple[bo
     try:
         print(f"[비활성화] toggle_company_active_status 시작 - 화주사명: '{company_name}', is_active: {is_active}")
         
-        # 화주사 존재 확인
+        # companies 테이블에 화주사 존재 여부 확인
         if USE_POSTGRESQL:
             cursor.execute('SELECT id FROM companies WHERE company_name = %s', (company_name,))
         else:
             cursor.execute('SELECT id FROM companies WHERE company_name = ?', (company_name,))
         
         company_row = cursor.fetchone()
-        if not company_row:
-            print(f"[비활성화] 오류: 화주사 '{company_name}'를 찾을 수 없음")
-            return False, f"화주사 '{company_name}'를 찾을 수 없습니다."
+        company_exists = company_row is not None
         
-        print(f"[비활성화] 화주사 존재 확인 완료")
+        print(f"[비활성화] companies 테이블에 화주사 존재 여부: {company_exists}")
         
-        # is_active 컬럼 존재 여부 확인 및 생성
-        if USE_POSTGRESQL:
-            cursor.execute('''
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'companies' AND column_name = 'is_active'
-            ''')
-            has_is_active = cursor.fetchone() is not None
+        if company_exists:
+            # companies 테이블에 있는 경우: is_active 필드 업데이트
+            # is_active 컬럼 존재 여부 확인 및 생성
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'companies' AND column_name = 'is_active'
+                ''')
+                has_is_active = cursor.fetchone() is not None
+                
+                if not has_is_active:
+                    print(f"[비활성화] is_active 컬럼이 없어서 생성 중...")
+                    cursor.execute('ALTER TABLE companies ADD COLUMN is_active BOOLEAN DEFAULT TRUE')
+                    print(f"[비활성화] is_active 컬럼 생성 완료")
+            else:
+                # SQLite에서 컬럼 존재 여부 확인
+                cursor.execute("PRAGMA table_info(companies)")
+                columns_info = cursor.fetchall()
+                available_columns = [col[1] for col in columns_info]
+                has_is_active = 'is_active' in available_columns
+                
+                if not has_is_active:
+                    print(f"[비활성화] is_active 컬럼이 없어서 생성 중...")
+                    cursor.execute('ALTER TABLE companies ADD COLUMN is_active INTEGER DEFAULT 1')
+                    print(f"[비활성화] is_active 컬럼 생성 완료")
             
-            if not has_is_active:
-                print(f"[비활성화] is_active 컬럼이 없어서 생성 중...")
-                cursor.execute('ALTER TABLE companies ADD COLUMN is_active BOOLEAN DEFAULT TRUE')
-                print(f"[비활성화] is_active 컬럼 생성 완료")
-        else:
-            # SQLite에서 컬럼 존재 여부 확인
-            cursor.execute("PRAGMA table_info(companies)")
-            columns_info = cursor.fetchall()
-            available_columns = [col[1] for col in columns_info]
-            has_is_active = 'is_active' in available_columns
+            # 상태 업데이트
+            print(f"[비활성화] companies 테이블 상태 업데이트 시작 - is_active: {is_active}")
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    UPDATE companies 
+                    SET is_active = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE company_name = %s
+                ''', (is_active, company_name))
+            else:
+                # SQLite는 INTEGER 사용 (1: 활성, 0: 비활성)
+                active_value = 1 if is_active else 0
+                cursor.execute('''
+                    UPDATE companies 
+                    SET is_active = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE company_name = ?
+                ''', (active_value, company_name))
             
-            if not has_is_active:
-                print(f"[비활성화] is_active 컬럼이 없어서 생성 중...")
-                cursor.execute('ALTER TABLE companies ADD COLUMN is_active INTEGER DEFAULT 1')
-                print(f"[비활성화] is_active 컬럼 생성 완료")
-        
-        # 상태 업데이트
-        print(f"[비활성화] 상태 업데이트 시작 - is_active: {is_active}")
-        if USE_POSTGRESQL:
-            cursor.execute('''
-                UPDATE companies 
-                SET is_active = %s, updated_at = CURRENT_TIMESTAMP
-                WHERE company_name = %s
-            ''', (is_active, company_name))
+            updated_rows = cursor.rowcount
+            print(f"[비활성화] companies 테이블 업데이트된 행 수: {updated_rows}")
         else:
-            # SQLite는 INTEGER 사용 (1: 활성, 0: 비활성)
-            active_value = 1 if is_active else 0
-            cursor.execute('''
-                UPDATE companies 
-                SET is_active = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE company_name = ?
-            ''', (active_value, company_name))
+            # companies 테이블에 없는 경우: deactivated_companies 테이블 관리
+            print(f"[비활성화] companies 테이블에 없음 - deactivated_companies 테이블로 관리")
         
-        updated_rows = cursor.rowcount
-        print(f"[비활성화] 업데이트된 행 수: {updated_rows}")
+        # deactivated_companies 테이블 관리 (companies 테이블에 있든 없든 모두 처리)
+        if is_active:
+            # 활성화: deactivated_companies 테이블에서 삭제
+            if USE_POSTGRESQL:
+                cursor.execute('DELETE FROM deactivated_companies WHERE company_name = %s', (company_name,))
+            else:
+                cursor.execute('DELETE FROM deactivated_companies WHERE company_name = ?', (company_name,))
+            print(f"[비활성화] deactivated_companies 테이블에서 삭제 완료")
+        else:
+            # 비활성화: deactivated_companies 테이블에 추가 (없으면 INSERT, 있으면 UPDATE)
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    INSERT INTO deactivated_companies (company_name, updated_at)
+                    VALUES (%s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (company_name) 
+                    DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+                ''', (company_name,))
+            else:
+                # SQLite는 INSERT OR REPLACE 사용
+                cursor.execute('''
+                    INSERT OR REPLACE INTO deactivated_companies (company_name, updated_at)
+                    VALUES (?, CURRENT_TIMESTAMP)
+                ''', (company_name,))
+            print(f"[비활성화] deactivated_companies 테이블에 추가 완료")
         
         conn.commit()
         print(f"[비활성화] 커밋 완료")
@@ -1786,6 +1833,63 @@ def toggle_company_active_status(company_name: str, is_active: bool) -> Tuple[bo
         import traceback
         traceback.print_exc()
         return False, f"화주사 상태 변경 실패: {str(e)}"
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def is_company_deactivated(company_name: str) -> bool:
+    """
+    화주사가 비활성화되었는지 확인
+    
+    ✅ companies 테이블과 deactivated_companies 테이블 모두 확인
+    
+    Args:
+        company_name: 화주사명
+    
+    Returns:
+        True: 비활성화됨, False: 활성화됨
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 1. companies 테이블에 있는 경우: is_active 필드 확인
+        if USE_POSTGRESQL:
+            cursor.execute('''
+                SELECT is_active 
+                FROM companies 
+                WHERE company_name = %s
+            ''', (company_name,))
+        else:
+            cursor.execute('''
+                SELECT is_active 
+                FROM companies 
+                WHERE company_name = ?
+            ''', (company_name,))
+        
+        company_row = cursor.fetchone()
+        if company_row:
+            # companies 테이블에 있는 경우
+            is_active = company_row[0] if USE_POSTGRESQL else company_row[0]
+            # SQLite는 INTEGER (1/0), PostgreSQL은 BOOLEAN
+            if isinstance(is_active, int):
+                return is_active == 0
+            else:
+                return not bool(is_active)
+        
+        # 2. companies 테이블에 없는 경우: deactivated_companies 테이블 확인
+        if USE_POSTGRESQL:
+            cursor.execute('SELECT id FROM deactivated_companies WHERE company_name = %s', (company_name,))
+        else:
+            cursor.execute('SELECT id FROM deactivated_companies WHERE company_name = ?', (company_name,))
+        
+        deactivated_row = cursor.fetchone()
+        return deactivated_row is not None
+        
+    except Exception as e:
+        print(f"[오류] is_company_deactivated 실패: {e}")
+        return False  # 에러 발생 시 기본값은 활성화
     finally:
         cursor.close()
         conn.close()
