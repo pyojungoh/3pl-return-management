@@ -312,15 +312,65 @@ def proxy_certificate():
             return Response(error_html, mimetype='text/html'), 400
         
         # URL 디코딩
-        from urllib.parse import unquote
+        from urllib.parse import unquote, urlparse
         pdf_url = unquote(pdf_url)
         
         print(f'[PDF 프록시] 시작 - URL: {pdf_url[:150]}...')
         
-        # PDF 파일 다운로드 (urllib 사용 - requests 의존성 없이)
+        # Cloudinary SDK를 사용하여 PDF 가져오기 시도
+        try:
+            import cloudinary
+            import cloudinary.api
+            from api.uploads.cloudinary_upload import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+            
+            # Cloudinary URL에서 public_id 추출
+            parsed_url = urlparse(pdf_url)
+            path_parts = parsed_url.path.split('/')
+            
+            # upload 이후의 경로 찾기
+            upload_index = -1
+            for i, part in enumerate(path_parts):
+                if part == 'upload':
+                    upload_index = i
+                    break
+            
+            if upload_index != -1:
+                # public_id 추출 (upload 다음부터 마지막까지, 버전 제외)
+                public_id_parts = []
+                for part in path_parts[upload_index + 1:]:
+                    if part.startswith('v') and len(part) > 1 and part[1:].isdigit():
+                        continue  # 버전 스킵
+                    if part:
+                        public_id_parts.append(part)
+                
+                if public_id_parts:
+                    public_id = '/'.join(public_id_parts)
+                    # 확장자 제거 (Cloudinary가 자동으로 추가)
+                    if public_id.endswith('.pdf'):
+                        public_id = public_id[:-4]
+                    
+                    print(f'[PDF 프록시] 추출된 public_id: {public_id}')
+                    
+                    # Cloudinary API를 사용하여 리소스 정보 가져오기
+                    try:
+                        resource = cloudinary.api.resource(
+                            public_id,
+                            resource_type='raw',  # PDF는 raw 타입
+                            type='upload'
+                        )
+                        
+                        # secure_url 가져오기
+                        secure_url = resource.get('secure_url', pdf_url)
+                        print(f'[PDF 프록시] Cloudinary secure_url 사용: {secure_url[:150]}...')
+                        pdf_url = secure_url
+                    except Exception as api_error:
+                        print(f'[PDF 프록시] Cloudinary API 오류 (직접 URL 사용): {api_error}')
+        except Exception as sdk_error:
+            print(f'[PDF 프록시] Cloudinary SDK 오류 (직접 URL 사용): {sdk_error}')
+        
+        # PDF 파일 다운로드 (urllib 사용)
         import urllib.request
         import urllib.error
-        import io
         
         try:
             req = urllib.request.Request(pdf_url)
@@ -328,7 +378,7 @@ def proxy_certificate():
             req.add_header('Accept', 'application/pdf,application/octet-stream,*/*')
             req.add_header('Accept-Language', 'ko-KR,ko;q=0.9,en;q=0.8')
             
-            print(f'[PDF 프록시] Cloudinary에 요청 중...')
+            print(f'[PDF 프록시] PDF 다운로드 요청 중...')
             
             # 타임아웃을 더 길게 설정하고 청크 단위로 읽기
             with urllib.request.urlopen(req, timeout=60) as response:

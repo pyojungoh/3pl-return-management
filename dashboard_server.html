@@ -13790,57 +13790,49 @@
         iframe.onload = function() {
           setTimeout(function() {
             const loading = document.getElementById('pdfLoading');
-            const iframeContent = iframe.contentDocument || iframe.contentWindow.document;
             
             // iframe 내용이 HTML 오류 페이지인지 확인
             try {
+              const iframeContent = iframe.contentDocument || iframe.contentWindow.document;
               if (iframeContent && iframeContent.body) {
                 const bodyText = iframeContent.body.innerText || iframeContent.body.textContent || '';
                 if (bodyText.includes('오류') || bodyText.includes('불러올 수 없습니다')) {
-                  // 오류 페이지가 표시된 경우
-                  if (loading) {
-                    loading.style.display = 'block';
-                    loading.innerHTML = `
-                      <div style="padding: 20px; text-align: center;">
-                        <p style="color: #e74c3c; font-size: 16px; margin-bottom: 20px;">❌ PDF를 불러올 수 없습니다.</p>
-                        <p style="color: #95a5a6; font-size: 14px; margin-bottom: 20px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
-                      </div>
-                    `;
-                  }
-                  iframe.style.display = 'none';
+                  // 오류 페이지가 표시된 경우 - 직접 URL로 재시도
+                  console.log('[PDF] 프록시 실패, 직접 URL로 재시도');
+                  iframe.src = directUrl;
                   return;
                 }
               }
             } catch (e) {
               // CORS로 인해 접근할 수 없는 경우 (정상 - PDF가 로드된 것)
-              console.log('PDF 로드 완료 (CORS로 내용 확인 불가)');
+              console.log('[PDF] 로드 완료 (CORS로 내용 확인 불가, 정상으로 간주)');
             }
             
             // PDF가 정상적으로 로드된 것으로 간주
             if (loading) {
               loading.style.display = 'none';
             }
-          }, 1000);
+          }, 1500);
         };
         
-        // iframe 로드 실패 시 대체 메시지
+        // iframe 로드 실패 시 직접 URL로 재시도
         iframe.onerror = function() {
-          const loading = document.getElementById('pdfLoading');
-          if (loading) {
-            loading.style.display = 'block';
-            loading.innerHTML = `
-              <div style="padding: 20px; text-align: center;">
-                <p style="color: #e74c3c; font-size: 16px; margin-bottom: 20px;">❌ PDF를 불러올 수 없습니다.</p>
-                <p style="color: #95a5a6; font-size: 14px; margin-bottom: 20px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
-              </div>
-            `;
-          }
-          iframe.style.display = 'none';
+          console.log('[PDF] 프록시 로드 실패, 직접 URL로 재시도');
+          iframe.src = directUrl;
         };
         
         pdfContainer.appendChild(iframe);
         
-        // 5초 후에도 로딩이 계속되면 대체 메시지 표시
+        // 3초 후에도 로딩이 계속되면 직접 URL로 재시도
+        setTimeout(function() {
+          const loading = document.getElementById('pdfLoading');
+          if (loading && loading.style.display !== 'none') {
+            console.log('[PDF] 로딩 지연, 직접 URL로 재시도');
+            iframe.src = directUrl;
+          }
+        }, 3000);
+        
+        // 8초 후에도 로딩이 계속되면 오류 메시지 표시
         setTimeout(function() {
           const loading = document.getElementById('pdfLoading');
           if (loading && loading.style.display !== 'none') {
@@ -13851,9 +13843,8 @@
                 <p style="color: #95a5a6; font-size: 14px; margin-bottom: 20px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
               </div>
             `;
-            iframe.style.display = 'none';
           }
-        }, 5000);
+        }, 8000);
         
         modalContent.appendChild(header);
         modalContent.appendChild(pdfContainer);
