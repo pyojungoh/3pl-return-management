@@ -1259,17 +1259,23 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
         
         # 화주사 필터링 (정규화 및 해시태그 지원)
         if company_name:
+            # 조회 대상 화주사명 정규화
+            company_name_normalized = normalize_company_name(company_name)
+            
             # 검색 가능한 키워드 목록 가져오기 (본인 이름 + 해시태그)
             # get_company_search_keywords는 이미 정규화된 값을 반환
             try:
                 normalized_keywords = get_company_search_keywords(company_name)
                 if not normalized_keywords:
-                    normalized_keywords = [normalize_company_name(company_name)]
+                    normalized_keywords = [company_name_normalized]
+                # 조회 대상 화주사명의 정규화된 이름도 키워드에 추가
+                if company_name_normalized not in normalized_keywords:
+                    normalized_keywords.append(company_name_normalized)
             except Exception as e:
                 print(f"[경고] 화주사 '{company_name}' 키워드 조회 실패: {e}")
                 import traceback
                 traceback.print_exc()
-                normalized_keywords = [normalize_company_name(company_name)]
+                normalized_keywords = [company_name_normalized]
             
             # 디버깅: 키워드 목록 확인
             print(f"[정산조회] 화주사 '{company_name}' 정규화된 키워드: {normalized_keywords}")
@@ -1304,8 +1310,7 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                     # 1. 정산 내역 화주사명을 정규화하여 직접 비교
                     settlement_company_normalized = normalize_company_name(settlement_company)
                     
-                    # 조회 대상 화주사명도 정규화하여 직접 비교 (예: "TKS 컴퍼니" vs "TKS컴퍼니")
-                    company_name_normalized = normalize_company_name(company_name)
+                    # 직접 비교: 정규화된 이름이 일치하거나 키워드 목록에 포함되는지 확인
                     is_match = (settlement_company_normalized == company_name_normalized) or (settlement_company_normalized in normalized_keywords)
                     
                     # 2. 직접 매칭이 안 되면 정산 내역 화주사명의 키워드도 확인 (양방향)
@@ -1314,22 +1319,18 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                         try:
                             settlement_normalized_keywords = get_company_search_keywords(settlement_company)
                             if not settlement_normalized_keywords:
-                                settlement_normalized_keywords = [normalize_company_name(settlement_company)]
+                                settlement_normalized_keywords = [settlement_company_normalized]
+                            # 정산 내역 화주사명의 정규화된 이름도 키워드에 추가
+                            if settlement_company_normalized not in settlement_normalized_keywords:
+                                settlement_normalized_keywords.append(settlement_company_normalized)
                         except Exception as e:
                             print(f"[경고] 정산 내역 화주사 '{settlement_company}' 키워드 조회 실패: {e}")
-                            settlement_normalized_keywords = [normalize_company_name(settlement_company)]
+                            settlement_normalized_keywords = [settlement_company_normalized]
                         
                         # 양방향 비교: 조회 대상 키워드 ↔ 정산 내역 키워드
-                        for norm_kw in normalized_keywords:
-                            if norm_kw in settlement_normalized_keywords:
-                                is_match = True
-                                break
-                        
-                        if not is_match:
-                            for settlement_norm_kw in settlement_normalized_keywords:
-                                if settlement_norm_kw in normalized_keywords:
-                                    is_match = True
-                                    break
+                        # 집합 교집합으로 빠르게 확인
+                        if set(normalized_keywords) & set(settlement_normalized_keywords):
+                            is_match = True
                     
                     if is_match:
                         result.append(settlement)
@@ -1339,6 +1340,7 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                     traceback.print_exc()
                     continue
             
+            print(f"[정산조회] 화주사 '{company_name}' 매칭된 정산 내역: {len(result)}개")
             return result
         else:
             # 화주사 필터링 없음 - 모든 정산 내역 조회 후 정규화하여 통합
