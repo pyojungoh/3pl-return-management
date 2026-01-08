@@ -2428,13 +2428,18 @@ def get_companies():
         # 화주사 목록에 비활성화 상태 추가
         companies_list = []
         for comp_name in companies_with_pallets:
-            # companies 테이블에 있는 경우 딕셔너리에서 가져오기
+            # 모든 화주사에 대해 is_company_deactivated로 최종 상태 확인
+            # (companies 테이블과 deactivated_companies 테이블 모두 확인)
+            is_deactivated = is_company_deactivated(comp_name)
+            
             if comp_name in companies_dict:
-                company_info = companies_dict[comp_name]
-                print(f"[화주사목록] {comp_name}: companies 테이블에 있음, is_active={company_info.get('is_active')}")
+                # companies 테이블에 있는 경우: 딕셔너리에서 가져오되, deactivated_companies도 확인
+                company_info = companies_dict[comp_name].copy()
+                # deactivated_companies 테이블에 있으면 무조건 비활성화
+                company_info['is_active'] = not is_deactivated
+                print(f"[화주사목록] {comp_name}: companies 테이블에 있음, 최종 is_active={company_info.get('is_active')} (deactivated={is_deactivated})")
             else:
-                # companies 테이블에 없는 경우: deactivated_companies 테이블 확인
-                is_deactivated = is_company_deactivated(comp_name)
+                # companies 테이블에 없는 경우: deactivated_companies 테이블만 확인
                 company_info = {
                     'company_name': comp_name,
                     'is_active': not is_deactivated  # 비활성화되어 있으면 False

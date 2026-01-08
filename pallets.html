@@ -3362,12 +3362,15 @@
               const companyNameEscaped = palEscapeHtml(companyName);
               
               // 디버깅 로그
-              console.log(`[화주사목록] ${companyName}:`, {
-                type: typeof company,
-                is_object: typeof company === 'object',
-                is_active: company.is_active,
-                isActive: isActive
-              });
+              if (!isActive) {
+                console.log(`[화주사목록] ⚠️ 비활성화된 화주사: ${companyName}`, {
+                  type: typeof company,
+                  is_object: typeof company === 'object',
+                  is_active: company.is_active,
+                  isActive: isActive,
+                  raw_company: company
+                });
+              }
               
               // 비활성화된 화주사는 빨간색으로 표시
               const buttonStyle = isActive 
