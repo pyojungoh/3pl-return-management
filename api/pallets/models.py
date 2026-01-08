@@ -1330,8 +1330,7 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
             if unique_companies:
                 # 모든 화주사 조회 (대소문자 무시를 위해 Python에서 필터링)
                 if USE_POSTGRESQL:
-                    placeholders = ','.join(['%s' for _ in unique_companies])
-                    cursor.execute(f'''
+                    cursor.execute('''
                         SELECT company_name, search_keywords 
                         FROM companies
                     ''')
@@ -1343,8 +1342,11 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                 
                 keyword_rows = cursor.fetchall()
                 
-                # 정규화된 화주사명 목록 생성
+                # 정규화된 화주사명 목록 생성 (정산 내역의 화주사명들)
                 normalized_unique_companies = {normalize_company_name(comp) for comp in unique_companies}
+                
+                # 원본 화주사명 -> 정규화된 이름 매핑 (정산 내역 기준)
+                original_to_normalized = {comp: normalize_company_name(comp) for comp in unique_companies}
                 
                 for row in keyword_rows:
                     if USE_POSTGRESQL:
@@ -1363,8 +1365,22 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                         if search_keywords:
                             aliases = [alias.strip() for alias in search_keywords.replace('\n', ',').split(',') if alias.strip()]
                             keywords.extend(aliases)
+                        
                         # 정규화된 이름으로 캐시 저장 (대소문자 무시)
-                        company_keywords_cache[norm_comp_name] = keywords
+                        # 같은 정규화된 이름이 여러 개 있으면 키워드를 합침
+                        if norm_comp_name in company_keywords_cache:
+                            # 기존 키워드와 합치기 (중복 제거)
+                            existing_keywords = company_keywords_cache[norm_comp_name]
+                            all_keywords = list(set(existing_keywords + keywords))
+                            company_keywords_cache[norm_comp_name] = all_keywords
+                        else:
+                            company_keywords_cache[norm_comp_name] = keywords
+                
+                # 캐시에 없는 정산 내역 화주사명도 추가 (기본값)
+                for orig_comp in unique_companies:
+                    norm_comp = normalize_company_name(orig_comp)
+                    if norm_comp not in company_keywords_cache:
+                        company_keywords_cache[norm_comp] = [orig_comp]
             
             # 1. 각 화주사명에 대해 정규화된 키워드 목록 생성 (본인 이름 + 해시태그)
             company_keywords_map = {}  # 정규화된 키워드 -> 원본 화주사명 매핑
