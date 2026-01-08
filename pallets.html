@@ -3355,8 +3355,19 @@
           } else {
             listContainer.innerHTML = companies.map(company => {
               const companyName = typeof company === 'string' ? company : (company.company_name || company);
-              const isActive = typeof company === 'object' ? (company.is_active !== false && company.is_active !== 0) : true;
+              // is_active 확인: false, 0, null, undefined는 비활성화로 간주
+              const isActive = typeof company === 'object' 
+                ? (company.is_active !== false && company.is_active !== 0 && company.is_active !== null && company.is_active !== undefined)
+                : true;
               const companyNameEscaped = palEscapeHtml(companyName);
+              
+              // 디버깅 로그
+              console.log(`[화주사목록] ${companyName}:`, {
+                type: typeof company,
+                is_object: typeof company === 'object',
+                is_active: company.is_active,
+                isActive: isActive
+              });
               
               // 비활성화된 화주사는 빨간색으로 표시
               const buttonStyle = isActive 

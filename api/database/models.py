@@ -1869,6 +1869,8 @@ def is_company_deactivated(company_name: str) -> bool:
     cursor = conn.cursor()
     
     try:
+        print(f"[비활성화확인] 화주사명: '{company_name}' 확인 시작")
+        
         # 1. companies 테이블에 있는 경우: is_active 필드 확인
         if USE_POSTGRESQL:
             cursor.execute('''
@@ -1887,23 +1889,31 @@ def is_company_deactivated(company_name: str) -> bool:
         if company_row:
             # companies 테이블에 있는 경우
             is_active = company_row[0] if USE_POSTGRESQL else company_row[0]
+            print(f"[비활성화확인] companies 테이블에 있음, is_active 값: {is_active} (타입: {type(is_active)})")
             # SQLite는 INTEGER (1/0), PostgreSQL은 BOOLEAN
             if isinstance(is_active, int):
-                return is_active == 0
+                result = is_active == 0
             else:
-                return not bool(is_active)
+                result = not bool(is_active)
+            print(f"[비활성화확인] companies 테이블 결과: {result}")
+            return result
         
         # 2. companies 테이블에 없는 경우: deactivated_companies 테이블 확인
+        print(f"[비활성화확인] companies 테이블에 없음, deactivated_companies 테이블 확인")
         if USE_POSTGRESQL:
             cursor.execute('SELECT id FROM deactivated_companies WHERE company_name = %s', (company_name,))
         else:
             cursor.execute('SELECT id FROM deactivated_companies WHERE company_name = ?', (company_name,))
         
         deactivated_row = cursor.fetchone()
-        return deactivated_row is not None
+        result = deactivated_row is not None
+        print(f"[비활성화확인] deactivated_companies 테이블 결과: {result}")
+        return result
         
     except Exception as e:
         print(f"[오류] is_company_deactivated 실패: {e}")
+        import traceback
+        traceback.print_exc()
         return False  # 에러 발생 시 기본값은 활성화
     finally:
         cursor.close()

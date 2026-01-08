@@ -2431,6 +2431,7 @@ def get_companies():
             # companies 테이블에 있는 경우 딕셔너리에서 가져오기
             if comp_name in companies_dict:
                 company_info = companies_dict[comp_name]
+                print(f"[화주사목록] {comp_name}: companies 테이블에 있음, is_active={company_info.get('is_active')}")
             else:
                 # companies 테이블에 없는 경우: deactivated_companies 테이블 확인
                 is_deactivated = is_company_deactivated(comp_name)
@@ -2438,6 +2439,7 @@ def get_companies():
                     'company_name': comp_name,
                     'is_active': not is_deactivated  # 비활성화되어 있으면 False
                 }
+                print(f"[화주사목록] {comp_name}: companies 테이블에 없음, deactivated={is_deactivated}, is_active={company_info.get('is_active')}")
             companies_list.append(company_info)
         
         return jsonify({
