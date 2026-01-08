@@ -1402,25 +1402,18 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
                     ORDER BY company_name
                 ''', (settlement_month,))
         else:
-            # 가장 최근 정산월의 화주사 목록 조회
+            # 정산월이 없으면 모든 정산월의 화주사 목록 조회 (합집합)
+            # 모든 정산월에 걸쳐 DISTINCT 화주사명 조회
             if USE_POSTGRESQL:
                 cursor.execute('''
                     SELECT DISTINCT company_name 
                     FROM pallet_settlement_companies 
-                    WHERE settlement_month = (
-                        SELECT MAX(settlement_month) 
-                        FROM pallet_settlement_companies
-                    )
                     ORDER BY company_name
                 ''')
             else:
                 cursor.execute('''
                     SELECT DISTINCT company_name 
                     FROM pallet_settlement_companies 
-                    WHERE settlement_month = (
-                        SELECT MAX(settlement_month) 
-                        FROM pallet_settlement_companies
-                    )
                     ORDER BY company_name
                 ''')
         
@@ -1432,7 +1425,7 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
         
         # 저장된 화주사 목록이 있으면 바로 반환 (이미 정산 생성 시 통합되어 있음)
         if stored_companies:
-            print(f"[화주사 목록 최적화] 저장된 목록 사용: {len(stored_companies)}개 (정산월: {settlement_month or '최근'})")
+            print(f"[화주사 목록 최적화] 저장된 목록 사용: {len(stored_companies)}개 (정산월: {settlement_month or '전체'})")
             return sorted(stored_companies)
         
         # 2단계: 저장된 목록이 없으면 파레트 테이블에서 실시간 조회 (기존 방식)
