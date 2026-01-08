@@ -2160,7 +2160,8 @@ def get_company_search_keywords(company_name: str) -> List[str]:
             
             # search_keywords 필드에서 별칭 추가
             search_keywords = matched_company.get('search_keywords', '')
-            if search_keywords:
+            # 'None' 문자열이나 None 값 처리
+            if search_keywords and search_keywords != 'None' and search_keywords.lower() != 'none':
                 # 쉼표나 줄바꿈으로 구분된 별칭들
                 aliases = [alias.strip() for alias in search_keywords.replace('\n', ',').split(',') if alias.strip()]
                 keywords.extend([normalize_company_name(alias) for alias in aliases])
