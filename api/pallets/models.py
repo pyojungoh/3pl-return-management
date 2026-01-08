@@ -1786,12 +1786,9 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
             stored_companies = [row[0] for row in stored_rows if row[0]]
         
         # 저장된 목록이 있으면 그것을 사용 (이미 정산 생성 시 통합되어 있음)
-        if stored_companies:
-            print(f"[화주사 목록 최적화] 저장된 목록 사용: {len(stored_companies)}개 (정산월: {settlement_month or '전체'})")
-            return sorted(stored_companies)
-        
-        # 2단계: 저장된 목록이 없으면 파레트 테이블에서 조회
-        print(f"[화주사 목록] 저장된 목록 없음, 파레트 테이블에서 조회")
+        # 하지만 실제 파레트 테이블의 모든 화주사명을 반영하기 위해 항상 파레트 테이블에서 조회
+        # 캐시는 성능 최적화용이지만, 정확성을 위해 파레트 테이블 우선 사용
+        print(f"[화주사 목록] 파레트 테이블에서 직접 조회 (정확성 우선)")
         
         # 파레트 테이블에서 화주사명 목록 조회
         if settlement_month:
