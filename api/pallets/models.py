@@ -933,17 +933,21 @@ def generate_monthly_settlement(settlement_month: str = None,
     company_normalized_map = {}  # 정규화된 이름 -> 대표 화주사명 매핑
     
     # 특정 화주사의 정산 생성 시 해당 화주사의 키워드 목록 가져오기
-    target_company_keywords = None
+    # get_company_search_keywords는 이미 정규화된 값을 반환하므로 추가 정규화 불필요
     target_company_normalized = None
     if company_name:
         try:
-            target_company_keywords = get_company_search_keywords(company_name)
-            if not target_company_keywords:
-                target_company_keywords = [company_name]
+            target_company_normalized = get_company_search_keywords(company_name)
+            if not target_company_normalized:
+                target_company_normalized = [normalize_company_name(company_name)]
         except Exception as e:
             print(f"[경고] 대상 화주사 '{company_name}' 키워드 조회 실패: {e}")
-            target_company_keywords = [company_name]
-        target_company_normalized = [normalize_company_name(kw) for kw in target_company_keywords]
+            import traceback
+            traceback.print_exc()
+            target_company_normalized = [normalize_company_name(company_name)]
+        
+        # 디버깅: 키워드 목록 확인
+        print(f"[정산생성] 화주사 '{company_name}' 정규화된 키워드: {target_company_normalized}")
     
     for pallet in pallets:
         raw_company = pallet['company_name']
@@ -962,16 +966,15 @@ def generate_monthly_settlement(settlement_month: str = None,
             
             # 직접 매칭이 안 되면 파레트 화주사명의 키워드도 확인 (태그 포함)
             if not is_match:
-                pallet_keywords = []
+                # get_company_search_keywords는 이미 정규화된 값을 반환
+                pallet_normalized_keywords = []
                 try:
-                    pallet_keywords = get_company_search_keywords(raw_company)
-                    if not pallet_keywords:
-                        pallet_keywords = [raw_company]
+                    pallet_normalized_keywords = get_company_search_keywords(raw_company)
+                    if not pallet_normalized_keywords:
+                        pallet_normalized_keywords = [normalize_company_name(raw_company)]
                 except Exception as e:
                     print(f"[경고] 파레트 화주사 '{raw_company}' 키워드 조회 실패: {e}")
-                    pallet_keywords = [raw_company]
-                
-                pallet_normalized_keywords = [normalize_company_name(kw) for kw in pallet_keywords]
+                    pallet_normalized_keywords = [normalize_company_name(raw_company)]
                 
                 # 양방향 비교
                 for norm_kw in target_company_normalized:
@@ -990,24 +993,24 @@ def generate_monthly_settlement(settlement_month: str = None,
                 continue
         
         # 정규화된 키워드 목록 가져오기 (본인 이름 + 해시태그)
+        # get_company_search_keywords는 이미 정규화된 값을 반환
         try:
-            search_keywords = get_company_search_keywords(raw_company)
-            if not search_keywords:
-                search_keywords = [raw_company]
+            normalized_keywords = get_company_search_keywords(raw_company)
+            if not normalized_keywords:
+                normalized_keywords = [normalize_company_name(raw_company)]
         except Exception as e:
             print(f"[경고] 화주사 '{raw_company}' 키워드 조회 실패: {e}")
-            search_keywords = [raw_company]
-        
-        normalized_keywords = [normalize_company_name(kw) for kw in search_keywords]
+            normalized_keywords = [normalize_company_name(raw_company)]
         
         # 대표 화주사명 결정 (이미 매핑된 것이 있으면 사용, 없으면 원본 사용)
+        # 정규화된 키워드 중 하나라도 이미 매핑되어 있으면 해당 대표 화주사명 사용
         representative_company = raw_company
         for normalized_kw in normalized_keywords:
             if normalized_kw in company_normalized_map:
                 representative_company = company_normalized_map[normalized_kw]
                 break
         
-        # 매핑 업데이트
+        # 매핑 업데이트: 모든 정규화된 키워드를 대표 화주사명에 매핑
         for normalized_kw in normalized_keywords:
             if normalized_kw not in company_normalized_map:
                 company_normalized_map[normalized_kw] = representative_company
@@ -1257,17 +1260,19 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
         # 화주사 필터링 (정규화 및 해시태그 지원)
         if company_name:
             # 검색 가능한 키워드 목록 가져오기 (본인 이름 + 해시태그)
+            # get_company_search_keywords는 이미 정규화된 값을 반환
             try:
-                search_keywords = get_company_search_keywords(company_name)
-                if not search_keywords:
-                    search_keywords = [company_name]
+                normalized_keywords = get_company_search_keywords(company_name)
+                if not normalized_keywords:
+                    normalized_keywords = [normalize_company_name(company_name)]
             except Exception as e:
                 print(f"[경고] 화주사 '{company_name}' 키워드 조회 실패: {e}")
                 import traceback
                 traceback.print_exc()
-                search_keywords = [company_name]
+                normalized_keywords = [normalize_company_name(company_name)]
             
-            normalized_keywords = [normalize_company_name(kw) for kw in search_keywords]
+            # 디버깅: 키워드 목록 확인
+            print(f"[정산조회] 화주사 '{company_name}' 정규화된 키워드: {normalized_keywords}")
             
             # 모든 정산 내역을 가져온 후 필터링
             if settlement_month:
@@ -1305,15 +1310,14 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                     
                     # 2. 직접 매칭이 안 되면 정산 내역 화주사명의 키워드도 확인 (양방향)
                     if not is_match:
+                        # get_company_search_keywords는 이미 정규화된 값을 반환
                         try:
-                            settlement_keywords = get_company_search_keywords(settlement_company)
-                            if not settlement_keywords:
-                                settlement_keywords = [settlement_company]
+                            settlement_normalized_keywords = get_company_search_keywords(settlement_company)
+                            if not settlement_normalized_keywords:
+                                settlement_normalized_keywords = [normalize_company_name(settlement_company)]
                         except Exception as e:
                             print(f"[경고] 정산 내역 화주사 '{settlement_company}' 키워드 조회 실패: {e}")
-                            settlement_keywords = [settlement_company]
-                        
-                        settlement_normalized_keywords = [normalize_company_name(kw) for kw in settlement_keywords]
+                            settlement_normalized_keywords = [normalize_company_name(settlement_company)]
                         
                         # 양방향 비교: 조회 대상 키워드 ↔ 정산 내역 키워드
                         for norm_kw in normalized_keywords:
@@ -2124,17 +2128,14 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
         # 화주사 태그를 고려한 키워드 목록 가져오기
         from api.database.models import normalize_company_name, get_company_search_keywords
         
-        search_keywords = []
+        # get_company_search_keywords는 이미 정규화된 값을 반환
         try:
-            search_keywords = get_company_search_keywords(settlement_company)
-            if not search_keywords:
-                search_keywords = [settlement_company]
+            normalized_keywords = get_company_search_keywords(settlement_company)
+            if not normalized_keywords:
+                normalized_keywords = [normalize_company_name(settlement_company)]
         except Exception as e:
             print(f"[경고] 화주사 '{settlement_company}' 키워드 조회 실패: {e}")
-            search_keywords = [settlement_company]
-        
-        # 정규화된 키워드 목록 생성 (띄어쓰기 무시)
-        normalized_keywords = [normalize_company_name(kw) for kw in search_keywords]
+            normalized_keywords = [normalize_company_name(settlement_company)]
         
         if USE_POSTGRESQL:
             cursor.execute('''
