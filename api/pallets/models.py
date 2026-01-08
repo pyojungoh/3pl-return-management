@@ -1334,13 +1334,15 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
     """
     파레트를 보관 중인 화주사 목록 조회
     
-    ✅ 성능 최적화:
-    - 단순 DISTINCT 쿼리로 변경 (N+1 쿼리 문제 해결)
-    - 정규화 로직은 필요시 프론트엔드에서 처리
+    ✅ 화주사 태그 동기화 지원:
+    - search_keywords 필드를 고려하여 동일 화주사 통합
+    - "TKS 컴퍼니"와 "TKS컴퍼니" 같은 동일 화주사를 하나로 통합
     
     Args:
         settlement_month: 정산월 (YYYY-MM 형식). 지정되면 해당 월에 보관했던 화주사만 조회
     """
+    from api.database.models import normalize_company_name, get_company_search_keywords
+    
     conn = get_db_connection()
     
     try:
@@ -1350,7 +1352,7 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
         else:
             cursor = conn.cursor()
         
-        # 단순 DISTINCT 쿼리로 성능 최적화
+        # 파레트에서 화주사명 목록 조회
         if USE_POSTGRESQL:
             cursor.execute('''
                 SELECT DISTINCT company_name 
@@ -1369,13 +1371,63 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
         rows = cursor.fetchall()
         
         # 화주사명 목록 추출
-        companies = []
+        raw_companies = []
         if USE_POSTGRESQL:
-            companies = [row['company_name'] for row in rows if row.get('company_name')]
+            raw_companies = [row['company_name'] for row in rows if row.get('company_name')]
         else:
-            companies = [row[0] for row in rows if row[0]]
+            raw_companies = [row[0] for row in rows if row[0]]
         
-        return companies
+        # 화주사 태그를 고려하여 동일 화주사 통합
+        # Union-Find 방식으로 동일 그룹 통합
+        company_to_group = {}  # {화주사명: 그룹_ID}
+        group_to_companies = {}  # {그룹_ID: [화주사명들]}
+        group_id_counter = 0
+        
+        # 1단계: 각 화주사명에 대해 키워드 수집 및 그룹 생성
+        for company in raw_companies:
+            # 화주사 등록 정보에서 키워드 가져오기 (본인 이름 + 태그)
+            keywords = get_company_search_keywords(company)
+            
+            # 이미 그룹에 속해있는지 확인
+            found_group = None
+            for keyword_normalized in keywords:
+                # 이 키워드와 연결된 화주사 찾기
+                for existing_company, existing_group in company_to_group.items():
+                    existing_keywords = get_company_search_keywords(existing_company)
+                    if keyword_normalized in existing_keywords:
+                        found_group = existing_group
+                        break
+                if found_group:
+                    break
+            
+            # 그룹에 추가
+            if found_group is not None:
+                company_to_group[company] = found_group
+                group_to_companies[found_group].append(company)
+            else:
+                # 새 그룹 생성
+                new_group = group_id_counter
+                group_id_counter += 1
+                company_to_group[company] = new_group
+                group_to_companies[new_group] = [company]
+        
+        # 2단계: 각 그룹의 대표 이름 선택 (가장 짧은 이름, 길이가 같으면 알파벳 순서)
+        result_companies = []
+        for group_companies in group_to_companies.values():
+            representative = min(group_companies, key=lambda x: (len(x), x))
+            result_companies.append(representative)
+        
+        # 정렬
+        result_companies = sorted(result_companies)
+        
+        print(f"[화주사 태그 동기화] 원본: {len(raw_companies)}개 → 통합 후: {len(result_companies)}개")
+        if len(raw_companies) != len(result_companies):
+            print(f"  통합 그룹 수: {len(group_to_companies)}개")
+            for group_id, companies_list in list(group_to_companies.items())[:5]:
+                if len(companies_list) > 1:
+                    print(f"    그룹 {group_id}: {companies_list} → {min(companies_list, key=lambda x: (len(x), x))}")
+        
+        return result_companies
     finally:
         cursor.close()
         conn.close()

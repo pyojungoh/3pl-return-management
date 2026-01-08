@@ -228,6 +228,12 @@
       -webkit-overflow-scrolling: touch;
       scrollbar-width: thin;
       scrollbar-color: #ffa502 #fff9e6;
+      height: 100% !important;
+      max-height: 100% !important;
+    }
+    
+    #palCompaniesList {
+      min-height: 100%;
     }
     
     #palCompaniesScrollArea::-webkit-scrollbar {
@@ -691,12 +697,12 @@
         <!-- 왼쪽: 화주사 목록 (관리자만), 오른쪽: 정산 내역 -->
         <div style="display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: start;" id="palListLayout">
           <!-- 왼쪽: 화주사 목록 (관리자만 표시) -->
-          <div class="pal-table-container pal-admin-only" id="palCompaniesContainer" style="height: calc(100vh - 300px); min-height: 500px; display: flex; flex-direction: column; overflow: hidden;">
+          <div class="pal-table-container pal-admin-only" id="palCompaniesContainer" style="height: calc(100vh - 300px); min-height: 500px; max-height: calc(100vh - 300px); display: flex; flex-direction: column; overflow: hidden;">
             <div class="pal-table-header" style="flex-shrink: 0; padding: 12px 15px;">
               <h3 style="font-size: 14px; margin: 0;">화주사 목록 <span id="palCompaniesCount" style="font-size: 11px; color: #636e72;">(0개)</span></h3>
             </div>
-            <div id="palCompaniesScrollArea" style="flex: 1; overflow-y: auto !important; overflow-x: hidden; padding: 6px; min-height: 0;">
-              <div id="palCompaniesList" style="display: flex; flex-direction: column; gap: 3px; min-height: min-content;">
+            <div id="palCompaniesScrollArea" style="flex: 1; overflow-y: auto !important; overflow-x: hidden !important; padding: 6px; min-height: 0; max-height: 100%; position: relative;">
+              <div id="palCompaniesList" style="display: flex; flex-direction: column; gap: 3px; width: 100%;">
                 <!-- 화주사 목록이 여기에 동적으로 추가됨 -->
               </div>
             </div>
@@ -3353,6 +3359,18 @@
                 ${palEscapeHtml(company)}
               </button>
             `).join('');
+            
+            // 스크롤 영역이 제대로 작동하도록 높이 재계산 및 스크롤 맨 아래로 이동
+            setTimeout(() => {
+              const scrollArea = document.getElementById('palCompaniesScrollArea');
+              if (scrollArea) {
+                // 스크롤을 맨 아래로 이동
+                scrollArea.scrollTop = scrollArea.scrollHeight;
+                // 높이 강제 업데이트
+                listContainer.style.minHeight = 'auto';
+                listContainer.style.height = 'auto';
+              }
+            }, 100);
           }
         } else {
           listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #f44336;">❌ ' + result.message + '</div>';
