@@ -2205,51 +2205,54 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
         else:
             end_date = date(year, month + 1, 1) - timedelta(days=1)
         
-        # 파레트별 상세 내역 처리 (보관료 재계산 - 해당 월 기준으로)
-        pallets_list = []
+        # 성능 최적화: 모든 파레트의 화주사명을 먼저 수집하여 배치로 키워드 조회 (N+1 문제 해결)
+        all_pallets = []
+        unique_pallet_companies = set()
+        
         for row in rows:
             if USE_POSTGRESQL:
                 pallet = dict(row)
             else:
                 pallet = dict(zip([col[0] for col in cursor.description], row))
-            
+            all_pallets.append(pallet)
+            pallet_company = pallet.get('company_name', '')
+            if pallet_company:
+                unique_pallet_companies.add(pallet_company)
+        
+        # 배치로 모든 파레트 화주사명의 키워드 조회 (캐싱)
+        pallet_keywords_cache = {}  # {화주사명: [정규화된 키워드 목록]}
+        for pallet_company in unique_pallet_companies:
+            try:
+                pallet_keywords = get_company_search_keywords(pallet_company)
+                if not pallet_keywords:
+                    pallet_keywords = [pallet_company]
+                # 정규화된 키워드로 변환
+                pallet_normalized_keywords = [normalize_company_name(kw) for kw in pallet_keywords]
+                # 정규화된 화주사명도 추가
+                pallet_company_normalized = normalize_company_name(pallet_company)
+                if pallet_company_normalized not in pallet_normalized_keywords:
+                    pallet_normalized_keywords.append(pallet_company_normalized)
+                pallet_keywords_cache[pallet_company] = pallet_normalized_keywords
+            except Exception as e:
+                pallet_company_normalized = normalize_company_name(pallet_company)
+                pallet_keywords_cache[pallet_company] = [pallet_company_normalized]
+        
+        # 파레트별 상세 내역 처리 (보관료 재계산 - 해당 월 기준으로)
+        pallets_list = []
+        for pallet in all_pallets:
             # 화주사명 태그 필터링 (정규화된 키워드로 비교 - 띄어쓰기 무시)
             pallet_company = pallet.get('company_name', '')
             if pallet_company:
                 # 파레트의 화주사명을 정규화하여 비교
                 pallet_company_normalized = normalize_company_name(pallet_company)
                 
-                # 파레트 화주사명의 키워드도 확인 (태그 포함)
-                pallet_keywords = []
-                try:
-                    pallet_keywords = get_company_search_keywords(pallet_company)
-                    if not pallet_keywords:
-                        pallet_keywords = [pallet_company]
-                except Exception as e:
-                    print(f"[경고] 파레트 화주사 '{pallet_company}' 키워드 조회 실패: {e}")
-                    pallet_keywords = [pallet_company]
-                
-                pallet_normalized_keywords = [normalize_company_name(kw) for kw in pallet_keywords]
+                # 캐시에서 파레트 화주사명의 키워드 가져오기 (이미 배치로 조회됨)
+                pallet_normalized_keywords = pallet_keywords_cache.get(pallet_company, [pallet_company_normalized])
                 
                 # 정산 화주사명의 키워드와 파레트 화주사명의 키워드가 하나라도 일치하는지 확인
                 # 양방향 비교: 정산 화주사 키워드 ↔ 파레트 화주사 키워드
-                is_match = False
-                
-                # 1. 정산 화주사 키워드가 파레트 화주사 키워드에 포함되는지 확인
-                for norm_kw in normalized_keywords:
-                    if norm_kw in pallet_normalized_keywords:
-                        is_match = True
-                        break
-                    if pallet_company_normalized == norm_kw:
-                        is_match = True
-                        break
-                
-                # 2. 파레트 화주사 키워드가 정산 화주사 키워드에 포함되는지 확인 (양방향)
-                if not is_match:
-                    for pallet_norm_kw in pallet_normalized_keywords:
-                        if pallet_norm_kw in normalized_keywords:
-                            is_match = True
-                            break
+                # 집합 교집합으로 빠르게 확인
+                is_match = bool(set(normalized_keywords) & set(pallet_normalized_keywords))
                 
                 if not is_match:
                     # 화주사명이 일치하지 않으면 건너뜀
