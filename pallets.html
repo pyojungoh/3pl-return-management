@@ -686,6 +686,24 @@
           </div>
         </div>
         
+        <!-- 일괄 정산 생성/삭제 (관리자만) -->
+        <div class="pal-admin-only" style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px;">
+          <h3 style="color: #ff6b35; font-weight: 700; margin: 0 0 15px 0; font-size: 16px;">⚡ 일괄 정산 관리</h3>
+          <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+            <div style="flex: 0 0 auto;">
+              <label style="display: block; font-size: 12px; margin-bottom: 6px; color: #636e72; font-weight: 600;">정산월</label>
+              <input type="month" id="palBatchSettlementMonth" class="pal-form-input" style="padding: 8px 12px; font-size: 13px; width: 160px; border: 2px solid #ddd; border-radius: 6px;">
+            </div>
+            <button class="pal-btn" onclick="palGenerateAllSettlements()" style="padding: 8px 16px; font-size: 13px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+              ✨ 전체 정산 생성
+            </button>
+            <button class="pal-btn" onclick="palDeleteAllSettlements()" style="padding: 8px 16px; font-size: 13px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+              🗑️ 전체 정산 삭제
+            </button>
+          </div>
+          <div id="palBatchSettlementMessage" style="margin-top: 12px; font-size: 12px;"></div>
+        </div>
+        
         <!-- 왼쪽: 화주사 목록 (관리자만), 오른쪽: 정산 내역 -->
         <div style="display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: start;" id="palListLayout">
           <!-- 왼쪽: 화주사 목록 (관리자만 표시) -->
@@ -3387,6 +3405,120 @@
       palLoadSettlements(companyName);
     }
     
+    
+    // 전체 정산 일괄 생성
+    async function palGenerateAllSettlements() {
+      const monthInput = document.getElementById('palBatchSettlementMonth');
+      const messageDiv = document.getElementById('palBatchSettlementMessage');
+      
+      if (!monthInput || !monthInput.value) {
+        if (messageDiv) messageDiv.innerHTML = '<div style="color: #dc3545;">❌ 정산월을 선택해주세요.</div>';
+        return;
+      }
+      
+      const settlementMonth = monthInput.value;
+      
+      if (!confirm(`${settlementMonth} 전체 화주사의 정산을 일괄 생성하시겠습니까?\n\n⚠️ 이 작업은 시간이 걸릴 수 있습니다.`)) {
+        return;
+      }
+      
+      if (!confirm(`정말로 ${settlementMonth} 전체 화주사의 정산을 생성하시겠습니까?`)) {
+        return;
+      }
+      
+      if (messageDiv) messageDiv.innerHTML = '<div style="color: #007bff;">⏳ 정산 생성 중...</div>';
+      
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/settlements/generate-all`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...palGetUserHeaders()
+          },
+          body: JSON.stringify({
+            settlement_month: settlementMonth
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          if (messageDiv) messageDiv.innerHTML = '<div style="color: #28a745;">✅ ' + (result.message || '정산이 일괄 생성되었습니다.') + '</div>';
+          alert('✅ ' + (result.message || '정산이 일괄 생성되었습니다.'));
+          
+          // 화주사 목록 및 정산 내역 새로고침
+          if (palCurrentRole === '관리자') {
+            palLoadCompanyList();
+          }
+          palLoadSettlements(null);
+        } else {
+          if (messageDiv) messageDiv.innerHTML = '<div style="color: #dc3545;">❌ ' + (result.message || '정산 생성에 실패했습니다.') + '</div>';
+          alert('❌ ' + (result.message || '정산 생성에 실패했습니다.'));
+        }
+      } catch (error) {
+        console.error('전체 정산 생성 오류:', error);
+        if (messageDiv) messageDiv.innerHTML = '<div style="color: #dc3545;">❌ 정산 생성 중 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류') + '</div>';
+        alert('❌ 정산 생성 중 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류'));
+      }
+    }
+    
+    // 전체 정산 일괄 삭제
+    async function palDeleteAllSettlements() {
+      const monthInput = document.getElementById('palBatchSettlementMonth');
+      const messageDiv = document.getElementById('palBatchSettlementMessage');
+      
+      if (!monthInput || !monthInput.value) {
+        if (messageDiv) messageDiv.innerHTML = '<div style="color: #dc3545;">❌ 정산월을 선택해주세요.</div>';
+        return;
+      }
+      
+      const settlementMonth = monthInput.value;
+      
+      if (!confirm(`${settlementMonth} 전체 정산을 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다.`)) {
+        return;
+      }
+      
+      if (!confirm(`정말로 ${settlementMonth}의 모든 정산을 삭제하시겠습니까?\n\n모든 화주사의 정산 내역이 삭제됩니다.`)) {
+        return;
+      }
+      
+      if (messageDiv) messageDiv.innerHTML = '<div style="color: #dc3545;">⏳ 정산 삭제 중...</div>';
+      
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/settlements/delete-all?settlement_month=${settlementMonth}`, {
+          method: 'DELETE',
+          headers: palGetUserHeaders()
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          if (messageDiv) messageDiv.innerHTML = '<div style="color: #28a745;">✅ ' + (result.message || '정산이 일괄 삭제되었습니다.') + '</div>';
+          alert('✅ ' + (result.message || '정산이 일괄 삭제되었습니다.'));
+          
+          // 화주사 목록 및 정산 내역 새로고침
+          if (palCurrentRole === '관리자') {
+            palLoadCompanyList();
+          }
+          palLoadSettlements(null);
+        } else {
+          if (messageDiv) messageDiv.innerHTML = '<div style="color: #dc3545;">❌ ' + (result.message || '정산 삭제에 실패했습니다.') + '</div>';
+          alert('❌ ' + (result.message || '정산 삭제에 실패했습니다.'));
+        }
+      } catch (error) {
+        console.error('전체 정산 삭제 오류:', error);
+        if (messageDiv) messageDiv.innerHTML = '<div style="color: #dc3545;">❌ 정산 삭제 중 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류') + '</div>';
+        alert('❌ 정산 삭제 중 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류'));
+      }
+    }
     
     // 정산 생성
     async function palGenerateSettlement(settlementMonth, companyName = null) {

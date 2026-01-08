@@ -1340,6 +1340,104 @@ def delete_settlement_route(settlement_id):
         }), 500
 
 
+@pallets_bp.route('/settlements/generate-all', methods=['POST'])
+def generate_all_settlements():
+    """
+    전체 화주사 정산 일괄 생성
+    """
+    try:
+        role, company_name, username = get_user_context()
+        
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 정산을 일괄 생성할 수 있습니다.'
+            }), 403
+        
+        data = request.get_json() or {}
+        settlement_month = data.get('settlement_month')
+        
+        if not settlement_month:
+            return jsonify({
+                'success': False,
+                'message': '정산월을 지정해주세요.'
+            }), 400
+        
+        # 전체 화주사 정산 생성 (company_name=None)
+        success, message, result = generate_monthly_settlement(
+            settlement_month=settlement_month,
+            company_name=None  # None이면 전체 화주사
+        )
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': message,
+                'data': result
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 400
+            
+    except Exception as e:
+        print(f"정산 일괄 생성 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'정산 일괄 생성 실패: {str(e)}'
+        }), 500
+
+
+@pallets_bp.route('/settlements/delete-all', methods=['DELETE'])
+def delete_all_settlements():
+    """
+    특정 월의 전체 정산 내역 일괄 삭제
+    """
+    try:
+        role, company_name, username = get_user_context()
+        
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 정산을 일괄 삭제할 수 있습니다.'
+            }), 403
+        
+        settlement_month = request.args.get('settlement_month')
+        
+        if not settlement_month:
+            return jsonify({
+                'success': False,
+                'message': '정산월을 지정해주세요.'
+            }), 400
+        
+        from api.pallets.models import delete_settlement_by_month
+        
+        success, message = delete_settlement_by_month(settlement_month)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': message
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 400
+            
+    except Exception as e:
+        print(f"정산 일괄 삭제 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'정산 일괄 삭제 실패: {str(e)}'
+        }), 500
+
+
 @pallets_bp.route('/settlements/export', methods=['GET'])
 def export_settlements():
     """

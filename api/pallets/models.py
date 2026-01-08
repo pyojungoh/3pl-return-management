@@ -1412,6 +1412,59 @@ def update_settlement_status(settlement_id: int, status: str) -> Tuple[bool, str
         conn.close()
 
 
+def delete_settlement_by_month(settlement_month: str) -> Tuple[bool, str]:
+    """
+    특정 월의 전체 정산 내역 일괄 삭제
+    
+    Args:
+        settlement_month: 정산월 (YYYY-MM 형식)
+    
+    Returns:
+        (success, message)
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 삭제할 정산 내역 개수 확인
+        if USE_POSTGRESQL:
+            cursor.execute('SELECT COUNT(*) FROM pallet_monthly_settlements WHERE settlement_month = %s', (settlement_month,))
+            count = cursor.fetchone()[0]
+        else:
+            cursor.execute('SELECT COUNT(*) FROM pallet_monthly_settlements WHERE settlement_month = ?', (settlement_month,))
+            count = cursor.fetchone()[0]
+        
+        if count == 0:
+            return False, f"{settlement_month} 정산 내역이 없습니다."
+        
+        # 파레트별 보관료 상세 내역 삭제
+        if USE_POSTGRESQL:
+            cursor.execute('DELETE FROM pallet_fee_calculations WHERE settlement_month = %s', (settlement_month,))
+        else:
+            cursor.execute('DELETE FROM pallet_fee_calculations WHERE settlement_month = ?', (settlement_month,))
+        
+        # 정산월별 화주사 목록 삭제 (성능 최적화 테이블)
+        if USE_POSTGRESQL:
+            cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = %s', (settlement_month,))
+        else:
+            cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = ?', (settlement_month,))
+        
+        # 정산 내역 삭제
+        if USE_POSTGRESQL:
+            cursor.execute('DELETE FROM pallet_monthly_settlements WHERE settlement_month = %s', (settlement_month,))
+        else:
+            cursor.execute('DELETE FROM pallet_monthly_settlements WHERE settlement_month = ?', (settlement_month,))
+        
+        conn.commit()
+        return True, f"{settlement_month} 정산 내역 {count}개가 삭제되었습니다."
+    except Exception as e:
+        conn.rollback() if USE_POSTGRESQL else None
+        return False, f"정산 일괄 삭제 실패: {str(e)}"
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def delete_settlement(settlement_id: int) -> Tuple[bool, str]:
     """
     정산 내역 삭제
@@ -1428,27 +1481,38 @@ def delete_settlement(settlement_id: int) -> Tuple[bool, str]:
     try:
         # 정산 내역 존재 확인
         if USE_POSTGRESQL:
-            cursor.execute('SELECT id, settlement_month FROM pallet_monthly_settlements WHERE id = %s', (settlement_id,))
+            cursor.execute('SELECT id, settlement_month, company_name FROM pallet_monthly_settlements WHERE id = %s', (settlement_id,))
         else:
-            cursor.execute('SELECT id, settlement_month FROM pallet_monthly_settlements WHERE id = ?', (settlement_id,))
+            cursor.execute('SELECT id, settlement_month, company_name FROM pallet_monthly_settlements WHERE id = ?', (settlement_id,))
         
         row = cursor.fetchone()
         if not row:
             return False, "정산 내역을 찾을 수 없습니다."
         
-        settlement_month = row[1] if USE_POSTGRESQL else row[1]
-        
-        # 파레트별 보관료 상세 내역 삭제
         if USE_POSTGRESQL:
-            cursor.execute('DELETE FROM pallet_fee_calculations WHERE settlement_month = %s', (settlement_month,))
+            settlement_month = row[1]
+            company_name_to_delete = row[2]
         else:
-            cursor.execute('DELETE FROM pallet_fee_calculations WHERE settlement_month = ?', (settlement_month,))
+            settlement_month = row[1]
+            company_name_to_delete = row[2]
         
-        # 정산월별 화주사 목록 삭제 (성능 최적화 테이블)
+        # 파레트별 보관료 상세 내역 삭제 (해당 화주사의 파레트만)
         if USE_POSTGRESQL:
-            cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = %s', (settlement_month,))
+            cursor.execute('''
+                DELETE FROM pallet_fee_calculations 
+                WHERE settlement_month = %s 
+                AND pallet_id IN (
+                    SELECT pallet_id FROM pallets WHERE company_name = %s
+                )
+            ''', (settlement_month, company_name_to_delete))
         else:
-            cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = ?', (settlement_month,))
+            cursor.execute('''
+                DELETE FROM pallet_fee_calculations 
+                WHERE settlement_month = ? 
+                AND pallet_id IN (
+                    SELECT pallet_id FROM pallets WHERE company_name = ?
+                )
+            ''', (settlement_month, company_name_to_delete))
         
         # 정산 내역 삭제
         if USE_POSTGRESQL:
