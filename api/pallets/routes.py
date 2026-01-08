@@ -2465,18 +2465,34 @@ def toggle_company_active(company_name):
         from urllib.parse import unquote
         company_name = unquote(company_name)
         
+        print(f"[비활성화] 요청 받음 - 화주사명: '{company_name}'")
+        
         data = request.get_json() or {}
+        print(f"[비활성화] 요청 데이터: {data}")
+        
         is_active = data.get('is_active')
         
+        # is_active가 None이거나 boolean이 아닌 경우 처리
         if is_active is None:
+            print(f"[비활성화] 오류: is_active 파라미터가 없음")
             return jsonify({
                 'success': False,
                 'message': 'is_active 파라미터가 필요합니다.'
             }), 400
         
+        # boolean으로 변환 (문자열 'true'/'false'도 처리)
+        if isinstance(is_active, str):
+            is_active = is_active.lower() in ('true', '1', 'yes')
+        elif not isinstance(is_active, bool):
+            is_active = bool(is_active)
+        
+        print(f"[비활성화] 처리할 is_active 값: {is_active} (타입: {type(is_active)})")
+        
         from api.database.models import toggle_company_active_status
         
         success, message = toggle_company_active_status(company_name, is_active)
+        
+        print(f"[비활성화] 결과 - success: {success}, message: {message}")
         
         if success:
             return jsonify({

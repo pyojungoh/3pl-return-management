@@ -1715,14 +1715,20 @@ def toggle_company_active_status(company_name: str, is_active: bool) -> Tuple[bo
     cursor = conn.cursor()
     
     try:
+        print(f"[비활성화] toggle_company_active_status 시작 - 화주사명: '{company_name}', is_active: {is_active}")
+        
         # 화주사 존재 확인
         if USE_POSTGRESQL:
             cursor.execute('SELECT id FROM companies WHERE company_name = %s', (company_name,))
         else:
             cursor.execute('SELECT id FROM companies WHERE company_name = ?', (company_name,))
         
-        if not cursor.fetchone():
+        company_row = cursor.fetchone()
+        if not company_row:
+            print(f"[비활성화] 오류: 화주사 '{company_name}'를 찾을 수 없음")
             return False, f"화주사 '{company_name}'를 찾을 수 없습니다."
+        
+        print(f"[비활성화] 화주사 존재 확인 완료")
         
         # is_active 컬럼 존재 여부 확인 및 생성
         if USE_POSTGRESQL:
@@ -1734,8 +1740,9 @@ def toggle_company_active_status(company_name: str, is_active: bool) -> Tuple[bo
             has_is_active = cursor.fetchone() is not None
             
             if not has_is_active:
-                # 컬럼이 없으면 생성
+                print(f"[비활성화] is_active 컬럼이 없어서 생성 중...")
                 cursor.execute('ALTER TABLE companies ADD COLUMN is_active BOOLEAN DEFAULT TRUE')
+                print(f"[비활성화] is_active 컬럼 생성 완료")
         else:
             # SQLite에서 컬럼 존재 여부 확인
             cursor.execute("PRAGMA table_info(companies)")
@@ -1744,10 +1751,12 @@ def toggle_company_active_status(company_name: str, is_active: bool) -> Tuple[bo
             has_is_active = 'is_active' in available_columns
             
             if not has_is_active:
-                # 컬럼이 없으면 생성
+                print(f"[비활성화] is_active 컬럼이 없어서 생성 중...")
                 cursor.execute('ALTER TABLE companies ADD COLUMN is_active INTEGER DEFAULT 1')
+                print(f"[비활성화] is_active 컬럼 생성 완료")
         
         # 상태 업데이트
+        print(f"[비활성화] 상태 업데이트 시작 - is_active: {is_active}")
         if USE_POSTGRESQL:
             cursor.execute('''
                 UPDATE companies 
@@ -1763,7 +1772,11 @@ def toggle_company_active_status(company_name: str, is_active: bool) -> Tuple[bo
                 WHERE company_name = ?
             ''', (active_value, company_name))
         
+        updated_rows = cursor.rowcount
+        print(f"[비활성화] 업데이트된 행 수: {updated_rows}")
+        
         conn.commit()
+        print(f"[비활성화] 커밋 완료")
         
         status_text = '활성화' if is_active else '비활성화'
         return True, f"화주사 '{company_name}'가 {status_text}되었습니다."
