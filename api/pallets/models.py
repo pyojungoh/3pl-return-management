@@ -1361,13 +1361,13 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
     """
     파레트를 보관 중인 화주사 목록 조회
     
-    ✅ 성능 최적화:
-    - 정산 생성 시 저장된 화주사 목록을 우선 사용 (pallet_settlement_companies 테이블)
-    - 저장된 목록이 없으면 파레트 테이블에서 실시간 조회
-    
     ✅ 화주사 태그 동기화 지원:
     - search_keywords 필드를 고려하여 동일 화주사 통합
     - "TKS 컴퍼니"와 "TKS컴퍼니" 같은 동일 화주사를 하나로 통합
+    
+    ⚠️ 중요: 화주사 목록은 항상 파레트 테이블에서 전체를 조회합니다.
+    - 정산월 지정이 있으면 해당 월의 파레트에서 조회
+    - 정산월 지정이 없으면 모든 파레트에서 조회
     
     Args:
         settlement_month: 정산월 (YYYY-MM 형식). 지정되면 해당 월에 보관했던 화주사만 조회
@@ -1383,68 +1383,54 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
         else:
             cursor = conn.cursor()
         
-        # 1단계: 저장된 화주사 목록에서 조회 시도 (정산 생성 시 저장된 목록)
-        stored_companies = []
+        # 파레트 테이블에서 화주사명 목록 조회 (항상 전체 조회)
+        # settlement_month가 지정된 경우만 해당 월의 파레트 필터링
         if settlement_month:
-            # 지정된 정산월의 화주사 목록 조회
+            # 정산월이 지정된 경우: 해당 월에 보관했던 파레트만 조회
+            year, month = map(int, settlement_month.split('-'))
+            from datetime import date, timedelta
+            month_start = date(year, month, 1)
+            if month == 12:
+                month_end = date(year + 1, 1, 1) - timedelta(days=1)
+            else:
+                month_end = date(year, month + 1, 1) - timedelta(days=1)
+            
             if USE_POSTGRESQL:
                 cursor.execute('''
                     SELECT DISTINCT company_name 
-                    FROM pallet_settlement_companies 
-                    WHERE settlement_month = %s
+                    FROM pallets 
+                    WHERE company_name IS NOT NULL AND company_name != ''
+                    AND in_date <= %s
+                    AND (out_date IS NULL OR out_date >= %s)
                     ORDER BY company_name
-                ''', (settlement_month,))
+                ''', (month_end, month_start))
             else:
                 cursor.execute('''
                     SELECT DISTINCT company_name 
-                    FROM pallet_settlement_companies 
-                    WHERE settlement_month = ?
+                    FROM pallets 
+                    WHERE company_name IS NOT NULL AND company_name != ''
+                    AND in_date <= ?
+                    AND (out_date IS NULL OR out_date >= ?)
                     ORDER BY company_name
-                ''', (settlement_month,))
+                ''', (month_end, month_start))
         else:
-            # 정산월이 없으면 모든 정산월의 화주사 목록 조회 (합집합)
-            # 모든 정산월에 걸쳐 DISTINCT 화주사명 조회
+            # 정산월이 없는 경우: 모든 파레트에서 조회
             if USE_POSTGRESQL:
                 cursor.execute('''
                     SELECT DISTINCT company_name 
-                    FROM pallet_settlement_companies 
+                    FROM pallets 
+                    WHERE company_name IS NOT NULL AND company_name != ''
                     ORDER BY company_name
                 ''')
             else:
                 cursor.execute('''
                     SELECT DISTINCT company_name 
-                    FROM pallet_settlement_companies 
+                    FROM pallets 
+                    WHERE company_name IS NOT NULL AND company_name != ''
                     ORDER BY company_name
                 ''')
         
-        stored_rows = cursor.fetchall()
-        if USE_POSTGRESQL:
-            stored_companies = [row['company_name'] for row in stored_rows if row.get('company_name')]
-        else:
-            stored_companies = [row[0] for row in stored_rows if row[0]]
-        
-        # 저장된 화주사 목록이 있으면 바로 반환 (이미 정산 생성 시 통합되어 있음)
-        if stored_companies:
-            print(f"[화주사 목록 최적화] 저장된 목록 사용: {len(stored_companies)}개 (정산월: {settlement_month or '전체'})")
-            return sorted(stored_companies)
-        
-        # 2단계: 저장된 목록이 없으면 파레트 테이블에서 실시간 조회 (기존 방식)
-        print(f"[화주사 목록 최적화] 저장된 목록 없음, 파레트 테이블에서 조회")
-        
-        if USE_POSTGRESQL:
-            cursor.execute('''
-                SELECT DISTINCT company_name 
-                FROM pallets 
-                WHERE company_name IS NOT NULL AND company_name != ''
-                ORDER BY company_name
-            ''')
-        else:
-            cursor.execute('''
-                SELECT DISTINCT company_name 
-                FROM pallets 
-                WHERE company_name IS NOT NULL AND company_name != ''
-                ORDER BY company_name
-            ''')
+        print(f"[화주사 목록] 파레트 테이블에서 조회 (정산월: {settlement_month or '전체'})")
         
         rows = cursor.fetchall()
         
