@@ -1534,7 +1534,13 @@ def get_company_by_username(username: str) -> Optional[Dict]:
         try:
             cursor.execute('SELECT * FROM companies WHERE username = %s', (username,))
             row = cursor.fetchone()
-            return dict(row) if row else None
+            if row:
+                row_dict = dict(row)
+                # is_active가 없으면 기본값 True 추가
+                if 'is_active' not in row_dict:
+                    row_dict['is_active'] = True
+                return row_dict
+            return None
         finally:
             cursor.close()
             conn.close()
@@ -1595,15 +1601,34 @@ def get_all_companies() -> List[Dict]:
     if USE_POSTGRESQL:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         try:
+            # is_active 컬럼 존재 여부 확인
             cursor.execute('''
-                SELECT id, company_name, username, role, 
-                       business_number, business_name, business_address, 
-                       business_tel, business_email, business_certificate_url,
-                       search_keywords, last_login, created_at, updated_at,
-                       COALESCE(is_active, TRUE) as is_active
-                FROM companies
-                ORDER BY created_at DESC
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'companies' AND column_name = 'is_active'
             ''')
+            has_is_active = cursor.fetchone() is not None
+            
+            if has_is_active:
+                cursor.execute('''
+                    SELECT id, company_name, username, role, 
+                           business_number, business_name, business_address, 
+                           business_tel, business_email, business_certificate_url,
+                           search_keywords, last_login, created_at, updated_at,
+                           COALESCE(is_active, TRUE) as is_active
+                    FROM companies
+                    ORDER BY created_at DESC
+                ''')
+            else:
+                # is_active 컬럼이 없으면 기본값으로 조회
+                cursor.execute('''
+                    SELECT id, company_name, username, role, 
+                           business_number, business_name, business_address, 
+                           business_tel, business_email, business_certificate_url,
+                           search_keywords, last_login, created_at, updated_at
+                    FROM companies
+                    ORDER BY created_at DESC
+                ''')
             rows = cursor.fetchall()
             result = []
             for row in rows:
@@ -1612,6 +1637,9 @@ def get_all_companies() -> List[Dict]:
                 for key, value in row_dict.items():
                     if isinstance(value, datetime):
                         row_dict[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+                # is_active가 없으면 기본값 True 추가
+                if 'is_active' not in row_dict:
+                    row_dict['is_active'] = True
                 result.append(row_dict)
             return result
         finally:
@@ -1631,7 +1659,7 @@ def get_all_companies() -> List[Dict]:
                 'business_number', 'business_name', 'business_address',
                 'business_tel', 'business_email', 'business_certificate_url',
                 'search_keywords', 'last_login', 'created_at', 'updated_at',
-                'is_active'
+                'is_active'  # 선택적 컬럼 (없을 수도 있음)
             ]
             
             # 존재하는 컬럼만 선택
@@ -1653,10 +1681,13 @@ def get_all_companies() -> List[Dict]:
                 # 실제 존재하는 컬럼만 추가
                 for key in row.keys():
                     row_dict[key] = row[key]
-                # 존재하지 않는 컬럼은 None으로 설정
+                # 존재하지 않는 컬럼은 None으로 설정 (is_active는 기본값 True)
                 for col in desired_columns:
                     if col not in row_dict:
-                        row_dict[col] = None
+                        if col == 'is_active':
+                            row_dict[col] = True  # 기본값
+                        else:
+                            row_dict[col] = None
                 result.append(row_dict)
             
             return result
