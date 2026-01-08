@@ -1273,13 +1273,7 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                     normalized_keywords.append(company_name_normalized)
             except Exception as e:
                 print(f"[경고] 화주사 '{company_name}' 키워드 조회 실패: {e}")
-                import traceback
-                traceback.print_exc()
                 normalized_keywords = [company_name_normalized]
-            
-            # 디버깅: 키워드 목록 확인
-            print(f"[정산조회] 화주사 '{company_name}' 정규화된 키워드: {normalized_keywords}")
-            print(f"[정산조회] 정규화된 화주사명: {company_name_normalized}")
             
             # 모든 정산 내역을 가져온 후 필터링
             if settlement_month:
@@ -1295,8 +1289,10 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
             
             rows = cursor.fetchall()
             
-            # 정규화된 키워드로 필터링 (양방향 비교)
-            result = []
+            # 성능 최적화: 정산 내역 화주사명의 키워드를 배치로 조회 (N+1 문제 해결)
+            # 먼저 모든 고유한 화주사명 수집
+            unique_settlement_companies = set()
+            settlements_list = []
             for row in rows:
                 try:
                     if USE_POSTGRESQL:
@@ -1305,54 +1301,61 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                         settlement = dict(zip([col[0] for col in cursor.description], row))
                     
                     settlement_company = settlement.get('company_name', '')
+                    if settlement_company:
+                        unique_settlement_companies.add(settlement_company)
+                        settlements_list.append(settlement)
+                except Exception as e:
+                    continue
+            
+            # 배치로 모든 정산 내역 화주사명의 키워드 조회 (캐싱)
+            settlement_keywords_cache = {}  # {화주사명: [정규화된 키워드 목록]}
+            for settlement_company in unique_settlement_companies:
+                try:
+                    settlement_normalized_keywords = get_company_search_keywords(settlement_company)
+                    if not settlement_normalized_keywords:
+                        settlement_normalized_keywords = [normalize_company_name(settlement_company)]
+                    # 정규화된 이름도 키워드에 추가
+                    settlement_company_normalized = normalize_company_name(settlement_company)
+                    if settlement_company_normalized not in settlement_normalized_keywords:
+                        settlement_normalized_keywords.append(settlement_company_normalized)
+                    settlement_keywords_cache[settlement_company] = settlement_normalized_keywords
+                except Exception as e:
+                    settlement_company_normalized = normalize_company_name(settlement_company)
+                    settlement_keywords_cache[settlement_company] = [settlement_company_normalized]
+            
+            # 정규화된 키워드로 필터링 (양방향 비교)
+            result = []
+            for settlement in settlements_list:
+                try:
+                    settlement_company = settlement.get('company_name', '')
                     if not settlement_company:
                         continue
                     
                     # 1. 정산 내역 화주사명을 정규화하여 직접 비교
                     settlement_company_normalized = normalize_company_name(settlement_company)
                     
-                    # 디버깅: 각 정산 내역의 매칭 과정 로그
-                    print(f"[정산조회] 정산 내역 화주사명: '{settlement_company}' → 정규화: '{settlement_company_normalized}'")
-                    
                     # 직접 비교: 정규화된 이름이 일치하거나 키워드 목록에 포함되는지 확인
                     direct_match = (settlement_company_normalized == company_name_normalized)
                     keyword_match = (settlement_company_normalized in normalized_keywords)
                     is_match = direct_match or keyword_match
                     
-                    print(f"[정산조회] 직접 매칭: {direct_match}, 키워드 매칭: {keyword_match}, 최종: {is_match}")
-                    
                     # 2. 직접 매칭이 안 되면 정산 내역 화주사명의 키워드도 확인 (양방향)
                     if not is_match:
-                        # get_company_search_keywords는 이미 정규화된 값을 반환
-                        try:
-                            settlement_normalized_keywords = get_company_search_keywords(settlement_company)
-                            if not settlement_normalized_keywords:
-                                settlement_normalized_keywords = [settlement_company_normalized]
-                            # 정산 내역 화주사명의 정규화된 이름도 키워드에 추가
-                            if settlement_company_normalized not in settlement_normalized_keywords:
-                                settlement_normalized_keywords.append(settlement_company_normalized)
-                        except Exception as e:
-                            print(f"[경고] 정산 내역 화주사 '{settlement_company}' 키워드 조회 실패: {e}")
-                            settlement_normalized_keywords = [settlement_company_normalized]
+                        # 캐시에서 키워드 가져오기 (이미 배치로 조회됨)
+                        settlement_normalized_keywords = settlement_keywords_cache.get(settlement_company, [settlement_company_normalized])
                         
                         # 양방향 비교: 조회 대상 키워드 ↔ 정산 내역 키워드
                         # 집합 교집합으로 빠르게 확인
                         intersection = set(normalized_keywords) & set(settlement_normalized_keywords)
                         if intersection:
                             is_match = True
-                            print(f"[정산조회] 키워드 교집합 발견: {intersection}")
-                        else:
-                            print(f"[정산조회] 키워드 교집합 없음 - 조회 대상: {normalized_keywords}, 정산 내역: {settlement_normalized_keywords}")
                     
                     if is_match:
                         result.append(settlement)
                 except Exception as e:
                     print(f"[경고] 정산 내역 처리 중 오류: {e}")
-                    import traceback
-                    traceback.print_exc()
                     continue
             
-            print(f"[정산조회] 화주사 '{company_name}' 매칭된 정산 내역: {len(result)}개")
             return result
         else:
             # 화주사 필터링 없음 - 모든 정산 내역 조회 후 정규화하여 통합

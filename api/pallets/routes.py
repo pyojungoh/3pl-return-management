@@ -960,7 +960,8 @@ def settlements_list():
                 # 화주사별 일일 보관료 캐시 (성능 최적화)
                 daily_fee_cache = {}
                 
-                # 각 월별로 임시 정산 내역 생성
+                # 성능 최적화: 각 월별 날짜 범위를 미리 계산
+                month_ranges = []
                 for month_str in missing_months:
                     year, month = map(int, month_str.split('-'))
                     month_start = date(year, month, 1)
@@ -968,15 +969,15 @@ def settlements_list():
                         month_end = date(year + 1, 1, 1) - timedelta(days=1)
                     else:
                         month_end = date(year, month + 1, 1) - timedelta(days=1)
-                    
-                    # 해당 월에 해당하는 파레트만 필터링
-                    month_pallets = []
-                    for pallet in pallets:
-                        in_date = pallet['in_date']
-                        out_date = pallet.get('out_date')
-                        # 해당 월에 보관 중이었던 파레트
-                        if in_date <= month_end and (out_date is None or out_date >= month_start):
-                            month_pallets.append(pallet)
+                    month_ranges.append((month_str, month_start, month_end))
+                
+                # 각 월별로 임시 정산 내역 생성
+                for month_str, month_start, month_end in month_ranges:
+                    # 해당 월에 해당하는 파레트만 필터링 (성능 최적화: 리스트 컴프리헨션 사용)
+                    month_pallets = [
+                        pallet for pallet in pallets
+                        if pallet['in_date'] <= month_end and (pallet.get('out_date') is None or pallet.get('out_date') >= month_start)
+                    ]
                     
                     if month_pallets:
                         # 임시 정산 내역 계산
