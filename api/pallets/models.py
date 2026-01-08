@@ -1946,25 +1946,8 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
             settlement = dict(zip([col[0] for col in cursor.description], row))
         
         # 파레트별 상세 내역 조회 (pallets 테이블과 조인)
-        # 정산 내역의 화주사명과 일치하는 파레트만 조회 (화주사 태그 고려)
-        settlement_company = settlement.get('company_name', '')
-        
-        # 화주사 태그를 고려한 키워드 목록 가져오기
-        from api.database.models import normalize_company_name, get_company_search_keywords
-        
-        search_keywords = []
-        try:
-            search_keywords = get_company_search_keywords(settlement_company)
-            if not search_keywords:
-                search_keywords = [settlement_company]
-        except Exception as e:
-            print(f"[경고] 화주사 '{settlement_company}' 키워드 조회 실패: {e}")
-            search_keywords = [settlement_company]
-        
-        # 정규화된 키워드 목록 생성
-        normalized_keywords = [normalize_company_name(kw) for kw in search_keywords]
-        
-        # 정산월에 해당하는 모든 파레트 조회 (화주사 필터링은 나중에 Python에서 처리)
+        # 정산 생성 시 이미 해당 화주사의 파레트만 pallet_fee_calculations에 저장되었으므로
+        # 정산월의 모든 파레트를 조회하면 됨 (추가 화주사 필터링 불필요)
         if USE_POSTGRESQL:
             cursor.execute('''
                 SELECT 
@@ -2027,14 +2010,8 @@ def get_settlement_detail(settlement_id: int) -> Optional[Dict]:
             else:
                 pallet = dict(zip([col[0] for col in cursor.description], row))
             
-            # 화주사명 태그 필터링 (정규화된 키워드로 비교)
-            pallet_company = pallet.get('company_name', '')
-            if pallet_company:
-                pallet_company_normalized = normalize_company_name(pallet_company)
-                # 정규화된 키워드 목록 중 하나와 일치하는지 확인
-                if pallet_company_normalized not in normalized_keywords:
-                    # 파레트의 화주사명이 정산 화주사명의 키워드와 일치하지 않으면 건너뜀
-                    continue
+            # 정산 생성 시 이미 해당 화주사의 파레트만 저장되었으므로
+            # 추가 화주사 필터링 불필요 (모든 파레트 포함)
             
             # 해당 월 내 보관일수 재계산
             in_date_str = pallet.get('in_date')
