@@ -1604,6 +1604,55 @@ def update_settlement_status(settlement_id: int, status: str) -> Tuple[bool, str
         conn.close()
 
 
+def confirm_all_settlements_by_month(settlement_month: str, status: str = '확정') -> Tuple[bool, str]:
+    """
+    특정 월의 전체 정산 내역 일괄 확정
+    
+    Args:
+        settlement_month: 정산월 (YYYY-MM 형식)
+        status: 변경할 상태 ('확정', '완료' 등)
+    
+    Returns:
+        (success, message)
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 유효한 상태인지 확인
+        valid_statuses = ['대기', '확정', '완료']
+        if status not in valid_statuses:
+            return False, f"유효하지 않은 상태입니다. 가능한 상태: {', '.join(valid_statuses)}"
+        
+        # 해당 월의 모든 정산 내역 상태 업데이트
+        if USE_POSTGRESQL:
+            cursor.execute('''
+                UPDATE pallet_monthly_settlements 
+                SET status = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE settlement_month = %s
+            ''', (status, settlement_month))
+        else:
+            cursor.execute('''
+                UPDATE pallet_monthly_settlements 
+                SET status = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE settlement_month = ?
+            ''', (status, settlement_month))
+        
+        updated_count = cursor.rowcount
+        conn.commit()
+        
+        if updated_count > 0:
+            return True, f"{settlement_month}의 정산 내역 {updated_count}개가 '{status}' 상태로 변경되었습니다."
+        else:
+            return False, f"{settlement_month}에 해당하는 정산 내역이 없습니다."
+    except Exception as e:
+        conn.rollback() if USE_POSTGRESQL else None
+        return False, f"정산 일괄 확정 실패: {str(e)}"
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def delete_settlement_by_month(settlement_month: str) -> Tuple[bool, str]:
     """
     특정 월의 전체 정산 내역 일괄 삭제

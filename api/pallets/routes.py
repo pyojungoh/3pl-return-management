@@ -1392,6 +1392,54 @@ def generate_all_settlements():
         }), 500
 
 
+@pallets_bp.route('/settlements/confirm-all', methods=['PUT'])
+def confirm_all_settlements():
+    """
+    특정 월의 전체 정산 내역 일괄 확정
+    """
+    try:
+        role, company_name, username = get_user_context()
+        
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 정산을 일괄 확정할 수 있습니다.'
+            }), 403
+        
+        settlement_month = request.args.get('settlement_month')
+        
+        if not settlement_month:
+            return jsonify({
+                'success': False,
+                'message': '정산월을 지정해주세요.'
+            }), 400
+        
+        data = request.get_json() or {}
+        status = data.get('status', '확정')
+        
+        from api.pallets.models import confirm_all_settlements_by_month
+        
+        success, message = confirm_all_settlements_by_month(settlement_month, status)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': message
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 400
+    except Exception as e:
+        print(f"전체 정산 확정 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'전체 정산 확정 중 오류가 발생했습니다: {str(e)}'
+        }), 500
+
 @pallets_bp.route('/settlements/delete-all', methods=['DELETE'])
 def delete_all_settlements():
     """
