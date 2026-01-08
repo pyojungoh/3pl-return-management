@@ -13705,28 +13705,29 @@
       const isPdf = certificateUrl.toLowerCase().endsWith('.pdf') || certificateUrl.includes('.pdf') || certificateUrl.includes('application/pdf');
       
       if (isPdf) {
-        // PDF 파일은 모달로 표시 (Google Docs Viewer 사용)
+        // PDF 파일은 모달로 표시
         const modal = document.createElement('div');
         modal.id = 'certificateModal';
         modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 10000; display: flex; justify-content: center; align-items: center;';
         
         const modalContent = document.createElement('div');
-        modalContent.style.cssText = 'background: white; border-radius: 12px; padding: 20px; max-width: 90%; max-height: 90%; width: 1000px; height: 90vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);';
+        modalContent.style.cssText = 'background: white; border-radius: 12px; padding: 20px; max-width: 95%; max-height: 95%; width: 1200px; height: 90vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);';
         
         const header = document.createElement('div');
-        header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #e0e0e0;';
+        header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #e0e0e0; flex-shrink: 0;';
         
         const title = document.createElement('h3');
         title.textContent = '사업자 등록증 미리보기';
         title.style.cssText = 'margin: 0; color: #2d3436; font-size: 18px; font-weight: 600;';
         
         const buttonGroup = document.createElement('div');
-        buttonGroup.style.cssText = 'display: flex; gap: 8px;';
+        buttonGroup.style.cssText = 'display: flex; gap: 8px; flex-shrink: 0;';
         
         const downloadBtn = document.createElement('button');
         downloadBtn.textContent = '⬇ 다운로드';
-        downloadBtn.style.cssText = 'padding: 8px 16px; background: #74b9ff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;';
-        downloadBtn.onclick = function() {
+        downloadBtn.style.cssText = 'padding: 8px 16px; background: #74b9ff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; white-space: nowrap;';
+        downloadBtn.onclick = function(e) {
+          e.stopPropagation();
           const link = document.createElement('a');
           link.href = certificateUrl;
           link.download = '사업자등록증.pdf';
@@ -13738,16 +13739,21 @@
         
         const newWindowBtn = document.createElement('button');
         newWindowBtn.textContent = '🔗 새 창';
-        newWindowBtn.style.cssText = 'padding: 8px 16px; background: #00b894; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;';
-        newWindowBtn.onclick = function() {
+        newWindowBtn.style.cssText = 'padding: 8px 16px; background: #00b894; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; white-space: nowrap;';
+        newWindowBtn.onclick = function(e) {
+          e.stopPropagation();
           window.open(certificateUrl, '_blank');
         };
         
         const closeBtn = document.createElement('button');
         closeBtn.textContent = '✕ 닫기';
-        closeBtn.style.cssText = 'padding: 8px 16px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;';
-        closeBtn.onclick = function() {
-          document.body.removeChild(modal);
+        closeBtn.style.cssText = 'padding: 8px 16px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; white-space: nowrap;';
+        closeBtn.onclick = function(e) {
+          e.stopPropagation();
+          const modalEl = document.getElementById('certificateModal');
+          if (modalEl) {
+            document.body.removeChild(modalEl);
+          }
         };
         
         buttonGroup.appendChild(downloadBtn);
@@ -13758,62 +13764,31 @@
         header.appendChild(buttonGroup);
         
         const iframeContainer = document.createElement('div');
-        iframeContainer.style.cssText = 'flex: 1; overflow: hidden; border-radius: 8px; border: 2px solid #e0e0e0; background: #f5f5f5; position: relative;';
+        iframeContainer.style.cssText = 'flex: 1; overflow: hidden; border-radius: 8px; border: 2px solid #e0e0e0; background: #f5f5f5; position: relative; min-height: 0;';
         
         // 로딩 표시
         const loadingDiv = document.createElement('div');
         loadingDiv.id = 'pdfLoading';
-        loadingDiv.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #636e72;';
+        loadingDiv.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #636e72; z-index: 10; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);';
         loadingDiv.innerHTML = '<div style="font-size: 16px; margin-bottom: 10px;">📄 PDF를 불러오는 중...</div>';
         iframeContainer.appendChild(loadingDiv);
         
-        // Google Docs Viewer를 사용하여 PDF 표시
-        const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(certificateUrl)}&embedded=true`;
-        
+        // PDF를 직접 iframe으로 표시 시도
         const iframe = document.createElement('iframe');
-        iframe.src = viewerUrl;
-        iframe.style.cssText = 'width: 100%; height: 100%; border: none;';
+        iframe.id = 'pdfIframe';
+        iframe.src = certificateUrl + '#toolbar=0';
+        iframe.style.cssText = 'width: 100%; height: 100%; border: none; position: absolute; top: 0; left: 0;';
         iframe.setAttribute('type', 'application/pdf');
         
         // iframe 로드 완료 시 로딩 숨기기
         iframe.onload = function() {
-          const loading = document.getElementById('pdfLoading');
-          if (loading) {
-            loading.style.display = 'none';
-          }
+          setTimeout(function() {
+            const loading = document.getElementById('pdfLoading');
+            if (loading) {
+              loading.style.display = 'none';
+            }
+          }, 1000);
         };
-        
-        // PDF가 로드되지 않으면 대체 방법 시도
-        iframe.onerror = function() {
-          const loading = document.getElementById('pdfLoading');
-          if (loading) {
-            loading.innerHTML = `
-              <div style="padding: 40px; text-align: center;">
-                <p style="color: #636e72; font-size: 16px; margin-bottom: 20px;">PDF 미리보기를 불러올 수 없습니다.</p>
-                <div style="display: flex; gap: 10px; justify-content: center;">
-                  <a href="${certificateUrl}" target="_blank" style="padding: 12px 24px; background: #74b9ff; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">새 창에서 열기</a>
-                  <a href="${certificateUrl}" download style="padding: 12px 24px; background: #00b894; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">다운로드</a>
-                </div>
-              </div>
-            `;
-          }
-        };
-        
-        // 5초 후에도 로딩이 계속되면 직접 링크 제공
-        setTimeout(function() {
-          const loading = document.getElementById('pdfLoading');
-          if (loading && loading.style.display !== 'none') {
-            loading.innerHTML = `
-              <div style="padding: 40px; text-align: center;">
-                <p style="color: #636e72; font-size: 16px; margin-bottom: 20px;">PDF 로딩이 지연되고 있습니다.</p>
-                <div style="display: flex; gap: 10px; justify-content: center;">
-                  <a href="${certificateUrl}" target="_blank" style="padding: 12px 24px; background: #74b9ff; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">새 창에서 열기</a>
-                  <a href="${certificateUrl}" download style="padding: 12px 24px; background: #00b894; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">다운로드</a>
-                </div>
-              </div>
-            `;
-          }
-        }, 5000);
         
         iframeContainer.appendChild(iframe);
         
@@ -13824,7 +13799,10 @@
         // 모달 외부 클릭 시 닫기
         modal.onclick = function(e) {
           if (e.target === modal) {
-            document.body.removeChild(modal);
+            const modalEl = document.getElementById('certificateModal');
+            if (modalEl) {
+              document.body.removeChild(modalEl);
+            }
           }
         };
         
@@ -13839,6 +13817,20 @@
           }
         };
         document.addEventListener('keydown', escHandler);
+        
+        // 3초 후에도 로딩이 계속되면 대체 메시지 표시
+        setTimeout(function() {
+          const loading = document.getElementById('pdfLoading');
+          const iframeEl = document.getElementById('pdfIframe');
+          if (loading && loading.style.display !== 'none') {
+            loading.innerHTML = `
+              <div style="padding: 20px; text-align: center;">
+                <p style="color: #636e72; font-size: 16px; margin-bottom: 20px;">PDF 미리보기를 불러올 수 없습니다.</p>
+                <p style="color: #95a5a6; font-size: 14px; margin-bottom: 20px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
+              </div>
+            `;
+          }
+        }, 3000);
         
         document.body.appendChild(modal);
       } else {
