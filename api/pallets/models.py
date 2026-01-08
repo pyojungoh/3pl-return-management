@@ -1324,22 +1324,35 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
             unique_companies = list(set([s.get('company_name', '') for s in all_settlements if s.get('company_name')]))
             
             # 배치로 모든 화주사 키워드 조회
-            company_keywords_cache = {}  # {화주사명: [키워드 목록]}
+            # 대소문자 무시를 위해 정규화된 화주사명으로 캐시 생성
+            company_keywords_cache = {}  # {정규화된_화주사명: [키워드 목록]}
+            company_name_mapping = {}  # {정규화된_화주사명: 원본_화주사명}
+            
             if unique_companies:
+                # 원본 화주사명을 정규화하여 매핑 생성
+                for orig_name in unique_companies:
+                    norm_name = normalize_company_name(orig_name)
+                    company_name_mapping[norm_name] = orig_name
+                
+                # 정규화된 화주사명 목록으로 조회 (대소문자 무시)
+                normalized_companies = list(company_name_mapping.keys())
+                
                 if USE_POSTGRESQL:
-                    placeholders = ','.join(['%s' for _ in unique_companies])
+                    placeholders = ','.join(['%s' for _ in normalized_companies])
                     cursor.execute(f'''
                         SELECT company_name, search_keywords 
                         FROM companies 
-                        WHERE company_name IN ({placeholders}) OR username IN ({placeholders})
-                    ''', unique_companies + unique_companies)
+                        WHERE LOWER(REPLACE(company_name, ' ', '')) IN ({placeholders}) 
+                           OR LOWER(REPLACE(username, ' ', '')) IN ({placeholders})
+                    ''', normalized_companies + normalized_companies)
                 else:
-                    placeholders = ','.join(['?' for _ in unique_companies])
+                    placeholders = ','.join(['?' for _ in normalized_companies])
                     cursor.execute(f'''
                         SELECT company_name, search_keywords 
                         FROM companies 
-                        WHERE company_name IN ({placeholders}) OR username IN ({placeholders})
-                    ''', unique_companies + unique_companies)
+                        WHERE LOWER(REPLACE(company_name, ' ', '')) IN ({placeholders}) 
+                           OR LOWER(REPLACE(username, ' ', '')) IN ({placeholders})
+                    ''', normalized_companies + normalized_companies)
                 
                 keyword_rows = cursor.fetchall()
                 for row in keyword_rows:
@@ -1350,11 +1363,13 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                         comp_name = row[0]
                         search_keywords = row[1] if len(row) > 1 else ''
                     
+                    # 정규화된 이름으로 캐시 저장
+                    norm_comp_name = normalize_company_name(comp_name)
                     keywords = [comp_name]
                     if search_keywords:
                         aliases = [alias.strip() for alias in search_keywords.replace('\n', ',').split(',') if alias.strip()]
                         keywords.extend(aliases)
-                    company_keywords_cache[comp_name] = keywords
+                    company_keywords_cache[norm_comp_name] = keywords
             
             # 1. 각 화주사명에 대해 정규화된 키워드 목록 생성 (본인 이름 + 해시태그)
             company_keywords_map = {}  # 정규화된 키워드 -> 원본 화주사명 매핑
@@ -1365,8 +1380,9 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                 if not raw_company:
                     continue
                 
-                # 캐시에서 키워드 가져오기 (없으면 기본값)
-                keywords = company_keywords_cache.get(raw_company, [raw_company])
+                # 캐시에서 키워드 가져오기 (정규화된 이름으로 조회 - 대소문자 무시)
+                normalized_raw_company = normalize_company_name(raw_company)
+                keywords = company_keywords_cache.get(normalized_raw_company, [raw_company])
                 
                 # 각 키워드에 대해 매핑 생성
                 normalized_company = normalize_company_name(raw_company)
