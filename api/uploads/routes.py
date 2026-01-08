@@ -297,45 +297,103 @@ def proxy_certificate():
     try:
         pdf_url = request.args.get('url')
         if not pdf_url:
-            return jsonify({
-                'success': False,
-                'message': 'URL 파라미터가 필요합니다.'
-            }), 400
+            # 에러 시 HTML 페이지로 반환 (iframe에서 표시)
+            from flask import Response
+            error_html = '''
+            <!DOCTYPE html>
+            <html>
+            <head><title>오류</title></head>
+            <body style="font-family: Arial; padding: 40px; text-align: center;">
+                <h2 style="color: #e74c3c;">❌ PDF를 불러올 수 없습니다</h2>
+                <p>URL 파라미터가 필요합니다.</p>
+            </body>
+            </html>
+            '''
+            return Response(error_html, mimetype='text/html'), 400
         
         # URL 디코딩
         from urllib.parse import unquote
         pdf_url = unquote(pdf_url)
         
-        # PDF 파일 다운로드
-        import requests
-        response = requests.get(pdf_url, stream=True, timeout=30)
+        print(f'[PDF 프록시] PDF URL: {pdf_url[:100]}...')
         
-        if response.status_code != 200:
-            return jsonify({
-                'success': False,
-                'message': f'PDF를 가져올 수 없습니다. (HTTP {response.status_code})'
-            }), response.status_code
+        # PDF 파일 다운로드 (urllib 사용 - requests 의존성 없이)
+        import urllib.request
+        import urllib.error
         
-        # PDF 파일을 스트림으로 반환
-        from flask import Response
-        return Response(
-            response.iter_content(chunk_size=8192),
-            mimetype='application/pdf',
-            headers={
-                'Content-Disposition': 'inline; filename="certificate.pdf"',
-                'Access-Control-Allow-Origin': '*',
-                'Cache-Control': 'public, max-age=3600'
-            }
-        )
+        try:
+            req = urllib.request.Request(pdf_url)
+            req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+            req.add_header('Accept', 'application/pdf,application/octet-stream,*/*')
+            
+            with urllib.request.urlopen(req, timeout=30) as response:
+                pdf_data = response.read()
+                
+                print(f'[PDF 프록시] PDF 다운로드 성공: {len(pdf_data)} bytes')
+                
+                # PDF 파일을 스트림으로 반환
+                from flask import Response
+                return Response(
+                    pdf_data,
+                    mimetype='application/pdf',
+                    headers={
+                        'Content-Disposition': 'inline; filename="certificate.pdf"',
+                        'Access-Control-Allow-Origin': '*',
+                        'Cache-Control': 'public, max-age=3600',
+                        'Content-Length': str(len(pdf_data))
+                    }
+                )
+        except urllib.error.HTTPError as e:
+            print(f'[PDF 프록시] HTTP 오류: {e.code} - {e.reason}')
+            # 에러 시 HTML 페이지로 반환
+            from flask import Response
+            error_html = f'''
+            <!DOCTYPE html>
+            <html>
+            <head><title>오류</title></head>
+            <body style="font-family: Arial; padding: 40px; text-align: center;">
+                <h2 style="color: #e74c3c;">❌ PDF를 불러올 수 없습니다</h2>
+                <p>HTTP 오류 {e.code}: {e.reason}</p>
+                <p style="color: #95a5a6; font-size: 14px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
+            </body>
+            </html>
+            '''
+            return Response(error_html, mimetype='text/html'), e.code
+        except urllib.error.URLError as e:
+            print(f'[PDF 프록시] URL 오류: {e.reason}')
+            # 에러 시 HTML 페이지로 반환
+            from flask import Response
+            error_html = f'''
+            <!DOCTYPE html>
+            <html>
+            <head><title>오류</title></head>
+            <body style="font-family: Arial; padding: 40px; text-align: center;">
+                <h2 style="color: #e74c3c;">❌ PDF를 불러올 수 없습니다</h2>
+                <p>URL 오류: {str(e.reason)}</p>
+                <p style="color: #95a5a6; font-size: 14px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
+            </body>
+            </html>
+            '''
+            return Response(error_html, mimetype='text/html'), 500
         
     except Exception as e:
         print(f'[오류] PDF 프록시 오류: {e}')
         import traceback
         traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'message': f'PDF 프록시 중 오류가 발생했습니다: {str(e)}'
-        }), 500
+        # 에러 시 HTML 페이지로 반환
+        from flask import Response
+        error_html = f'''
+        <!DOCTYPE html>
+        <html>
+        <head><title>오류</title></head>
+        <body style="font-family: Arial; padding: 40px; text-align: center;">
+            <h2 style="color: #e74c3c;">❌ PDF 프록시 중 오류가 발생했습니다</h2>
+            <p>{str(e)}</p>
+            <p style="color: #95a5a6; font-size: 14px;">아래 버튼을 사용하여 PDF를 확인하세요.</p>
+        </body>
+        </html>
+        '''
+        return Response(error_html, mimetype='text/html'), 500
 
 
 @uploads_bp.route('/certificate', methods=['POST'])
