@@ -755,6 +755,27 @@ def init_db():
                 ON pallet_fee_calculations(settlement_month)
             ''')
             
+            # pallet_settlement_companies 테이블 (정산월별 화주사 목록 - 성능 최적화용)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pallet_settlement_companies (
+                    id SERIAL PRIMARY KEY,
+                    settlement_month TEXT NOT NULL,
+                    company_name TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(settlement_month, company_name)
+                )
+            ''')
+            
+            # pallet_settlement_companies 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlement_companies_month 
+                ON pallet_settlement_companies(settlement_month)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlement_companies_company 
+                ON pallet_settlement_companies(company_name)
+            ''')
+            
             print("[성공] 파레트 보관료 관리 시스템 테이블 생성 완료 (PostgreSQL)")
             
         else:
@@ -1424,6 +1445,27 @@ def init_db():
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_calculations_month 
                 ON pallet_fee_calculations(settlement_month)
+            ''')
+            
+            # pallet_settlement_companies 테이블 (정산월별 화주사 목록 - 성능 최적화용)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pallet_settlement_companies (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    settlement_month TEXT NOT NULL,
+                    company_name TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(settlement_month, company_name)
+                )
+            ''')
+            
+            # pallet_settlement_companies 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlement_companies_month 
+                ON pallet_settlement_companies(settlement_month)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlement_companies_company 
+                ON pallet_settlement_companies(company_name)
             ''')
             
             print("[성공] 파레트 보관료 관리 시스템 테이블 생성 완료 (SQLite)")

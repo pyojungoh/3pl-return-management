@@ -1066,6 +1066,27 @@ def generate_monthly_settlement(settlement_month: str = None,
                           pallet_detail['rounded_fee'], pallet_detail['rounded_fee'],
                           1 if pallet_detail['is_service'] else 0))
         
+        # 정산월별 화주사 목록 저장 (성능 최적화)
+        # 해당 정산월의 기존 화주사 목록 삭제 후 새로 저장
+        if USE_POSTGRESQL:
+            cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = %s', (settlement_month,))
+        else:
+            cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = ?', (settlement_month,))
+        
+        # 화주사 목록 저장
+        for company in company_settlements.keys():
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    INSERT INTO pallet_settlement_companies (settlement_month, company_name, created_at)
+                    VALUES (%s, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (settlement_month, company_name) DO NOTHING
+                ''', (settlement_month, company))
+            else:
+                cursor.execute('''
+                    INSERT OR IGNORE INTO pallet_settlement_companies (settlement_month, company_name, created_at)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                ''', (settlement_month, company))
+        
         conn.commit()
         
         return True, f"정산 생성 완료: {len(company_settlements)}개 화주사", {
@@ -1314,6 +1335,12 @@ def delete_settlement(settlement_id: int) -> Tuple[bool, str]:
         else:
             cursor.execute('DELETE FROM pallet_fee_calculations WHERE settlement_month = ?', (settlement_month,))
         
+        # 정산월별 화주사 목록 삭제 (성능 최적화 테이블)
+        if USE_POSTGRESQL:
+            cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = %s', (settlement_month,))
+        else:
+            cursor.execute('DELETE FROM pallet_settlement_companies WHERE settlement_month = ?', (settlement_month,))
+        
         # 정산 내역 삭제
         if USE_POSTGRESQL:
             cursor.execute('DELETE FROM pallet_monthly_settlements WHERE id = %s', (settlement_id,))
@@ -1334,6 +1361,10 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
     """
     파레트를 보관 중인 화주사 목록 조회
     
+    ✅ 성능 최적화:
+    - 정산 생성 시 저장된 화주사 목록을 우선 사용 (pallet_settlement_companies 테이블)
+    - 저장된 목록이 없으면 파레트 테이블에서 실시간 조회
+    
     ✅ 화주사 태그 동기화 지원:
     - search_keywords 필드를 고려하여 동일 화주사 통합
     - "TKS 컴퍼니"와 "TKS컴퍼니" 같은 동일 화주사를 하나로 통합
@@ -1352,7 +1383,61 @@ def get_companies_with_pallets(settlement_month: str = None) -> List[str]:
         else:
             cursor = conn.cursor()
         
-        # 파레트에서 화주사명 목록 조회
+        # 1단계: 저장된 화주사 목록에서 조회 시도 (정산 생성 시 저장된 목록)
+        stored_companies = []
+        if settlement_month:
+            # 지정된 정산월의 화주사 목록 조회
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    SELECT DISTINCT company_name 
+                    FROM pallet_settlement_companies 
+                    WHERE settlement_month = %s
+                    ORDER BY company_name
+                ''', (settlement_month,))
+            else:
+                cursor.execute('''
+                    SELECT DISTINCT company_name 
+                    FROM pallet_settlement_companies 
+                    WHERE settlement_month = ?
+                    ORDER BY company_name
+                ''', (settlement_month,))
+        else:
+            # 가장 최근 정산월의 화주사 목록 조회
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    SELECT DISTINCT company_name 
+                    FROM pallet_settlement_companies 
+                    WHERE settlement_month = (
+                        SELECT MAX(settlement_month) 
+                        FROM pallet_settlement_companies
+                    )
+                    ORDER BY company_name
+                ''')
+            else:
+                cursor.execute('''
+                    SELECT DISTINCT company_name 
+                    FROM pallet_settlement_companies 
+                    WHERE settlement_month = (
+                        SELECT MAX(settlement_month) 
+                        FROM pallet_settlement_companies
+                    )
+                    ORDER BY company_name
+                ''')
+        
+        stored_rows = cursor.fetchall()
+        if USE_POSTGRESQL:
+            stored_companies = [row['company_name'] for row in stored_rows if row.get('company_name')]
+        else:
+            stored_companies = [row[0] for row in stored_rows if row[0]]
+        
+        # 저장된 화주사 목록이 있으면 바로 반환 (이미 정산 생성 시 통합되어 있음)
+        if stored_companies:
+            print(f"[화주사 목록 최적화] 저장된 목록 사용: {len(stored_companies)}개 (정산월: {settlement_month or '최근'})")
+            return sorted(stored_companies)
+        
+        # 2단계: 저장된 목록이 없으면 파레트 테이블에서 실시간 조회 (기존 방식)
+        print(f"[화주사 목록 최적화] 저장된 목록 없음, 파레트 테이블에서 조회")
+        
         if USE_POSTGRESQL:
             cursor.execute('''
                 SELECT DISTINCT company_name 
