@@ -1129,7 +1129,14 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
         # 화주사 필터링 (정규화 및 해시태그 지원)
         if company_name:
             # 검색 가능한 키워드 목록 가져오기 (본인 이름 + 해시태그)
-            search_keywords = get_company_search_keywords(company_name)
+            try:
+                search_keywords = get_company_search_keywords(company_name)
+                if not search_keywords:
+                    search_keywords = [company_name]
+            except Exception as e:
+                print(f"[경고] 화주사 '{company_name}' 키워드 조회 실패: {e}")
+                search_keywords = [company_name]
+            
             normalized_keywords = [normalize_company_name(kw) for kw in search_keywords]
             
             # 모든 정산 내역을 가져온 후 필터링
@@ -1195,7 +1202,13 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                     continue
                 
                 # 검색 가능한 키워드 목록 가져오기 (본인 이름 + 해시태그)
-                keywords = get_company_search_keywords(raw_company)
+                try:
+                    keywords = get_company_search_keywords(raw_company)
+                    if not keywords:
+                        keywords = [raw_company]
+                except Exception as e:
+                    print(f"[경고] 화주사 '{raw_company}' 키워드 조회 실패: {e}")
+                    keywords = [raw_company]
                 
                 # 각 키워드에 대해 매핑 생성
                 normalized_company = normalize_company_name(raw_company)
