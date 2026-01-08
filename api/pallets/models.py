@@ -1298,7 +1298,10 @@ def get_settlements(company_name: str = None, settlement_month: str = None,
                     
                     # 1. 정산 내역 화주사명을 정규화하여 직접 비교
                     settlement_company_normalized = normalize_company_name(settlement_company)
-                    is_match = settlement_company_normalized in normalized_keywords
+                    
+                    # 조회 대상 화주사명도 정규화하여 직접 비교 (예: "TKS 컴퍼니" vs "TKS컴퍼니")
+                    company_name_normalized = normalize_company_name(company_name)
+                    is_match = (settlement_company_normalized == company_name_normalized) or (settlement_company_normalized in normalized_keywords)
                     
                     # 2. 직접 매칭이 안 되면 정산 내역 화주사명의 키워드도 확인 (양방향)
                     if not is_match:
