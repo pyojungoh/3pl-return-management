@@ -568,3 +568,100 @@ def upload_certificate():
             'message': f'사업자 등록증 업로드 중 오류가 발생했습니다: {str(e)}'
         }), 500
 
+
+@uploads_bp.route('/test/upload-excel', methods=['POST'])
+def test_upload_excel():
+    """
+    엑셀 파일 업로드 테스트 API (구글 드라이브)
+    
+    Request Body:
+        FormData with 'file' field (엑셀 파일)
+    
+    Returns:
+        {
+            "success": bool,
+            "file_id": str,
+            "file_url": str,
+            "web_view_link": str,
+            "message": str
+        }
+    """
+    try:
+        print(f"[정보] 엑셀 파일 업로드 테스트 API 호출됨")
+        
+        if 'file' not in request.files:
+            return jsonify({
+                'success': False,
+                'message': '파일이 제공되지 않았습니다.'
+            }), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({
+                'success': False,
+                'message': '파일이 선택되지 않았습니다.'
+            }), 400
+        
+        # 파일명 확인
+        filename = file.filename
+        if not filename.lower().endswith(('.xlsx', '.xls')):
+            return jsonify({
+                'success': False,
+                'message': '엑셀 파일만 업로드 가능합니다. (.xlsx, .xls)'
+            }), 400
+        
+        print(f"   파일명: {filename}")
+        
+        # 파일 데이터 읽기
+        file_data = file.read()
+        file_size = len(file_data)
+        print(f"   파일 크기: {file_size} bytes ({file_size / 1024 / 1024:.2f} MB)")
+        
+        # 구글 드라이브에 업로드
+        try:
+            from api.uploads.google_drive import upload_excel_to_drive
+            
+            result = upload_excel_to_drive(
+                file_data=file_data,
+                filename=filename,
+                folder_name='정산파일'  # 테스트용 폴더명
+            )
+            
+            if result.get('success'):
+                return jsonify({
+                    'success': True,
+                    'file_id': result.get('file_id'),
+                    'file_url': result.get('file_url'),
+                    'web_view_link': result.get('web_view_link'),
+                    'message': result.get('message', '파일 업로드 성공')
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': result.get('message', '파일 업로드 실패')
+                }), 500
+                
+        except ImportError as import_error:
+            print(f"[오류] 구글 드라이브 모듈 import 실패: {import_error}")
+            return jsonify({
+                'success': False,
+                'message': f'구글 드라이브 모듈을 찾을 수 없습니다: {str(import_error)}'
+            }), 500
+        except Exception as upload_error:
+            print(f"[오류] 구글 드라이브 업로드 오류: {upload_error}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'파일 업로드 중 오류가 발생했습니다: {str(upload_error)}'
+            }), 500
+        
+    except Exception as e:
+        print(f'[오류] 엑셀 파일 업로드 테스트 API 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'엑셀 파일 업로드 테스트 중 오류: {str(e)}'
+        }), 500

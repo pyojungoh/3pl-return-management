@@ -12,6 +12,9 @@ from googleapiclient.errors import HttpError
 import io
 
 # Google Drive 설정
+# 정산 파일용 메인 폴더명
+SETTLEMENT_MAIN_FOLDER_NAME = '제이제이솔루션'
+# 반품 내역용 메인 폴더명 (기존 호환성 유지)
 DRIVE_FOLDER_NAME = '반품내역'
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
@@ -24,6 +27,8 @@ SCOPES = ['https://www.googleapis.com/auth/drive']
 # Google Drive에서 폴더 URL 확인 후 폴더 ID 복사
 # 예: https://drive.google.com/drive/folders/1KiirgG6NkMI0XsLL6P9N88OB9QCPucbn
 MAIN_FOLDER_ID = os.environ.get('GOOGLE_DRIVE_MAIN_FOLDER_ID', '1KiirgG6NkMI0XsLL6P9N88OB9QCPucbn')
+# 정산 파일용 메인 폴더 ID (제이제이솔루션 폴더)
+SETTLEMENT_MAIN_FOLDER_ID = os.environ.get('GOOGLE_DRIVE_SETTLEMENT_MAIN_FOLDER_ID', '16TdQlAqyOkYIrvSTvEPH9LByLzyamsAw')
 
 
 def get_credentials():
@@ -580,4 +585,177 @@ def upload_images_to_drive(image_data_list: List[str], tracking_number: str) -> 
         import traceback
         traceback.print_exc()
         raise Exception(f"이미지 업로드 실패: {str(e)}")
+
+
+def upload_excel_to_drive(file_data: bytes, filename: str, folder_name: str = '정산파일') -> dict:
+    """
+    Google Drive에 엑셀 파일 업로드 (테스트용)
+    
+    Args:
+        file_data: 파일 바이너리 데이터
+        filename: 파일명 (예: 'test.xlsx')
+        folder_name: 업로드할 폴더명 (기본값: '정산파일')
+    
+    Returns:
+        {
+            'success': True/False,
+            'file_id': '파일ID',
+            'file_url': '파일URL',
+            'web_view_link': '웹보기링크',
+            'message': '메시지'
+        }
+    """
+    try:
+        print(f"📤 엑셀 파일 업로드 시작: {filename}")
+        
+        # Google Drive API 서비스 생성
+        credentials = get_credentials()
+        if not credentials:
+            raise Exception("Google Drive API 인증 실패")
+        
+        service = build('drive', 'v3', credentials=credentials)
+        
+        # 정산 파일용 메인 폴더 ID 가져오기 (제이제이솔루션)
+        # 환경 변수 또는 기본값 사용
+        main_folder_id = SETTLEMENT_MAIN_FOLDER_ID
+        print(f"✅ 정산 메인 폴더 ID 사용: {SETTLEMENT_MAIN_FOLDER_NAME} (ID: {main_folder_id})")
+        
+        # 메인 폴더 접근 가능 여부 확인
+        try:
+            folder_info = service.files().get(
+                fileId=main_folder_id,
+                fields='id, name',
+                supportsAllDrives=True
+            ).execute()
+            print(f"✅ 메인 폴더 접근 확인: {folder_info.get('name', '알 수 없음')}")
+        except HttpError as e:
+            error_status = e.resp.status if hasattr(e, 'resp') else '알 수 없음'
+            if error_status == 404:
+                raise Exception(
+                    f"'{SETTLEMENT_MAIN_FOLDER_NAME}' 폴더를 찾을 수 없습니다. (ID: {main_folder_id})\n"
+                    f"폴더가 존재하지 않거나 삭제되었습니다.\n"
+                    f"또는 서비스 계정이 폴더에 접근할 수 없습니다.\n\n"
+                    f"해결 방법:\n"
+                    f"1. Google Drive에서 '{SETTLEMENT_MAIN_FOLDER_NAME}' 폴더 확인\n"
+                    f"2. 폴더 우클릭 → '공유' 클릭\n"
+                    f"3. 서비스 계정 이메일 추가 (편집자 권한)\n"
+                    f"4. '전송' 클릭"
+                )
+            elif error_status == 403:
+                raise Exception(
+                    f"'{SETTLEMENT_MAIN_FOLDER_NAME}' 폴더에 접근할 수 없습니다. (403 Forbidden)\n\n"
+                    f"서비스 계정이 폴더에 접근할 수 없습니다.\n\n"
+                    f"해결 방법:\n"
+                    f"1. Google Drive에서 '{SETTLEMENT_MAIN_FOLDER_NAME}' 폴더 확인\n"
+                    f"2. 폴더 우클릭 → '공유' 클릭\n"
+                    f"3. 서비스 계정 이메일 추가\n"
+                    f"4. 권한: '편집자' 선택 (중요!)\n"
+                    f"5. '전송' 클릭\n\n"
+                    f"폴더 ID: {main_folder_id}"
+                )
+            else:
+                raise Exception(f"메인 폴더 접근 실패 ({error_status}): {e}")
+        
+        # 정산파일 폴더 찾기 (제이제이솔루션 폴더 안에)
+        target_folder_id = find_folder_in_shared(service, folder_name, main_folder_id)
+        
+        if not target_folder_id:
+            # 폴더가 없으면 에러 발생
+            print(f"⚠️ '{folder_name}' 폴더를 찾을 수 없습니다.")
+            print(f"   Google Drive에서 '{SETTLEMENT_MAIN_FOLDER_NAME}' 폴더 안에 '{folder_name}' 폴더를 만들어주세요.")
+            raise Exception(
+                f"'{folder_name}' 폴더를 찾을 수 없습니다.\n"
+                f"Google Drive에서 '{SETTLEMENT_MAIN_FOLDER_NAME}' 폴더 안에 '{folder_name}' 폴더를 만들어주세요.\n"
+                f"폴더 구조: {SETTLEMENT_MAIN_FOLDER_NAME} > {folder_name}\n\n"
+                f"해결 방법:\n"
+                f"1. Google Drive에서 '{SETTLEMENT_MAIN_FOLDER_NAME}' 폴더 열기\n"
+                f"2. '새로 만들기' → '폴더' 클릭\n"
+                f"3. 폴더 이름: '{folder_name}'\n"
+                f"4. 폴더 생성 후 서비스 계정과 공유 (상위 폴더 공유 시 자동 공유됨)"
+            )
+        
+        print(f"✅ 대상 폴더 찾기 성공: {folder_name} (ID: {target_folder_id})")
+        
+        print(f"✅ 대상 폴더 찾기 성공: {folder_name} (ID: {target_folder_id})")
+        
+        # 파일 메타데이터
+        file_metadata = {
+            'name': filename,
+            'parents': [target_folder_id]
+        }
+        
+        # 미디어 업로드 (엑셀 파일)
+        media = MediaIoBaseUpload(
+            io.BytesIO(file_data),
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',  # .xlsx
+            resumable=True
+        )
+        
+        # 파일 업로드
+        try:
+            file = service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id, name, webViewLink, webContentLink',
+                supportsAllDrives=True,
+                ignoreDefaultVisibility=True
+            ).execute()
+            
+            file_id = file.get('id')
+            web_view_link = file.get('webViewLink', '')
+            web_content_link = file.get('webContentLink', '')
+            
+            print(f"✅ 파일 업로드 성공: {filename} (ID: {file_id})")
+            print(f"🔗 웹 보기 링크: {web_view_link}")
+            
+            # 공유 설정 (누구나 링크로 볼 수 있도록)
+            try:
+                permission = {
+                    'type': 'anyone',
+                    'role': 'reader'
+                }
+                service.permissions().create(
+                    fileId=file_id,
+                    body=permission,
+                    supportsAllDrives=True
+                ).execute()
+                print(f"✅ 공유 설정 완료: {filename}")
+            except HttpError as perm_error:
+                print(f"⚠️ 공유 설정 실패 (무시, 파일은 업로드됨): {perm_error}")
+            
+            return {
+                'success': True,
+                'file_id': file_id,
+                'file_url': web_content_link,
+                'web_view_link': web_view_link,
+                'message': f'파일 업로드 성공: {filename}'
+            }
+            
+        except HttpError as upload_error:
+            error_msg = str(upload_error)
+            error_status = upload_error.resp.status if hasattr(upload_error, 'resp') else '알 수 없음'
+            
+            print(f"❌ 파일 업로드 실패: {error_msg} (상태 코드: {error_status})")
+            raise Exception(f"파일 업로드 실패 ({error_status}): {error_msg}")
+    
+    except HttpError as error:
+        print(f"💥 Google Drive API 오류: {error}")
+        return {
+            'success': False,
+            'file_id': None,
+            'file_url': None,
+            'web_view_link': None,
+            'message': f'Google Drive API 오류: {error}'
+        }
+    except Exception as e:
+        print(f"💥 엑셀 파일 업로드 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'file_id': None,
+            'file_url': None,
+            'web_view_link': None,
+            'message': f'엑셀 파일 업로드 실패: {str(e)}'
+        }
 

@@ -216,6 +216,18 @@ def pallets():
         return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
 
 
+@app.route('/test-excel-upload.html')
+def test_excel_upload():
+    """엑셀 파일 업로드 테스트 페이지"""
+    try:
+        # test_excel_upload.html 파일 직접 제공
+        return send_file('test_excel_upload.html')
+    except FileNotFoundError:
+        return '<h1>테스트 페이지 파일을 찾을 수 없습니다.</h1><p>test_excel_upload.html 파일이 필요합니다.</p>', 404
+    except Exception as e:
+        return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
+
+
 @app.route('/settlements.html')
 def settlements():
     """정산 관리 페이지"""
