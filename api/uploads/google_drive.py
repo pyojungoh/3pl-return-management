@@ -36,21 +36,47 @@ def get_credentials():
     try:
         # 환경 변수에서 인증 정보 가져오기
         creds_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
+        
+        # 디버깅: 환경 변수 존재 여부 확인
+        if creds_json:
+            print(f"[디버깅] GOOGLE_SERVICE_ACCOUNT_JSON 환경 변수 발견 (길이: {len(creds_json)} 문자)")
+            print(f"[디버깅] 처음 50자: {creds_json[:50]}...")
+        else:
+            print("[디버깅] GOOGLE_SERVICE_ACCOUNT_JSON 환경 변수가 설정되지 않았습니다.")
+            # 모든 환경 변수 확인 (디버깅용)
+            all_env_vars = [k for k in os.environ.keys() if 'GOOGLE' in k.upper() or 'SERVICE' in k.upper()]
+            if all_env_vars:
+                print(f"[디버깅] Google 관련 환경 변수: {all_env_vars}")
+            else:
+                print("[디버깅] Google 관련 환경 변수가 없습니다.")
+        
         if creds_json:
             import json
             try:
+                # JSON 문자열인 경우 파싱
                 if isinstance(creds_json, str):
-                    creds_info = json.loads(creds_json)
+                    # 줄바꿈 제거 시도 (Vercel에서 줄바꿈이 \n으로 저장될 수 있음)
+                    creds_json_cleaned = creds_json.strip()
+                    creds_info = json.loads(creds_json_cleaned)
                 else:
                     creds_info = creds_json
+                
+                # 필수 필드 확인
+                required_fields = ['type', 'project_id', 'private_key', 'client_email']
+                missing_fields = [field for field in required_fields if field not in creds_info]
+                if missing_fields:
+                    print(f"❌ 필수 필드 누락: {missing_fields}")
+                    return None
                 
                 credentials = service_account.Credentials.from_service_account_info(
                     creds_info, scopes=SCOPES)
                 print("✅ Google Drive API 인증 정보 로드 성공 (환경 변수)")
+                print(f"   서비스 계정: {creds_info.get('client_email', '알 수 없음')}")
                 return credentials
             except json.JSONDecodeError as json_error:
                 print(f"❌ 환경 변수 JSON 파싱 실패: {json_error}")
-                print(f"   GOOGLE_SERVICE_ACCOUNT_JSON 값의 처음 100자: {str(creds_json)[:100]}")
+                print(f"   오류 위치: {json_error.msg} (라인 {json_error.lineno}, 컬럼 {json_error.colno})")
+                print(f"   GOOGLE_SERVICE_ACCOUNT_JSON 값의 처음 200자: {str(creds_json)[:200]}")
                 return None
             except Exception as parse_error:
                 print(f"❌ 환경 변수에서 인증 정보 파싱 실패: {parse_error}")
@@ -74,6 +100,11 @@ def get_credentials():
         
         print("❌ Google Drive API 인증 정보를 찾을 수 없습니다.")
         print("   환경 변수 GOOGLE_SERVICE_ACCOUNT_JSON 또는 service_account.json 파일이 필요합니다.")
+        print("   Vercel 환경 변수 설정 확인:")
+        print("   1. Vercel 대시보드 → 프로젝트 → Settings → Environment Variables")
+        print("   2. GOOGLE_SERVICE_ACCOUNT_JSON 변수가 있는지 확인")
+        print("   3. Production, Preview, Development 모두 선택했는지 확인")
+        print("   4. 재배포 후 다시 시도")
         return None
     except Exception as e:
         print(f"❌ 인증 정보 로드 실패: {e}")
