@@ -134,7 +134,7 @@ print("[앱 시작] 정산 관리 시스템 Blueprint 등록 완료")
 
 # C/S 알림 스케줄러 시작
 print("[정보] [앱 시작] C/S 알림 스케줄러 시작 시도...")
-print("[정보] [앱 시작] 배포 시간: 2025-01-09 17:10") # Force Vercel deployment trigger
+print("[정보] [앱 시작] 배포 시간: 2025-01-09 18:00") # Force Vercel deployment trigger
 try:
     # DB가 준비되지 않은 경우(예: Neon 쿼터 초과), 서버리스 부팅 안정성을 위해 스케줄러는 시작하지 않습니다.
     if DB_READY:
