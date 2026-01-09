@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>정산 관리</title>
+  <style>
+    /* 정산 메뉴 전용 스타일 */
+    #stContainer {
+      padding: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    /* 관리자 전용 섹션 (기본 숨김) */
+    .st-admin-only {
+      display: none;
+    }
+    
+    /* 화주사 전용 섹션 (기본 숨김) */
+    .st-consignor-only {
+      display: none;
+    }
+    
+    /* 공통 스타일 */
+    .st-section {
+      margin-bottom: 20px;
+    }
+    
+    .st-toggle-btn {
+      background: linear-gradient(135deg, #ffffff 0%, #fffef9 100%);
+      width: 100%;
+      text-align: left;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-radius: 14px;
+      border: 2px solid #ffeaa7;
+      color: #ff6b35;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(255, 152, 0, 0.1);
+    }
+    
+    .st-toggle-btn:hover {
+      background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%);
+      box-shadow: 0 6px 16px rgba(255, 152, 0, 0.15);
+    }
+    
+    .st-toggle-content {
+      display: none;
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 0 0 14px 14px;
+      border: 2px solid #ffeaa7;
+      border-top: none;
+      margin-top: -2px;
+      box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1);
+    }
+    
+    .st-filters {
+      display: flex;
+      gap: 15px;
+      align-items: flex-end;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .st-filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    
+    .st-filter-group label {
+      color: #2d3436;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    .st-filter-group input,
+    .st-filter-group select {
+      padding: 10px 14px;
+      border: 2px solid #ffeaa7;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #ffffff;
+      color: #2d3436;
+    }
+    
+    .st-filter-group input:focus,
+    .st-filter-group select:focus {
+      outline: none;
+      border-color: #ff6b35;
+      box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+    }
+    
+    .st-btn {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
+    }
+    
+    .st-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(255, 107, 53, 0.35);
+    }
+    
+    .st-table-container {
+      margin-top: 20px;
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1);
+      border: 2px solid #ffeaa7;
+      overflow: hidden;
+    }
+    
+    .st-table-header {
+      padding: 15px 20px 10px 20px;
+      border-bottom: 2px solid #ffeaa7;
+      background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%);
+    }
+    
+    .st-table-header h3 {
+      margin: 0;
+      color: #ff6b35;
+      font-weight: 700;
+      font-size: 18px;
+    }
+    
+    .st-table-scroll-wrapper {
+      overflow-x: auto;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    
+    .st-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1200px;
+    }
+    
+    .st-table thead {
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      color: white;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    
+    .st-table th {
+      padding: 12px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    .st-table td {
+      padding: 12px;
+      text-align: center;
+      font-size: 14px;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: middle;
+    }
+    
+    .st-table tbody tr:hover {
+      background: #fffef9;
+    }
+    
+    .st-table .no-data {
+      text-align: center;
+      padding: 40px;
+      color: #636e72;
+    }
+    
+    .st-form-group {
+      margin-bottom: 15px;
+    }
+    
+    .st-form-label {
+      color: #2d3436;
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: block;
+      font-size: 14px;
+    }
+    
+    .st-form-input,
+    .st-form-select,
+    .st-form-textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border: 2px solid #ffeaa7;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #ffffff;
+      color: #2d3436;
+      box-sizing: border-box;
+    }
+    
+    .st-form-input:focus,
+    .st-form-select:focus,
+    .st-form-textarea:focus {
+      outline: none;
+      border-color: #ff6b35;
+      box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+    }
+    
+    .st-form-textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    
+    .st-file-upload-area {
+      border: 2px dashed #ffeaa7;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: #fffef9;
+      margin-top: 8px;
+    }
+    
+    .st-file-upload-area:hover {
+      border-color: #ff6b35;
+      background: #ffffff;
+    }
+    
+    .st-file-link {
+      color: #74b9ff;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    
+    .st-file-link:hover {
+      color: #0984e3;
+    }
+    
+    .st-amount-display {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ff6b35;
+      text-align: right;
+    }
+    
+    .st-total-amount {
+      font-size: 24px;
+      font-weight: 800;
+      color: #ff6b35;
+      text-align: right;
+      padding: 15px;
+      background: #fffef9;
+      border-radius: 8px;
+      border: 2px solid #ffeaa7;
+    }
+    
+    .st-btn-secondary {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    
+    .st-btn-secondary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(178, 190, 195, 0.25);
+    }
+    
+    .st-btn-danger {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    
+    .st-btn-danger:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(231, 76, 60, 0.25);
+    }
+    
+    .st-searchable-select {
+      position: relative;
+      width: 100%;
+    }
+    
+    .st-dropdown-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 2px solid #ffeaa7;
+      border-radius: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      margin-top: 4px;
+    }
+    
+    .st-dropdown-list.show {
+      display: block;
+    }
+    
+    .st-dropdown-item {
+      padding: 10px 15px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .st-dropdown-item:last-child {
+      border-bottom: none;
+    }
+    
+    .st-dropdown-item:hover {
+      background-color: #fff9e6;
+    }
+    
+    .st-settlement-detail {
+      background: #f8f9fa;
+      border: 2px solid #ffeaa7;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 15px;
+    }
+    
+    .st-settlement-detail-row {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 15px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    
+    .st-settlement-detail-label {
+      font-weight: 600;
+      color: #2d3436;
+    }
+    
+    .st-settlement-detail-value {
+      color: #636e72;
+    }
+  </style>
+</head>
+<body>
+  <div id="stContainer">
+    <!-- 정산 등록/수정 섹션 (관리자만) -->
+    <div id="stAdminSettlementSection" class="st-admin-only st-section">
+      <button class="st-toggle-btn" onclick="stAdminToggleSettlementForm()">
+        <span>➕ 정산 등록</span>
+        <span id="stAdminSettlementIcon">▼</span>
+      </button>
+      <div id="stAdminSettlementForm" class="st-toggle-content">
+        <h3 style="margin: 0 0 20px 0; color: #ff6b35; font-weight: 700;">정산 등록</h3>
+        <form id="stSettlementForm" onsubmit="stAdminHandleSettlementSubmit(event)">
+          <input type="hidden" id="stSettlementId">
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">
+            <div class="st-form-group">
+              <label class="st-form-label">화주사 *</label>
+              <div class="st-searchable-select">
+                <input type="text" id="stSettlementCompanyInput" class="st-form-input" placeholder="화주사명을 입력하거나 선택하세요" autocomplete="off" required>
+                <input type="hidden" id="stSettlementCompanyName" required>
+                <div id="stSettlementCompanyDropdown" class="st-dropdown-list"></div>
+              </div>
+            </div>
+            <div class="st-form-group">
+              <label class="st-form-label">정산년월 *</label>
+              <input type="month" id="stSettlementYearMonth" class="st-form-input" required>
+            </div>
+          </div>
+          
+          <!-- 작업비 -->
+          <div class="st-settlement-detail" style="margin-bottom: 15px;">
+            <div class="st-settlement-detail-row">
+              <div class="st-settlement-detail-label">작업비</div>
+              <div>
+                <input type="number" id="stWorkFee" class="st-form-input" placeholder="작업비 금액 입력" style="width: 200px; display: inline-block; margin-right: 10px;" onchange="stCalculateTotal()">
+                <span>원</span>
+              </div>
+            </div>
+            <div class="st-form-group">
+              <label class="st-form-label">이지어드민 상세내역 파일</label>
+              <div class="st-file-upload-area" onclick="document.getElementById('stWorkFeeFileInput').click()">
+                <p>📄 클릭하여 파일 업로드</p>
+                <input type="file" id="stWorkFeeFileInput" accept=".pdf,.xlsx,.xls,.csv" style="display: none;" onchange="stHandleFileSelect('work_fee', event)">
+              </div>
+              <div id="stWorkFeeFileDisplay"></div>
+            </div>
+          </div>
+          
+          <!-- 입출고비 -->
+          <div class="st-settlement-detail" style="margin-bottom: 15px;">
+            <div class="st-settlement-detail-row">
+              <div class="st-settlement-detail-label">입출고비</div>
+              <div>
+                <input type="number" id="stInoutFee" class="st-form-input" placeholder="입출고비 금액 입력" style="width: 200px; display: inline-block; margin-right: 10px;" onchange="stCalculateTotal()">
+                <span>원</span>
+              </div>
+            </div>
+            <div class="st-form-group">
+              <label class="st-form-label">이지어드민 상세내역 파일</label>
+              <div class="st-file-upload-area" onclick="document.getElementById('stInoutFeeFileInput').click()">
+                <p>📄 클릭하여 파일 업로드</p>
+                <input type="file" id="stInoutFeeFileInput" accept=".pdf,.xlsx,.xls,.csv" style="display: none;" onchange="stHandleFileSelect('inout_fee', event)">
+              </div>
+              <div id="stInoutFeeFileDisplay"></div>
+            </div>
+          </div>
+          
+          <!-- 택배비 -->
+          <div class="st-settlement-detail" style="margin-bottom: 15px;">
+            <div class="st-settlement-detail-row">
+              <div class="st-settlement-detail-label">택배비</div>
+              <div>
+                <input type="number" id="stShippingFee" class="st-form-input" placeholder="택배비 금액 입력" style="width: 200px; display: inline-block; margin-right: 10px;" onchange="stCalculateTotal()">
+                <span>원</span>
+              </div>
+            </div>
+            <div class="st-form-group">
+              <label class="st-form-label">택배사 파일</label>
+              <div class="st-file-upload-area" onclick="document.getElementById('stShippingFeeFileInput').click()">
+                <p>📄 클릭하여 파일 업로드</p>
+                <input type="file" id="stShippingFeeFileInput" accept=".pdf,.xlsx,.xls,.csv" style="display: none;" onchange="stHandleFileSelect('shipping_fee', event)">
+              </div>
+              <div id="stShippingFeeFileDisplay"></div>
+            </div>
+          </div>
+          
+          <!-- 보관료 (자동 연동) -->
+          <div class="st-settlement-detail" style="margin-bottom: 15px;">
+            <div class="st-settlement-detail-row">
+              <div class="st-settlement-detail-label">보관료</div>
+              <div>
+                <span id="stStorageFeeDisplay" class="st-amount-display">0</span>
+                <span>원</span>
+                <button type="button" class="st-btn" onclick="stLoadStorageFee()" style="margin-left: 10px; padding: 6px 12px; font-size: 12px;">🔄 파레트에서 가져오기</button>
+              </div>
+            </div>
+            <input type="hidden" id="stStorageFee" value="0">
+          </div>
+          
+          <!-- 특수작업 (자동 연동) -->
+          <div class="st-settlement-detail" style="margin-bottom: 15px;">
+            <div class="st-settlement-detail-row">
+              <div class="st-settlement-detail-label">특수작업</div>
+              <div>
+                <span id="stSpecialWorkFeeDisplay" class="st-amount-display">0</span>
+                <span>원</span>
+                <button type="button" class="st-btn" onclick="stLoadSpecialWorkFee()" style="margin-left: 10px; padding: 6px 12px; font-size: 12px;">🔄 특수작업에서 가져오기</button>
+              </div>
+            </div>
+            <input type="hidden" id="stSpecialWorkFee" value="0">
+          </div>
+          
+          <!-- 오배송/누락 차감 (자동 계산) -->
+          <div class="st-settlement-detail" style="margin-bottom: 15px;">
+            <div class="st-settlement-detail-row">
+              <div class="st-settlement-detail-label">오배송/누락 차감</div>
+              <div>
+                <span id="stErrorDeductionDisplay" class="st-amount-display" style="color: #e74c3c;">0</span>
+                <span>원</span>
+                <button type="button" class="st-btn" onclick="stLoadErrorDeduction()" style="margin-left: 10px; padding: 6px 12px; font-size: 12px;">🔄 반품관리에서 계산</button>
+              </div>
+            </div>
+            <input type="hidden" id="stErrorDeduction" value="0">
+          </div>
+          
+          <!-- 총액 -->
+          <div class="st-form-group" style="margin-top: 20px;">
+            <div class="st-total-amount">
+              <div style="font-size: 14px; color: #636e72; margin-bottom: 5px;">총 정산 금액</div>
+              <div><span id="stTotalAmount">0</span>원</div>
+            </div>
+          </div>
+          
+          <div class="st-form-group">
+            <label class="st-form-label">비고</label>
+            <textarea id="stSettlementMemo" class="st-form-textarea" placeholder="정산 관련 비고를 입력하세요"></textarea>
+          </div>
+          
+          <div style="display: flex; gap: 12px; margin-top: 24px; padding-top: 24px; border-top: 2px solid #ffeaa7;">
+            <button type="submit" class="st-btn">💾 저장</button>
+            <button type="button" class="st-btn-secondary" onclick="stAdminResetSettlementForm()">🔄 초기화</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <!-- 관리자 전용 필터 섹션 -->
+    <div id="stAdminFilterSection" class="st-admin-only st-section">
+      <div class="st-filters">
+        <div class="st-filter-group">
+          <label for="stAdminFilterYearMonth">정산년월</label>
+          <input type="month" id="stAdminFilterYearMonth">
+        </div>
+        <div class="st-filter-group">
+          <label for="stAdminFilterCompany">화주사</label>
+          <div class="st-searchable-select">
+            <input type="text" id="stAdminFilterCompanyInput" class="st-form-input" placeholder="화주사명을 입력하거나 선택하세요" autocomplete="off">
+            <input type="hidden" id="stAdminFilterCompanyName">
+            <div id="stAdminFilterCompanyDropdown" class="st-dropdown-list"></div>
+          </div>
+        </div>
+        <button class="st-btn" onclick="stAdminLoadSettlements()">조회</button>
+      </div>
+    </div>
+    
+    <!-- 화주사 전용 필터 섹션 -->
+    <div id="stConsignorFilterSection" class="st-consignor-only st-section">
+      <div class="st-filters">
+        <div class="st-filter-group">
+          <label for="stConsignorFilterYearMonth">정산년월</label>
+          <input type="month" id="stConsignorFilterYearMonth">
+        </div>
+        <button class="st-btn" onclick="stConsignorLoadSettlements()">조회</button>
+      </div>
+    </div>
+    
+    <!-- 정산 목록 테이블 -->
+    <div id="stCommonTableSection" class="st-section">
+      <div class="st-table-container">
+        <div class="st-table-header">
+          <h3>💰 정산 목록</h3>
+        </div>
+        <div class="st-table-scroll-wrapper">
+          <table class="st-table">
+            <thead>
+              <tr>
+                <th>순번</th>
+                <th>정산년월</th>
+                <th class="st-admin-only">화주사</th>
+                <th>작업비</th>
+                <th>입출고비</th>
+                <th>택배비</th>
+                <th>보관료</th>
+                <th>특수작업</th>
+                <th>오배송/누락</th>
+                <th>총액</th>
+                <th>상태</th>
+                <th class="st-admin-only">관리</th>
+              </tr>
+            </thead>
+            <tbody id="stTableBody">
+              <tr>
+                <td colspan="12" class="no-data">로딩 중...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 정산 상세 모달 -->
+  <div id="stSettlementDetailModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; overflow-y: auto;">
+    <div style="max-width: 900px; margin: 50px auto; background: white; border-radius: 14px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h2 style="margin: 0; color: #ff6b35; font-weight: 700;">정산 상세</h2>
+        <button onclick="stCloseDetailModal()" style="background: #e17055; color: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 18px;">×</button>
+      </div>
+      <div id="stSettlementDetailContent"></div>
+      <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="st-btn" onclick="stDownloadStatement()">📥 명세서 다운로드</button>
+        <button class="st-btn-secondary" onclick="stCloseDetailModal()">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 전역 변수
+    var stCurrentRole = '';
+    var stCurrentCompany = '';
+    var stCurrentUsername = '';
+    var stInitialized = false;
+    var stSelectedFiles = {}; // {file_type: {file: File, base64: string}}
+    var stCurrentSettlementId = null;
+
+    // 공통 초기화 함수
+    function stCommonInit() {
+      if (stInitialized) {
+        console.log('[ST] 이미 초기화됨, 중복 실행 방지');
+        return;
+      }
+      
+      const container = document.getElementById('stContainer');
+      if (!container) {
+        console.error('[ST] stContainer를 찾을 수 없습니다');
+        return;
+      }
+      
+      // 1. 역할 확인 (헤더 우선, 없으면 전역 변수/localStorage)
+      const companyInfoEl = document.getElementById('companyInfo');
+      if (companyInfoEl && companyInfoEl.textContent) {
+        const headerText = companyInfoEl.textContent.trim();
+        if (headerText.includes('[관리자]')) {
+          stCurrentRole = '관리자';
+          const usernameMatch = headerText.match(/\(([^)]+)\)/);
+          if (usernameMatch) {
+            stCurrentUsername = usernameMatch[1].trim();
+          }
+          const companyMatch = headerText.match(/^([^[]+)/);
+          if (companyMatch) {
+            stCurrentCompany = companyMatch[1].trim();
+          }
+        } else {
+          const usernameMatch = headerText.match(/\(([^)]+)\)/);
+          if (usernameMatch) {
+            stCurrentUsername = usernameMatch[1].trim();
+          }
+          const companyMatch = headerText.match(/^([^(]+)/);
+          if (companyMatch) {
+            stCurrentCompany = companyMatch[1].trim();
+          }
+          stCurrentRole = '화주사';
+        }
+      } else {
+        stCurrentRole = (window.currentRole || localStorage.getItem('client_role') || '').toString().trim();
+        stCurrentCompany = (window.currentCompany || localStorage.getItem('client_company') || '').toString().trim();
+        stCurrentUsername = (window.currentUsername || localStorage.getItem('client_username') || '').toString().trim();
+      }
+      
+      console.log('[ST] 역할 확인:', {
+        role: stCurrentRole,
+        company: stCurrentCompany,
+        username: stCurrentUsername
+      });
+      
+      // 2. 가시성 제어
+      stApplyVisibility();
+      
+      // 3. 모드별 초기화 함수 호출
+      const roleNormalized = stCurrentRole.toString().trim();
+      const isAdmin = (roleNormalized === '관리자');
+      
+      if (isAdmin) {
+        stAdminInit();
+      } else {
+        stConsignorInit();
+      }
+      
+      // 4. 가시성 제어 재실행
+      setTimeout(() => {
+        stApplyVisibility();
+      }, 50);
+      
+      stInitialized = true;
+      console.log('[ST] 초기화 완료');
+    }
+    window.stCommonInit = stCommonInit;
+
+    // 가시성 제어 함수
+    function stApplyVisibility() {
+      const container = document.getElementById('stContainer');
+      if (!container) return;
+      
+      const roleNormalized = (stCurrentRole || '').toString().trim();
+      const isAdmin = (roleNormalized === '관리자');
+      
+      container.querySelectorAll('.st-admin-only').forEach(el => {
+        el.style.display = isAdmin ? 'block' : 'none';
+      });
+      
+      container.querySelectorAll('.st-consignor-only').forEach(el => {
+        el.style.display = isAdmin ? 'none' : 'block';
+      });
+    }
+
+    // 사용자 헤더 생성 함수
+    function stGetUserHeaders() {
+      const encodeHeader = (value) => encodeURIComponent((value || '').toString().trim());
+      return {
+        'X-User-Role': encodeHeader(stCurrentRole),
+        'X-User-Name': encodeHeader(stCurrentUsername),
+        'X-Company-Name': encodeHeader(stCurrentCompany)
+      };
+    }
+
+    // 관리자 초기화 함수
+    function stAdminInit() {
+      console.log('[ST] stAdminInit 시작');
+      const container = document.getElementById('stContainer');
+      if (!container) return;
+      
+      // 오늘 날짜로 정산년월 초기화
+      const today = new Date().toISOString().split('T')[0];
+      const yearMonthInput = container.querySelector('#stAdminFilterYearMonth');
+      if (yearMonthInput) yearMonthInput.value = today.slice(0, 7);
+      
+      // 화주사 목록 로드
+      stAdminLoadCompanies();
+      
+      // 정산 목록 로드
+      stAdminLoadSettlements();
+    }
+
+    // 화주사 초기화 함수
+    function stConsignorInit() {
+      console.log('[ST] stConsignorInit 시작');
+      const container = document.getElementById('stContainer');
+      if (!container) return;
+      
+      // 오늘 날짜로 정산년월 초기화
+      const today = new Date().toISOString().split('T')[0];
+      const yearMonthInput = container.querySelector('#stConsignorFilterYearMonth');
+      if (yearMonthInput) yearMonthInput.value = today.slice(0, 7);
+      
+      // 정산 목록 로드
+      stConsignorLoadSettlements();
+    }
+
+    // 관리자 정산 목록 로드
+    function stAdminLoadSettlements() {
+      const container = document.getElementById('stContainer');
+      if (!container) return;
+      
+      const yearMonth = container.querySelector('#stAdminFilterYearMonth')?.value || '';
+      const companyName = container.querySelector('#stAdminFilterCompanyName')?.value || '';
+      
+      let url = '/api/settlements/list?';
+      if (yearMonth) url += `settlement_year_month=${yearMonth}&`;
+      if (companyName) url += `company_name=${encodeURIComponent(companyName)}&`;
+      
+      const tbody = container.querySelector('#stTableBody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="12" class="no-data">로딩 중...</td></tr>';
+      
+      fetch(url, {
+        credentials: 'include',
+        headers: stGetUserHeaders()
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            let items = data.data || [];
+            items.sort((a, b) => {
+              if (b.settlement_year_month !== a.settlement_year_month) {
+                return b.settlement_year_month.localeCompare(a.settlement_year_month);
+              }
+              return a.company_name.localeCompare(b.company_name);
+            });
+            stAdminRenderSettlements(items);
+          } else {
+            if (tbody) tbody.innerHTML = `<tr><td colspan="12" class="no-data">${data.message || '목록을 불러오는 중 오류가 발생했습니다.'}</td></tr>`;
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 관리자 목록 로드 오류:', error);
+          if (tbody) tbody.innerHTML = '<tr><td colspan="12" class="no-data">목록을 불러오는 중 오류가 발생했습니다.</td></tr>';
+        });
+    }
+
+    // 화주사 정산 목록 로드
+    function stConsignorLoadSettlements() {
+      const container = document.getElementById('stContainer');
+      if (!container) return;
+      
+      const yearMonth = container.querySelector('#stConsignorFilterYearMonth')?.value || '';
+      const companyName = stCurrentCompany;
+      
+      if (!companyName) {
+        console.error('[ST] 화주사 정보를 확인할 수 없습니다');
+        alert('화주사 정보를 확인할 수 없습니다.');
+        return;
+      }
+      
+      let url = '/api/settlements/list?';
+      if (yearMonth) url += `settlement_year_month=${yearMonth}&`;
+      url += `company_name=${encodeURIComponent(companyName)}&`;
+      
+      const tbody = container.querySelector('#stTableBody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="11" class="no-data">로딩 중...</td></tr>';
+      
+      fetch(url, {
+        credentials: 'include',
+        headers: stGetUserHeaders()
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            let items = data.data || [];
+            items.sort((a, b) => b.settlement_year_month.localeCompare(a.settlement_year_month));
+            stConsignorRenderSettlements(items);
+          } else {
+            if (tbody) tbody.innerHTML = `<tr><td colspan="11" class="no-data">${data.message || '목록을 불러오는 중 오류가 발생했습니다.'}</td></tr>`;
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 화주사 목록 로드 오류:', error);
+          if (tbody) tbody.innerHTML = '<tr><td colspan="11" class="no-data">목록을 불러오는 중 오류가 발생했습니다.</td></tr>';
+        });
+    }
+
+    // 관리자 정산 목록 렌더링
+    function stAdminRenderSettlements(items) {
+      const tbody = document.getElementById('stTableBody');
+      if (!tbody) return;
+      
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" class="no-data">정산 내역이 없습니다.</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = items.map((item, index) => {
+        const totalAmount = (item.work_fee || 0) + (item.inout_fee || 0) + (item.shipping_fee || 0) + 
+                           (item.storage_fee || 0) + (item.special_work_fee || 0) - (item.error_deduction || 0);
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${item.settlement_year_month || ''}</td>
+            <td>${item.company_name || ''}</td>
+            <td>${(item.work_fee || 0).toLocaleString()}원</td>
+            <td>${(item.inout_fee || 0).toLocaleString()}원</td>
+            <td>${(item.shipping_fee || 0).toLocaleString()}원</td>
+            <td>${(item.storage_fee || 0).toLocaleString()}원</td>
+            <td>${(item.special_work_fee || 0).toLocaleString()}원</td>
+            <td style="color: #e74c3c;">-${(item.error_deduction || 0).toLocaleString()}원</td>
+            <td style="font-weight: 700; color: #ff6b35;">${totalAmount.toLocaleString()}원</td>
+            <td>${item.status || '대기'}</td>
+            <td>
+              <button class="st-btn" onclick="stShowSettlementDetail(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px;">상세</button>
+              <button class="st-btn" onclick="stEditSettlement(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px;">수정</button>
+              <button class="st-btn-danger" onclick="stDeleteSettlement(${item.id})" style="padding: 6px 12px; font-size: 12px;">삭제</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 화주사 정산 목록 렌더링
+    function stConsignorRenderSettlements(items) {
+      const tbody = document.getElementById('stTableBody');
+      if (!tbody) return;
+      
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="no-data">정산 내역이 없습니다.</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = items.map((item, index) => {
+        const totalAmount = (item.work_fee || 0) + (item.inout_fee || 0) + (item.shipping_fee || 0) + 
+                           (item.storage_fee || 0) + (item.special_work_fee || 0) - (item.error_deduction || 0);
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${item.settlement_year_month || ''}</td>
+            <td>${(item.work_fee || 0).toLocaleString()}원</td>
+            <td>${(item.inout_fee || 0).toLocaleString()}원</td>
+            <td>${(item.shipping_fee || 0).toLocaleString()}원</td>
+            <td>${(item.storage_fee || 0).toLocaleString()}원</td>
+            <td>${(item.special_work_fee || 0).toLocaleString()}원</td>
+            <td style="color: #e74c3c;">-${(item.error_deduction || 0).toLocaleString()}원</td>
+            <td style="font-weight: 700; color: #ff6b35;">${totalAmount.toLocaleString()}원</td>
+            <td>${item.status || '대기'}</td>
+            <td>
+              <button class="st-btn" onclick="stShowSettlementDetail(${item.id})" style="padding: 6px 12px; font-size: 12px;">상세</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 정산 등록 폼 토글
+    function stAdminToggleSettlementForm() {
+      const form = document.getElementById('stAdminSettlementForm');
+      const icon = document.getElementById('stAdminSettlementIcon');
+      if (form.style.display === 'none' || !form.style.display) {
+        form.style.display = 'block';
+        icon.textContent = '▲';
+      } else {
+        form.style.display = 'none';
+        icon.textContent = '▼';
+      }
+    }
+
+    // 총액 계산
+    function stCalculateTotal() {
+      const workFee = parseInt(document.getElementById('stWorkFee')?.value || 0);
+      const inoutFee = parseInt(document.getElementById('stInoutFee')?.value || 0);
+      const shippingFee = parseInt(document.getElementById('stShippingFee')?.value || 0);
+      const storageFee = parseInt(document.getElementById('stStorageFee')?.value || 0);
+      const specialWorkFee = parseInt(document.getElementById('stSpecialWorkFee')?.value || 0);
+      const errorDeduction = parseInt(document.getElementById('stErrorDeduction')?.value || 0);
+      
+      const total = workFee + inoutFee + shippingFee + storageFee + specialWorkFee - errorDeduction;
+      document.getElementById('stTotalAmount').textContent = total.toLocaleString();
+    }
+
+    // 파일 선택 처리
+    function stHandleFileSelect(fileType, event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64 = e.target.result;
+        stSelectedFiles[fileType] = {
+          file: file,
+          base64: base64
+        };
+        
+        // 파일 표시 업데이트
+        const displayDiv = document.getElementById(`st${fileType.charAt(0).toUpperCase() + fileType.slice(1)}FileDisplay`);
+        if (displayDiv) {
+          displayDiv.innerHTML = `
+            <div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px;">
+              <span>📄 ${file.name}</span>
+              <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
+            </div>
+          `;
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // 파일 제거
+    function stRemoveFile(fileType) {
+      delete stSelectedFiles[fileType];
+      const displayDiv = document.getElementById(`st${fileType.charAt(0).toUpperCase() + fileType.slice(1)}FileDisplay`);
+      if (displayDiv) {
+        displayDiv.innerHTML = '';
+      }
+      const input = document.getElementById(`st${fileType.charAt(0).toUpperCase() + fileType.slice(1)}FileInput`);
+      if (input) {
+        input.value = '';
+      }
+    }
+
+    // 파레트 보관료 가져오기
+    function stLoadStorageFee() {
+      const companyName = document.getElementById('stSettlementCompanyName')?.value || stCurrentCompany;
+      const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
+      
+      if (!companyName || !yearMonth) {
+        alert('화주사와 정산년월을 먼저 선택해주세요.');
+        return;
+      }
+      
+      fetch(`/api/settlements/data-sources?settlement_year_month=${yearMonth}&company_name=${encodeURIComponent(companyName)}`, {
+        credentials: 'include',
+        headers: stGetUserHeaders()
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const storageFee = data.data.storage_fee || 0;
+            document.getElementById('stStorageFee').value = storageFee;
+            document.getElementById('stStorageFeeDisplay').textContent = storageFee.toLocaleString();
+            stCalculateTotal();
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 보관료 로드 오류:', error);
+          alert('보관료를 가져오는 중 오류가 발생했습니다.');
+        });
+    }
+
+    // 특수작업 비용 가져오기
+    function stLoadSpecialWorkFee() {
+      const companyName = document.getElementById('stSettlementCompanyName')?.value || stCurrentCompany;
+      const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
+      
+      if (!companyName || !yearMonth) {
+        alert('화주사와 정산년월을 먼저 선택해주세요.');
+        return;
+      }
+      
+      fetch(`/api/settlements/data-sources?settlement_year_month=${yearMonth}&company_name=${encodeURIComponent(companyName)}`, {
+        credentials: 'include',
+        headers: stGetUserHeaders()
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const specialWorkFee = data.data.special_work_fee || 0;
+            document.getElementById('stSpecialWorkFee').value = specialWorkFee;
+            document.getElementById('stSpecialWorkFeeDisplay').textContent = specialWorkFee.toLocaleString();
+            stCalculateTotal();
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 특수작업 비용 로드 오류:', error);
+          alert('특수작업 비용을 가져오는 중 오류가 발생했습니다.');
+        });
+    }
+
+    // 오배송/누락 차감 계산
+    function stLoadErrorDeduction() {
+      const companyName = document.getElementById('stSettlementCompanyName')?.value || stCurrentCompany;
+      const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
+      
+      if (!companyName || !yearMonth) {
+        alert('화주사와 정산년월을 먼저 선택해주세요.');
+        return;
+      }
+      
+      fetch(`/api/settlements/data-sources?settlement_year_month=${yearMonth}&company_name=${encodeURIComponent(companyName)}`, {
+        credentials: 'include',
+        headers: stGetUserHeaders()
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const errorDeduction = data.data.error_deduction || 0;
+            document.getElementById('stErrorDeduction').value = errorDeduction;
+            document.getElementById('stErrorDeductionDisplay').textContent = errorDeduction.toLocaleString();
+            stCalculateTotal();
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 오배송/누락 차감 계산 오류:', error);
+          alert('오배송/누락 차감을 계산하는 중 오류가 발생했습니다.');
+        });
+    }
+
+    // 정산 저장 처리
+    function stAdminHandleSettlementSubmit(event) {
+      event.preventDefault();
+      
+      const companyName = document.getElementById('stSettlementCompanyName')?.value;
+      const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
+      const workFee = parseInt(document.getElementById('stWorkFee')?.value || 0);
+      const inoutFee = parseInt(document.getElementById('stInoutFee')?.value || 0);
+      const shippingFee = parseInt(document.getElementById('stShippingFee')?.value || 0);
+      const storageFee = parseInt(document.getElementById('stStorageFee')?.value || 0);
+      const specialWorkFee = parseInt(document.getElementById('stSpecialWorkFee')?.value || 0);
+      const errorDeduction = parseInt(document.getElementById('stErrorDeduction')?.value || 0);
+      const memo = document.getElementById('stSettlementMemo')?.value || '';
+      const settlementId = document.getElementById('stSettlementId')?.value;
+      
+      if (!companyName || !yearMonth) {
+        alert('화주사와 정산년월은 필수입니다.');
+        return;
+      }
+      
+      const totalAmount = workFee + inoutFee + shippingFee + storageFee + specialWorkFee - errorDeduction;
+      
+      const data = {
+        company_name: companyName,
+        settlement_year_month: yearMonth,
+        work_fee: workFee,
+        inout_fee: inoutFee,
+        shipping_fee: shippingFee,
+        storage_fee: storageFee,
+        special_work_fee: specialWorkFee,
+        error_deduction: errorDeduction,
+        total_amount: totalAmount,
+        memo: memo
+      };
+      
+      const url = settlementId ? `/api/settlements/${settlementId}` : '/api/settlements/';
+      const method = settlementId ? 'PUT' : 'POST';
+      
+      fetch(url, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...stGetUserHeaders()
+        },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      })
+        .then(response => response.json())
+        .then(result => {
+          if (result.success) {
+            alert(result.message || '정산이 저장되었습니다.');
+            
+            // 파일 업로드 처리
+            const finalSettlementId = result.id || settlementId;
+            if (finalSettlementId && Object.keys(stSelectedFiles).length > 0) {
+              const promises = [];
+              for (const [fileType, fileData] of Object.entries(stSelectedFiles)) {
+                if (fileData && fileData.base64) {
+                  const uploadData = {
+                    settlement_id: finalSettlementId,
+                    file_type: fileType,
+                    file_name: fileData.file.name,
+                    file_data: fileData.base64
+                  };
+                  
+                  promises.push(
+                    fetch('/api/settlements/upload-file', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        ...stGetUserHeaders()
+                      },
+                      credentials: 'include',
+                      body: JSON.stringify(uploadData)
+                    })
+                  );
+                }
+              }
+              
+              Promise.all(promises).then(() => {
+                stAdminResetSettlementForm();
+                stAdminLoadSettlements();
+              }).catch(error => {
+                console.error('[ST] 파일 업로드 오류:', error);
+                alert('정산은 저장되었지만 파일 업로드 중 오류가 발생했습니다.');
+                stAdminResetSettlementForm();
+                stAdminLoadSettlements();
+              });
+            } else {
+              stAdminResetSettlementForm();
+              stAdminLoadSettlements();
+            }
+          } else {
+            alert(result.message || '정산 저장에 실패했습니다.');
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 정산 저장 오류:', error);
+          alert('정산 저장 중 오류가 발생했습니다.');
+        });
+    }
+
+    // 정산 폼 초기화
+    function stAdminResetSettlementForm() {
+      document.getElementById('stSettlementForm').reset();
+      document.getElementById('stSettlementId').value = '';
+      stSelectedFiles = {};
+      document.getElementById('stWorkFeeFileDisplay').innerHTML = '';
+      document.getElementById('stInoutFeeFileDisplay').innerHTML = '';
+      document.getElementById('stShippingFeeFileDisplay').innerHTML = '';
+      document.getElementById('stStorageFee').value = '0';
+      document.getElementById('stStorageFeeDisplay').textContent = '0';
+      document.getElementById('stSpecialWorkFee').value = '0';
+      document.getElementById('stSpecialWorkFeeDisplay').textContent = '0';
+      document.getElementById('stErrorDeduction').value = '0';
+      document.getElementById('stErrorDeductionDisplay').textContent = '0';
+      stCalculateTotal();
+    }
+
+    // 정산 상세 보기
+    function stShowSettlementDetail(settlementId) {
+      fetch(`/api/settlements/${settlementId}`, {
+        credentials: 'include',
+        headers: stGetUserHeaders()
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const settlement = data.data;
+            const totalAmount = (settlement.work_fee || 0) + (settlement.inout_fee || 0) + 
+                              (settlement.shipping_fee || 0) + (settlement.storage_fee || 0) + 
+                              (settlement.special_work_fee || 0) - (settlement.error_deduction || 0);
+            
+            let content = `
+              <div class="st-settlement-detail">
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">화주사</div>
+                  <div class="st-settlement-detail-value">${settlement.company_name || ''}</div>
+                </div>
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">정산년월</div>
+                  <div class="st-settlement-detail-value">${settlement.settlement_year_month || ''}</div>
+                </div>
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">작업비</div>
+                  <div class="st-settlement-detail-value">
+                    ${(settlement.work_fee || 0).toLocaleString()}원
+                    ${settlement.work_fee_file_url ? `<a href="${settlement.work_fee_file_url}" target="_blank" class="st-file-link">📄 파일 보기</a>` : ''}
+                  </div>
+                </div>
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">입출고비</div>
+                  <div class="st-settlement-detail-value">
+                    ${(settlement.inout_fee || 0).toLocaleString()}원
+                    ${settlement.inout_fee_file_url ? `<a href="${settlement.inout_fee_file_url}" target="_blank" class="st-file-link">📄 파일 보기</a>` : ''}
+                  </div>
+                </div>
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">택배비</div>
+                  <div class="st-settlement-detail-value">
+                    ${(settlement.shipping_fee || 0).toLocaleString()}원
+                    ${settlement.shipping_fee_file_url ? `<a href="${settlement.shipping_fee_file_url}" target="_blank" class="st-file-link">📄 파일 보기</a>` : ''}
+                  </div>
+                </div>
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">보관료</div>
+                  <div class="st-settlement-detail-value">${(settlement.storage_fee || 0).toLocaleString()}원</div>
+                </div>
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">특수작업</div>
+                  <div class="st-settlement-detail-value">${(settlement.special_work_fee || 0).toLocaleString()}원</div>
+                </div>
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">오배송/누락 차감</div>
+                  <div class="st-settlement-detail-value" style="color: #e74c3c;">-${(settlement.error_deduction || 0).toLocaleString()}원</div>
+                </div>
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">총액</div>
+                  <div class="st-settlement-detail-value" style="font-weight: 700; font-size: 18px; color: #ff6b35;">${totalAmount.toLocaleString()}원</div>
+                </div>
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">상태</div>
+                  <div class="st-settlement-detail-value">${settlement.status || '대기'}</div>
+                </div>
+                ${settlement.memo ? `
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">비고</div>
+                  <div class="st-settlement-detail-value">${settlement.memo}</div>
+                </div>
+                ` : ''}
+              </div>
+            `;
+            
+            document.getElementById('stSettlementDetailContent').innerHTML = content;
+            document.getElementById('stSettlementDetailModal').style.display = 'block';
+            stCurrentSettlementId = settlementId;
+          } else {
+            alert('정산 상세 정보를 불러올 수 없습니다.');
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 정산 상세 조회 오류:', error);
+          alert('정산 상세 정보를 불러오는 중 오류가 발생했습니다.');
+        });
+    }
+
+    // 정산 수정
+    function stEditSettlement(settlementId) {
+      fetch(`/api/settlements/${settlementId}`, {
+        credentials: 'include',
+        headers: stGetUserHeaders()
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const settlement = data.data;
+            document.getElementById('stSettlementId').value = settlement.id;
+            document.getElementById('stSettlementCompanyName').value = settlement.company_name;
+            document.getElementById('stSettlementCompanyInput').value = settlement.company_name;
+            document.getElementById('stSettlementYearMonth').value = settlement.settlement_year_month;
+            document.getElementById('stWorkFee').value = settlement.work_fee || 0;
+            document.getElementById('stInoutFee').value = settlement.inout_fee || 0;
+            document.getElementById('stShippingFee').value = settlement.shipping_fee || 0;
+            document.getElementById('stStorageFee').value = settlement.storage_fee || 0;
+            document.getElementById('stStorageFeeDisplay').textContent = (settlement.storage_fee || 0).toLocaleString();
+            document.getElementById('stSpecialWorkFee').value = settlement.special_work_fee || 0;
+            document.getElementById('stSpecialWorkFeeDisplay').textContent = (settlement.special_work_fee || 0).toLocaleString();
+            document.getElementById('stErrorDeduction').value = settlement.error_deduction || 0;
+            document.getElementById('stErrorDeductionDisplay').textContent = (settlement.error_deduction || 0).toLocaleString();
+            document.getElementById('stSettlementMemo').value = settlement.memo || '';
+            stCalculateTotal();
+            
+            // 폼 열기
+            document.getElementById('stAdminSettlementForm').style.display = 'block';
+            document.getElementById('stAdminSettlementIcon').textContent = '▲';
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 정산 수정 로드 오류:', error);
+          alert('정산 정보를 불러오는 중 오류가 발생했습니다.');
+        });
+    }
+
+    // 정산 삭제
+    function stDeleteSettlement(settlementId) {
+      if (!confirm('정산을 삭제하시겠습니까?')) return;
+      
+      fetch(`/api/settlements/${settlementId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: stGetUserHeaders()
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert('정산이 삭제되었습니다.');
+            stAdminLoadSettlements();
+          } else {
+            alert(data.message || '정산 삭제에 실패했습니다.');
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 정산 삭제 오류:', error);
+          alert('정산 삭제 중 오류가 발생했습니다.');
+        });
+    }
+
+    // 상세 모달 닫기
+    function stCloseDetailModal() {
+      document.getElementById('stSettlementDetailModal').style.display = 'none';
+      stCurrentSettlementId = null;
+    }
+
+    // 명세서 다운로드
+    function stDownloadStatement() {
+      if (!stCurrentSettlementId) {
+        alert('정산 정보를 불러올 수 없습니다.');
+        return;
+      }
+      
+      // TODO: 명세서 다운로드 기능 구현 (PDF/Excel)
+      alert('명세서 다운로드 기능은 추후 구현 예정입니다.');
+    }
+
+    // 화주사 목록 로드 (관리자용)
+    function stAdminLoadCompanies() {
+      fetch('/api/auth/companies', {
+        credentials: 'include',
+        headers: stGetUserHeaders()
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.companies) {
+            const companies = data.companies.filter(c => c.role !== '관리자').map(c => c.company_name);
+            
+            // 검색 가능한 드롭다운 초기화
+            stInitSearchableDropdown('stSettlementCompanyInput', 'stSettlementCompanyName', 'stSettlementCompanyDropdown', companies);
+            stInitSearchableDropdown('stAdminFilterCompanyInput', 'stAdminFilterCompanyName', 'stAdminFilterCompanyDropdown', companies);
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 화주사 목록 로드 오류:', error);
+        });
+    }
+
+    // 검색 가능한 드롭다운 초기화
+    function stInitSearchableDropdown(inputId, hiddenId, dropdownId, items) {
+      const inputEl = document.getElementById(inputId);
+      const hiddenEl = document.getElementById(hiddenId);
+      const dropdownEl = document.getElementById(dropdownId);
+      if (!inputEl || !hiddenEl || !dropdownEl) return;
+
+      let isOpen = false;
+      let closeTimeout = null;
+
+      const renderList = (keyword = '') => {
+        const filtered = items.filter(item =>
+          item.toLowerCase().includes(keyword.toLowerCase())
+        );
+        dropdownEl.innerHTML = filtered.length
+          ? filtered.map(name => `<div class="st-dropdown-item" data-value="${name}">${name}</div>`).join('')
+          : '<div class="st-dropdown-item" style="color:#999;cursor:default;">검색 결과가 없습니다</div>';
+      };
+
+      const openDropdown = () => {
+        clearTimeout(closeTimeout);
+        renderList(inputEl.value);
+        dropdownEl.classList.add('show');
+        isOpen = true;
+      };
+
+      const scheduleClose = () => {
+        clearTimeout(closeTimeout);
+        closeTimeout = setTimeout(() => {
+          dropdownEl.classList.remove('show');
+          isOpen = false;
+        }, 120);
+      };
+
+      inputEl.addEventListener('input', (e) => {
+        hiddenEl.value = e.target.value;
+        if (!isOpen) openDropdown();
+        else renderList(e.target.value);
+      });
+
+      ['focus', 'click'].forEach(evt =>
+        inputEl.addEventListener(evt, () => {
+          clearTimeout(closeTimeout);
+          openDropdown();
+        })
+      );
+
+      dropdownEl.addEventListener('click', (e) => {
+        const item = e.target.closest('.st-dropdown-item');
+        if (!item || !item.dataset.value) return;
+        inputEl.value = item.dataset.value;
+        hiddenEl.value = item.dataset.value;
+        dropdownEl.classList.remove('show');
+        isOpen = false;
+      });
+
+      document.addEventListener('mousedown', (e) => {
+        if (!inputEl.contains(e.target) && !dropdownEl.contains(e.target)) {
+          scheduleClose();
+        }
+      });
+    }
+
+    // 페이지 로드 시 자동 초기화
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', stCommonInit);
+    } else {
+      stCommonInit();
+    }
+  </script>
+</body>
+</html>
+

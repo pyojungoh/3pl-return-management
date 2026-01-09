@@ -112,6 +112,7 @@ from api.special_works.routes_db import special_works_bp
 from api.schedule_notifications.scheduler import start_schedule_notification_scheduler
 from api.schedule_notifications.routes import schedule_notifications_bp
 from api.pallets.routes import pallets_bp
+from api.settlements.routes_db import settlements_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(returns_bp)
@@ -128,6 +129,8 @@ app.register_blueprint(special_works_bp)
 app.register_blueprint(schedule_notifications_bp)
 app.register_blueprint(pallets_bp)
 print("[앱 시작] 파레트 보관료 관리 시스템 Blueprint 등록 완료")
+app.register_blueprint(settlements_bp)
+print("[앱 시작] 정산 관리 시스템 Blueprint 등록 완료")
 
 # C/S 알림 스케줄러 시작
 print("[정보] [앱 시작] C/S 알림 스케줄러 시작 시도...")
@@ -209,6 +212,18 @@ def pallets():
         return send_file('pallets.html')
     except FileNotFoundError:
         return '<h1>파레트 관리 페이지 파일을 찾을 수 없습니다.</h1><p>pallets.html 파일이 필요합니다.</p>', 404
+    except Exception as e:
+        return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
+
+
+@app.route('/settlements.html')
+def settlements():
+    """정산 관리 페이지"""
+    try:
+        # settlements.html 파일 직접 제공
+        return send_file('settlements.html')
+    except FileNotFoundError:
+        return '<h1>정산 관리 페이지 파일을 찾을 수 없습니다.</h1><p>settlements.html 파일이 필요합니다.</p>', 404
     except Exception as e:
         return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
 

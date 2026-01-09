@@ -1867,6 +1867,7 @@
         <button type="button" class="menu-item" id="csMenuBtn" onclick="switchMenu('cs')">📞 C/S</button>
         <button type="button" class="menu-item" id="specialWorksMenuBtn" onclick="switchMenu('specialWorks')">🔧 특수작업</button>
         <button type="button" class="menu-item" id="palletsMenuBtn" onclick="switchMenu('pallets')">📦 파레트 관리</button>
+        <button type="button" class="menu-item" id="settlementsMenuBtn" onclick="switchMenu('settlements')">💰 정산</button>
         <button type="button" class="menu-item" id="scheduleMenuBtn" onclick="switchMenu('schedule')">📅 스케쥴</button>
         <button type="button" class="menu-item" id="boardMenuBtn" onclick="switchMenu('board')">📋 게시판</button>
       </div>
@@ -1878,6 +1879,7 @@
           <button type="button" class="tab-btn" id="csTabBtn" onclick="switchAdminTab('cs')">📞 C/S 관리</button>
           <button type="button" class="tab-btn" id="specialWorksTabBtn" onclick="switchAdminTab('specialWorks')">🔧 특수작업</button>
           <button type="button" class="tab-btn" id="palletsTabBtn" onclick="switchAdminTab('pallets')">📦 파레트 관리</button>
+          <button type="button" class="tab-btn" id="settlementsTabBtn" onclick="switchAdminTab('settlements')">💰 정산 관리</button>
           <button type="button" class="tab-btn" id="scheduleCalendarTabBtn" onclick="switchAdminTab('scheduleCalendar')">📅 스케쥴 관리</button>
           <button type="button" class="tab-btn" id="boardTabBtn" onclick="switchAdminTab('board')">📋 게시판 관리</button>
           <button type="button" class="tab-btn" id="popupTabBtn" onclick="switchAdminTab('popup')">🔔 팝업 관리</button>
@@ -3474,7 +3476,7 @@
       } else {
         // 관리자면 저장된 탭 정보 확인 (F5 새로고침 시 현재 탭 유지)
         const savedTab = localStorage.getItem('activeAdminTab');
-        const validTabs = ['returns', 'cs', 'scheduleCalendar', 'board', 'popup', 'specialWorks', 'pallets', 'register'];
+        const validTabs = ['returns', 'cs', 'scheduleCalendar', 'board', 'popup', 'specialWorks', 'pallets', 'settlements', 'register'];
         const activeTab = savedTab && validTabs.includes(savedTab) ? savedTab : 'returns';
         console.log('저장된 탭:', savedTab, '활성화할 탭:', activeTab);
         // 약간의 지연을 두고 탭 전환 (DOM이 완전히 로드된 후)
@@ -5972,6 +5974,18 @@
         });
         // 파레트 관리 콘텐츠 로드
         loadPalletsContent();
+      } else if (menuName === 'settlements') {
+        // 정산 메뉴
+        // 모든 화주사 모드 탭 숨기기
+        consignorTabIds.forEach(tabId => {
+          const tab = document.getElementById(tabId);
+          if (tab) {
+            tab.classList.add('hidden');
+            tab.style.display = 'none';
+          }
+        });
+        // 정산 콘텐츠 로드
+        loadSettlementsContent();
       }
       
       // 현재 활성 메뉴를 localStorage에 저장 (F5 새로고침 시 복원용)
@@ -5996,7 +6010,7 @@
       }
       
       // 관리자 탭만 명시적으로 숨기기 (화주사 모드 탭에 영향 주지 않도록)
-      const adminTabIds = ['returnsTab', 'csTab', 'specialWorksTab', 'palletsTab', 'scheduleCalendarTab', 'boardTab', 'boardCategoryTab', 'popupTab', 'registerTab'];
+      const adminTabIds = ['returnsTab', 'csTab', 'specialWorksTab', 'palletsTab', 'settlementsTab', 'scheduleCalendarTab', 'boardTab', 'boardCategoryTab', 'popupTab', 'registerTab'];
       adminTabIds.forEach(tabId => {
         const tab = document.getElementById(tabId);
         if (tab) {
@@ -6150,6 +6164,9 @@
       } else if (tabName === 'pallets') {
         // 파레트 관리 탭
         loadPalletsContent();
+      } else if (tabName === 'settlements') {
+        // 정산 관리 탭
+        loadSettlementsContent();
       }
       
       // 현재 활성 탭을 localStorage에 저장 (F5 새로고침 시 복원용)
@@ -6480,6 +6497,107 @@
         });
     }
     window.loadPalletsContent = loadPalletsContent;
+    
+    // ========== 정산 관리 관련 함수 ==========
+    
+    /**
+     * 정산 관리 콘텐츠 로드 (화주사 모드 및 관리자 모드 공통)
+     */
+    function loadSettlementsContent() {
+      // 정산 탭 컨테이너 찾기 또는 생성
+      let container = document.getElementById('settlementsTab');
+      if (!container) {
+        // 컨테이너가 없으면 생성
+        container = document.createElement('div');
+        container.id = 'settlementsTab';
+        container.className = 'tab-content';
+        // 관리자 탭 영역에 추가
+        const adminTabs = document.getElementById('adminTabs');
+        if (adminTabs && adminTabs.parentNode) {
+          adminTabs.parentNode.insertBefore(container, adminTabs.nextSibling);
+        } else {
+          // adminTabs를 찾을 수 없으면 body에 추가
+          document.body.appendChild(container);
+        }
+      }
+      
+      // 컨테이너 표시
+      container.classList.remove('hidden');
+      container.style.display = 'block';
+      
+      // 로딩 표시
+      container.innerHTML = '<div style="text-align: center; padding: 40px; color: #636e72;">로딩 중...</div>';
+      
+      // settlements.html 파일 로드
+      fetch('settlements.html')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('정산 페이지를 불러올 수 없습니다.');
+          }
+          return response.text();
+        })
+        .then(html => {
+          // HTML 파싱
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          
+          // body 내용 추출
+          const bodyContent = doc.body.innerHTML;
+          const styleContent = doc.head.querySelector('style')?.innerHTML || '';
+          
+          // 컨테이너에 삽입
+          container.innerHTML = `<style>${styleContent}</style>${bodyContent}`;
+          
+          // 전역 변수 설정 (settlements.html에서 사용)
+          window.currentRole = typeof currentRole !== 'undefined' ? currentRole : '';
+          window.currentCompany = typeof currentCompany !== 'undefined' ? currentCompany : '';
+          window.currentUsername = typeof currentUsername !== 'undefined' ? currentUsername : '';
+          
+          // localStorage에서도 읽어오기 (백업)
+          if (!window.currentRole) {
+            window.currentRole = localStorage.getItem('client_role') || '';
+          }
+          if (!window.currentCompany) {
+            window.currentCompany = localStorage.getItem('client_company') || '';
+          }
+          if (!window.currentUsername) {
+            window.currentUsername = localStorage.getItem('client_username') || '';
+          }
+          
+          console.log('[ST] 전역 변수 설정:', {
+            role: window.currentRole,
+            company: window.currentCompany,
+            username: window.currentUsername
+          });
+          
+          // 스크립트 실행
+          const scripts = container.querySelectorAll('script');
+          scripts.forEach(script => {
+            const newScript = document.createElement('script');
+            if (script.src) {
+              newScript.src = script.src;
+            } else {
+              newScript.textContent = script.textContent;
+            }
+            document.body.appendChild(newScript);
+            if (script.parentNode) {
+              script.parentNode.removeChild(script);
+            }
+          });
+          
+          // 초기화 함수 호출 (약간의 지연 후)
+          setTimeout(() => {
+            if (typeof window.stCommonInit === 'function') {
+              window.stCommonInit();
+            }
+          }, 100);
+        })
+        .catch(error => {
+          console.error('정산 콘텐츠 로드 오류:', error);
+          container.innerHTML = `<div style="text-align: center; padding: 40px; color: #e74c3c;">❌ 정산 페이지를 불러오는 중 오류가 발생했습니다: ${error.message}</div>`;
+        });
+    }
+    window.loadSettlementsContent = loadSettlementsContent;
     
     // ========== 판매 스케쥴 관련 함수 ==========
     

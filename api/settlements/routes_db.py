@@ -1,0 +1,813 @@
+"""
+정산 관리 API 라우트
+"""
+from flask import Blueprint, request, jsonify
+from api.database.models import (
+    get_db_connection,
+    USE_POSTGRESQL
+)
+from datetime import datetime, date
+from urllib.parse import unquote
+import os
+
+if USE_POSTGRESQL:
+    from psycopg2.extras import RealDictCursor
+
+# Blueprint 생성
+settlements_bp = Blueprint('settlements', __name__, url_prefix='/api/settlements')
+
+
+def get_user_context():
+    """사용자 컨텍스트 가져오기 (헤더 또는 세션)"""
+    # 헤더에서 사용자 정보 가져오기
+    role = request.headers.get('X-User-Role', '').strip()
+    username = request.headers.get('X-User-Name', '').strip()
+    company_name = request.headers.get('X-Company-Name', '').strip()
+    
+    # URL 디코딩
+    if role:
+        role = unquote(role)
+    if username:
+        username = unquote(username)
+    if company_name:
+        company_name = unquote(company_name)
+    
+    return {
+        'role': role or '화주사',
+        'username': username,
+        'company_name': company_name
+    }
+
+
+# ========== 정산 목록 조회 ==========
+
+@settlements_bp.route('/list', methods=['GET'])
+def get_settlements_list():
+    """정산 목록 조회"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        company_name = user_context['company_name']
+        
+        # 필터 파라미터
+        settlement_year_month = request.args.get('settlement_year_month', '').strip()
+        filter_company_name = request.args.get('company_name', '').strip()
+        
+        conn = get_db_connection()
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
+        
+        try:
+            # 화주사는 자신의 정산만 조회
+            if role != '관리자':
+                if not company_name:
+                    return jsonify({
+                        'success': False,
+                        'data': [],
+                        'count': 0,
+                        'message': '화주사 정보를 확인할 수 없습니다.'
+                    }), 400
+                filter_company_name = company_name
+            
+            # 쿼리 구성
+            where_clauses = []
+            params = []
+            
+            if settlement_year_month:
+                where_clauses.append('s.settlement_year_month = %s' if USE_POSTGRESQL else 's.settlement_year_month = ?')
+                params.append(settlement_year_month)
+            
+            if filter_company_name:
+                where_clauses.append('s.company_name = %s' if USE_POSTGRESQL else 's.company_name = ?')
+                params.append(filter_company_name)
+            
+            where_sql = ' AND '.join(where_clauses) if where_clauses else '1=1'
+            
+            query = f'''
+                SELECT 
+                    s.id,
+                    s.company_name,
+                    s.settlement_year_month,
+                    s.work_fee,
+                    s.inout_fee,
+                    s.shipping_fee,
+                    s.storage_fee,
+                    s.special_work_fee,
+                    s.error_deduction,
+                    s.total_amount,
+                    s.status,
+                    s.memo,
+                    s.created_at,
+                    s.updated_at
+                FROM settlements s
+                WHERE {where_sql}
+                ORDER BY s.settlement_year_month DESC, s.company_name
+            '''
+            
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            result = [dict(row) for row in rows]
+            
+            # datetime 객체를 문자열로 변환
+            for item in result:
+                for key, value in item.items():
+                    if isinstance(value, datetime):
+                        item[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+                    elif isinstance(value, date):
+                        item[key] = value.strftime('%Y-%m-%d') if value else None
+            
+            return jsonify({
+                'success': True,
+                'data': result,
+                'count': len(result)
+            })
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f'[오류] 정산 목록 조회 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'data': [],
+            'count': 0,
+            'message': f'정산 목록 조회 중 오류: {str(e)}'
+        }), 500
+
+
+# ========== 정산 상세 조회 ==========
+
+@settlements_bp.route('/<int:settlement_id>', methods=['GET'])
+def get_settlement_detail(settlement_id):
+    """정산 상세 조회"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        company_name = user_context['company_name']
+        
+        conn = get_db_connection()
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
+        
+        try:
+            # 정산 정보 조회
+            if USE_POSTGRESQL:
+                cursor.execute('SELECT * FROM settlements WHERE id = %s', (settlement_id,))
+            else:
+                cursor.execute('SELECT * FROM settlements WHERE id = ?', (settlement_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({
+                    'success': False,
+                    'message': '정산을 찾을 수 없습니다.'
+                }), 404
+            
+            settlement = dict(row)
+            
+            # 화주사는 자신의 정산만 조회 가능
+            if role != '관리자':
+                if settlement.get('company_name') != company_name:
+                    return jsonify({
+                        'success': False,
+                        'message': '권한이 없습니다.'
+                    }), 403
+            
+            # 첨부파일 조회
+            if USE_POSTGRESQL:
+                cursor.execute('SELECT * FROM settlement_files WHERE settlement_id = %s ORDER BY uploaded_at DESC', (settlement_id,))
+            else:
+                cursor.execute('SELECT * FROM settlement_files WHERE settlement_id = ? ORDER BY uploaded_at DESC', (settlement_id,))
+            
+            files = cursor.fetchall()
+            settlement['files'] = [dict(f) for f in files]
+            
+            # datetime 객체를 문자열로 변환
+            for key, value in settlement.items():
+                if isinstance(value, datetime):
+                    settlement[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+                elif isinstance(value, date):
+                    settlement[key] = value.strftime('%Y-%m-%d') if value else None
+            
+            for file in settlement['files']:
+                for key, value in file.items():
+                    if isinstance(value, datetime):
+                        file[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+            
+            return jsonify({
+                'success': True,
+                'data': settlement
+            })
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f'[오류] 정산 상세 조회 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'정산 상세 조회 중 오류: {str(e)}'
+        }), 500
+
+
+# ========== 정산 생성/수정 ==========
+
+@settlements_bp.route('/', methods=['POST'])
+def create_settlement():
+    """정산 생성"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        company_name = user_context['company_name']
+        
+        # 관리자만 정산 생성 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 정산을 생성할 수 있습니다.'
+            }), 403
+        
+        data = request.get_json()
+        settlement_company_name = data.get('company_name', '').strip()
+        settlement_year_month = data.get('settlement_year_month', '').strip()
+        
+        if not settlement_company_name or not settlement_year_month:
+            return jsonify({
+                'success': False,
+                'message': '화주사명과 정산년월은 필수입니다.'
+            }), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # 중복 체크
+            if USE_POSTGRESQL:
+                cursor.execute('SELECT id FROM settlements WHERE company_name = %s AND settlement_year_month = %s', 
+                             (settlement_company_name, settlement_year_month))
+            else:
+                cursor.execute('SELECT id FROM settlements WHERE company_name = ? AND settlement_year_month = ?', 
+                             (settlement_company_name, settlement_year_month))
+            
+            if cursor.fetchone():
+                return jsonify({
+                    'success': False,
+                    'message': '이미 존재하는 정산입니다.'
+                }), 400
+            
+            # 정산 생성
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    INSERT INTO settlements (
+                        company_name, settlement_year_month, work_fee, inout_fee, 
+                        shipping_fee, storage_fee, special_work_fee, error_deduction,
+                        total_amount, status, memo, created_at, updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    RETURNING id
+                ''', (
+                    settlement_company_name, settlement_year_month,
+                    data.get('work_fee', 0), data.get('inout_fee', 0),
+                    data.get('shipping_fee', 0), data.get('storage_fee', 0),
+                    data.get('special_work_fee', 0), data.get('error_deduction', 0),
+                    data.get('total_amount', 0), data.get('status', '대기'),
+                    data.get('memo', '')
+                ))
+                settlement_id = cursor.fetchone()[0]
+            else:
+                cursor.execute('''
+                    INSERT INTO settlements (
+                        company_name, settlement_year_month, work_fee, inout_fee, 
+                        shipping_fee, storage_fee, special_work_fee, error_deduction,
+                        total_amount, status, memo, created_at, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ''', (
+                    settlement_company_name, settlement_year_month,
+                    data.get('work_fee', 0), data.get('inout_fee', 0),
+                    data.get('shipping_fee', 0), data.get('storage_fee', 0),
+                    data.get('special_work_fee', 0), data.get('error_deduction', 0),
+                    data.get('total_amount', 0), data.get('status', '대기'),
+                    data.get('memo', '')
+                ))
+                settlement_id = cursor.lastrowid
+            
+            conn.commit()
+            return jsonify({
+                'success': True,
+                'message': '정산이 생성되었습니다.',
+                'id': settlement_id
+            })
+        except Exception as e:
+            conn.rollback() if USE_POSTGRESQL else None
+            print(f'[오류] 정산 생성 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'정산 생성 중 오류: {str(e)}'
+            }), 500
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f'❌ 정산 생성 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'정산 생성 중 오류: {str(e)}'
+        }), 500
+
+
+@settlements_bp.route('/<int:settlement_id>', methods=['PUT'])
+def update_settlement(settlement_id):
+    """정산 수정"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        
+        # 관리자만 정산 수정 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 정산을 수정할 수 있습니다.'
+            }), 403
+        
+        data = request.get_json()
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # 업데이트할 필드 구성
+            updates = []
+            params = []
+            
+            if 'work_fee' in data:
+                updates.append('work_fee = %s' if USE_POSTGRESQL else 'work_fee = ?')
+                params.append(data['work_fee'])
+            
+            if 'work_fee_file_url' in data:
+                updates.append('work_fee_file_url = %s' if USE_POSTGRESQL else 'work_fee_file_url = ?')
+                params.append(data['work_fee_file_url'])
+            
+            if 'inout_fee' in data:
+                updates.append('inout_fee = %s' if USE_POSTGRESQL else 'inout_fee = ?')
+                params.append(data['inout_fee'])
+            
+            if 'inout_fee_file_url' in data:
+                updates.append('inout_fee_file_url = %s' if USE_POSTGRESQL else 'inout_fee_file_url = ?')
+                params.append(data['inout_fee_file_url'])
+            
+            if 'shipping_fee' in data:
+                updates.append('shipping_fee = %s' if USE_POSTGRESQL else 'shipping_fee = ?')
+                params.append(data['shipping_fee'])
+            
+            if 'shipping_fee_file_url' in data:
+                updates.append('shipping_fee_file_url = %s' if USE_POSTGRESQL else 'shipping_fee_file_url = ?')
+                params.append(data['shipping_fee_file_url'])
+            
+            if 'storage_fee' in data:
+                updates.append('storage_fee = %s' if USE_POSTGRESQL else 'storage_fee = ?')
+                params.append(data['storage_fee'])
+            
+            if 'special_work_fee' in data:
+                updates.append('special_work_fee = %s' if USE_POSTGRESQL else 'special_work_fee = ?')
+                params.append(data['special_work_fee'])
+            
+            if 'error_deduction' in data:
+                updates.append('error_deduction = %s' if USE_POSTGRESQL else 'error_deduction = ?')
+                params.append(data['error_deduction'])
+            
+            if 'total_amount' in data:
+                updates.append('total_amount = %s' if USE_POSTGRESQL else 'total_amount = ?')
+                params.append(data['total_amount'])
+            
+            if 'status' in data:
+                updates.append('status = %s' if USE_POSTGRESQL else 'status = ?')
+                params.append(data['status'])
+            
+            if 'memo' in data:
+                updates.append('memo = %s' if USE_POSTGRESQL else 'memo = ?')
+                params.append(data['memo'])
+            
+            if not updates:
+                return jsonify({
+                    'success': False,
+                    'message': '수정할 데이터가 없습니다.'
+                }), 400
+            
+            updates.append('updated_at = CURRENT_TIMESTAMP')
+            params.append(settlement_id)
+            
+            if USE_POSTGRESQL:
+                cursor.execute(f'''
+                    UPDATE settlements 
+                    SET {', '.join(updates)}
+                    WHERE id = %s
+                ''', params)
+            else:
+                cursor.execute(f'''
+                    UPDATE settlements 
+                    SET {', '.join(updates)}
+                    WHERE id = ?
+                ''', params)
+            
+            conn.commit()
+            
+            if cursor.rowcount > 0:
+                return jsonify({
+                    'success': True,
+                    'message': '정산이 수정되었습니다.'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '정산을 찾을 수 없습니다.'
+                }), 404
+        except Exception as e:
+            conn.rollback() if USE_POSTGRESQL else None
+            print(f'[오류] 정산 수정 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'정산 수정 중 오류: {str(e)}'
+            }), 500
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f'❌ 정산 수정 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'정산 수정 중 오류: {str(e)}'
+        }), 500
+
+
+# ========== 정산 삭제 ==========
+
+@settlements_bp.route('/<int:settlement_id>', methods=['DELETE'])
+def delete_settlement(settlement_id):
+    """정산 삭제"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        
+        # 관리자만 정산 삭제 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 정산을 삭제할 수 있습니다.'
+            }), 403
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute('DELETE FROM settlements WHERE id = %s', (settlement_id,))
+            else:
+                cursor.execute('DELETE FROM settlements WHERE id = ?', (settlement_id,))
+            
+            conn.commit()
+            
+            if cursor.rowcount > 0:
+                return jsonify({
+                    'success': True,
+                    'message': '정산이 삭제되었습니다.'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '정산을 찾을 수 없습니다.'
+                }), 404
+        except Exception as e:
+            conn.rollback() if USE_POSTGRESQL else None
+            print(f'[오류] 정산 삭제 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'정산 삭제 중 오류: {str(e)}'
+            }), 500
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f'❌ 정산 삭제 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'정산 삭제 중 오류: {str(e)}'
+        }), 500
+
+
+# ========== 데이터 소스 조회 (파레트, 특수작업, 반품관리) ==========
+
+@settlements_bp.route('/data-sources', methods=['GET'])
+def get_data_sources():
+    """정산에 필요한 데이터 소스 조회 (파레트 보관료, 특수작업, 오배송/누락 차감)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        company_name = user_context['company_name']
+        
+        settlement_year_month = request.args.get('settlement_year_month', '').strip()
+        filter_company_name = request.args.get('company_name', '').strip()
+        
+        if not settlement_year_month:
+            return jsonify({
+                'success': False,
+                'message': '정산년월이 필요합니다.'
+            }), 400
+        
+        # 화주사는 자신의 데이터만 조회
+        if role != '관리자':
+            if not company_name:
+                return jsonify({
+                    'success': False,
+                    'message': '화주사 정보를 확인할 수 없습니다.'
+                }), 400
+            filter_company_name = company_name
+        
+        result = {
+            'storage_fee': 0,  # 파레트 보관료
+            'special_work_fee': 0,  # 특수작업 비용
+            'error_deduction': 0,  # 오배송/누락 차감
+            'error_details': []  # 오배송/누락 상세
+        }
+        
+        # 1. 파레트 보관료 조회
+        try:
+            from api.pallets.models import get_settlements
+            pallet_settlements = get_settlements(
+                company_name=filter_company_name,
+                settlement_month=settlement_year_month,
+                role=role
+            )
+            if pallet_settlements:
+                for settlement in pallet_settlements:
+                    if settlement.get('company_name') == filter_company_name:
+                        result['storage_fee'] = settlement.get('total_fee', 0)
+                        break
+        except Exception as e:
+            print(f'[경고] 파레트 보관료 조회 오류: {e}')
+        
+        # 2. 특수작업 비용 조회
+        try:
+            conn = get_db_connection()
+            if USE_POSTGRESQL:
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+            else:
+                cursor = conn.cursor()
+            
+            try:
+                # 정산년월을 날짜 범위로 변환
+                year, month = map(int, settlement_year_month.split('-'))
+                start_date = f'{year}-{month:02d}-01'
+                # 다음 달 1일에서 하루 빼기
+                if month == 12:
+                    end_date = f'{year + 1}-01-01'
+                else:
+                    end_date = f'{year}-{month + 1:02d}-01'
+                
+                if USE_POSTGRESQL:
+                    cursor.execute('''
+                        SELECT SUM(total_price) as total
+                        FROM special_works
+                        WHERE company_name = %s 
+                        AND work_date >= %s 
+                        AND work_date < %s
+                    ''', (filter_company_name, start_date, end_date))
+                else:
+                    cursor.execute('''
+                        SELECT SUM(total_price) as total
+                        FROM special_works
+                        WHERE company_name = ? 
+                        AND work_date >= ? 
+                        AND work_date < ?
+                    ''', (filter_company_name, start_date, end_date))
+                
+                row = cursor.fetchone()
+                if row and row[0]:
+                    result['special_work_fee'] = int(row[0])
+            finally:
+                cursor.close()
+                conn.close()
+        except Exception as e:
+            print(f'[경고] 특수작업 비용 조회 오류: {e}')
+        
+        # 3. 오배송/누락 차감 조회 (반품관리)
+        try:
+            conn = get_db_connection()
+            if USE_POSTGRESQL:
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+            else:
+                cursor = conn.cursor()
+            
+            try:
+                # 정산년월을 월 형식으로 변환 (예: "2025-11" -> "2025년11월")
+                year, month = map(int, settlement_year_month.split('-'))
+                month_str = f'{year}년{month:02d}월'
+                
+                if USE_POSTGRESQL:
+                    cursor.execute('''
+                        SELECT tracking_number, shipping_fee, return_type, customer_name
+                        FROM returns
+                        WHERE company_name = %s 
+                        AND month = %s
+                        AND (return_type = '오배송' OR return_type = '누락')
+                    ''', (filter_company_name, month_str))
+                else:
+                    cursor.execute('''
+                        SELECT tracking_number, shipping_fee, return_type, customer_name
+                        FROM returns
+                        WHERE company_name = ? 
+                        AND month = ?
+                        AND (return_type = '오배송' OR return_type = '누락')
+                    ''', (filter_company_name, month_str))
+                
+                rows = cursor.fetchall()
+                error_deduction = 0
+                error_details = []
+                
+                for row in rows:
+                    shipping_fee = row.get('shipping_fee', 0) or 0
+                    try:
+                        shipping_fee_int = int(str(shipping_fee).replace(',', '').replace('원', '').strip())
+                    except:
+                        shipping_fee_int = 0
+                    
+                    # 택배비 + 작업비 (작업비는 추정치, 실제로는 별도 계산 필요)
+                    work_fee_estimate = 1000  # 기본 작업비 추정치
+                    deduction = shipping_fee_int + work_fee_estimate
+                    error_deduction += deduction
+                    
+                    error_details.append({
+                        'tracking_number': row.get('tracking_number', ''),
+                        'customer_name': row.get('customer_name', ''),
+                        'return_type': row.get('return_type', ''),
+                        'shipping_fee': shipping_fee_int,
+                        'work_fee_estimate': work_fee_estimate,
+                        'deduction': deduction
+                    })
+                
+                result['error_deduction'] = error_deduction
+                result['error_details'] = error_details
+            finally:
+                cursor.close()
+                conn.close()
+        except Exception as e:
+            print(f'[경고] 오배송/누락 차감 조회 오류: {e}')
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+    except Exception as e:
+        print(f'[오류] 데이터 소스 조회 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'데이터 소스 조회 중 오류: {str(e)}'
+        }), 500
+
+
+# ========== 파일 업로드 ==========
+
+@settlements_bp.route('/upload-file', methods=['POST'])
+def upload_settlement_file():
+    """정산 파일 업로드 (이지어드민, 택배사 파일 등)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        
+        # 관리자만 파일 업로드 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 파일을 업로드할 수 있습니다.'
+            }), 403
+        
+        data = request.get_json()
+        settlement_id = data.get('settlement_id')
+        file_type = data.get('file_type', '').strip()  # 'work_fee', 'inout_fee', 'shipping_fee', 'other'
+        file_name = data.get('file_name', '').strip()
+        base64_data = data.get('file_data', '')
+        
+        if not settlement_id or not file_type or not file_name or not base64_data:
+            return jsonify({
+                'success': False,
+                'message': '필수 데이터가 누락되었습니다.'
+            }), 400
+        
+        # Cloudinary 업로드
+        try:
+            from api.uploads.cloudinary_upload import upload_single_file_to_cloudinary
+            
+            # Base64 데이터에서 실제 데이터 추출
+            if ',' in base64_data:
+                base64_data = base64_data.split(',')[1]
+            
+            # 파일 업로드 (폴더: settlements/년월/파일명)
+            folder = 'settlements'
+            file_url = upload_single_file_to_cloudinary(base64_data, file_name, folder)
+            
+            if not file_url:
+                return jsonify({
+                    'success': False,
+                    'message': '파일 업로드에 실패했습니다.'
+                }), 500
+            
+            # 파일 정보 DB 저장
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            try:
+                # 파일 크기 계산 (대략적)
+                file_size = len(base64_data) * 3 // 4  # Base64는 약 4/3 크기
+                
+                if USE_POSTGRESQL:
+                    cursor.execute('''
+                        INSERT INTO settlement_files (
+                            settlement_id, file_type, file_name, file_url, file_size, uploaded_at
+                        )
+                        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        RETURNING id
+                    ''', (settlement_id, file_type, file_name, file_url, file_size))
+                    file_id = cursor.fetchone()[0]
+                else:
+                    cursor.execute('''
+                        INSERT INTO settlement_files (
+                            settlement_id, file_type, file_name, file_url, file_size, uploaded_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ''', (settlement_id, file_type, file_name, file_url, file_size))
+                    file_id = cursor.lastrowid
+                
+                # 정산 테이블에 파일 URL 업데이트 (file_type에 따라)
+                if file_type == 'work_fee':
+                    if USE_POSTGRESQL:
+                        cursor.execute('UPDATE settlements SET work_fee_file_url = %s WHERE id = %s', (file_url, settlement_id))
+                    else:
+                        cursor.execute('UPDATE settlements SET work_fee_file_url = ? WHERE id = ?', (file_url, settlement_id))
+                elif file_type == 'inout_fee':
+                    if USE_POSTGRESQL:
+                        cursor.execute('UPDATE settlements SET inout_fee_file_url = %s WHERE id = %s', (file_url, settlement_id))
+                    else:
+                        cursor.execute('UPDATE settlements SET inout_fee_file_url = ? WHERE id = ?', (file_url, settlement_id))
+                elif file_type == 'shipping_fee':
+                    if USE_POSTGRESQL:
+                        cursor.execute('UPDATE settlements SET shipping_fee_file_url = %s WHERE id = %s', (file_url, settlement_id))
+                    else:
+                        cursor.execute('UPDATE settlements SET shipping_fee_file_url = ? WHERE id = ?', (file_url, settlement_id))
+                
+                conn.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'message': '파일이 업로드되었습니다.',
+                    'file_id': file_id,
+                    'file_url': file_url
+                })
+            except Exception as e:
+                conn.rollback() if USE_POSTGRESQL else None
+                print(f'[오류] 파일 정보 저장 오류: {e}')
+                import traceback
+                traceback.print_exc()
+                return jsonify({
+                    'success': False,
+                    'message': f'파일 정보 저장 중 오류: {str(e)}'
+                }), 500
+            finally:
+                cursor.close()
+                conn.close()
+        except Exception as e:
+            print(f'[오류] 파일 업로드 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'파일 업로드 중 오류: {str(e)}'
+            }), 500
+    except Exception as e:
+        print(f'❌ 파일 업로드 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'파일 업로드 중 오류: {str(e)}'
+        }), 500
+

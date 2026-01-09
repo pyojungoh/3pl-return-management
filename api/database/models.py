@@ -799,6 +799,66 @@ def init_db():
             
             print("[성공] 파레트 보관료 관리 시스템 테이블 생성 완료 (PostgreSQL)")
             
+            # ========================================
+            # 정산 관리 시스템 테이블 (PostgreSQL)
+            # ========================================
+            
+            # settlements 테이블 (정산 기본 정보)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS settlements (
+                    id SERIAL PRIMARY KEY,
+                    company_name TEXT NOT NULL,
+                    settlement_year_month TEXT NOT NULL,
+                    work_fee INTEGER DEFAULT 0,
+                    work_fee_file_url TEXT,
+                    inout_fee INTEGER DEFAULT 0,
+                    inout_fee_file_url TEXT,
+                    shipping_fee INTEGER DEFAULT 0,
+                    shipping_fee_file_url TEXT,
+                    storage_fee INTEGER DEFAULT 0,
+                    special_work_fee INTEGER DEFAULT 0,
+                    error_deduction INTEGER DEFAULT 0,
+                    total_amount INTEGER DEFAULT 0,
+                    status TEXT DEFAULT '대기',
+                    memo TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(company_name, settlement_year_month)
+                )
+            ''')
+            
+            # settlements 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlements_company 
+                ON settlements(company_name)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlements_year_month 
+                ON settlements(settlement_year_month)
+            ''')
+            
+            # settlement_files 테이블 (정산 첨부파일)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS settlement_files (
+                    id SERIAL PRIMARY KEY,
+                    settlement_id INTEGER NOT NULL,
+                    file_type TEXT NOT NULL,
+                    file_name TEXT NOT NULL,
+                    file_url TEXT NOT NULL,
+                    file_size INTEGER,
+                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # settlement_files 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlement_files_settlement 
+                ON settlement_files(settlement_id)
+            ''')
+            
+            print("[성공] 정산 관리 시스템 테이블 생성 완료 (PostgreSQL)")
+            
         else:
             # SQLite 테이블 생성 (기존 코드)
             # 화주사 계정 테이블
@@ -1505,6 +1565,66 @@ def init_db():
             ''')
             
             print("[성공] 파레트 보관료 관리 시스템 테이블 생성 완료 (SQLite)")
+            
+            # ========================================
+            # 정산 관리 시스템 테이블 (SQLite)
+            # ========================================
+            
+            # settlements 테이블 (정산 기본 정보)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS settlements (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    company_name TEXT NOT NULL,
+                    settlement_year_month TEXT NOT NULL,
+                    work_fee INTEGER DEFAULT 0,
+                    work_fee_file_url TEXT,
+                    inout_fee INTEGER DEFAULT 0,
+                    inout_fee_file_url TEXT,
+                    shipping_fee INTEGER DEFAULT 0,
+                    shipping_fee_file_url TEXT,
+                    storage_fee INTEGER DEFAULT 0,
+                    special_work_fee INTEGER DEFAULT 0,
+                    error_deduction INTEGER DEFAULT 0,
+                    total_amount INTEGER DEFAULT 0,
+                    status TEXT DEFAULT '대기',
+                    memo TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(company_name, settlement_year_month)
+                )
+            ''')
+            
+            # settlements 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlements_company 
+                ON settlements(company_name)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlements_year_month 
+                ON settlements(settlement_year_month)
+            ''')
+            
+            # settlement_files 테이블 (정산 첨부파일)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS settlement_files (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    settlement_id INTEGER NOT NULL,
+                    file_type TEXT NOT NULL,
+                    file_name TEXT NOT NULL,
+                    file_url TEXT NOT NULL,
+                    file_size INTEGER,
+                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # settlement_files 인덱스
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_settlement_files_settlement 
+                ON settlement_files(settlement_id)
+            ''')
+            
+            print("[성공] 정산 관리 시스템 테이블 생성 완료 (SQLite)")
         
         conn.commit()
         print("데이터베이스 초기화 완료")
