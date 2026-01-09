@@ -544,7 +544,8 @@ def get_data_sources():
         result = {
             'storage_fee': 0,  # 파레트 보관료
             'special_work_fee': 0,  # 특수작업 비용
-            'error_deduction': 0,  # 오배송/누락 차감
+            'error_wrong_delivery_count': 0,  # 오배송 건수
+            'error_missing_count': 0,  # 누락 건수
             'error_details': []  # 오배송/누락 상세
         }
         
@@ -639,31 +640,25 @@ def get_data_sources():
                     ''', (filter_company_name, month_str))
                 
                 rows = cursor.fetchall()
-                error_deduction = 0
+                wrong_delivery_count = 0
+                missing_count = 0
                 error_details = []
                 
                 for row in rows:
-                    shipping_fee = row.get('shipping_fee', 0) or 0
-                    try:
-                        shipping_fee_int = int(str(shipping_fee).replace(',', '').replace('원', '').strip())
-                    except:
-                        shipping_fee_int = 0
-                    
-                    # 택배비 + 작업비 (작업비는 추정치, 실제로는 별도 계산 필요)
-                    work_fee_estimate = 1000  # 기본 작업비 추정치
-                    deduction = shipping_fee_int + work_fee_estimate
-                    error_deduction += deduction
+                    return_type = row.get('return_type', '')
+                    if return_type == '오배송':
+                        wrong_delivery_count += 1
+                    elif return_type == '누락':
+                        missing_count += 1
                     
                     error_details.append({
                         'tracking_number': row.get('tracking_number', ''),
                         'customer_name': row.get('customer_name', ''),
-                        'return_type': row.get('return_type', ''),
-                        'shipping_fee': shipping_fee_int,
-                        'work_fee_estimate': work_fee_estimate,
-                        'deduction': deduction
+                        'return_type': return_type
                     })
                 
-                result['error_deduction'] = error_deduction
+                result['error_wrong_delivery_count'] = wrong_delivery_count
+                result['error_missing_count'] = missing_count
                 result['error_details'] = error_details
             finally:
                 cursor.close()

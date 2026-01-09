@@ -476,17 +476,19 @@
             <input type="hidden" id="stSpecialWorkFee" value="0">
           </div>
           
-          <!-- 오배송/누락 차감 (자동 계산) -->
+          <!-- 오배송/누락 차감 (수동 입력, 건수 자동 표시) -->
           <div class="st-settlement-detail" style="margin-bottom: 15px;">
             <div class="st-settlement-detail-row">
               <div class="st-settlement-detail-label">오배송/누락 차감</div>
               <div>
-                <span id="stErrorDeductionDisplay" class="st-amount-display" style="color: #e74c3c;">0</span>
+                <input type="number" id="stErrorDeduction" class="st-form-input" placeholder="차감 금액 입력" style="width: 200px; display: inline-block; margin-right: 10px;" onchange="stCalculateTotal()">
                 <span>원</span>
-                <button type="button" class="st-btn" onclick="stLoadErrorDeduction()" style="margin-left: 10px; padding: 6px 12px; font-size: 12px;">🔄 반품관리에서 계산</button>
+                <button type="button" class="st-btn" onclick="stLoadErrorCounts()" style="margin-left: 10px; padding: 6px 12px; font-size: 12px;">🔄 건수 확인</button>
               </div>
             </div>
-            <input type="hidden" id="stErrorDeduction" value="0">
+            <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border-radius: 6px; font-size: 13px; color: #856404;">
+              <span id="stErrorCountsDisplay">오배송: 0건, 누락: 0건</span>
+            </div>
           </div>
           
           <!-- 총액 -->
@@ -831,9 +833,18 @@
             <td>${index + 1}</td>
             <td>${item.settlement_year_month || ''}</td>
             <td>${item.company_name || ''}</td>
-            <td>${(item.work_fee || 0).toLocaleString()}원</td>
-            <td>${(item.inout_fee || 0).toLocaleString()}원</td>
-            <td>${(item.shipping_fee || 0).toLocaleString()}원</td>
+            <td>
+              ${(item.work_fee || 0).toLocaleString()}원
+              ${item.work_fee_file_url ? `<br><a href="${item.work_fee_file_url}" target="_blank" class="st-file-link" download style="font-size: 11px;" title="파일 다운로드">📄</a>` : ''}
+            </td>
+            <td>
+              ${(item.inout_fee || 0).toLocaleString()}원
+              ${item.inout_fee_file_url ? `<br><a href="${item.inout_fee_file_url}" target="_blank" class="st-file-link" download style="font-size: 11px;" title="파일 다운로드">📄</a>` : ''}
+            </td>
+            <td>
+              ${(item.shipping_fee || 0).toLocaleString()}원
+              ${item.shipping_fee_file_url ? `<br><a href="${item.shipping_fee_file_url}" target="_blank" class="st-file-link" download style="font-size: 11px;" title="파일 다운로드">📄</a>` : ''}
+            </td>
             <td>${(item.storage_fee || 0).toLocaleString()}원</td>
             <td>${(item.special_work_fee || 0).toLocaleString()}원</td>
             <td style="color: #e74c3c;">-${(item.error_deduction || 0).toLocaleString()}원</td>
@@ -866,9 +877,18 @@
           <tr>
             <td>${index + 1}</td>
             <td>${item.settlement_year_month || ''}</td>
-            <td>${(item.work_fee || 0).toLocaleString()}원</td>
-            <td>${(item.inout_fee || 0).toLocaleString()}원</td>
-            <td>${(item.shipping_fee || 0).toLocaleString()}원</td>
+            <td>
+              ${(item.work_fee || 0).toLocaleString()}원
+              ${item.work_fee_file_url ? `<br><a href="${item.work_fee_file_url}" target="_blank" class="st-file-link" download style="font-size: 11px;">📄</a>` : ''}
+            </td>
+            <td>
+              ${(item.inout_fee || 0).toLocaleString()}원
+              ${item.inout_fee_file_url ? `<br><a href="${item.inout_fee_file_url}" target="_blank" class="st-file-link" download style="font-size: 11px;">📄</a>` : ''}
+            </td>
+            <td>
+              ${(item.shipping_fee || 0).toLocaleString()}원
+              ${item.shipping_fee_file_url ? `<br><a href="${item.shipping_fee_file_url}" target="_blank" class="st-file-link" download style="font-size: 11px;">📄</a>` : ''}
+            </td>
             <td>${(item.storage_fee || 0).toLocaleString()}원</td>
             <td>${(item.special_work_fee || 0).toLocaleString()}원</td>
             <td style="color: #e74c3c;">-${(item.error_deduction || 0).toLocaleString()}원</td>
@@ -1006,8 +1026,8 @@
         });
     }
 
-    // 오배송/누락 차감 계산
-    function stLoadErrorDeduction() {
+    // 오배송/누락 건수 확인
+    function stLoadErrorCounts() {
       const companyName = document.getElementById('stSettlementCompanyName')?.value || stCurrentCompany;
       const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
       
@@ -1023,15 +1043,14 @@
         .then(response => response.json())
         .then(data => {
           if (data.success && data.data) {
-            const errorDeduction = data.data.error_deduction || 0;
-            document.getElementById('stErrorDeduction').value = errorDeduction;
-            document.getElementById('stErrorDeductionDisplay').textContent = errorDeduction.toLocaleString();
-            stCalculateTotal();
+            const wrongDeliveryCount = data.data.error_wrong_delivery_count || 0;
+            const missingCount = data.data.error_missing_count || 0;
+            document.getElementById('stErrorCountsDisplay').textContent = `오배송: ${wrongDeliveryCount}건, 누락: ${missingCount}건`;
           }
         })
         .catch(error => {
-          console.error('[ST] 오배송/누락 차감 계산 오류:', error);
-          alert('오배송/누락 차감을 계산하는 중 오류가 발생했습니다.');
+          console.error('[ST] 오배송/누락 건수 확인 오류:', error);
+          alert('오배송/누락 건수를 확인하는 중 오류가 발생했습니다.');
         });
     }
 
@@ -1150,7 +1169,7 @@
       document.getElementById('stSpecialWorkFee').value = '0';
       document.getElementById('stSpecialWorkFeeDisplay').textContent = '0';
       document.getElementById('stErrorDeduction').value = '0';
-      document.getElementById('stErrorDeductionDisplay').textContent = '0';
+      document.getElementById('stErrorCountsDisplay').textContent = '오배송: 0건, 누락: 0건';
       stCalculateTotal();
     }
 
@@ -1182,21 +1201,21 @@
                   <div class="st-settlement-detail-label">작업비</div>
                   <div class="st-settlement-detail-value">
                     ${(settlement.work_fee || 0).toLocaleString()}원
-                    ${settlement.work_fee_file_url ? `<a href="${settlement.work_fee_file_url}" target="_blank" class="st-file-link">📄 파일 보기</a>` : ''}
+                    ${settlement.work_fee_file_url ? `<a href="${settlement.work_fee_file_url}" target="_blank" class="st-file-link" download>📄 파일 다운로드</a>` : ''}
                   </div>
                 </div>
                 <div class="st-settlement-detail-row">
                   <div class="st-settlement-detail-label">입출고비</div>
                   <div class="st-settlement-detail-value">
                     ${(settlement.inout_fee || 0).toLocaleString()}원
-                    ${settlement.inout_fee_file_url ? `<a href="${settlement.inout_fee_file_url}" target="_blank" class="st-file-link">📄 파일 보기</a>` : ''}
+                    ${settlement.inout_fee_file_url ? `<a href="${settlement.inout_fee_file_url}" target="_blank" class="st-file-link" download>📄 파일 다운로드</a>` : ''}
                   </div>
                 </div>
                 <div class="st-settlement-detail-row">
                   <div class="st-settlement-detail-label">택배비</div>
                   <div class="st-settlement-detail-value">
                     ${(settlement.shipping_fee || 0).toLocaleString()}원
-                    ${settlement.shipping_fee_file_url ? `<a href="${settlement.shipping_fee_file_url}" target="_blank" class="st-file-link">📄 파일 보기</a>` : ''}
+                    ${settlement.shipping_fee_file_url ? `<a href="${settlement.shipping_fee_file_url}" target="_blank" class="st-file-link" download>📄 파일 다운로드</a>` : ''}
                   </div>
                 </div>
                 <div class="st-settlement-detail-row">
@@ -1209,7 +1228,10 @@
                 </div>
                 <div class="st-settlement-detail-row">
                   <div class="st-settlement-detail-label">오배송/누락 차감</div>
-                  <div class="st-settlement-detail-value" style="color: #e74c3c;">-${(settlement.error_deduction || 0).toLocaleString()}원</div>
+                  <div class="st-settlement-detail-value" style="color: #e74c3c;">
+                    -${(settlement.error_deduction || 0).toLocaleString()}원
+                    <div id="stDetailErrorCounts" style="margin-top: 4px; font-size: 12px; color: #856404;"></div>
+                  </div>
                 </div>
                 <div class="st-settlement-detail-row">
                   <div class="st-settlement-detail-label">총액</div>
@@ -1231,6 +1253,30 @@
             document.getElementById('stSettlementDetailContent').innerHTML = content;
             document.getElementById('stSettlementDetailModal').style.display = 'block';
             stCurrentSettlementId = settlementId;
+            
+            // 오배송/누락 건수 로드
+            const companyName = settlement.company_name;
+            const yearMonth = settlement.settlement_year_month;
+            if (companyName && yearMonth) {
+              fetch(`/api/settlements/data-sources?settlement_year_month=${yearMonth}&company_name=${encodeURIComponent(companyName)}`, {
+                credentials: 'include',
+                headers: stGetUserHeaders()
+              })
+                .then(response => response.json())
+                .then(data => {
+                  if (data.success && data.data) {
+                    const wrongDeliveryCount = data.data.error_wrong_delivery_count || 0;
+                    const missingCount = data.data.error_missing_count || 0;
+                    const countsEl = document.getElementById('stDetailErrorCounts');
+                    if (countsEl) {
+                      countsEl.textContent = `(오배송: ${wrongDeliveryCount}건, 누락: ${missingCount}건)`;
+                    }
+                  }
+                })
+                .catch(error => {
+                  console.error('[ST] 오배송/누락 건수 로드 오류:', error);
+                });
+            }
           } else {
             alert('정산 상세 정보를 불러올 수 없습니다.');
           }
@@ -1263,8 +1309,11 @@
             document.getElementById('stSpecialWorkFee').value = settlement.special_work_fee || 0;
             document.getElementById('stSpecialWorkFeeDisplay').textContent = (settlement.special_work_fee || 0).toLocaleString();
             document.getElementById('stErrorDeduction').value = settlement.error_deduction || 0;
-            document.getElementById('stErrorDeductionDisplay').textContent = (settlement.error_deduction || 0).toLocaleString();
+            document.getElementById('stErrorCountsDisplay').textContent = '오배송: 0건, 누락: 0건';
             document.getElementById('stSettlementMemo').value = settlement.memo || '';
+            
+            // 오배송/누락 건수 자동 로드
+            stLoadErrorCounts();
             stCalculateTotal();
             
             // 폼 열기
@@ -1412,4 +1461,5 @@
   </script>
 </body>
 </html>
+
 
