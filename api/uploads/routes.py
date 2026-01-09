@@ -698,6 +698,24 @@ def test_upload_excel_start():
                 'message': '필수 파라미터가 없습니다.'
             }), 400
         
+        # 구글 드라이브 인증 확인 (사전 체크)
+        try:
+            from api.uploads.google_drive import get_credentials
+            credentials = get_credentials()
+            if not credentials:
+                return jsonify({
+                    'success': False,
+                    'message': 'Google Drive API 인증 정보를 찾을 수 없습니다.\n\n환경 변수 GOOGLE_SERVICE_ACCOUNT_JSON을 확인하거나 service_account.json 파일이 있는지 확인해주세요.'
+                }), 500
+        except Exception as auth_error:
+            print(f"[오류] 구글 드라이브 인증 확인 실패: {auth_error}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'Google Drive API 인증 확인 실패: {str(auth_error)}\n\n환경 변수 GOOGLE_SERVICE_ACCOUNT_JSON을 확인하거나 service_account.json 파일이 있는지 확인해주세요.'
+            }), 500
+        
         # 업로드 세션 생성 (간단한 메모리 저장, 실제로는 DB나 Redis 사용 권장)
         import uuid
         upload_id = str(uuid.uuid4())

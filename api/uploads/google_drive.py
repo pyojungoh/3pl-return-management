@@ -38,26 +38,45 @@ def get_credentials():
         creds_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
         if creds_json:
             import json
-            if isinstance(creds_json, str):
-                creds_info = json.loads(creds_json)
-            else:
-                creds_info = creds_json
-            
-            credentials = service_account.Credentials.from_service_account_info(
-                creds_info, scopes=SCOPES)
-            return credentials
+            try:
+                if isinstance(creds_json, str):
+                    creds_info = json.loads(creds_json)
+                else:
+                    creds_info = creds_json
+                
+                credentials = service_account.Credentials.from_service_account_info(
+                    creds_info, scopes=SCOPES)
+                print("✅ Google Drive API 인증 정보 로드 성공 (환경 변수)")
+                return credentials
+            except json.JSONDecodeError as json_error:
+                print(f"❌ 환경 변수 JSON 파싱 실패: {json_error}")
+                print(f"   GOOGLE_SERVICE_ACCOUNT_JSON 값의 처음 100자: {str(creds_json)[:100]}")
+                return None
+            except Exception as parse_error:
+                print(f"❌ 환경 변수에서 인증 정보 파싱 실패: {parse_error}")
+                import traceback
+                traceback.print_exc()
+                return None
         
         # 로컬 파일에서 인증 정보 가져오기
         creds_path = os.path.join(os.path.dirname(__file__), '../../service_account.json')
         if os.path.exists(creds_path):
-            credentials = service_account.Credentials.from_service_account_file(
-                creds_path, scopes=SCOPES)
-            return credentials
+            try:
+                credentials = service_account.Credentials.from_service_account_file(
+                    creds_path, scopes=SCOPES)
+                print("✅ Google Drive API 인증 정보 로드 성공 (로컬 파일)")
+                return credentials
+            except Exception as file_error:
+                print(f"❌ 로컬 파일에서 인증 정보 로드 실패: {file_error}")
+                import traceback
+                traceback.print_exc()
+                return None
         
         print("❌ Google Drive API 인증 정보를 찾을 수 없습니다.")
+        print("   환경 변수 GOOGLE_SERVICE_ACCOUNT_JSON 또는 service_account.json 파일이 필요합니다.")
         return None
     except Exception as e:
-        print(f"인증 정보 로드 실패: {e}")
+        print(f"❌ 인증 정보 로드 실패: {e}")
         import traceback
         traceback.print_exc()
         return None
