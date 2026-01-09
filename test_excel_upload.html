@@ -336,9 +336,106 @@
             return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
         }
         
+        // 파일을 Base64로 변환
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const base64 = reader.result.split(',')[1]; // data:xxx;base64, 부분 제거
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // 청크로 나누어 업로드
+        async function uploadInChunks(file, filename) {
+            const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB 청크
+            const fileData = await fileToBase64(file);
+            const totalChunks = Math.ceil(fileData.length / CHUNK_SIZE);
+            
+            console.log(`파일 크기: ${(fileData.length / 1024 / 1024).toFixed(2)} MB`);
+            console.log(`청크 개수: ${totalChunks}`);
+            
+            // 업로드 시작
+            const startResponse = await fetch('/api/uploads/test/upload-excel-start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    filename: filename,
+                    file_size: fileData.length,
+                    total_chunks: totalChunks
+                })
+            });
+            
+            const startData = await startResponse.json();
+            if (!startData.success) {
+                throw new Error(startData.message || '업로드 시작 실패');
+            }
+            
+            const uploadId = startData.upload_id;
+            console.log(`업로드 ID: ${uploadId}`);
+            
+            // 청크 업로드
+            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                const start = chunkIndex * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, fileData.length);
+                const chunk = fileData.substring(start, end);
+                const isLastChunk = chunkIndex === totalChunks - 1;
+                
+                console.log(`청크 ${chunkIndex + 1}/${totalChunks} 업로드 중...`);
+                
+                const chunkResponse = await fetch('/api/uploads/test/upload-excel-chunk', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        upload_id: uploadId,
+                        chunk_index: chunkIndex,
+                        chunk_data: chunk,
+                        is_last_chunk: isLastChunk
+                    })
+                });
+                
+                const chunkData = await chunkResponse.json();
+                if (!chunkData.success) {
+                    throw new Error(chunkData.message || `청크 ${chunkIndex + 1} 업로드 실패`);
+                }
+            }
+            
+            // 업로드 완료
+            const completeResponse = await fetch('/api/uploads/test/upload-excel-complete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    upload_id: uploadId
+                })
+            });
+            
+            const completeData = await completeResponse.json();
+            if (!completeData.success) {
+                throw new Error(completeData.message || '업로드 완료 처리 실패');
+            }
+            
+            return completeData;
+        }
+        
         // 업로드 버튼 클릭
         uploadBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
+            
+            // 파일 크기 확인 (10MB 제한)
+            const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+            if (selectedFile.size > MAX_SIZE) {
+                showResult('error', '❌ 파일 크기 초과', `파일 크기가 너무 큽니다. (최대 10MB)\n현재 파일: ${formatFileSize(selectedFile.size)}`);
+                return;
+            }
             
             // UI 업데이트
             uploadBtn.disabled = true;
@@ -346,27 +443,50 @@
             result.classList.remove('show');
             
             try {
-                const formData = new FormData();
-                formData.append('file', selectedFile);
+                // 4MB 이상이면 청크 업로드, 미만이면 일반 업로드
+                const FILE_SIZE_LIMIT = 4 * 1024 * 1024; // 4MB
                 
-                const response = await fetch('/api/uploads/test/upload-excel', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    showResult('success', '✅ 업로드 성공!', 
-                        `파일이 구글 드라이브에 업로드되었습니다.\n\n` +
-                        `파일 ID: ${data.file_id}\n` +
-                        `파일명: ${selectedFile.name}`,
-                        data.web_view_link
-                    );
+                if (selectedFile.size >= FILE_SIZE_LIMIT) {
+                    // 청크 업로드
+                    console.log('청크 업로드 모드');
+                    const data = await uploadInChunks(selectedFile, selectedFile.name);
+                    
+                    if (data.success) {
+                        showResult('success', '✅ 업로드 성공!', 
+                            `파일이 구글 드라이브에 업로드되었습니다.\n\n` +
+                            `파일 ID: ${data.file_id}\n` +
+                            `파일명: ${selectedFile.name}`,
+                            data.web_view_link
+                        );
+                    } else {
+                        showResult('error', '❌ 업로드 실패', data.message || '알 수 없는 오류가 발생했습니다.');
+                    }
                 } else {
-                    showResult('error', '❌ 업로드 실패', data.message || '알 수 없는 오류가 발생했습니다.');
+                    // 일반 업로드
+                    console.log('일반 업로드 모드');
+                    const formData = new FormData();
+                    formData.append('file', selectedFile);
+                    
+                    const response = await fetch('/api/uploads/test/upload-excel', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showResult('success', '✅ 업로드 성공!', 
+                            `파일이 구글 드라이브에 업로드되었습니다.\n\n` +
+                            `파일 ID: ${data.file_id}\n` +
+                            `파일명: ${selectedFile.name}`,
+                            data.web_view_link
+                        );
+                    } else {
+                        showResult('error', '❌ 업로드 실패', data.message || '알 수 없는 오류가 발생했습니다.');
+                    }
                 }
             } catch (error) {
+                console.error('업로드 오류:', error);
                 showResult('error', '❌ 오류 발생', `업로드 중 오류가 발생했습니다: ${error.message}`);
             } finally {
                 uploadBtn.disabled = false;

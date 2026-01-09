@@ -665,3 +665,250 @@ def test_upload_excel():
             'success': False,
             'message': f'엑셀 파일 업로드 테스트 중 오류: {str(e)}'
         }), 500
+
+
+@uploads_bp.route('/test/upload-excel-start', methods=['POST'])
+def test_upload_excel_start():
+    """
+    엑셀 파일 청크 업로드 시작 API
+    
+    Request Body:
+        {
+            "filename": str,
+            "file_size": int,
+            "total_chunks": int
+        }
+    
+    Returns:
+        {
+            "success": bool,
+            "upload_id": str,
+            "message": str
+        }
+    """
+    try:
+        data = request.get_json()
+        filename = data.get('filename')
+        file_size = data.get('file_size')
+        total_chunks = data.get('total_chunks')
+        
+        if not filename or not file_size or not total_chunks:
+            return jsonify({
+                'success': False,
+                'message': '필수 파라미터가 없습니다.'
+            }), 400
+        
+        # 업로드 세션 생성 (간단한 메모리 저장, 실제로는 DB나 Redis 사용 권장)
+        import uuid
+        upload_id = str(uuid.uuid4())
+        
+        # 세션 저장 (임시로 전역 변수 사용, 실제로는 DB나 Redis 사용)
+        if not hasattr(test_upload_excel_start, 'upload_sessions'):
+            test_upload_excel_start.upload_sessions = {}
+        
+        test_upload_excel_start.upload_sessions[upload_id] = {
+            'filename': filename,
+            'file_size': file_size,
+            'total_chunks': total_chunks,
+            'chunks': {},
+            'created_at': datetime.now()
+        }
+        
+        print(f"[정보] 업로드 세션 시작: {upload_id}, 파일: {filename}, 크기: {file_size} bytes, 청크: {total_chunks}")
+        
+        return jsonify({
+            'success': True,
+            'upload_id': upload_id,
+            'message': '업로드 세션이 생성되었습니다.'
+        })
+        
+    except Exception as e:
+        print(f'[오류] 업로드 시작 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'업로드 시작 중 오류: {str(e)}'
+        }), 500
+
+
+@uploads_bp.route('/test/upload-excel-chunk', methods=['POST'])
+def test_upload_excel_chunk():
+    """
+    엑셀 파일 청크 업로드 API
+    
+    Request Body:
+        {
+            "upload_id": str,
+            "chunk_index": int,
+            "chunk_data": str (base64),
+            "is_last_chunk": bool
+        }
+    
+    Returns:
+        {
+            "success": bool,
+            "message": str
+        }
+    """
+    try:
+        data = request.get_json()
+        upload_id = data.get('upload_id')
+        chunk_index = data.get('chunk_index')
+        chunk_data = data.get('chunk_data')
+        is_last_chunk = data.get('is_last_chunk', False)
+        
+        if not upload_id or chunk_index is None or not chunk_data:
+            return jsonify({
+                'success': False,
+                'message': '필수 파라미터가 없습니다.'
+            }), 400
+        
+        # 세션 확인
+        if not hasattr(test_upload_excel_start, 'upload_sessions'):
+            return jsonify({
+                'success': False,
+                'message': '업로드 세션을 찾을 수 없습니다.'
+            }), 404
+        
+        session = test_upload_excel_start.upload_sessions.get(upload_id)
+        if not session:
+            return jsonify({
+                'success': False,
+                'message': '업로드 세션이 만료되었거나 존재하지 않습니다.'
+            }), 404
+        
+        # 청크 저장
+        session['chunks'][chunk_index] = chunk_data
+        
+        print(f"[정보] 청크 수신: {upload_id}, 청크 {chunk_index + 1}/{session['total_chunks']}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'청크 {chunk_index + 1} 수신 완료'
+        })
+        
+    except Exception as e:
+        print(f'[오류] 청크 업로드 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'청크 업로드 중 오류: {str(e)}'
+        }), 500
+
+
+@uploads_bp.route('/test/upload-excel-complete', methods=['POST'])
+def test_upload_excel_complete():
+    """
+    엑셀 파일 청크 업로드 완료 API
+    
+    Request Body:
+        {
+            "upload_id": str
+        }
+    
+    Returns:
+        {
+            "success": bool,
+            "file_id": str,
+            "file_url": str,
+            "web_view_link": str,
+            "message": str
+        }
+    """
+    try:
+        data = request.get_json()
+        upload_id = data.get('upload_id')
+        
+        if not upload_id:
+            return jsonify({
+                'success': False,
+                'message': '업로드 ID가 없습니다.'
+            }), 400
+        
+        # 세션 확인
+        if not hasattr(test_upload_excel_start, 'upload_sessions'):
+            return jsonify({
+                'success': False,
+                'message': '업로드 세션을 찾을 수 없습니다.'
+            }), 404
+        
+        session = test_upload_excel_start.upload_sessions.get(upload_id)
+        if not session:
+            return jsonify({
+                'success': False,
+                'message': '업로드 세션이 만료되었거나 존재하지 않습니다.'
+            }), 404
+        
+        # 모든 청크 확인
+        total_chunks = session['total_chunks']
+        chunks = session['chunks']
+        
+        if len(chunks) != total_chunks:
+            return jsonify({
+                'success': False,
+                'message': f'모든 청크를 받지 못했습니다. ({len(chunks)}/{total_chunks})'
+            }), 400
+        
+        # 청크 조립
+        print(f"[정보] 청크 조립 시작: {upload_id}, 총 {total_chunks}개 청크")
+        chunks_list = [chunks[i] for i in range(total_chunks)]
+        base64_data = ''.join(chunks_list)
+        
+        # Base64 디코딩
+        import base64
+        file_data = base64.b64decode(base64_data)
+        
+        print(f"[정보] 파일 조립 완료: {len(file_data)} bytes")
+        
+        # 구글 드라이브에 업로드
+        try:
+            from api.uploads.google_drive import upload_excel_to_drive
+            
+            result = upload_excel_to_drive(
+                file_data=file_data,
+                filename=session['filename'],
+                folder_name='정산파일'
+            )
+            
+            # 세션 삭제
+            del test_upload_excel_start.upload_sessions[upload_id]
+            
+            if result.get('success'):
+                return jsonify({
+                    'success': True,
+                    'file_id': result.get('file_id'),
+                    'file_url': result.get('file_url'),
+                    'web_view_link': result.get('web_view_link'),
+                    'message': result.get('message', '파일 업로드 성공')
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': result.get('message', '파일 업로드 실패')
+                }), 500
+                
+        except ImportError as import_error:
+            print(f"[오류] 구글 드라이브 모듈 import 실패: {import_error}")
+            return jsonify({
+                'success': False,
+                'message': f'구글 드라이브 모듈을 찾을 수 없습니다: {str(import_error)}'
+            }), 500
+        except Exception as upload_error:
+            print(f"[오류] 구글 드라이브 업로드 오류: {upload_error}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'파일 업로드 중 오류가 발생했습니다: {str(upload_error)}'
+            }), 500
+        
+    except Exception as e:
+        print(f'[오류] 업로드 완료 처리 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'업로드 완료 처리 중 오류: {str(e)}'
+        }), 500
