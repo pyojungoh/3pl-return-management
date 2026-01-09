@@ -667,6 +667,72 @@ def test_upload_excel():
         }), 500
 
 
+@uploads_bp.route('/test/check-auth', methods=['GET'])
+def test_check_auth():
+    """
+    구글 드라이브 인증 정보 확인 테스트 API
+    
+    Returns:
+        {
+            "success": bool,
+            "has_env_var": bool,
+            "env_var_length": int,
+            "has_credentials": bool,
+            "service_account_email": str,
+            "message": str
+        }
+    """
+    try:
+        import os
+        
+        # 환경 변수 확인
+        creds_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
+        has_env_var = bool(creds_json)
+        env_var_length = len(creds_json) if creds_json else 0
+        
+        # 인증 정보 확인
+        has_credentials = False
+        service_account_email = None
+        
+        try:
+            from api.uploads.google_drive import get_credentials
+            credentials = get_credentials()
+            if credentials:
+                has_credentials = True
+                # 서비스 계정 이메일 추출 시도
+                try:
+                    import json
+                    if creds_json:
+                        creds_info = json.loads(creds_json)
+                        service_account_email = creds_info.get('client_email', '알 수 없음')
+                except:
+                    pass
+        except Exception as cred_error:
+            print(f"[오류] 인증 정보 확인 실패: {cred_error}")
+        
+        return jsonify({
+            'success': True,
+            'has_env_var': has_env_var,
+            'env_var_length': env_var_length,
+            'has_credentials': has_credentials,
+            'service_account_email': service_account_email,
+            'message': '인증 정보 확인 완료'
+        })
+        
+    except Exception as e:
+        print(f'[오류] 인증 확인 테스트 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'has_env_var': False,
+            'env_var_length': 0,
+            'has_credentials': False,
+            'service_account_email': None,
+            'message': f'인증 확인 중 오류: {str(e)}'
+        }), 500
+
+
 @uploads_bp.route('/test/upload-excel-start', methods=['POST'])
 def test_upload_excel_start():
     """
