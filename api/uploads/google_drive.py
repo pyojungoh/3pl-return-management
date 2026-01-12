@@ -279,7 +279,7 @@ def upload_images_to_drive(image_data_list: List[str], tracking_number: str) -> 
                 
                 return '확인 필요'
             except:
-                return 'id-pl-return-service@composite-dream-477907-c5.iam.gserviceaccount.com'
+                return 'id-pl-drive-uploader@composite-dream-477907-c5.iam.gserviceaccount.com'
         
         service = build('drive', 'v3', credentials=credentials)
         
@@ -742,13 +742,31 @@ def upload_excel_to_drive(file_data: bytes, filename: str, folder_name: str = '�
         )
         
         # 파일 업로드
+        # 중요: 서비스 계정은 저장 공간이 없으므로 공유된 폴더에만 업로드 가능
+        # 공유 드라이브(Shared Drive) 또는 조직의 공유 드라이브가 필요
         try:
+            # 폴더 정보 확인 (공유 드라이브 여부 확인)
+            try:
+                folder_info = service.files().get(
+                    fileId=target_folder_id,
+                    fields='id, name, driveId, capabilities',
+                    supportsAllDrives=True
+                ).execute()
+                drive_id = folder_info.get('driveId')
+                print(f"📁 폴더 정보: {folder_info.get('name')} (Drive ID: {drive_id})")
+                if drive_id:
+                    print(f"✅ 공유 드라이브 확인됨 (Drive ID: {drive_id})")
+                else:
+                    print(f"⚠️ 개인 드라이브의 공유된 폴더입니다. 공유 드라이브로 이동하는 것을 권장합니다.")
+            except Exception as info_error:
+                print(f"⚠️ 폴더 정보 확인 실패 (계속 진행): {info_error}")
+            
             file = service.files().create(
                 body=file_metadata,
                 media_body=media,
                 fields='id, name, webViewLink, webContentLink',
-                supportsAllDrives=True,
-                ignoreDefaultVisibility=True
+                supportsAllDrives=True,  # 공유 드라이브 지원 (필수)
+                ignoreDefaultVisibility=True  # 기본 공개 설정 무시
             ).execute()
             
             file_id = file.get('id')
@@ -786,6 +804,22 @@ def upload_excel_to_drive(file_data: bytes, filename: str, folder_name: str = '�
             error_status = upload_error.resp.status if hasattr(upload_error, 'resp') else '알 수 없음'
             
             print(f"❌ 파일 업로드 실패: {error_msg} (상태 코드: {error_status})")
+            
+            # 403 storageQuotaExceeded 오류 처리
+            if error_status == 403 and 'storageQuotaExceeded' in error_msg:
+                sa_email = get_service_account_email()
+                raise Exception(
+                    f"파일 업로드 실패: 서비스 계정은 저장 공간 할당량이 없어 개인 드라이브의 공유된 폴더에 파일을 업로드할 수 없습니다.\n\n"
+                    f"해결 방법:\n"
+                    f"1. Google Drive에서 '제이제이솔루션' 폴더를 공유 드라이브(Shared Drive)로 이동하세요.\n"
+                    f"   - Google Workspace 관리자에게 문의하여 공유 드라이브 생성 요청\n"
+                    f"   - 또는 Google Drive에서 '새로 만들기' → '공유 드라이브' 생성\n"
+                    f"2. 또는 OAuth 2.0을 사용하여 사용자 계정으로 업로드 (코드 수정 필요)\n\n"
+                    f"현재 서비스 계정: {sa_email}\n"
+                    f"폴더: {SETTLEMENT_MAIN_FOLDER_NAME} > {folder_name}\n"
+                    f"폴더 ID: {target_folder_id}"
+                )
+            
             raise Exception(f"파일 업로드 실패 ({error_status}): {error_msg}")
     
     except HttpError as error:

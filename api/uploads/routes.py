@@ -620,7 +620,8 @@ def test_upload_excel():
         
         # 구글 드라이브에 업로드
         try:
-            from api.uploads.google_drive import upload_excel_to_drive
+            # OAuth 2.0 사용 (서비스 계정 제한 우회)
+            from api.uploads.oauth_drive import upload_excel_to_drive
             
             result = upload_excel_to_drive(
                 file_data=file_data,
@@ -679,11 +680,14 @@ def test_check_auth():
             "env_var_length": int,
             "has_credentials": bool,
             "service_account_email": str,
+            "json_parse_error": str,
+            "error_details": str,
             "message": str
         }
     """
     try:
         import os
+        import json
         
         # 환경 변수 확인
         creds_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
@@ -693,6 +697,12 @@ def test_check_auth():
         # 인증 정보 확인
         has_credentials = False
         service_account_email = None
+        json_parse_error = None
+        error_details = None
+        
+        # 환경 변수 길이 확인 (일반적으로 2000자 이상)
+        if has_env_var and env_var_length < 1000:
+            error_details = f"⚠️ 환경 변수 길이가 너무 짧습니다 ({env_var_length}자). 일반적으로 서비스 계정 JSON은 2000자 이상입니다. 환경 변수가 잘못 설정되었을 수 있습니다."
         
         try:
             from api.uploads.google_drive import get_credentials
@@ -701,14 +711,35 @@ def test_check_auth():
                 has_credentials = True
                 # 서비스 계정 이메일 추출 시도
                 try:
-                    import json
                     if creds_json:
-                        creds_info = json.loads(creds_json)
+                        creds_info = json.loads(creds_json.strip())
                         service_account_email = creds_info.get('client_email', '알 수 없음')
-                except:
-                    pass
+                except json.JSONDecodeError as json_err:
+                    json_parse_error = f"JSON 파싱 오류: {json_err.msg} (라인 {json_err.lineno}, 컬럼 {json_err.colno})"
+                    error_details = f"JSON 파싱 실패. 환경 변수 형식이 올바른지 확인하세요.\n오류 위치: {json_parse_error}\n처음 200자: {creds_json[:200] if creds_json else '없음'}"
+                except Exception as parse_err:
+                    json_parse_error = str(parse_err)
+                    error_details = f"JSON 파싱 중 오류: {json_parse_error}"
         except Exception as cred_error:
             print(f"[오류] 인증 정보 확인 실패: {cred_error}")
+            import traceback
+            error_details = f"인증 정보 로드 실패: {str(cred_error)}\n{traceback.format_exc()}"
+        
+        # JSON 파싱 직접 시도 (디버깅용)
+        if has_env_var and not has_credentials and not json_parse_error:
+            try:
+                creds_json_cleaned = creds_json.strip()
+                test_parse = json.loads(creds_json_cleaned)
+                # 파싱은 성공했지만 인증 객체 생성 실패
+                if 'client_email' in test_parse:
+                    service_account_email = test_parse.get('client_email')
+                    error_details = "JSON 파싱은 성공했지만 인증 객체 생성에 실패했습니다. 필수 필드가 누락되었을 수 있습니다."
+            except json.JSONDecodeError as json_err:
+                json_parse_error = f"JSON 파싱 오류: {json_err.msg} (라인 {json_err.lineno}, 컬럼 {json_err.colno})"
+                error_details = f"JSON 파싱 실패.\n오류: {json_parse_error}\n처음 300자: {creds_json[:300] if creds_json else '없음'}\n마지막 100자: {creds_json[-100:] if creds_json and len(creds_json) > 100 else '없음'}"
+            except Exception as parse_err:
+                json_parse_error = str(parse_err)
+                error_details = f"JSON 파싱 중 오류: {json_parse_error}"
         
         return jsonify({
             'success': True,
@@ -716,6 +747,8 @@ def test_check_auth():
             'env_var_length': env_var_length,
             'has_credentials': has_credentials,
             'service_account_email': service_account_email,
+            'json_parse_error': json_parse_error,
+            'error_details': error_details,
             'message': '인증 정보 확인 완료'
         })
         
@@ -729,6 +762,8 @@ def test_check_auth():
             'env_var_length': 0,
             'has_credentials': False,
             'service_account_email': None,
+            'json_parse_error': None,
+            'error_details': str(e),
             'message': f'인증 확인 중 오류: {str(e)}'
         }), 500
 
@@ -948,13 +983,22 @@ def test_upload_excel_complete():
         
         # 구글 드라이브에 업로드
         try:
-            from api.uploads.google_drive import upload_excel_to_drive
+            print(f"[디버깅] 엑셀 파일 업로드 시작: {session['filename']}")
+            print(f"[디버깅] OAuth 2.0 모듈 import 시도...")
+            
+            # OAuth 2.0 사용 (서비스 계정 제한 우회)
+            from api.uploads.oauth_drive import upload_excel_to_drive
+            
+            print(f"[디버깅] OAuth 2.0 모듈 import 성공")
+            print(f"[디버깅] upload_excel_to_drive 함수 호출 시작...")
             
             result = upload_excel_to_drive(
                 file_data=file_data,
                 filename=session['filename'],
                 folder_name='정산파일'
             )
+            
+            print(f"[디버깅] upload_excel_to_drive 함수 호출 완료: {result.get('success')}")
             
             # 세션 삭제
             del test_upload_excel_start.upload_sessions[upload_id]
