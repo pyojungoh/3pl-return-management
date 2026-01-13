@@ -1347,3 +1347,76 @@ def delete_settlement_file(settlement_id):
             'message': f'파일 삭제 중 오류: {str(e)}'
         }), 500
 
+
+# ========== 일괄 상태 변경 ==========
+
+@settlements_bp.route('/bulk-update-status', methods=['POST'])
+def bulk_update_settlement_status():
+    """정산년월별 일괄 상태 변경"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        
+        # 관리자만 일괄 상태 변경 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 일괄 상태 변경이 가능합니다.'
+            }), 403
+        
+        settlement_year_month = request.args.get('settlement_year_month', '').strip()
+        status = request.args.get('status', '').strip()
+        
+        if not settlement_year_month or not status:
+            return jsonify({
+                'success': False,
+                'message': '정산년월과 상태는 필수입니다.'
+            }), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # 해당 정산년월의 모든 정산 상태 변경
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    UPDATE settlements 
+                    SET status = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE settlement_year_month = %s
+                ''', (status, settlement_year_month))
+            else:
+                cursor.execute('''
+                    UPDATE settlements 
+                    SET status = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE settlement_year_month = ?
+                ''', (status, settlement_year_month))
+            
+            updated_count = cursor.rowcount
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'{updated_count}개의 정산이 {status} 상태로 변경되었습니다.',
+                'updated_count': updated_count
+            })
+        except Exception as e:
+            conn.rollback() if USE_POSTGRESQL else None
+            print(f'[오류] 일괄 상태 변경 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'일괄 상태 변경 중 오류: {str(e)}'
+            }), 500
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f'[오류] 일괄 상태 변경 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'일괄 상태 변경 중 오류: {str(e)}'
+        }), 500
+
