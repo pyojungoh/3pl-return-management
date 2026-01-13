@@ -554,3 +554,274 @@ def upload_excel_to_drive(file_data: bytes, filename: str, folder_name: str = '�
             'message': f'엑셀 파일 업로드 실패: {str(e)}'
         }
 
+
+# ========== 정산 파일 업로드 관련 함수 ==========
+
+def find_or_create_year_folder(service, parent_folder_id: str, year: str) -> str:
+    """
+    년도 폴더 찾기 또는 생성
+    
+    Args:
+        service: Google Drive API 서비스 객체
+        parent_folder_id: 부모 폴더 ID (정산파일 폴더)
+        year: 년도 (예: "2025")
+    
+    Returns:
+        폴더 ID
+    """
+    folder_name = f"{year}년"
+    
+    # 기존 폴더 찾기
+    folder_id = find_folder_in_oauth(service, folder_name, parent_folder_id)
+    
+    if folder_id:
+        return folder_id
+    
+    # 폴더가 없으면 생성
+    file_metadata = {
+        'name': folder_name,
+        'mimeType': 'application/vnd.google-apps.folder',
+        'parents': [parent_folder_id]
+    }
+    
+    folder = service.files().create(
+        body=file_metadata,
+        fields='id'
+    ).execute()
+    
+    print(f"✅ 년도 폴더 생성: {folder_name} (ID: {folder.get('id')})")
+    return folder.get('id')
+
+
+def find_or_create_month_folder(service, parent_folder_id: str, month: str) -> str:
+    """
+    월 폴더 찾기 또는 생성
+    
+    Args:
+        service: Google Drive API 서비스 객체
+        parent_folder_id: 부모 폴더 ID (년도 폴더)
+        month: 월 (예: "01" 또는 "1")
+    
+    Returns:
+        폴더 ID
+    """
+    # 월을 2자리로 변환 (예: "1" -> "01")
+    month_padded = month.zfill(2)
+    folder_name = f"{month_padded}월"
+    
+    # 기존 폴더 찾기
+    folder_id = find_folder_in_oauth(service, folder_name, parent_folder_id)
+    
+    if folder_id:
+        return folder_id
+    
+    # 폴더가 없으면 생성
+    file_metadata = {
+        'name': folder_name,
+        'mimeType': 'application/vnd.google-apps.folder',
+        'parents': [parent_folder_id]
+    }
+    
+    folder = service.files().create(
+        body=file_metadata,
+        fields='id'
+    ).execute()
+    
+    print(f"✅ 월 폴더 생성: {folder_name} (ID: {folder.get('id')})")
+    return folder.get('id')
+
+
+def find_or_create_company_folder(service, parent_folder_id: str, company_name: str) -> str:
+    """
+    화주사 폴더 찾기 또는 생성
+    
+    Args:
+        service: Google Drive API 서비스 객체
+        parent_folder_id: 부모 폴더 ID (월 폴더)
+        company_name: 화주사명
+    
+    Returns:
+        폴더 ID
+    """
+    # 기존 폴더 찾기
+    folder_id = find_folder_in_oauth(service, company_name, parent_folder_id)
+    
+    if folder_id:
+        return folder_id
+    
+    # 폴더가 없으면 생성
+    file_metadata = {
+        'name': company_name,
+        'mimeType': 'application/vnd.google-apps.folder',
+        'parents': [parent_folder_id]
+    }
+    
+    folder = service.files().create(
+        body=file_metadata,
+        fields='id'
+    ).execute()
+    
+    print(f"✅ 화주사 폴더 생성: {company_name} (ID: {folder.get('id')})")
+    return folder.get('id')
+
+
+def upload_settlement_excel_to_drive(
+    file_data: bytes, 
+    filename: str, 
+    company_name: str, 
+    settlement_year_month: str
+) -> dict:
+    """
+    정산용 엑셀 파일을 Google Drive에 업로드
+    폴더 구조: 제이제이솔루션 > 정산파일 > 년도 > 월 > 화주사명
+    
+    Args:
+        file_data: 파일 데이터 (bytes)
+        filename: 파일명 (예: "작업비정산서.xlsx")
+        company_name: 화주사명
+        settlement_year_month: 정산년월 (예: "2025-01")
+    
+    Returns:
+        {
+            'success': bool,
+            'file_id': str,
+            'file_url': str,
+            'web_view_link': str,
+            'message': str
+        }
+    """
+    try:
+        if not file_data:
+            raise Exception("파일 데이터가 없습니다.")
+        
+        if not filename:
+            raise Exception("파일명이 없습니다.")
+        
+        if not company_name:
+            raise Exception("화주사명이 없습니다.")
+        
+        if not settlement_year_month:
+            raise Exception("정산년월이 없습니다.")
+        
+        print(f"📄 정산 엑셀 파일 업로드 시작: {filename}")
+        print(f"   화주사: {company_name}")
+        print(f"   정산년월: {settlement_year_month}")
+        
+        # OAuth 2.0 인증 정보 가져오기
+        credentials = get_credentials()
+        if not credentials:
+            raise Exception("OAuth 2.0 인증 실패")
+        
+        service = build('drive', 'v3', credentials=credentials)
+        
+        # 1. 메인 폴더 ID 사용
+        main_folder_id = SETTLEMENT_MAIN_FOLDER_ID
+        print(f"✅ 메인 폴더 ID 사용: {SETTLEMENT_MAIN_FOLDER_NAME} (ID: {main_folder_id})")
+        
+        # 2. 정산파일 폴더 찾기
+        settlement_folder_id = find_folder_in_oauth(service, "정산파일", main_folder_id)
+        if not settlement_folder_id:
+            raise Exception(
+                f"'정산파일' 폴더를 찾을 수 없습니다.\n"
+                f"Google Drive에서 '{SETTLEMENT_MAIN_FOLDER_NAME}' 폴더 안에 '정산파일' 폴더를 만들어주세요."
+            )
+        print(f"✅ 정산파일 폴더 찾기 성공 (ID: {settlement_folder_id})")
+        
+        # 3. 정산년월에서 년도와 월 추출
+        # settlement_year_month 형식: "2025-01"
+        year, month = settlement_year_month.split('-')
+        print(f"   년도: {year}, 월: {month}")
+        
+        # 4. 년도 폴더 찾기/생성
+        year_folder_id = find_or_create_year_folder(service, settlement_folder_id, year)
+        print(f"✅ 년도 폴더: {year}년 (ID: {year_folder_id})")
+        
+        # 5. 월 폴더 찾기/생성
+        month_folder_id = find_or_create_month_folder(service, year_folder_id, month)
+        print(f"✅ 월 폴더: {month}월 (ID: {month_folder_id})")
+        
+        # 6. 화주사 폴더 찾기/생성
+        company_folder_id = find_or_create_company_folder(service, month_folder_id, company_name)
+        print(f"✅ 화주사 폴더: {company_name} (ID: {company_folder_id})")
+        
+        # 7. 파일 메타데이터
+        file_metadata = {
+            'name': filename,
+            'parents': [company_folder_id]
+        }
+        
+        # 8. 미디어 업로드 (엑셀 파일)
+        if filename.endswith('.xlsx'):
+            mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        elif filename.endswith('.xls'):
+            mimetype = 'application/vnd.ms-excel'
+        elif filename.endswith('.csv'):
+            mimetype = 'text/csv'
+        elif filename.endswith('.pdf'):
+            mimetype = 'application/pdf'
+        else:
+            mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        
+        media = MediaIoBaseUpload(
+            io.BytesIO(file_data),
+            mimetype=mimetype,
+            resumable=True
+        )
+        
+        # 9. 파일 업로드
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, name, webViewLink, webContentLink'
+        ).execute()
+        
+        file_id = file.get('id')
+        web_view_link = file.get('webViewLink', '')
+        web_content_link = file.get('webContentLink', '')
+        
+        print(f"✅ 파일 업로드 성공: {filename} (ID: {file_id})")
+        print(f"🔗 웹 보기 링크: {web_view_link}")
+        
+        # 10. 공유 설정 (누구나 링크로 볼 수 있도록)
+        try:
+            permission = {
+                'type': 'anyone',
+                'role': 'reader'
+            }
+            service.permissions().create(
+                fileId=file_id,
+                body=permission
+            ).execute()
+            print(f"✅ 공유 설정 완료: {filename}")
+        except HttpError as perm_error:
+            print(f"⚠️ 공유 설정 실패 (무시, 파일은 업로드됨): {perm_error}")
+        
+        return {
+            'success': True,
+            'file_id': file_id,
+            'file_url': web_content_link,
+            'web_view_link': web_view_link,
+            'message': f'파일 업로드 성공: {filename}'
+        }
+        
+    except HttpError as error:
+        print(f"💥 Google Drive API 오류: {error}")
+        return {
+            'success': False,
+            'file_id': None,
+            'file_url': None,
+            'web_view_link': None,
+            'message': f'Google Drive API 오류: {error}'
+        }
+    except Exception as e:
+        print(f"💥 정산 엑셀 파일 업로드 전체 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'file_id': None,
+            'file_url': None,
+            'web_view_link': None,
+            'message': f'정산 엑셀 파일 업로드 실패: {str(e)}'
+        }
+

@@ -91,8 +91,11 @@ def get_settlements_list():
                     s.company_name,
                     s.settlement_year_month,
                     s.work_fee,
+                    s.work_fee_file_url,
                     s.inout_fee,
+                    s.inout_fee_file_url,
                     s.shipping_fee,
+                    s.shipping_fee_file_url,
                     s.storage_fee,
                     s.special_work_fee,
                     s.error_deduction,
@@ -684,7 +687,7 @@ def get_data_sources():
 
 @settlements_bp.route('/upload-file', methods=['POST'])
 def upload_settlement_file():
-    """정산 파일 업로드 (이지어드민, 택배사 파일 등)"""
+    """정산 파일 업로드 (이지어드민, 택배사 파일 등) - Google Drive"""
     try:
         user_context = get_user_context()
         role = user_context['role']
@@ -708,22 +711,77 @@ def upload_settlement_file():
                 'message': '필수 데이터가 누락되었습니다.'
             }), 400
         
-        # Cloudinary 업로드
+        # 정산 정보 조회 (company_name, settlement_year_month 가져오기)
+        conn = get_db_connection()
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
+        
         try:
-            from api.uploads.cloudinary_upload import upload_single_file_to_cloudinary
+            if USE_POSTGRESQL:
+                cursor.execute('SELECT company_name, settlement_year_month FROM settlements WHERE id = %s', (settlement_id,))
+            else:
+                cursor.execute('SELECT company_name, settlement_year_month FROM settlements WHERE id = ?', (settlement_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({
+                    'success': False,
+                    'message': '정산을 찾을 수 없습니다.'
+                }), 404
+            
+            settlement = dict(row)
+            company_name = settlement.get('company_name', '')
+            settlement_year_month = settlement.get('settlement_year_month', '')
+            
+            if not company_name or not settlement_year_month:
+                return jsonify({
+                    'success': False,
+                    'message': '정산 정보가 불완전합니다. (화주사명 또는 정산년월 없음)'
+                }), 400
+        finally:
+            cursor.close()
+            conn.close()
+        
+        # Google Drive 업로드
+        try:
+            from api.uploads.oauth_drive import upload_settlement_excel_to_drive
+            import base64 as base64_lib
             
             # Base64 데이터에서 실제 데이터 추출
             if ',' in base64_data:
                 base64_data = base64_data.split(',')[1]
             
-            # 파일 업로드 (폴더: settlements/년월/파일명)
-            folder = 'settlements'
-            file_url = upload_single_file_to_cloudinary(base64_data, file_name, folder)
+            # Base64 디코딩
+            try:
+                file_bytes = base64_lib.b64decode(base64_data)
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'message': f'파일 데이터 디코딩 실패: {str(e)}'
+                }), 400
+            
+            # Google Drive에 업로드
+            result = upload_settlement_excel_to_drive(
+                file_data=file_bytes,
+                filename=file_name,
+                company_name=company_name,
+                settlement_year_month=settlement_year_month
+            )
+            
+            if not result.get('success'):
+                return jsonify({
+                    'success': False,
+                    'message': result.get('message', '파일 업로드 실패')
+                }), 500
+            
+            file_url = result.get('web_view_link', result.get('file_url', ''))
             
             if not file_url:
                 return jsonify({
                     'success': False,
-                    'message': '파일 업로드에 실패했습니다.'
+                    'message': '파일 업로드는 성공했지만 파일 URL을 가져올 수 없습니다.'
                 }), 500
             
             # 파일 정보 DB 저장
@@ -731,8 +789,8 @@ def upload_settlement_file():
             cursor = conn.cursor()
             
             try:
-                # 파일 크기 계산 (대략적)
-                file_size = len(base64_data) * 3 // 4  # Base64는 약 4/3 크기
+                # 파일 크기 계산
+                file_size = len(file_bytes)
                 
                 if USE_POSTGRESQL:
                     cursor.execute('''

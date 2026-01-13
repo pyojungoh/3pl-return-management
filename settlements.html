@@ -933,6 +933,18 @@
       const file = event.target.files[0];
       if (!file) return;
       
+      const displayDiv = document.getElementById(`st${fileType.charAt(0).toUpperCase() + fileType.slice(1)}FileDisplay`);
+      
+      // 업로드 중 상태 표시
+      if (displayDiv) {
+        displayDiv.innerHTML = `
+          <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border-radius: 6px;">
+            <span>📄 ${file.name}</span>
+            <span style="margin-left: 10px; color: #856404;">⏳ 파일 준비 중...</span>
+          </div>
+        `;
+      }
+      
       const reader = new FileReader();
       reader.onload = function(e) {
         const base64 = e.target.result;
@@ -941,18 +953,112 @@
           base64: base64
         };
         
-        // 파일 표시 업데이트
-        const displayDiv = document.getElementById(`st${fileType.charAt(0).toUpperCase() + fileType.slice(1)}FileDisplay`);
+        // 정산 ID가 있으면 즉시 업로드 (수정 모드)
+        const settlementId = document.getElementById('stSettlementId')?.value;
+        if (settlementId) {
+          stUploadFileImmediately(fileType, settlementId, file, base64);
+        } else {
+          // 정산 ID가 없으면 저장 후 업로드 예정 상태 표시
+          if (displayDiv) {
+            displayDiv.innerHTML = `
+              <div style="margin-top: 8px; padding: 8px; background: #d1ecf1; border-radius: 6px;">
+                <span>📄 ${file.name}</span>
+                <span style="margin-left: 10px; color: #0c5460;">✅ 저장 후 업로드 예정</span>
+                <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
+              </div>
+            `;
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+    
+    // 파일 즉시 업로드 (수정 모드)
+    function stUploadFileImmediately(fileType, settlementId, file, base64) {
+      const displayDiv = document.getElementById(`st${fileType.charAt(0).toUpperCase() + fileType.slice(1)}FileDisplay`);
+      
+      // 업로드 중 상태 표시
+      if (displayDiv) {
+        displayDiv.innerHTML = `
+          <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border-radius: 6px;">
+            <span>📄 ${file.name}</span>
+            <span style="margin-left: 10px; color: #856404;">⏳ 업로드 중...</span>
+          </div>
+        `;
+      }
+      
+      const companyName = document.getElementById('stSettlementCompanyName')?.value;
+      const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
+      
+      if (!companyName || !yearMonth) {
         if (displayDiv) {
           displayDiv.innerHTML = `
-            <div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px;">
+            <div style="margin-top: 8px; padding: 8px; background: #f8d7da; border-radius: 6px;">
               <span>📄 ${file.name}</span>
+              <span style="margin-left: 10px; color: #721c24;">❌ 화주사와 정산년월을 먼저 선택해주세요.</span>
               <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
             </div>
           `;
         }
+        return;
+      }
+      
+      const uploadData = {
+        settlement_id: parseInt(settlementId),
+        file_type: fileType,
+        file_name: file.name,
+        file_data: base64
       };
-      reader.readAsDataURL(file);
+      
+      fetch('/api/settlements/upload-file', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...stGetUserHeaders()
+        },
+        credentials: 'include',
+        body: JSON.stringify(uploadData)
+      })
+        .then(response => response.json())
+        .then(result => {
+          if (result.success) {
+            // 업로드 성공 상태 표시
+            if (displayDiv) {
+              displayDiv.innerHTML = `
+                <div style="margin-top: 8px; padding: 8px; background: #d4edda; border-radius: 6px;">
+                  <span>📄 ${file.name}</span>
+                  <span style="margin-left: 10px; color: #155724;">✅ 업로드 완료</span>
+                  <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
+                </div>
+              `;
+            }
+            // stSelectedFiles에서 제거 (이미 업로드됨)
+            delete stSelectedFiles[fileType];
+          } else {
+            // 업로드 실패 상태 표시
+            if (displayDiv) {
+              displayDiv.innerHTML = `
+                <div style="margin-top: 8px; padding: 8px; background: #f8d7da; border-radius: 6px;">
+                  <span>📄 ${file.name}</span>
+                  <span style="margin-left: 10px; color: #721c24;">❌ 업로드 실패: ${result.message || '알 수 없는 오류'}</span>
+                  <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
+                </div>
+              `;
+            }
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 파일 업로드 오류:', error);
+          if (displayDiv) {
+            displayDiv.innerHTML = `
+              <div style="margin-top: 8px; padding: 8px; background: #f8d7da; border-radius: 6px;">
+                <span>📄 ${file.name}</span>
+                <span style="margin-left: 10px; color: #721c24;">❌ 업로드 오류 발생</span>
+                <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
+              </div>
+            `;
+          }
+        });
     }
 
     // 파일 제거
@@ -1201,21 +1307,36 @@
                   <div class="st-settlement-detail-label">작업비</div>
                   <div class="st-settlement-detail-value">
                     ${(settlement.work_fee || 0).toLocaleString()}원
-                    ${settlement.work_fee_file_url ? `<a href="${settlement.work_fee_file_url}" target="_blank" class="st-file-link" download>📄 파일 다운로드</a>` : ''}
+                    ${settlement.work_fee_file_url ? `
+                      <div style="margin-top: 8px; display: flex; gap: 10px;">
+                        <a href="${settlement.work_fee_file_url}" target="_blank" class="st-file-link" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">👁️ 미리보기</a>
+                        <a href="${settlement.work_fee_file_url}" target="_blank" class="st-file-link" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">📥 다운로드</a>
+                      </div>
+                    ` : ''}
                   </div>
                 </div>
                 <div class="st-settlement-detail-row">
                   <div class="st-settlement-detail-label">입출고비</div>
                   <div class="st-settlement-detail-value">
                     ${(settlement.inout_fee || 0).toLocaleString()}원
-                    ${settlement.inout_fee_file_url ? `<a href="${settlement.inout_fee_file_url}" target="_blank" class="st-file-link" download>📄 파일 다운로드</a>` : ''}
+                    ${settlement.inout_fee_file_url ? `
+                      <div style="margin-top: 8px; display: flex; gap: 10px;">
+                        <a href="${settlement.inout_fee_file_url}" target="_blank" class="st-file-link" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">👁️ 미리보기</a>
+                        <a href="${settlement.inout_fee_file_url}" target="_blank" class="st-file-link" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">📥 다운로드</a>
+                      </div>
+                    ` : ''}
                   </div>
                 </div>
                 <div class="st-settlement-detail-row">
                   <div class="st-settlement-detail-label">택배비</div>
                   <div class="st-settlement-detail-value">
                     ${(settlement.shipping_fee || 0).toLocaleString()}원
-                    ${settlement.shipping_fee_file_url ? `<a href="${settlement.shipping_fee_file_url}" target="_blank" class="st-file-link" download>📄 파일 다운로드</a>` : ''}
+                    ${settlement.shipping_fee_file_url ? `
+                      <div style="margin-top: 8px; display: flex; gap: 10px;">
+                        <a href="${settlement.shipping_fee_file_url}" target="_blank" class="st-file-link" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">👁️ 미리보기</a>
+                        <a href="${settlement.shipping_fee_file_url}" target="_blank" class="st-file-link" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">📥 다운로드</a>
+                      </div>
+                    ` : ''}
                   </div>
                 </div>
                 <div class="st-settlement-detail-row">
