@@ -631,15 +631,17 @@ def get_data_sources():
                     try:
                         year, month = map(int, settlement_year_month.split('-'))
                         start_date = f'{year}-{month:02d}-01'
-                        # 해당 월의 마지막 날 계산 (특수작업 메뉴와 동일)
+                        # 해당 월의 마지막 날 계산 (특수작업 메뉴와 동일한 방식)
+                        # JavaScript의 new Date(year, month, 0).getDate()와 동일
                         from datetime import date
                         if month == 12:
-                            # 12월인 경우 다음 해 1월의 0일 = 올해 12월 마지막 날
+                            # 12월인 경우: date(다음해, 1, 0).day = 올해 12월 마지막 날
                             last_day = date(year + 1, 1, 0).day
                         else:
-                            # 다음 달의 0일 = 이번 달 마지막 날
+                            # 다른 월: date(올해, 다음월, 0).day = 이번 달 마지막 날
                             last_day = date(year, month + 1, 0).day
                         end_date = f'{year}-{month:02d}-{last_day:02d}'
+                        print(f'[디버깅] 날짜 범위 계산: {settlement_year_month} -> {start_date} ~ {end_date}')
                     except (ValueError, AttributeError) as e:
                         print(f'[경고] 정산년월 파싱 오류: {settlement_year_month}, {e}')
                         start_date = None
@@ -676,20 +678,21 @@ def get_data_sources():
                             }
                             print(f'[디버깅] 발견된 데이터: {debug_data}')
                         
-                        # 모든 화주사명으로 조회 시도 (대소문자/공백 차이 허용)
+                        # 화주사명으로 조회 (정확한 매칭)
                         if USE_POSTGRESQL:
                             cursor.execute('''
                                 SELECT COALESCE(SUM(total_price), 0) as total
                                 FROM special_works
-                                WHERE TRIM(UPPER(company_name)) = TRIM(UPPER(%s))
+                                WHERE company_name = %s
                                 AND work_date >= %s 
                                 AND work_date <= %s
                             ''', (filter_company_name, start_date, end_date))
                         else:
+                            # SQLite는 기본적으로 대소문자 구분 안 함 (TEXT 컬럼)
                             cursor.execute('''
                                 SELECT COALESCE(SUM(total_price), 0) as total
                                 FROM special_works
-                                WHERE TRIM(UPPER(company_name)) = TRIM(UPPER(?))
+                                WHERE company_name = ?
                                 AND work_date >= ? 
                                 AND work_date <= ?
                             ''', (filter_company_name, start_date, end_date))
