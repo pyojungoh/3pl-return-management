@@ -617,47 +617,65 @@ def get_data_sources():
         
         # 2. 특수작업 비용 조회
         try:
-            conn = get_db_connection()
-            if USE_POSTGRESQL:
-                cursor = conn.cursor(cursor_factory=RealDictCursor)
+            if not filter_company_name:
+                print('[경고] 특수작업 비용 조회: 화주사명이 없어서 조회하지 않음')
             else:
-                cursor = conn.cursor()
-            
-            try:
-                # 정산년월을 날짜 범위로 변환
-                year, month = map(int, settlement_year_month.split('-'))
-                start_date = f'{year}-{month:02d}-01'
-                # 다음 달 1일에서 하루 빼기
-                if month == 12:
-                    end_date = f'{year + 1}-01-01'
-                else:
-                    end_date = f'{year}-{month + 1:02d}-01'
-                
+                conn = get_db_connection()
                 if USE_POSTGRESQL:
-                    cursor.execute('''
-                        SELECT SUM(total_price) as total
-                        FROM special_works
-                        WHERE company_name = %s 
-                        AND work_date >= %s 
-                        AND work_date < %s
-                    ''', (filter_company_name, start_date, end_date))
+                    cursor = conn.cursor(cursor_factory=RealDictCursor)
                 else:
-                    cursor.execute('''
-                        SELECT SUM(total_price) as total
-                        FROM special_works
-                        WHERE company_name = ? 
-                        AND work_date >= ? 
-                        AND work_date < ?
-                    ''', (filter_company_name, start_date, end_date))
+                    cursor = conn.cursor()
                 
-                row = cursor.fetchone()
-                if row and row[0]:
-                    result['special_work_fee'] = int(row[0])
-            finally:
-                cursor.close()
-                conn.close()
+                try:
+                    # 정산년월을 날짜 범위로 변환
+                    try:
+                        year, month = map(int, settlement_year_month.split('-'))
+                        start_date = f'{year}-{month:02d}-01'
+                        # 다음 달 1일
+                        if month == 12:
+                            end_date = f'{year + 1}-01-01'
+                        else:
+                            end_date = f'{year}-{month + 1:02d}-01'
+                    except (ValueError, AttributeError) as e:
+                        print(f'[경고] 정산년월 파싱 오류: {settlement_year_month}, {e}')
+                        start_date = None
+                        end_date = None
+                    
+                    if start_date and end_date:
+                        if USE_POSTGRESQL:
+                            cursor.execute('''
+                                SELECT COALESCE(SUM(total_price), 0) as total
+                                FROM special_works
+                                WHERE company_name = %s 
+                                AND work_date >= %s 
+                                AND work_date < %s
+                            ''', (filter_company_name, start_date, end_date))
+                        else:
+                            cursor.execute('''
+                                SELECT COALESCE(SUM(total_price), 0) as total
+                                FROM special_works
+                                WHERE company_name = ? 
+                                AND work_date >= ? 
+                                AND work_date < ?
+                            ''', (filter_company_name, start_date, end_date))
+                        
+                        row = cursor.fetchone()
+                        if row:
+                            total = row[0] if isinstance(row, dict) else row[0]
+                            result['special_work_fee'] = int(total or 0)
+                            print(f'[정보] 특수작업 비용 조회 성공: {filter_company_name}, {settlement_year_month}, {result["special_work_fee"]}원')
+                        else:
+                            result['special_work_fee'] = 0
+                            print(f'[정보] 특수작업 비용 조회 결과 없음: {filter_company_name}, {settlement_year_month}')
+                finally:
+                    cursor.close()
+                    conn.close()
         except Exception as e:
             print(f'[경고] 특수작업 비용 조회 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            # 에러가 발생해도 기본값 0으로 계속 진행
+            result['special_work_fee'] = 0
         
         # 3. 오배송/누락 차감 조회 (반품관리)
         try:
