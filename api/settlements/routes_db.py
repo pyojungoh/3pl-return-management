@@ -584,6 +584,12 @@ def get_data_sources():
                     'message': '화주사 정보를 확인할 수 없습니다.'
                 }), 400
             filter_company_name = company_name
+        elif not filter_company_name:
+            # 관리자인 경우 company_name 파라미터가 필수
+            return jsonify({
+                'success': False,
+                'message': '화주사명이 필요합니다.'
+            }), 400
         
         result = {
             'storage_fee': 0,  # 파레트 보관료

@@ -1396,7 +1396,11 @@
 
     // 특수작업 비용 가져오기
     function stLoadSpecialWorkFee() {
-      const companyName = document.getElementById('stSettlementCompanyName')?.value || stCurrentCompany;
+      // 화주사명 가져오기 (여러 방법 시도)
+      const companyInput = document.getElementById('stSettlementCompanyInput')?.value;
+      const companyNameHidden = document.getElementById('stSettlementCompanyName')?.value;
+      const companyName = companyNameHidden || companyInput || stCurrentCompany;
+      
       const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
       
       if (!companyName || !yearMonth) {
@@ -1404,22 +1408,50 @@
         return;
       }
       
+      console.log('[ST] 특수작업 비용 조회 시작:', { companyName, yearMonth });
+      
       fetch(`/api/settlements/data-sources?settlement_year_month=${yearMonth}&company_name=${encodeURIComponent(companyName)}`, {
         credentials: 'include',
         headers: stGetUserHeaders()
       })
-        .then(response => response.json())
+        .then(response => {
+          console.log('[ST] 특수작업 비용 조회 응답 상태:', response.status);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          return response.json();
+        })
         .then(data => {
+          console.log('[ST] 특수작업 비용 조회 응답 데이터:', data);
           if (data.success && data.data) {
-            const specialWorkFee = data.data.special_work_fee || 0;
-            document.getElementById('stSpecialWorkFee').value = specialWorkFee;
-            document.getElementById('stSpecialWorkFeeDisplay').textContent = specialWorkFee.toLocaleString();
+            const specialWorkFee = parseInt(data.data.special_work_fee || 0);
+            console.log('[ST] 특수작업 비용:', specialWorkFee);
+            
+            const feeInput = document.getElementById('stSpecialWorkFee');
+            const feeDisplay = document.getElementById('stSpecialWorkFeeDisplay');
+            
+            if (feeInput) {
+              feeInput.value = specialWorkFee;
+            }
+            if (feeDisplay) {
+              feeDisplay.textContent = specialWorkFee.toLocaleString();
+            }
+            
             stCalculateTotal();
+            
+            if (specialWorkFee === 0) {
+              alert('해당 기간의 특수작업 데이터가 없습니다.');
+            } else {
+              alert(`특수작업 비용 ${specialWorkFee.toLocaleString()}원이 불러와졌습니다.`);
+            }
+          } else {
+            console.error('[ST] 특수작업 비용 조회 실패:', data.message);
+            alert(data.message || '특수작업 비용을 가져올 수 없습니다.');
           }
         })
         .catch(error => {
           console.error('[ST] 특수작업 비용 로드 오류:', error);
-          alert('특수작업 비용을 가져오는 중 오류가 발생했습니다.');
+          alert(`특수작업 비용을 가져오는 중 오류가 발생했습니다: ${error.message}`);
         });
     }
 
