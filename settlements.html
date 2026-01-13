@@ -1396,9 +1396,9 @@
 
     // 특수작업 비용 가져오기
     function stLoadSpecialWorkFee() {
-      // 화주사명 가져오기 (여러 방법 시도)
-      const companyInput = document.getElementById('stSettlementCompanyInput')?.value;
-      const companyNameHidden = document.getElementById('stSettlementCompanyName')?.value;
+      // 화주사명 가져오기 (여러 방법 시도, 특수작업 메뉴와 동일한 방식)
+      const companyInput = document.getElementById('stSettlementCompanyInput')?.value?.trim();
+      const companyNameHidden = document.getElementById('stSettlementCompanyName')?.value?.trim();
       const companyName = companyNameHidden || companyInput || stCurrentCompany;
       
       const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
@@ -1408,7 +1408,14 @@
         return;
       }
       
-      console.log('[ST] 특수작업 비용 조회 시작:', { companyName, yearMonth });
+      // 디버깅: 화주사명 값 확인
+      console.log('[ST] 특수작업 비용 조회 시작:', { 
+        companyInput, 
+        companyNameHidden, 
+        companyName, 
+        yearMonth,
+        stCurrentCompany 
+      });
       
       fetch(`/api/settlements/data-sources?settlement_year_month=${yearMonth}&company_name=${encodeURIComponent(companyName)}`, {
         credentials: 'include',
