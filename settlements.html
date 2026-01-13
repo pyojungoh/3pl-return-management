@@ -517,7 +517,10 @@
       <div class="st-filters">
         <div class="st-filter-group">
           <label for="stAdminFilterYearMonth">정산년월</label>
-          <input type="month" id="stAdminFilterYearMonth">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="month" id="stAdminFilterYearMonth" style="flex: 1;">
+            <button class="st-btn" onclick="stSelectYearMonthForDelivery()" style="padding: 8px 12px; font-size: 12px; white-space: nowrap;">바로 전달 선택</button>
+          </div>
         </div>
         <div class="st-filter-group">
           <label for="stAdminFilterCompany">화주사</label>
@@ -527,7 +530,10 @@
             <div id="stAdminFilterCompanyDropdown" class="st-dropdown-list"></div>
           </div>
         </div>
-        <button class="st-btn" onclick="stAdminLoadSettlements()">조회</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="st-btn" onclick="stAdminLoadSettlements()">조회</button>
+          <button class="st-btn" onclick="stAdminLoadDeliveredSettlements()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">전달 조회</button>
+        </div>
       </div>
     </div>
     

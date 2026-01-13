@@ -73,6 +73,9 @@ def get_settlements_list():
                     }), 400
                 filter_company_name = company_name
             
+            # 필터 파라미터 - status
+            filter_status = request.args.get('status', '').strip()
+            
             # 쿼리 구성
             where_clauses = []
             params = []
@@ -84,6 +87,10 @@ def get_settlements_list():
             if filter_company_name:
                 where_clauses.append('s.company_name = %s' if USE_POSTGRESQL else 's.company_name = ?')
                 params.append(filter_company_name)
+            
+            if filter_status:
+                where_clauses.append('s.status = %s' if USE_POSTGRESQL else 's.status = ?')
+                params.append(filter_status)
             
             where_sql = ' AND '.join(where_clauses) if where_clauses else '1=1'
             
