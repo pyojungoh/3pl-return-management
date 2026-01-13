@@ -1194,7 +1194,15 @@
         
         console.log(`[ST] 청크 ${chunkIndex + 1}/${totalChunks} 업로드 중...`);
         
-        // 진행 상황 표시 (박스 안 텍스트 변경)
+        // 진행 상황 표시 (박스 밑 표시 영역 업데이트)
+        if (displayDiv) {
+          const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+          const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+          displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #d1ecf1; border: 1px solid #0c5460; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="color: #0c5460; font-weight: 600;">📄 ${file.name} (${fileSizeMB} MB) - ⏳ 청크 ${chunkIndex + 1}/${totalChunks} 업로드 중... (${progress}%)</span>
+          </div>`;
+        }
+        // 박스 안 텍스트도 업데이트 (선택사항)
         if (uploadTextEl) {
           const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
           uploadTextEl.textContent = `⏳ 청크 ${chunkIndex + 1}/${totalChunks} 업로드 중... (${progress}%)`;
