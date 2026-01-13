@@ -1007,12 +1007,12 @@
             return;
           }
         } else {
-          // 화주사명과 정산년월이 없으면 파일만 저장
+          // 화주사명과 정산년월이 없으면 파일만 저장 (저장 후 업로드 예정)
           stSelectedFiles[fileType] = { file: file };
           
-          // 박스 안 텍스트 변경: 파일 선택됨
+          // 박스 안 텍스트 변경: 파일 선택됨 (선택 취소 버튼 포함)
           if (uploadTextEl) {
-            uploadTextEl.textContent = `📄 ${file.name} (${fileSizeMB} MB) - 화주사와 정산년월 선택 필요`;
+            uploadTextEl.innerHTML = `📄 ${file.name} (${fileSizeMB} MB) - 저장 후 업로드 예정 <button type="button" onclick="stRemoveFile('${fileType}', event)" style="margin-left: 10px; padding: 2px 6px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 취소</button>`;
           }
           
           if (displayDiv) {
@@ -1275,7 +1275,11 @@
     }
 
     // 파일 제거
-    function stRemoveFile(fileType) {
+    function stRemoveFile(fileType, event) {
+      if (event) {
+        event.stopPropagation(); // 이벤트 전파 방지
+      }
+      
       delete stSelectedFiles[fileType];
       const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
       const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
@@ -1442,10 +1446,18 @@
               for (const [fileType, fileData] of Object.entries(stSelectedFiles)) {
                 if (fileData && fileData.file) {
                   const file = fileData.file;
+                  const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+                  const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
+                  
+                  // 박스 안 텍스트 변경: 업로드 시작
+                  if (uploadTextEl) {
+                    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+                    uploadTextEl.textContent = `⏳ 업로드 중... (${fileSizeMB} MB)`;
+                  }
                   
                   if (file.size >= FILE_SIZE_LIMIT) {
-                    // 청크 업로드
-                    promises.push(stUploadInChunks(file, fileType, finalSettlementId, null));
+                    // 청크 업로드 (uploadTextEl 전달하여 진행 상황 표시)
+                    promises.push(stUploadInChunks(file, fileType, finalSettlementId, uploadTextEl));
                   } else {
                     // FormData 업로드
                     const formData = new FormData();
@@ -1461,7 +1473,26 @@
                         headers: headers,
                         credentials: 'include',
                         body: formData
-                      }).then(response => response.json())
+                      }).then(async response => {
+                        const result = await response.json();
+                        
+                        // 박스 안 텍스트 변경: 업로드 결과
+                        if (uploadTextEl) {
+                          if (result.success) {
+                            uploadTextEl.innerHTML = `✅ 업로드 완료: ${file.name} <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="margin-left: 10px; padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>`;
+                          } else {
+                            uploadTextEl.textContent = `❌ 업로드 실패: ${result.message || '알 수 없는 오류'}`;
+                          }
+                        }
+                        
+                        return result;
+                      }).catch(error => {
+                        // 박스 안 텍스트 변경: 업로드 실패
+                        if (uploadTextEl) {
+                          uploadTextEl.textContent = `❌ 업로드 실패: ${error.message || '알 수 없는 오류'}`;
+                        }
+                        return { success: false, message: error.message || '알 수 없는 오류' };
+                      })
                     );
                   }
                 }
@@ -1472,14 +1503,13 @@
                 const failed = results.filter(r => !r || !r.success);
                 if (failed.length > 0) {
                   console.error('[ST] 일부 파일 업로드 실패:', failed);
-                  alert('정산은 저장되었지만 일부 파일 업로드에 실패했습니다.');
+                  // 각 파일별 박스에 이미 오류 메시지가 표시되므로 alert는 생략
                 }
-                stAdminResetSettlementForm();
                 stAdminLoadSettlements();
+                // 폼은 초기화하지 않음 (업로드 완료된 파일 정보 유지)
               }).catch(error => {
                 console.error('[ST] 파일 업로드 오류:', error);
                 alert('정산은 저장되었지만 파일 업로드 중 오류가 발생했습니다.');
-                stAdminResetSettlementForm();
                 stAdminLoadSettlements();
               });
             } else {
