@@ -1014,7 +1014,8 @@
       const file = event.target.files[0];
       if (!file) return;
       
-      const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+      // fileType을 올바르게 변환: 'work_fee' -> 'WorkFee' (언더스코어 제거, 각 단어 첫 글자 대문자)
+      const fileTypeCapitalized = fileType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
       const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
       const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
       const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
@@ -1261,7 +1262,8 @@
     
     // 파일 즉시 업로드 (수정 모드) - 4MB 이상은 청크 업로드, 미만은 FormData
     async function stUploadFileImmediately(fileType, settlementId, file) {
-      const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+      // fileType을 올바르게 변환: 'work_fee' -> 'WorkFee' (언더스코어 제거, 각 단어 첫 글자 대문자)
+      const fileTypeCapitalized = fileType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
       const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
       const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
       
@@ -1283,7 +1285,8 @@
         if (file.size >= FILE_SIZE_LIMIT) {
           // 청크 업로드
           console.log('[ST] 청크 업로드 모드');
-          const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+          // fileType을 올바르게 변환: 'work_fee' -> 'WorkFee' (언더스코어 제거, 각 단어 첫 글자 대문자)
+          const fileTypeCapitalized = fileType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
           const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
           const data = await stUploadInChunks(file, fileType, settlementId, uploadTextEl, displayDiv);
           
@@ -1320,7 +1323,8 @@
           
           if (result.success) {
             // 박스 밑 표시 영역에 업로드 완료 표시
-            const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+            // fileType을 올바르게 변환: 'work_fee' -> 'WorkFee' (언더스코어 제거, 각 단어 첫 글자 대문자)
+            const fileTypeCapitalized = fileType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
             const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
             if (displayDiv) {
               const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
@@ -1409,7 +1413,8 @@
       }
       
       delete stSelectedFiles[fileType];
-      const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+      // fileType을 올바르게 변환: 'work_fee' -> 'WorkFee' (언더스코어 제거, 각 단어 첫 글자 대문자)
+      const fileTypeCapitalized = fileType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
       const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
       const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
       
@@ -1574,7 +1579,8 @@
               for (const [fileType, fileData] of Object.entries(stSelectedFiles)) {
                 if (fileData && fileData.file) {
                   const file = fileData.file;
-                  const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+                  // fileType을 올바르게 변환: 'work_fee' -> 'WorkFee' (언더스코어 제거, 각 단어 첫 글자 대문자)
+                  const fileTypeCapitalized = fileType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
                   const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
                   
                   // 박스 안 텍스트 변경: 업로드 시작
