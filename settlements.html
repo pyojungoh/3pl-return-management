@@ -1019,9 +1019,17 @@
       const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
       const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
       
-      // 파일 선택 즉시 박스 업데이트 (먼저 표시)
+      // 파일 선택 즉시 박스 밑에 파일명(용량) 표시 (테스트 파일처럼)
+      if (displayDiv) {
+        displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #d4edda; border: 1px solid #28a745; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+          <span style="color: #155724; font-weight: 600;">📄 ${file.name} (${fileSizeMB} MB)</span>
+          <button type="button" onclick="stRemoveFile('${fileType}', event)" style="padding: 4px 8px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 취소</button>
+        </div>`;
+      }
+      
+      // 박스 안 텍스트는 원래대로 유지
       if (uploadTextEl) {
-        uploadTextEl.innerHTML = `📄 ${file.name} (${fileSizeMB} MB) - 준비 중...`;
+        uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
       }
       
       // 정산 ID가 있으면 즉시 업로드 (수정 모드)
@@ -1033,9 +1041,12 @@
         const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
         
         if (companyName && yearMonth) {
-          // 박스 안 텍스트 변경: 임시 정산 생성 중
-          if (uploadTextEl) {
-            uploadTextEl.textContent = `⏳ 임시 정산 생성 중...`;
+          // 박스 밑 표시 영역에 업로드 준비 중 표시
+          if (displayDiv) {
+            displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+              <span style="color: #856404; font-weight: 600;">📄 ${file.name} (${fileSizeMB} MB) - ⏳ 임시 정산 생성 중...</span>
+              <button type="button" onclick="stRemoveFile('${fileType}', event)" style="padding: 4px 8px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 취소</button>
+            </div>`;
           }
           
           try {
@@ -1087,8 +1098,10 @@
             }
           } catch (error) {
             console.error('[ST] 임시 정산 생성 오류:', error);
-            if (uploadTextEl) {
-              uploadTextEl.textContent = `❌ 정산 생성 실패: ${error.message || '알 수 없는 오류'}`;
+            if (displayDiv) {
+              displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8d7da; border: 1px solid #dc3545; border-radius: 4px; color: #721c24;">
+                ❌ 정산 생성 실패: ${error.message || '알 수 없는 오류'}
+              </div>`;
             }
             return;
           }
@@ -1096,13 +1109,12 @@
           // 화주사명과 정산년월이 없으면 파일만 저장 (저장 후 업로드 예정)
           stSelectedFiles[fileType] = { file: file };
           
-          // 박스 안 텍스트 변경: 파일 선택됨 (선택 취소 버튼 포함)
-          if (uploadTextEl) {
-            uploadTextEl.innerHTML = `📄 ${file.name} (${fileSizeMB} MB) - 저장 후 업로드 예정 <button type="button" onclick="stRemoveFile('${fileType}', event)" style="margin-left: 10px; padding: 2px 6px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 취소</button>`;
-          }
-          
+          // 박스 밑 표시 영역에 저장 후 업로드 예정 표시
           if (displayDiv) {
-            displayDiv.innerHTML = '';
+            displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+              <span style="color: #856404; font-weight: 600;">📄 ${file.name} (${fileSizeMB} MB) - 저장 후 업로드 예정</span>
+              <button type="button" onclick="stRemoveFile('${fileType}', event)" style="padding: 4px 8px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 취소</button>
+            </div>`;
           }
           return;
         }
@@ -1111,14 +1123,16 @@
       // 파일 객체 저장하고 즉시 업로드
       stSelectedFiles[fileType] = { file: file };
       
-      // 박스 안 텍스트 변경: 업로드 중
-      if (uploadTextEl) {
-        uploadTextEl.textContent = `⏳ 업로드 중... (${fileSizeMB} MB)`;
+      // 박스 밑 표시 영역에 업로드 중 표시
+      if (displayDiv) {
+        displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #d1ecf1; border: 1px solid #0c5460; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+          <span style="color: #0c5460; font-weight: 600;">📄 ${file.name} (${fileSizeMB} MB) - ⏳ 업로드 중...</span>
+        </div>`;
       }
       
-      // 별도 표시 영역 비우기
-      if (displayDiv) {
-        displayDiv.innerHTML = '';
+      // 박스 안 텍스트는 원래대로 유지
+      if (uploadTextEl) {
+        uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
       }
       
       stUploadFileImmediately(fileType, settlementId, file);
@@ -1266,13 +1280,15 @@
           const data = await stUploadInChunks(file, fileType, settlementId, uploadTextEl, displayDiv);
           
           if (data.success) {
-            // 박스 안 텍스트 원래대로 복원
-            if (uploadTextEl) {
-              uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
-            }
             // stSelectedFiles에서 제거 (이미 업로드됨)
             delete stSelectedFiles[fileType];
           } else {
+            // 업로드 실패 시 박스 밑 표시 영역에 오류 표시
+            if (displayDiv) {
+              displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8d7da; border: 1px solid #dc3545; border-radius: 4px; color: #721c24;">
+                ❌ 업로드 실패: ${data.message || '알 수 없는 오류'}
+              </div>`;
+            }
             throw new Error(data.message || '업로드 실패');
           }
         } else {
@@ -1295,17 +1311,13 @@
           const result = await response.json();
           
           if (result.success) {
-            // 박스 안 텍스트 원래대로 복원
-            if (uploadTextEl) {
-              uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
-            }
-            // 박스 밑에 파일명(용량) X 버튼 표시
+            // 박스 밑 표시 영역에 업로드 완료 표시
             const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
             const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
             if (displayDiv) {
               const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-              displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
-                <span>📄 ${file.name} (${fileSizeMB} MB)</span>
+              displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #d4edda; border: 1px solid #28a745; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+                <span style="color: #155724; font-weight: 600;">✅ ${file.name} (${fileSizeMB} MB) - 업로드 완료</span>
                 <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>
               </div>`;
             }
@@ -1594,22 +1606,19 @@
                       }).then(async response => {
                         const result = await response.json();
                         
-                        // 박스 안 텍스트 변경: 업로드 결과
-                        if (uploadTextEl) {
+                        // 박스 밑 표시 영역에 업로드 결과 표시
+                        const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
+                        if (displayDiv) {
                           if (result.success) {
-                            // 박스 안 텍스트 원래대로 복원
-                            uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
-                            // 박스 밑에 파일명(용량) X 버튼 표시
-                            const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
-                            if (displayDiv) {
-                              const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-                              displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
-                                <span>📄 ${file.name} (${fileSizeMB} MB)</span>
-                                <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>
-                              </div>`;
-                            }
+                            const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+                            displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #d4edda; border: 1px solid #28a745; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+                              <span style="color: #155724; font-weight: 600;">✅ ${file.name} (${fileSizeMB} MB) - 업로드 완료</span>
+                              <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>
+                            </div>`;
                           } else {
-                            uploadTextEl.textContent = `❌ 업로드 실패: ${result.message || '알 수 없는 오류'}`;
+                            displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8d7da; border: 1px solid #dc3545; border-radius: 4px; color: #721c24;">
+                              ❌ 업로드 실패: ${result.message || '알 수 없는 오류'}
+                            </div>`;
                           }
                         }
                         
