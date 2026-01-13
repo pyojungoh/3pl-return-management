@@ -627,15 +627,19 @@ def get_data_sources():
                     cursor = conn.cursor()
                 
                 try:
-                    # 정산년월을 날짜 범위로 변환
+                    # 정산년월을 날짜 범위로 변환 (특수작업 메뉴와 동일한 방식: 해당 월의 마지막 날까지)
                     try:
                         year, month = map(int, settlement_year_month.split('-'))
                         start_date = f'{year}-{month:02d}-01'
-                        # 다음 달 1일
+                        # 해당 월의 마지막 날 계산 (특수작업 메뉴와 동일)
+                        from datetime import date
                         if month == 12:
-                            end_date = f'{year + 1}-01-01'
+                            # 12월인 경우 다음 해 1월의 0일 = 올해 12월 마지막 날
+                            last_day = date(year + 1, 1, 0).day
                         else:
-                            end_date = f'{year}-{month + 1:02d}-01'
+                            # 다음 달의 0일 = 이번 달 마지막 날
+                            last_day = date(year, month + 1, 0).day
+                        end_date = f'{year}-{month:02d}-{last_day:02d}'
                     except (ValueError, AttributeError) as e:
                         print(f'[경고] 정산년월 파싱 오류: {settlement_year_month}, {e}')
                         start_date = None
