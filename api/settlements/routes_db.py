@@ -646,11 +646,42 @@ def get_data_sources():
                         end_date = None
                     
                     if start_date and end_date:
+                        # 디버깅: 조회 전 실제 데이터 확인
+                        if USE_POSTGRESQL:
+                            cursor.execute('''
+                                SELECT company_name, work_date, total_price
+                                FROM special_works
+                                WHERE company_name = %s 
+                                AND work_date >= %s 
+                                AND work_date <= %s
+                                LIMIT 5
+                            ''', (filter_company_name, start_date, end_date))
+                        else:
+                            cursor.execute('''
+                                SELECT company_name, work_date, total_price
+                                FROM special_works
+                                WHERE company_name = ? 
+                                AND work_date >= ? 
+                                AND work_date <= ?
+                                LIMIT 5
+                            ''', (filter_company_name, start_date, end_date))
+                        debug_rows = cursor.fetchall()
+                        print(f'[디버깅] 특수작업 조회 조건: company_name={filter_company_name}, start_date={start_date}, end_date={end_date}')
+                        print(f'[디버깅] 조회된 데이터 개수: {len(debug_rows)}')
+                        for debug_row in debug_rows:
+                            debug_data = dict(debug_row) if isinstance(debug_row, dict) else {
+                                'company_name': debug_row[0],
+                                'work_date': debug_row[1],
+                                'total_price': debug_row[2]
+                            }
+                            print(f'[디버깅] 발견된 데이터: {debug_data}')
+                        
+                        # 모든 화주사명으로 조회 시도 (대소문자/공백 차이 허용)
                         if USE_POSTGRESQL:
                             cursor.execute('''
                                 SELECT COALESCE(SUM(total_price), 0) as total
                                 FROM special_works
-                                WHERE company_name = %s 
+                                WHERE TRIM(UPPER(company_name)) = TRIM(UPPER(%s))
                                 AND work_date >= %s 
                                 AND work_date <= %s
                             ''', (filter_company_name, start_date, end_date))
@@ -658,7 +689,7 @@ def get_data_sources():
                             cursor.execute('''
                                 SELECT COALESCE(SUM(total_price), 0) as total
                                 FROM special_works
-                                WHERE company_name = ? 
+                                WHERE TRIM(UPPER(company_name)) = TRIM(UPPER(?))
                                 AND work_date >= ? 
                                 AND work_date <= ?
                             ''', (filter_company_name, start_date, end_date))
