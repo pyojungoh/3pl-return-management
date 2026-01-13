@@ -1138,7 +1138,7 @@
     }
     
     // 청크로 나누어 업로드 (테스트 파일과 동일한 방식)
-    async function stUploadInChunks(file, fileType, settlementId, uploadTextEl = null) {
+    async function stUploadInChunks(file, fileType, settlementId, uploadTextEl = null, displayDiv = null) {
       const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB 청크
       const fileData = await stFileToBase64(file);
       const totalChunks = Math.ceil(fileData.length / CHUNK_SIZE);
