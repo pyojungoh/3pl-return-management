@@ -1020,10 +1020,13 @@
       const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
       const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
       
-      // 파일 선택 즉시 박스 밑에 파일명(용량) 표시 (테스트 파일처럼)
+      // 파일 선택 시 파일만 저장하고 표시만 함 (저장 버튼 클릭 시 업로드)
+      stSelectedFiles[fileType] = { file: file };
+      
+      // 박스 밑 표시 영역에 파일명(용량) 및 저장 후 업로드 예정 표시
       if (displayDiv) {
-        displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #d4edda; border: 1px solid #28a745; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
-          <span style="color: #155724; font-weight: 600;">📄 ${file.name} (${fileSizeMB} MB)</span>
+        displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+          <span style="color: #856404; font-weight: 600;">📄 ${file.name} (${fileSizeMB} MB) - 저장 후 업로드 예정</span>
           <button type="button" onclick="stRemoveFile('${fileType}', event)" style="padding: 4px 8px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 취소</button>
         </div>`;
       }
@@ -1032,111 +1035,6 @@
       if (uploadTextEl) {
         uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
       }
-      
-      // 정산 ID가 있으면 즉시 업로드 (수정 모드)
-      let settlementId = document.getElementById('stSettlementId')?.value;
-      
-      if (!settlementId) {
-        // 정산 ID가 없으면 화주사명과 정산년월 확인
-        const companyName = document.getElementById('stSettlementCompanyName')?.value;
-        const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
-        
-        if (companyName && yearMonth) {
-          // 박스 밑 표시 영역에 업로드 준비 중 표시
-          if (displayDiv) {
-            displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
-              <span style="color: #856404; font-weight: 600;">📄 ${file.name} (${fileSizeMB} MB) - ⏳ 임시 정산 생성 중...</span>
-              <button type="button" onclick="stRemoveFile('${fileType}', event)" style="padding: 4px 8px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 취소</button>
-            </div>`;
-          }
-          
-          try {
-            // 임시 정산 생성 (화주사명과 정산년월만으로)
-            const tempSettlementData = {
-              company_name: companyName,
-              settlement_year_month: yearMonth,
-              work_fee: 0,
-              inout_fee: 0,
-              shipping_fee: 0,
-              storage_fee: 0,
-              special_work_fee: 0,
-              error_deduction: 0,
-              total_amount: 0,
-              status: '대기',
-              memo: ''
-            };
-            
-            // 기존 정산이 있는지 확인 (중복 방지)
-            const checkResponse = await fetch(`/api/settlements/list?settlement_year_month=${yearMonth}&company_name=${encodeURIComponent(companyName)}`, {
-              credentials: 'include',
-              headers: stGetUserHeaders()
-            });
-            
-            const checkData = await checkResponse.json();
-            if (checkData.success && checkData.data && checkData.data.length > 0) {
-              // 기존 정산이 있으면 그 ID 사용
-              settlementId = checkData.data[0].id.toString();
-              document.getElementById('stSettlementId').value = settlementId;
-            } else {
-              // 임시 정산 생성
-              const createResponse = await fetch('/api/settlements/', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...stGetUserHeaders()
-                },
-                credentials: 'include',
-                body: JSON.stringify(tempSettlementData)
-              });
-              
-              const createResult = await createResponse.json();
-              if (createResult.success) {
-                settlementId = createResult.id.toString();
-                document.getElementById('stSettlementId').value = settlementId;
-              } else {
-                throw new Error(createResult.message || '임시 정산 생성 실패');
-              }
-            }
-          } catch (error) {
-            console.error('[ST] 임시 정산 생성 오류:', error);
-            if (displayDiv) {
-              displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8d7da; border: 1px solid #dc3545; border-radius: 4px; color: #721c24;">
-                ❌ 정산 생성 실패: ${error.message || '알 수 없는 오류'}
-              </div>`;
-            }
-            return;
-          }
-        } else {
-          // 화주사명과 정산년월이 없으면 파일만 저장 (저장 후 업로드 예정)
-          stSelectedFiles[fileType] = { file: file };
-          
-          // 박스 밑 표시 영역에 저장 후 업로드 예정 표시
-          if (displayDiv) {
-            displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
-              <span style="color: #856404; font-weight: 600;">📄 ${file.name} (${fileSizeMB} MB) - 저장 후 업로드 예정</span>
-              <button type="button" onclick="stRemoveFile('${fileType}', event)" style="padding: 4px 8px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 취소</button>
-            </div>`;
-          }
-          return;
-        }
-      }
-      
-      // 파일 객체 저장하고 즉시 업로드
-      stSelectedFiles[fileType] = { file: file };
-      
-      // 박스 밑 표시 영역에 업로드 중 표시
-      if (displayDiv) {
-        displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #d1ecf1; border: 1px solid #0c5460; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
-          <span style="color: #0c5460; font-weight: 600;">📄 ${file.name} (${fileSizeMB} MB) - ⏳ 업로드 중...</span>
-        </div>`;
-      }
-      
-      // 박스 안 텍스트는 원래대로 유지
-      if (uploadTextEl) {
-        uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
-      }
-      
-      stUploadFileImmediately(fileType, settlementId, file);
     }
     
     // 파일을 Base64로 변환 (테스트 파일과 동일)
