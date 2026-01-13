@@ -648,7 +648,7 @@ def get_data_sources():
                                 FROM special_works
                                 WHERE company_name = %s 
                                 AND work_date >= %s 
-                                AND work_date < %s
+                                AND work_date <= %s
                             ''', (filter_company_name, start_date, end_date))
                         else:
                             cursor.execute('''
@@ -656,7 +656,7 @@ def get_data_sources():
                                 FROM special_works
                                 WHERE company_name = ? 
                                 AND work_date >= ? 
-                                AND work_date < ?
+                                AND work_date <= ?
                             ''', (filter_company_name, start_date, end_date))
                         
                         row = cursor.fetchone()
