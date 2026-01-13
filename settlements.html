@@ -1225,6 +1225,15 @@
         throw new Error(completeData.message || '업로드 완료 처리 실패');
       }
       
+      // 박스 밑에 파일명(용량) X 버튼 표시 (displayDiv가 전달된 경우)
+      if (displayDiv) {
+        const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+        displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+          <span>📄 ${file.name} (${fileSizeMB} MB)</span>
+          <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>
+        </div>`;
+      }
+      
       return completeData;
     }
     
@@ -1252,22 +1261,14 @@
         if (file.size >= FILE_SIZE_LIMIT) {
           // 청크 업로드
           console.log('[ST] 청크 업로드 모드');
-          const data = await stUploadInChunks(file, fileType, settlementId, uploadTextEl);
+          const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+          const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
+          const data = await stUploadInChunks(file, fileType, settlementId, uploadTextEl, displayDiv);
           
           if (data.success) {
             // 박스 안 텍스트 원래대로 복원
             if (uploadTextEl) {
               uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
-            }
-            // 박스 밑에 파일명(용량) X 버튼 표시
-            const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
-            const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
-            if (displayDiv) {
-              const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-              displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
-                <span>📄 ${file.name} (${fileSizeMB} MB)</span>
-                <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>
-              </div>`;
             }
             // stSelectedFiles에서 제거 (이미 업로드됨)
             delete stSelectedFiles[fileType];
@@ -1563,8 +1564,18 @@
                   }
                   
                   if (file.size >= FILE_SIZE_LIMIT) {
-                    // 청크 업로드 (uploadTextEl 전달하여 진행 상황 표시)
-                    promises.push(stUploadInChunks(file, fileType, finalSettlementId, uploadTextEl));
+                    // 청크 업로드 (uploadTextEl, displayDiv 전달하여 진행 상황 및 완료 표시)
+                    const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
+                    promises.push(
+                      stUploadInChunks(file, fileType, finalSettlementId, uploadTextEl, displayDiv)
+                        .then(data => {
+                          // 박스 안 텍스트 원래대로 복원
+                          if (uploadTextEl) {
+                            uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+                          }
+                          return data;
+                        })
+                    );
                   } else {
                     // FormData 업로드
                     const formData = new FormData();
