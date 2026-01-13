@@ -299,41 +299,41 @@ def create_settlement():
                     ))
             else:
                 # 정산 생성
-            if USE_POSTGRESQL:
-                cursor.execute('''
-                    INSERT INTO settlements (
-                        company_name, settlement_year_month, work_fee, inout_fee, 
-                        shipping_fee, storage_fee, special_work_fee, error_deduction,
-                        total_amount, status, memo, created_at, updated_at
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    RETURNING id
-                ''', (
-                    settlement_company_name, settlement_year_month,
-                    data.get('work_fee', 0), data.get('inout_fee', 0),
-                    data.get('shipping_fee', 0), data.get('storage_fee', 0),
-                    data.get('special_work_fee', 0), data.get('error_deduction', 0),
-                    data.get('total_amount', 0), data.get('status', '대기'),
-                    data.get('memo', '')
-                ))
-                settlement_id = cursor.fetchone()[0]
-            else:
-                cursor.execute('''
-                    INSERT INTO settlements (
-                        company_name, settlement_year_month, work_fee, inout_fee, 
-                        shipping_fee, storage_fee, special_work_fee, error_deduction,
-                        total_amount, status, memo, created_at, updated_at
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ''', (
-                    settlement_company_name, settlement_year_month,
-                    data.get('work_fee', 0), data.get('inout_fee', 0),
-                    data.get('shipping_fee', 0), data.get('storage_fee', 0),
-                    data.get('special_work_fee', 0), data.get('error_deduction', 0),
-                    data.get('total_amount', 0), data.get('status', '대기'),
-                    data.get('memo', '')
-                ))
-                settlement_id = cursor.lastrowid
+                if USE_POSTGRESQL:
+                    cursor.execute('''
+                        INSERT INTO settlements (
+                            company_name, settlement_year_month, work_fee, inout_fee, 
+                            shipping_fee, storage_fee, special_work_fee, error_deduction,
+                            total_amount, status, memo, created_at, updated_at
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        RETURNING id
+                    ''', (
+                        settlement_company_name, settlement_year_month,
+                        data.get('work_fee', 0), data.get('inout_fee', 0),
+                        data.get('shipping_fee', 0), data.get('storage_fee', 0),
+                        data.get('special_work_fee', 0), data.get('error_deduction', 0),
+                        data.get('total_amount', 0), data.get('status', '대기'),
+                        data.get('memo', '')
+                    ))
+                    settlement_id = cursor.fetchone()[0]
+                else:
+                    cursor.execute('''
+                        INSERT INTO settlements (
+                            company_name, settlement_year_month, work_fee, inout_fee, 
+                            shipping_fee, storage_fee, special_work_fee, error_deduction,
+                            total_amount, status, memo, created_at, updated_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ''', (
+                        settlement_company_name, settlement_year_month,
+                        data.get('work_fee', 0), data.get('inout_fee', 0),
+                        data.get('shipping_fee', 0), data.get('storage_fee', 0),
+                        data.get('special_work_fee', 0), data.get('error_deduction', 0),
+                        data.get('total_amount', 0), data.get('status', '대기'),
+                        data.get('memo', '')
+                    ))
+                    settlement_id = cursor.lastrowid
             
             conn.commit()
             return jsonify({
