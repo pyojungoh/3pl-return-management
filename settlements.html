@@ -598,7 +598,7 @@
     var stCurrentCompany = '';
     var stCurrentUsername = '';
     var stInitialized = false;
-    var stSelectedFiles = {}; // {file_type: {file: File, base64: string}}
+    var stSelectedFiles = {}; // {file_type: {file: File}} (FormData 방식 사용)
     var stCurrentSettlementId = null;
 
     // 공통 초기화 함수
@@ -935,46 +935,29 @@
       
       const displayDiv = document.getElementById(`st${fileType.charAt(0).toUpperCase() + fileType.slice(1)}FileDisplay`);
       
-      // 업로드 중 상태 표시
-      if (displayDiv) {
-        displayDiv.innerHTML = `
-          <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border-radius: 6px;">
-            <span>📄 ${file.name}</span>
-            <span style="margin-left: 10px; color: #856404;">⏳ 파일 준비 중...</span>
-          </div>
-        `;
-      }
-      
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const base64 = e.target.result;
-        stSelectedFiles[fileType] = {
-          file: file,
-          base64: base64
-        };
-        
-        // 정산 ID가 있으면 즉시 업로드 (수정 모드)
-        const settlementId = document.getElementById('stSettlementId')?.value;
-        if (settlementId) {
-          stUploadFileImmediately(fileType, settlementId, file, base64);
-        } else {
-          // 정산 ID가 없으면 저장 후 업로드 예정 상태 표시
-          if (displayDiv) {
-            displayDiv.innerHTML = `
-              <div style="margin-top: 8px; padding: 8px; background: #d1ecf1; border-radius: 6px;">
-                <span>📄 ${file.name}</span>
-                <span style="margin-left: 10px; color: #0c5460;">✅ 저장 후 업로드 예정</span>
-                <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
-              </div>
-            `;
-          }
+      // 정산 ID가 있으면 즉시 업로드 (수정 모드)
+      const settlementId = document.getElementById('stSettlementId')?.value;
+      if (settlementId) {
+        // 파일 객체만 저장하고 즉시 업로드
+        stSelectedFiles[fileType] = { file: file };
+        stUploadFileImmediately(fileType, settlementId, file);
+      } else {
+        // 정산 ID가 없으면 파일 객체만 저장 (저장 후 업로드 예정)
+        stSelectedFiles[fileType] = { file: file };
+        if (displayDiv) {
+          displayDiv.innerHTML = `
+            <div style="margin-top: 8px; padding: 8px; background: #d1ecf1; border-radius: 6px;">
+              <span>📄 ${file.name}</span>
+              <span style="margin-left: 10px; color: #0c5460;">✅ 저장 후 업로드 예정</span>
+              <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
+            </div>
+          `;
         }
-      };
-      reader.readAsDataURL(file);
+      }
     }
     
-    // 파일 즉시 업로드 (수정 모드)
-    function stUploadFileImmediately(fileType, settlementId, file, base64) {
+    // 파일 즉시 업로드 (수정 모드) - FormData 방식 사용
+    function stUploadFileImmediately(fileType, settlementId, file) {
       const displayDiv = document.getElementById(`st${fileType.charAt(0).toUpperCase() + fileType.slice(1)}FileDisplay`);
       
       // 업로드 중 상태 표시
@@ -1003,23 +986,39 @@
         return;
       }
       
-      const uploadData = {
-        settlement_id: parseInt(settlementId),
-        file_type: fileType,
-        file_name: file.name,
-        file_data: base64
-      };
+      // FormData 방식 사용 (테스트 파일과 동일)
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('settlement_id', settlementId);
+      formData.append('file_type', fileType);
+      
+      // Content-Type 헤더는 자동 설정되므로 제거 (브라우저가 boundary 설정)
+      const headers = stGetUserHeaders();
       
       fetch('/api/settlements/upload-file', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...stGetUserHeaders()
-        },
+        headers: headers,  // Content-Type 제거 (FormData가 자동 설정)
         credentials: 'include',
-        body: JSON.stringify(uploadData)
+        body: formData
       })
-        .then(response => response.json())
+        .then(response => {
+          if (!response.ok) {
+            // 413 에러 등 처리
+            if (response.status === 413) {
+              return response.text().then(text => {
+                throw new Error('파일 크기가 너무 큽니다. (최대 약 4MB)');
+              });
+            }
+            return response.text().then(text => {
+              try {
+                return JSON.parse(text);
+              } catch (e) {
+                throw new Error(text || '서버 오류가 발생했습니다.');
+              }
+            });
+          }
+          return response.json();
+        })
         .then(result => {
           if (result.success) {
             // 업로드 성공 상태 표시
@@ -1212,28 +1211,25 @@
           if (result.success) {
             alert(result.message || '정산이 저장되었습니다.');
             
-            // 파일 업로드 처리
+            // 파일 업로드 처리 (FormData 방식)
             const finalSettlementId = result.id || settlementId;
             if (finalSettlementId && Object.keys(stSelectedFiles).length > 0) {
               const promises = [];
               for (const [fileType, fileData] of Object.entries(stSelectedFiles)) {
-                if (fileData && fileData.base64) {
-                  const uploadData = {
-                    settlement_id: finalSettlementId,
-                    file_type: fileType,
-                    file_name: fileData.file.name,
-                    file_data: fileData.base64
-                  };
+                if (fileData && fileData.file) {
+                  const formData = new FormData();
+                  formData.append('file', fileData.file);
+                  formData.append('settlement_id', finalSettlementId);
+                  formData.append('file_type', fileType);
+                  
+                  const headers = stGetUserHeaders();
                   
                   promises.push(
                     fetch('/api/settlements/upload-file', {
                       method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        ...stGetUserHeaders()
-                      },
+                      headers: headers,  // Content-Type 제거 (FormData가 자동 설정)
                       credentials: 'include',
-                      body: JSON.stringify(uploadData)
+                      body: formData
                     })
                   );
                 }

@@ -687,7 +687,20 @@ def get_data_sources():
 
 @settlements_bp.route('/upload-file', methods=['POST'])
 def upload_settlement_file():
-    """정산 파일 업로드 (이지어드민, 택배사 파일 등) - Google Drive"""
+    """정산 파일 업로드 (이지어드민, 택배사 파일 등) - Google Drive
+    
+    지원하는 요청 형식:
+    1. FormData (권장): multipart/form-data
+       - settlement_id: int
+       - file_type: str ('work_fee', 'inout_fee', 'shipping_fee')
+       - file: File (파일 객체)
+    
+    2. JSON (호환성): application/json
+       - settlement_id: int
+       - file_type: str
+       - file_name: str
+       - file_data: str (base64 인코딩된 파일 데이터)
+    """
     try:
         user_context = get_user_context()
         role = user_context['role']
@@ -699,17 +712,52 @@ def upload_settlement_file():
                 'message': '관리자만 파일을 업로드할 수 있습니다.'
             }), 403
         
-        data = request.get_json()
-        settlement_id = data.get('settlement_id')
-        file_type = data.get('file_type', '').strip()  # 'work_fee', 'inout_fee', 'shipping_fee', 'other'
-        file_name = data.get('file_name', '').strip()
-        base64_data = data.get('file_data', '')
-        
-        if not settlement_id or not file_type or not file_name or not base64_data:
-            return jsonify({
-                'success': False,
-                'message': '필수 데이터가 누락되었습니다.'
-            }), 400
+        # FormData 방식인지 JSON 방식인지 확인
+        if 'file' in request.files:
+            # FormData 방식 (권장)
+            file = request.files['file']
+            settlement_id = request.form.get('settlement_id')
+            file_type = request.form.get('file_type', '').strip()
+            
+            if not settlement_id or not file_type or not file.filename:
+                return jsonify({
+                    'success': False,
+                    'message': '필수 데이터가 누락되었습니다. (settlement_id, file_type, file 필요)'
+                }), 400
+            
+            settlement_id = int(settlement_id)
+            file_name = file.filename
+            file_data = file.read()
+            
+        else:
+            # JSON 방식 (호환성)
+            data = request.get_json()
+            settlement_id = data.get('settlement_id')
+            file_type = data.get('file_type', '').strip()
+            file_name = data.get('file_name', '').strip()
+            base64_data = data.get('file_data', '')
+            
+            if not settlement_id or not file_type or not file_name or not base64_data:
+                return jsonify({
+                    'success': False,
+                    'message': '필수 데이터가 누락되었습니다.'
+                }), 400
+            
+            # Base64 디코딩
+            try:
+                from api.uploads.oauth_drive import upload_settlement_excel_to_drive
+                import base64 as base64_lib
+                
+                # Base64 데이터에서 실제 데이터 추출
+                if ',' in base64_data:
+                    base64_data = base64_data.split(',')[1]
+                
+                file_data = base64_lib.b64decode(base64_data)
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'message': f'파일 데이터 디코딩 실패: {str(e)}'
+                }), 400
         
         # 정산 정보 조회 (company_name, settlement_year_month 가져오기)
         conn = get_db_connection()
@@ -747,24 +795,10 @@ def upload_settlement_file():
         # Google Drive 업로드
         try:
             from api.uploads.oauth_drive import upload_settlement_excel_to_drive
-            import base64 as base64_lib
-            
-            # Base64 데이터에서 실제 데이터 추출
-            if ',' in base64_data:
-                base64_data = base64_data.split(',')[1]
-            
-            # Base64 디코딩
-            try:
-                file_bytes = base64_lib.b64decode(base64_data)
-            except Exception as e:
-                return jsonify({
-                    'success': False,
-                    'message': f'파일 데이터 디코딩 실패: {str(e)}'
-                }), 400
             
             # Google Drive에 업로드
             result = upload_settlement_excel_to_drive(
-                file_data=file_bytes,
+                file_data=file_data,
                 filename=file_name,
                 company_name=company_name,
                 settlement_year_month=settlement_year_month
@@ -790,7 +824,7 @@ def upload_settlement_file():
             
             try:
                 # 파일 크기 계산
-                file_size = len(file_bytes)
+                file_size = len(file_data)
                 
                 if USE_POSTGRESQL:
                     cursor.execute('''
