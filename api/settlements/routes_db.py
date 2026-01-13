@@ -9,6 +9,8 @@ from api.database.models import (
 from datetime import datetime, date
 from urllib.parse import unquote
 import os
+import uuid
+import base64 as base64_lib
 
 if USE_POSTGRESQL:
     from psycopg2.extras import RealDictCursor
@@ -896,5 +898,333 @@ def upload_settlement_file():
         return jsonify({
             'success': False,
             'message': f'파일 업로드 중 오류: {str(e)}'
+        }), 500
+
+
+# ========== 청크 업로드 (큰 파일용) ==========
+
+@settlements_bp.route('/upload-file-start', methods=['POST'])
+def upload_settlement_file_start():
+    """정산 파일 청크 업로드 시작 API (테스트 파일과 동일한 방식)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        
+        # 관리자만 파일 업로드 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 파일을 업로드할 수 있습니다.'
+            }), 403
+        
+        data = request.get_json()
+        settlement_id = data.get('settlement_id')
+        file_type = data.get('file_type', '').strip()
+        filename = data.get('filename')
+        file_size = data.get('file_size')
+        total_chunks = data.get('total_chunks')
+        
+        if not settlement_id or not file_type or not filename or not file_size or not total_chunks:
+            return jsonify({
+                'success': False,
+                'message': '필수 파라미터가 없습니다.'
+            }), 400
+        
+        # 정산 정보 조회 (company_name, settlement_year_month 가져오기)
+        conn = get_db_connection()
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
+        
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute('SELECT company_name, settlement_year_month FROM settlements WHERE id = %s', (settlement_id,))
+            else:
+                cursor.execute('SELECT company_name, settlement_year_month FROM settlements WHERE id = ?', (settlement_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({
+                    'success': False,
+                    'message': '정산을 찾을 수 없습니다.'
+                }), 404
+            
+            settlement = dict(row)
+            company_name = settlement.get('company_name', '')
+            settlement_year_month = settlement.get('settlement_year_month', '')
+            
+            if not company_name or not settlement_year_month:
+                return jsonify({
+                    'success': False,
+                    'message': '정산 정보가 불완전합니다. (화주사명 또는 정산년월 없음)'
+                }), 400
+        finally:
+            cursor.close()
+            conn.close()
+        
+        # 업로드 세션 생성 (테스트 파일과 동일한 방식)
+        upload_id = str(uuid.uuid4())
+        
+        # 세션 저장 (임시로 전역 변수 사용, 실제로는 DB나 Redis 사용)
+        if not hasattr(upload_settlement_file_start, 'upload_sessions'):
+            upload_settlement_file_start.upload_sessions = {}
+        
+        upload_settlement_file_start.upload_sessions[upload_id] = {
+            'settlement_id': settlement_id,
+            'file_type': file_type,
+            'filename': filename,
+            'file_size': file_size,
+            'total_chunks': total_chunks,
+            'company_name': company_name,
+            'settlement_year_month': settlement_year_month,
+            'chunks': {},
+            'created_at': datetime.now()
+        }
+        
+        print(f"[정보] 정산 파일 업로드 세션 시작: {upload_id}, 파일: {filename}, 크기: {file_size} bytes, 청크: {total_chunks}")
+        
+        return jsonify({
+            'success': True,
+            'upload_id': upload_id,
+            'message': '업로드 세션이 생성되었습니다.'
+        })
+        
+    except Exception as e:
+        print(f'[오류] 업로드 시작 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'업로드 시작 중 오류: {str(e)}'
+        }), 500
+
+
+@settlements_bp.route('/upload-file-chunk', methods=['POST'])
+def upload_settlement_file_chunk():
+    """정산 파일 청크 업로드 API (테스트 파일과 동일한 방식)"""
+    try:
+        data = request.get_json()
+        upload_id = data.get('upload_id')
+        chunk_index = data.get('chunk_index')
+        chunk_data = data.get('chunk_data')
+        is_last_chunk = data.get('is_last_chunk', False)
+        
+        if not upload_id or chunk_index is None or not chunk_data:
+            return jsonify({
+                'success': False,
+                'message': '필수 파라미터가 없습니다.'
+            }), 400
+        
+        # 세션 확인
+        if not hasattr(upload_settlement_file_start, 'upload_sessions'):
+            return jsonify({
+                'success': False,
+                'message': '업로드 세션을 찾을 수 없습니다.'
+            }), 404
+        
+        session = upload_settlement_file_start.upload_sessions.get(upload_id)
+        if not session:
+            return jsonify({
+                'success': False,
+                'message': '업로드 세션이 만료되었거나 존재하지 않습니다.'
+            }), 404
+        
+        # 청크 저장
+        session['chunks'][chunk_index] = chunk_data
+        
+        print(f"[정보] 정산 파일 청크 수신: {upload_id}, 청크 {chunk_index + 1}/{session['total_chunks']}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'청크 {chunk_index + 1} 수신 완료'
+        })
+        
+    except Exception as e:
+        print(f'[오류] 청크 업로드 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'청크 업로드 중 오류: {str(e)}'
+        }), 500
+
+
+@settlements_bp.route('/upload-file-complete', methods=['POST'])
+def upload_settlement_file_complete():
+    """정산 파일 청크 업로드 완료 API (테스트 파일과 동일한 방식)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        
+        # 관리자만 파일 업로드 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 파일을 업로드할 수 있습니다.'
+            }), 403
+        
+        data = request.get_json()
+        upload_id = data.get('upload_id')
+        
+        if not upload_id:
+            return jsonify({
+                'success': False,
+                'message': '업로드 ID가 없습니다.'
+            }), 400
+        
+        # 세션 확인
+        if not hasattr(upload_settlement_file_start, 'upload_sessions'):
+            return jsonify({
+                'success': False,
+                'message': '업로드 세션을 찾을 수 없습니다.'
+            }), 404
+        
+        session = upload_settlement_file_start.upload_sessions.get(upload_id)
+        if not session:
+            return jsonify({
+                'success': False,
+                'message': '업로드 세션이 만료되었거나 존재하지 않습니다.'
+            }), 404
+        
+        # 모든 청크 확인
+        total_chunks = session['total_chunks']
+        chunks = session['chunks']
+        
+        if len(chunks) != total_chunks:
+            return jsonify({
+                'success': False,
+                'message': f'모든 청크를 받지 못했습니다. ({len(chunks)}/{total_chunks})'
+            }), 400
+        
+        # 청크 조립
+        print(f"[정보] 정산 파일 청크 조립 시작: {upload_id}, 총 {total_chunks}개 청크")
+        chunks_list = [chunks[i] for i in range(total_chunks)]
+        base64_data = ''.join(chunks_list)
+        
+        # Base64 디코딩
+        file_data = base64_lib.b64decode(base64_data)
+        
+        print(f"[정보] 정산 파일 조립 완료: {len(file_data)} bytes")
+        
+        # Google Drive에 업로드
+        try:
+            from api.uploads.oauth_drive import upload_settlement_excel_to_drive
+            
+            settlement_id = session['settlement_id']
+            file_type = session['file_type']
+            filename = session['filename']
+            company_name = session['company_name']
+            settlement_year_month = session['settlement_year_month']
+            
+            result = upload_settlement_excel_to_drive(
+                file_data=file_data,
+                filename=filename,
+                company_name=company_name,
+                settlement_year_month=settlement_year_month
+            )
+            
+            # 세션 삭제
+            del upload_settlement_file_start.upload_sessions[upload_id]
+            
+            if not result.get('success'):
+                return jsonify({
+                    'success': False,
+                    'message': result.get('message', '파일 업로드 실패')
+                }), 500
+            
+            file_url = result.get('web_view_link', result.get('file_url', ''))
+            
+            if not file_url:
+                return jsonify({
+                    'success': False,
+                    'message': '파일 업로드는 성공했지만 파일 URL을 가져올 수 없습니다.'
+                }), 500
+            
+            # 파일 정보 DB 저장
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            try:
+                file_size = len(file_data)
+                
+                if USE_POSTGRESQL:
+                    cursor.execute('''
+                        INSERT INTO settlement_files (
+                            settlement_id, file_type, file_name, file_url, file_size, uploaded_at
+                        )
+                        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        RETURNING id
+                    ''', (settlement_id, file_type, filename, file_url, file_size))
+                    file_id = cursor.fetchone()[0]
+                else:
+                    cursor.execute('''
+                        INSERT INTO settlement_files (
+                            settlement_id, file_type, file_name, file_url, file_size, uploaded_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ''', (settlement_id, file_type, filename, file_url, file_size))
+                    file_id = cursor.lastrowid
+                
+                # 정산 테이블에 파일 URL 업데이트 (file_type에 따라)
+                if file_type == 'work_fee':
+                    if USE_POSTGRESQL:
+                        cursor.execute('UPDATE settlements SET work_fee_file_url = %s WHERE id = %s', (file_url, settlement_id))
+                    else:
+                        cursor.execute('UPDATE settlements SET work_fee_file_url = ? WHERE id = ?', (file_url, settlement_id))
+                elif file_type == 'inout_fee':
+                    if USE_POSTGRESQL:
+                        cursor.execute('UPDATE settlements SET inout_fee_file_url = %s WHERE id = %s', (file_url, settlement_id))
+                    else:
+                        cursor.execute('UPDATE settlements SET inout_fee_file_url = ? WHERE id = ?', (file_url, settlement_id))
+                elif file_type == 'shipping_fee':
+                    if USE_POSTGRESQL:
+                        cursor.execute('UPDATE settlements SET shipping_fee_file_url = %s WHERE id = %s', (file_url, settlement_id))
+                    else:
+                        cursor.execute('UPDATE settlements SET shipping_fee_file_url = ? WHERE id = ?', (file_url, settlement_id))
+                
+                conn.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'file_id': file_id,
+                    'file_url': file_url,
+                    'message': '파일 업로드 성공'
+                })
+            except Exception as e:
+                conn.rollback() if USE_POSTGRESQL else None
+                print(f'[오류] 파일 정보 저장 오류: {e}')
+                import traceback
+                traceback.print_exc()
+                return jsonify({
+                    'success': False,
+                    'message': f'파일 정보 저장 중 오류: {str(e)}'
+                }), 500
+            finally:
+                cursor.close()
+                conn.close()
+                
+        except ImportError as import_error:
+            print(f"[오류] 구글 드라이브 모듈 import 실패: {import_error}")
+            return jsonify({
+                'success': False,
+                'message': f'구글 드라이브 모듈을 찾을 수 없습니다: {str(import_error)}'
+            }), 500
+        except Exception as upload_error:
+            print(f"[오류] 구글 드라이브 업로드 오류: {upload_error}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'파일 업로드 중 오류가 발생했습니다: {str(upload_error)}'
+            }), 500
+        
+    except Exception as e:
+        print(f'[오류] 업로드 완료 처리 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'업로드 완료 처리 중 오류: {str(e)}'
         }), 500
 

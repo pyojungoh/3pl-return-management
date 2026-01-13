@@ -956,8 +956,106 @@
       }
     }
     
-    // 파일 즉시 업로드 (수정 모드) - FormData 방식 사용
-    function stUploadFileImmediately(fileType, settlementId, file) {
+    // 파일을 Base64로 변환 (테스트 파일과 동일)
+    function stFileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = reader.result.split(',')[1]; // data:xxx;base64, 부분 제거
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+    
+    // 청크로 나누어 업로드 (테스트 파일과 동일한 방식)
+    async function stUploadInChunks(file, fileType, settlementId) {
+      const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB 청크
+      const fileData = await stFileToBase64(file);
+      const totalChunks = Math.ceil(fileData.length / CHUNK_SIZE);
+      
+      console.log(`[ST] 파일 크기: ${(fileData.length / 1024 / 1024).toFixed(2)} MB`);
+      console.log(`[ST] 청크 개수: ${totalChunks}`);
+      
+      // 업로드 시작
+      const startResponse = await fetch('/api/settlements/upload-file-start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...stGetUserHeaders()
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          settlement_id: parseInt(settlementId),
+          file_type: fileType,
+          filename: file.name,
+          file_size: fileData.length,
+          total_chunks: totalChunks
+        })
+      });
+      
+      const startData = await startResponse.json();
+      if (!startData.success) {
+        throw new Error(startData.message || '업로드 시작 실패');
+      }
+      
+      const uploadId = startData.upload_id;
+      console.log(`[ST] 업로드 ID: ${uploadId}`);
+      
+      // 청크 업로드
+      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        const start = chunkIndex * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, fileData.length);
+        const chunk = fileData.substring(start, end);
+        const isLastChunk = chunkIndex === totalChunks - 1;
+        
+        console.log(`[ST] 청크 ${chunkIndex + 1}/${totalChunks} 업로드 중...`);
+        
+        const chunkResponse = await fetch('/api/settlements/upload-file-chunk', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...stGetUserHeaders()
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            upload_id: uploadId,
+            chunk_index: chunkIndex,
+            chunk_data: chunk,
+            is_last_chunk: isLastChunk
+          })
+        });
+        
+        const chunkData = await chunkResponse.json();
+        if (!chunkData.success) {
+          throw new Error(chunkData.message || `청크 ${chunkIndex + 1} 업로드 실패`);
+        }
+      }
+      
+      // 업로드 완료
+      const completeResponse = await fetch('/api/settlements/upload-file-complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...stGetUserHeaders()
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          upload_id: uploadId
+        })
+      });
+      
+      const completeData = await completeResponse.json();
+      if (!completeData.success) {
+        throw new Error(completeData.message || '업로드 완료 처리 실패');
+      }
+      
+      return completeData;
+    }
+    
+    // 파일 즉시 업로드 (수정 모드) - 4MB 이상은 청크 업로드, 미만은 FormData
+    async function stUploadFileImmediately(fileType, settlementId, file) {
       const displayDiv = document.getElementById(`st${fileType.charAt(0).toUpperCase() + fileType.slice(1)}FileDisplay`);
       
       // 업로드 중 상태 표시
@@ -986,40 +1084,50 @@
         return;
       }
       
-      // FormData 방식 사용 (테스트 파일과 동일)
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('settlement_id', settlementId);
-      formData.append('file_type', fileType);
-      
-      // Content-Type 헤더는 자동 설정되므로 제거 (브라우저가 boundary 설정)
-      const headers = stGetUserHeaders();
-      
-      fetch('/api/settlements/upload-file', {
-        method: 'POST',
-        headers: headers,  // Content-Type 제거 (FormData가 자동 설정)
-        credentials: 'include',
-        body: formData
-      })
-        .then(response => {
-          if (!response.ok) {
-            // 413 에러 등 처리
-            if (response.status === 413) {
-              return response.text().then(text => {
-                throw new Error('파일 크기가 너무 큽니다. (최대 약 4MB)');
-              });
+      try {
+        // 4MB 이상이면 청크 업로드, 미만이면 일반 업로드 (테스트 파일과 동일)
+        const FILE_SIZE_LIMIT = 4 * 1024 * 1024; // 4MB
+        
+        if (file.size >= FILE_SIZE_LIMIT) {
+          // 청크 업로드
+          console.log('[ST] 청크 업로드 모드');
+          const data = await stUploadInChunks(file, fileType, settlementId);
+          
+          if (data.success) {
+            // 업로드 성공 상태 표시
+            if (displayDiv) {
+              displayDiv.innerHTML = `
+                <div style="margin-top: 8px; padding: 8px; background: #d4edda; border-radius: 6px;">
+                  <span>📄 ${file.name}</span>
+                  <span style="margin-left: 10px; color: #155724;">✅ 업로드 완료</span>
+                  <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
+                </div>
+              `;
             }
-            return response.text().then(text => {
-              try {
-                return JSON.parse(text);
-              } catch (e) {
-                throw new Error(text || '서버 오류가 발생했습니다.');
-              }
-            });
+            // stSelectedFiles에서 제거 (이미 업로드됨)
+            delete stSelectedFiles[fileType];
+          } else {
+            throw new Error(data.message || '업로드 실패');
           }
-          return response.json();
-        })
-        .then(result => {
+        } else {
+          // 일반 업로드 (FormData)
+          console.log('[ST] 일반 업로드 모드');
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('settlement_id', settlementId);
+          formData.append('file_type', fileType);
+          
+          const headers = stGetUserHeaders();
+          
+          const response = await fetch('/api/settlements/upload-file', {
+            method: 'POST',
+            headers: headers,
+            credentials: 'include',
+            body: formData
+          });
+          
+          const result = await response.json();
+          
           if (result.success) {
             // 업로드 성공 상태 표시
             if (displayDiv) {
@@ -1034,30 +1142,21 @@
             // stSelectedFiles에서 제거 (이미 업로드됨)
             delete stSelectedFiles[fileType];
           } else {
-            // 업로드 실패 상태 표시
-            if (displayDiv) {
-              displayDiv.innerHTML = `
-                <div style="margin-top: 8px; padding: 8px; background: #f8d7da; border-radius: 6px;">
-                  <span>📄 ${file.name}</span>
-                  <span style="margin-left: 10px; color: #721c24;">❌ 업로드 실패: ${result.message || '알 수 없는 오류'}</span>
-                  <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
-                </div>
-              `;
-            }
+            throw new Error(result.message || '업로드 실패');
           }
-        })
-        .catch(error => {
-          console.error('[ST] 파일 업로드 오류:', error);
-          if (displayDiv) {
-            displayDiv.innerHTML = `
-              <div style="margin-top: 8px; padding: 8px; background: #f8d7da; border-radius: 6px;">
-                <span>📄 ${file.name}</span>
-                <span style="margin-left: 10px; color: #721c24;">❌ 업로드 오류 발생</span>
-                <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
-              </div>
-            `;
-          }
-        });
+        }
+      } catch (error) {
+        console.error('[ST] 파일 업로드 오류:', error);
+        if (displayDiv) {
+          displayDiv.innerHTML = `
+            <div style="margin-top: 8px; padding: 8px; background: #f8d7da; border-radius: 6px;">
+              <span>📄 ${file.name}</span>
+              <span style="margin-left: 10px; color: #721c24;">❌ 업로드 오류: ${error.message || '알 수 없는 오류'}</span>
+              <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
+            </div>
+          `;
+        }
+      }
     }
 
     // 파일 제거
@@ -1211,31 +1310,47 @@
           if (result.success) {
             alert(result.message || '정산이 저장되었습니다.');
             
-            // 파일 업로드 처리 (FormData 방식)
+            // 파일 업로드 처리 (4MB 이상은 청크 업로드, 미만은 FormData)
             const finalSettlementId = result.id || settlementId;
             if (finalSettlementId && Object.keys(stSelectedFiles).length > 0) {
               const promises = [];
+              const FILE_SIZE_LIMIT = 4 * 1024 * 1024; // 4MB
+              
               for (const [fileType, fileData] of Object.entries(stSelectedFiles)) {
                 if (fileData && fileData.file) {
-                  const formData = new FormData();
-                  formData.append('file', fileData.file);
-                  formData.append('settlement_id', finalSettlementId);
-                  formData.append('file_type', fileType);
+                  const file = fileData.file;
                   
-                  const headers = stGetUserHeaders();
-                  
-                  promises.push(
-                    fetch('/api/settlements/upload-file', {
-                      method: 'POST',
-                      headers: headers,  // Content-Type 제거 (FormData가 자동 설정)
-                      credentials: 'include',
-                      body: formData
-                    })
-                  );
+                  if (file.size >= FILE_SIZE_LIMIT) {
+                    // 청크 업로드
+                    promises.push(stUploadInChunks(file, fileType, finalSettlementId));
+                  } else {
+                    // FormData 업로드
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('settlement_id', finalSettlementId);
+                    formData.append('file_type', fileType);
+                    
+                    const headers = stGetUserHeaders();
+                    
+                    promises.push(
+                      fetch('/api/settlements/upload-file', {
+                        method: 'POST',
+                        headers: headers,
+                        credentials: 'include',
+                        body: formData
+                      }).then(response => response.json())
+                    );
+                  }
                 }
               }
               
-              Promise.all(promises).then(() => {
+              Promise.all(promises).then(results => {
+                // 모든 결과 확인
+                const failed = results.filter(r => !r || !r.success);
+                if (failed.length > 0) {
+                  console.error('[ST] 일부 파일 업로드 실패:', failed);
+                  alert('정산은 저장되었지만 일부 파일 업로드에 실패했습니다.');
+                }
                 stAdminResetSettlementForm();
                 stAdminLoadSettlements();
               }).catch(error => {
