@@ -783,15 +783,22 @@
     // 전달 조회 (status가 '전달'인 정산만 조회)
     function stAdminLoadDeliveredSettlements() {
       const container = document.getElementById('stContainer');
-      if (!container) return;
+      if (!container) {
+        console.error('[ST] stContainer를 찾을 수 없습니다.');
+        return;
+      }
       
       const yearMonth = container.querySelector('#stAdminFilterYearMonth')?.value || '';
       const companyName = container.querySelector('#stAdminFilterCompanyName')?.value || '';
       
-      let url = '/api/settlements/list?';
-      if (yearMonth) url += `settlement_year_month=${yearMonth}&`;
-      if (companyName) url += `company_name=${encodeURIComponent(companyName)}&`;
-      url += `status=전달`;
+      // URL 파라미터 구성
+      let urlParams = [];
+      if (yearMonth) urlParams.push(`settlement_year_month=${yearMonth}`);
+      if (companyName) urlParams.push(`company_name=${encodeURIComponent(companyName)}`);
+      urlParams.push(`status=전달`);
+      const url = '/api/settlements/list?' + urlParams.join('&');
+      
+      console.log('[ST] 전달 조회 URL:', url);
       
       const tbody = container.querySelector('#stTableBody');
       if (tbody) tbody.innerHTML = '<tr><td colspan="12" class="no-data">로딩 중...</td></tr>';
@@ -800,10 +807,18 @@
         credentials: 'include',
         headers: stGetUserHeaders()
       })
-        .then(response => response.json())
+        .then(response => {
+          console.log('[ST] 전달 조회 응답 상태:', response.status);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          return response.json();
+        })
         .then(data => {
+          console.log('[ST] 전달 조회 응답 데이터:', data);
           if (data.success) {
             let items = data.data || [];
+            console.log('[ST] 전달 정산 개수:', items.length);
             items.sort((a, b) => {
               if (b.settlement_year_month !== a.settlement_year_month) {
                 return b.settlement_year_month.localeCompare(a.settlement_year_month);
@@ -812,14 +827,19 @@
             });
             stAdminRenderSettlements(items);
           } else {
+            console.error('[ST] 전달 조회 실패:', data.message);
             const tbody = container.querySelector('#stTableBody');
-            if (tbody) tbody.innerHTML = `<tr><td colspan="12" class="no-data">${data.message || '전달 정산 목록을 불러올 수 없습니다.'}</td></tr>`;
+            if (tbody) {
+              tbody.innerHTML = `<tr><td colspan="12" class="no-data">${data.message || '전달 정산 목록을 불러올 수 없습니다.'}</td></tr>`;
+            }
           }
         })
         .catch(error => {
           console.error('[ST] 전달 정산 목록 로드 오류:', error);
           const tbody = container.querySelector('#stTableBody');
-          if (tbody) tbody.innerHTML = '<tr><td colspan="12" class="no-data">전달 정산 목록을 불러오는 중 오류가 발생했습니다.</td></tr>';
+          if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="12" class="no-data">전달 정산 목록을 불러오는 중 오류가 발생했습니다: ${error.message}</td></tr>`;
+          }
         });
     }
     
