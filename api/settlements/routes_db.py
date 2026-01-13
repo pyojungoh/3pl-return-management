@@ -252,7 +252,7 @@ def create_settlement():
         cursor = conn.cursor()
         
         try:
-            # 중복 체크
+            # 중복 체크 - 기존 정산이 있으면 UPDATE, 없으면 INSERT
             if USE_POSTGRESQL:
                 cursor.execute('SELECT id FROM settlements WHERE company_name = %s AND settlement_year_month = %s', 
                              (settlement_company_name, settlement_year_month))
@@ -260,13 +260,45 @@ def create_settlement():
                 cursor.execute('SELECT id FROM settlements WHERE company_name = ? AND settlement_year_month = ?', 
                              (settlement_company_name, settlement_year_month))
             
-            if cursor.fetchone():
-                return jsonify({
-                    'success': False,
-                    'message': '이미 존재하는 정산입니다.'
-                }), 400
+            existing = cursor.fetchone()
             
-            # 정산 생성
+            if existing:
+                # 기존 정산이 있으면 UPDATE (임시 정산 업데이트)
+                settlement_id = existing[0]
+                if USE_POSTGRESQL:
+                    cursor.execute('''
+                        UPDATE settlements SET
+                            work_fee = %s, inout_fee = %s, 
+                            shipping_fee = %s, storage_fee = %s,
+                            special_work_fee = %s, error_deduction = %s,
+                            total_amount = %s, status = %s, memo = %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    ''', (
+                        data.get('work_fee', 0), data.get('inout_fee', 0),
+                        data.get('shipping_fee', 0), data.get('storage_fee', 0),
+                        data.get('special_work_fee', 0), data.get('error_deduction', 0),
+                        data.get('total_amount', 0), data.get('status', '대기'),
+                        data.get('memo', ''), settlement_id
+                    ))
+                else:
+                    cursor.execute('''
+                        UPDATE settlements SET
+                            work_fee = ?, inout_fee = ?, 
+                            shipping_fee = ?, storage_fee = ?,
+                            special_work_fee = ?, error_deduction = ?,
+                            total_amount = ?, status = ?, memo = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ''', (
+                        data.get('work_fee', 0), data.get('inout_fee', 0),
+                        data.get('shipping_fee', 0), data.get('storage_fee', 0),
+                        data.get('special_work_fee', 0), data.get('error_deduction', 0),
+                        data.get('total_amount', 0), data.get('status', '대기'),
+                        data.get('memo', ''), settlement_id
+                    ))
+            else:
+                # 정산 생성
             if USE_POSTGRESQL:
                 cursor.execute('''
                     INSERT INTO settlements (
@@ -1226,5 +1258,85 @@ def upload_settlement_file_complete():
         return jsonify({
             'success': False,
             'message': f'업로드 완료 처리 중 오류: {str(e)}'
+        }), 500
+
+
+# ========== 파일 삭제 ==========
+
+@settlements_bp.route('/<int:settlement_id>/delete-file', methods=['POST'])
+def delete_settlement_file(settlement_id):
+    """정산 파일 삭제"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        
+        # 관리자만 파일 삭제 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 파일을 삭제할 수 있습니다.'
+            }), 403
+        
+        data = request.get_json()
+        file_type = data.get('file_type', '').strip()
+        
+        if not file_type:
+            return jsonify({
+                'success': False,
+                'message': '파일 타입이 필요합니다.'
+            }), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # 정산 테이블에서 파일 URL 제거 (file_type에 따라)
+            if file_type == 'work_fee':
+                if USE_POSTGRESQL:
+                    cursor.execute('UPDATE settlements SET work_fee_file_url = NULL WHERE id = %s', (settlement_id,))
+                else:
+                    cursor.execute('UPDATE settlements SET work_fee_file_url = NULL WHERE id = ?', (settlement_id,))
+            elif file_type == 'inout_fee':
+                if USE_POSTGRESQL:
+                    cursor.execute('UPDATE settlements SET inout_fee_file_url = NULL WHERE id = %s', (settlement_id,))
+                else:
+                    cursor.execute('UPDATE settlements SET inout_fee_file_url = NULL WHERE id = ?', (settlement_id,))
+            elif file_type == 'shipping_fee':
+                if USE_POSTGRESQL:
+                    cursor.execute('UPDATE settlements SET shipping_fee_file_url = NULL WHERE id = %s', (settlement_id,))
+                else:
+                    cursor.execute('UPDATE settlements SET shipping_fee_file_url = NULL WHERE id = ?', (settlement_id,))
+            
+            # settlement_files 테이블에서도 삭제
+            if USE_POSTGRESQL:
+                cursor.execute('DELETE FROM settlement_files WHERE settlement_id = %s AND file_type = %s', (settlement_id, file_type))
+            else:
+                cursor.execute('DELETE FROM settlement_files WHERE settlement_id = ? AND file_type = ?', (settlement_id, file_type))
+            
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': '파일이 삭제되었습니다.'
+            })
+        except Exception as e:
+            conn.rollback() if USE_POSTGRESQL else None
+            print(f'[오류] 파일 삭제 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'파일 삭제 중 오류: {str(e)}'
+            }), 500
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f'[오류] 파일 삭제 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'파일 삭제 중 오류: {str(e)}'
         }), 500
 

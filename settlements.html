@@ -929,7 +929,7 @@
     }
 
     // 파일 선택 처리
-    function stHandleFileSelect(fileType, event) {
+    async function stHandleFileSelect(fileType, event) {
       const file = event.target.files[0];
       if (!file) return;
       
@@ -939,36 +939,103 @@
       const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
       
       // 정산 ID가 있으면 즉시 업로드 (수정 모드)
-      const settlementId = document.getElementById('stSettlementId')?.value;
-      if (settlementId) {
-        // 파일 객체만 저장하고 즉시 업로드
-        stSelectedFiles[fileType] = { file: file };
+      let settlementId = document.getElementById('stSettlementId')?.value;
+      
+      if (!settlementId) {
+        // 정산 ID가 없으면 화주사명과 정산년월 확인
+        const companyName = document.getElementById('stSettlementCompanyName')?.value;
+        const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
         
-        // 박스 안 텍스트 변경: 업로드 중
-        if (uploadTextEl) {
-          uploadTextEl.textContent = `⏳ 업로드 중... (${fileSizeMB} MB)`;
-        }
-        
-        // 별도 표시 영역 비우기
-        if (displayDiv) {
-          displayDiv.innerHTML = '';
-        }
-        
-        stUploadFileImmediately(fileType, settlementId, file);
-      } else {
-        // 정산 ID가 없으면 파일 객체만 저장 (저장 후 업로드 예정)
-        stSelectedFiles[fileType] = { file: file };
-        
-        // 박스 안 텍스트 변경: 파일 선택됨
-        if (uploadTextEl) {
-          uploadTextEl.textContent = `📄 ${file.name} (${fileSizeMB} MB) - 저장 후 업로드`;
-        }
-        
-        // 별도 표시 영역 비우기
-        if (displayDiv) {
-          displayDiv.innerHTML = '';
+        if (companyName && yearMonth) {
+          // 박스 안 텍스트 변경: 임시 정산 생성 중
+          if (uploadTextEl) {
+            uploadTextEl.textContent = `⏳ 임시 정산 생성 중...`;
+          }
+          
+          try {
+            // 임시 정산 생성 (화주사명과 정산년월만으로)
+            const tempSettlementData = {
+              company_name: companyName,
+              settlement_year_month: yearMonth,
+              work_fee: 0,
+              inout_fee: 0,
+              shipping_fee: 0,
+              storage_fee: 0,
+              special_work_fee: 0,
+              error_deduction: 0,
+              total_amount: 0,
+              status: '대기',
+              memo: ''
+            };
+            
+            // 기존 정산이 있는지 확인 (중복 방지)
+            const checkResponse = await fetch(`/api/settlements/list?settlement_year_month=${yearMonth}&company_name=${encodeURIComponent(companyName)}`, {
+              credentials: 'include',
+              headers: stGetUserHeaders()
+            });
+            
+            const checkData = await checkResponse.json();
+            if (checkData.success && checkData.data && checkData.data.length > 0) {
+              // 기존 정산이 있으면 그 ID 사용
+              settlementId = checkData.data[0].id.toString();
+              document.getElementById('stSettlementId').value = settlementId;
+            } else {
+              // 임시 정산 생성
+              const createResponse = await fetch('/api/settlements/', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...stGetUserHeaders()
+                },
+                credentials: 'include',
+                body: JSON.stringify(tempSettlementData)
+              });
+              
+              const createResult = await createResponse.json();
+              if (createResult.success) {
+                settlementId = createResult.id.toString();
+                document.getElementById('stSettlementId').value = settlementId;
+              } else {
+                throw new Error(createResult.message || '임시 정산 생성 실패');
+              }
+            }
+          } catch (error) {
+            console.error('[ST] 임시 정산 생성 오류:', error);
+            if (uploadTextEl) {
+              uploadTextEl.textContent = `❌ 정산 생성 실패: ${error.message || '알 수 없는 오류'}`;
+            }
+            return;
+          }
+        } else {
+          // 화주사명과 정산년월이 없으면 파일만 저장
+          stSelectedFiles[fileType] = { file: file };
+          
+          // 박스 안 텍스트 변경: 파일 선택됨
+          if (uploadTextEl) {
+            uploadTextEl.textContent = `📄 ${file.name} (${fileSizeMB} MB) - 화주사와 정산년월 선택 필요`;
+          }
+          
+          if (displayDiv) {
+            displayDiv.innerHTML = '';
+          }
+          return;
         }
       }
+      
+      // 파일 객체 저장하고 즉시 업로드
+      stSelectedFiles[fileType] = { file: file };
+      
+      // 박스 안 텍스트 변경: 업로드 중
+      if (uploadTextEl) {
+        uploadTextEl.textContent = `⏳ 업로드 중... (${fileSizeMB} MB)`;
+      }
+      
+      // 별도 표시 영역 비우기
+      if (displayDiv) {
+        displayDiv.innerHTML = '';
+      }
+      
+      stUploadFileImmediately(fileType, settlementId, file);
     }
     
     // 파일을 Base64로 변환 (테스트 파일과 동일)
@@ -1102,9 +1169,9 @@
           const data = await stUploadInChunks(file, fileType, settlementId, uploadTextEl);
           
           if (data.success) {
-            // 박스 안 텍스트 변경: 업로드 완료
+            // 박스 안 텍스트 변경: 업로드 완료 (삭제 버튼 포함)
             if (uploadTextEl) {
-              uploadTextEl.textContent = `✅ 업로드 완료: ${file.name}`;
+              uploadTextEl.innerHTML = `✅ 업로드 완료: ${file.name} <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="margin-left: 10px; padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>`;
             }
             // stSelectedFiles에서 제거 (이미 업로드됨)
             delete stSelectedFiles[fileType];
@@ -1131,9 +1198,9 @@
           const result = await response.json();
           
           if (result.success) {
-            // 박스 안 텍스트 변경: 업로드 완료
+            // 박스 안 텍스트 변경: 업로드 완료 (삭제 버튼 포함)
             if (uploadTextEl) {
-              uploadTextEl.textContent = `✅ 업로드 완료: ${file.name}`;
+              uploadTextEl.innerHTML = `✅ 업로드 완료: ${file.name} <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="margin-left: 10px; padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>`;
             }
             // stSelectedFiles에서 제거 (이미 업로드됨)
             delete stSelectedFiles[fileType];
@@ -1146,6 +1213,63 @@
         // 박스 안 텍스트 변경: 업로드 실패
         if (uploadTextEl) {
           uploadTextEl.textContent = `❌ 업로드 실패: ${error.message || '알 수 없는 오류'}`;
+        }
+      }
+    }
+    
+    // 업로드 완료된 파일 삭제
+    async function stDeleteUploadedFile(fileType, event) {
+      event.stopPropagation(); // 이벤트 전파 방지
+      
+      if (!confirm('업로드된 파일을 삭제하시겠습니까?')) {
+        return;
+      }
+      
+      const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+      const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
+      const settlementId = document.getElementById('stSettlementId')?.value;
+      
+      if (!settlementId) {
+        alert('정산 ID를 찾을 수 없습니다.');
+        return;
+      }
+      
+      // 박스 안 텍스트 변경: 삭제 중
+      if (uploadTextEl) {
+        uploadTextEl.textContent = '⏳ 삭제 중...';
+      }
+      
+      try {
+        const response = await fetch(`/api/settlements/${settlementId}/delete-file`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...stGetUserHeaders()
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            file_type: fileType
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          // 박스 안 텍스트 원래대로 복원
+          if (uploadTextEl) {
+            uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+          }
+          alert('파일이 삭제되었습니다.');
+        } else {
+          throw new Error(result.message || '파일 삭제 실패');
+        }
+      } catch (error) {
+        console.error('[ST] 파일 삭제 오류:', error);
+        alert(`파일 삭제 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`);
+        
+        // 박스 안 텍스트: 오류
+        if (uploadTextEl) {
+          uploadTextEl.textContent = `❌ 삭제 실패: ${error.message || '알 수 없는 오류'}`;
         }
       }
     }
@@ -1380,6 +1504,35 @@
       document.getElementById('stWorkFeeFileDisplay').innerHTML = '';
       document.getElementById('stInoutFeeFileDisplay').innerHTML = '';
       document.getElementById('stShippingFeeFileDisplay').innerHTML = '';
+      
+      // 파일 업로드 박스 텍스트 원래대로 복원
+      const workFeeUploadText = document.getElementById('stWorkFeeFileUploadText');
+      if (workFeeUploadText) {
+        workFeeUploadText.textContent = '📄 클릭하여 파일 업로드';
+      }
+      const inoutFeeUploadText = document.getElementById('stInoutFeeFileUploadText');
+      if (inoutFeeUploadText) {
+        inoutFeeUploadText.textContent = '📄 클릭하여 파일 업로드';
+      }
+      const shippingFeeUploadText = document.getElementById('stShippingFeeFileUploadText');
+      if (shippingFeeUploadText) {
+        shippingFeeUploadText.textContent = '📄 클릭하여 파일 업로드';
+      }
+      
+      // 파일 입력 필드 초기화
+      const workFeeFileInput = document.getElementById('stWorkFeeFileInput');
+      if (workFeeFileInput) {
+        workFeeFileInput.value = '';
+      }
+      const inoutFeeFileInput = document.getElementById('stInoutFeeFileInput');
+      if (inoutFeeFileInput) {
+        inoutFeeFileInput.value = '';
+      }
+      const shippingFeeFileInput = document.getElementById('stShippingFeeFileInput');
+      if (shippingFeeFileInput) {
+        shippingFeeFileInput.value = '';
+      }
+      
       document.getElementById('stStorageFee').value = '0';
       document.getElementById('stStorageFeeDisplay').textContent = '0';
       document.getElementById('stSpecialWorkFee').value = '0';
@@ -1547,11 +1700,13 @@
             stLoadErrorCounts();
             stCalculateTotal();
             
-            // 파일 정보 표시 (이미 업로드된 파일) - 박스 안 텍스트 변경
+            // 파일 정보 표시 (이미 업로드된 파일) - 박스 안 텍스트 변경 (삭제 버튼 포함)
             if (settlement.work_fee_file_url) {
               const uploadTextEl = document.getElementById('stWorkFeeFileUploadText');
               if (uploadTextEl) {
-                uploadTextEl.textContent = '✅ 파일 업로드됨 (클릭하여 변경)';
+                // 파일명 추출 (URL에서 마지막 / 이후)
+                const fileName = settlement.work_fee_file_url.split('/').pop() || '파일';
+                uploadTextEl.innerHTML = `✅ 파일 업로드됨: ${fileName} <button type="button" onclick="stDeleteUploadedFile('work_fee', event)" style="margin-left: 10px; padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>`;
               }
             } else {
               const uploadTextEl = document.getElementById('stWorkFeeFileUploadText');
@@ -1563,7 +1718,8 @@
             if (settlement.inout_fee_file_url) {
               const uploadTextEl = document.getElementById('stInoutFeeFileUploadText');
               if (uploadTextEl) {
-                uploadTextEl.textContent = '✅ 파일 업로드됨 (클릭하여 변경)';
+                const fileName = settlement.inout_fee_file_url.split('/').pop() || '파일';
+                uploadTextEl.innerHTML = `✅ 파일 업로드됨: ${fileName} <button type="button" onclick="stDeleteUploadedFile('inout_fee', event)" style="margin-left: 10px; padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>`;
               }
             } else {
               const uploadTextEl = document.getElementById('stInoutFeeFileUploadText');
@@ -1575,7 +1731,8 @@
             if (settlement.shipping_fee_file_url) {
               const uploadTextEl = document.getElementById('stShippingFeeFileUploadText');
               if (uploadTextEl) {
-                uploadTextEl.textContent = '✅ 파일 업로드됨 (클릭하여 변경)';
+                const fileName = settlement.shipping_fee_file_url.split('/').pop() || '파일';
+                uploadTextEl.innerHTML = `✅ 파일 업로드됨: ${fileName} <button type="button" onclick="stDeleteUploadedFile('shipping_fee', event)" style="margin-left: 10px; padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>`;
               }
             } else {
               const uploadTextEl = document.getElementById('stShippingFeeFileUploadText');
