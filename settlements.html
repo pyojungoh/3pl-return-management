@@ -1356,7 +1356,8 @@
         return;
       }
       
-      const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+      // fileType을 올바르게 변환: 'work_fee' -> 'WorkFee' (언더스코어 제거, 각 단어 첫 글자 대문자)
+      const fileTypeCapitalized = fileType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
       const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
       const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
       const settlementId = document.getElementById('stSettlementId')?.value;
@@ -1621,7 +1622,9 @@
                         const result = await response.json();
                         
                         // 박스 밑 표시 영역에 업로드 결과 표시
-                        const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
+                        // fileType을 올바르게 변환: 'work_fee' -> 'WorkFee' (언더스코어 제거, 각 단어 첫 글자 대문자)
+                        const fileTypeCapitalizedForDisplay = fileType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
+                        const displayDiv = document.getElementById(`st${fileTypeCapitalizedForDisplay}FileDisplay`);
                         if (displayDiv) {
                           if (result.success) {
                             const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
