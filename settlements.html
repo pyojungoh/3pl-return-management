@@ -938,6 +938,11 @@
       const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
       const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
       
+      // 파일 선택 즉시 박스 업데이트 (먼저 표시)
+      if (uploadTextEl) {
+        uploadTextEl.innerHTML = `📄 ${file.name} (${fileSizeMB} MB) - 준비 중...`;
+      }
+      
       // 정산 ID가 있으면 즉시 업로드 (수정 모드)
       let settlementId = document.getElementById('stSettlementId')?.value;
       
