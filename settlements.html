@@ -1505,7 +1505,17 @@
                         // 박스 안 텍스트 변경: 업로드 결과
                         if (uploadTextEl) {
                           if (result.success) {
-                            uploadTextEl.innerHTML = `✅ 업로드 완료: ${file.name} <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="margin-left: 10px; padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>`;
+                            // 박스 안 텍스트 원래대로 복원
+                            uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+                            // 박스 밑에 파일명(용량) X 버튼 표시
+                            const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
+                            if (displayDiv) {
+                              const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+                              displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+                                <span>📄 ${file.name} (${fileSizeMB} MB)</span>
+                                <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>
+                              </div>`;
+                            }
                           } else {
                             uploadTextEl.textContent = `❌ 업로드 실패: ${result.message || '알 수 없는 오류'}`;
                           }
