@@ -1239,11 +1239,11 @@
         throw new Error(completeData.message || '업로드 완료 처리 실패');
       }
       
-      // 박스 밑에 파일명(용량) X 버튼 표시 (displayDiv가 전달된 경우)
+      // 박스 밑 표시 영역에 업로드 완료 표시 (displayDiv가 전달된 경우)
       if (displayDiv) {
         const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-        displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
-          <span>📄 ${file.name} (${fileSizeMB} MB)</span>
+        displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #d4edda; border: 1px solid #28a745; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+          <span style="color: #155724; font-weight: 600;">✅ ${file.name} (${fileSizeMB} MB) - 업로드 완료</span>
           <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>
         </div>`;
       }
