@@ -788,10 +788,12 @@
       const yearMonth = container.querySelector('#stAdminFilterYearMonth')?.value || '';
       const companyName = container.querySelector('#stAdminFilterCompanyName')?.value || '';
       
-      let url = '/api/settlements/list?';
-      if (yearMonth) url += `settlement_year_month=${yearMonth}&`;
-      if (companyName) url += `company_name=${encodeURIComponent(companyName)}&`;
-      url += `status=전달&`;
+      // URL 파라미터 구성 (마지막 & 제거)
+      let urlParams = [];
+      if (yearMonth) urlParams.push(`settlement_year_month=${yearMonth}`);
+      if (companyName) urlParams.push(`company_name=${encodeURIComponent(companyName)}`);
+      urlParams.push(`status=전달`);
+      const url = '/api/settlements/list?' + urlParams.join('&');
       
       const tbody = container.querySelector('#stTableBody');
       if (tbody) tbody.innerHTML = '<tr><td colspan="12" class="no-data">로딩 중...</td></tr>';
@@ -823,7 +825,7 @@
         });
     }
     
-    // 정산년월 선택 후 바로 전달 선택
+    // 정산년월 선택 후 바로 전달 선택 (이전 달의 정산을 전달 상태로 변경)
     function stSelectYearMonthForDelivery() {
       const yearMonth = document.getElementById('stAdminFilterYearMonth')?.value;
       if (!yearMonth) {
@@ -831,11 +833,20 @@
         return;
       }
       
-      if (!confirm(`선택한 정산년월(${yearMonth})의 모든 정산을 전달 상태로 변경하시겠습니까?`)) {
+      // 선택한 정산년월에서 1개월 빼기 (예: 2026-01 -> 2025-12)
+      const [year, month] = yearMonth.split('-');
+      const date = new Date(parseInt(year), parseInt(month) - 1, 1); // 월은 0부터 시작
+      date.setMonth(date.getMonth() - 1); // 1개월 빼기
+      
+      const prevYear = date.getFullYear();
+      const prevMonth = String(date.getMonth() + 1).padStart(2, '0');
+      const prevYearMonth = `${prevYear}-${prevMonth}`;
+      
+      if (!confirm(`이전 달(${prevYearMonth})의 모든 정산을 전달 상태로 변경하시겠습니까?`)) {
         return;
       }
       
-      fetch(`/api/settlements/bulk-update-status?settlement_year_month=${yearMonth}&status=전달`, {
+      fetch(`/api/settlements/bulk-update-status?settlement_year_month=${prevYearMonth}&status=전달`, {
         method: 'POST',
         credentials: 'include',
         headers: stGetUserHeaders()
@@ -843,8 +854,10 @@
         .then(response => response.json())
         .then(data => {
           if (data.success) {
-            alert(`정산년월 ${yearMonth}의 ${data.updated_count || 0}개 정산이 전달 상태로 변경되었습니다.`);
-            stAdminLoadSettlements();
+            alert(`정산년월 ${prevYearMonth}의 ${data.updated_count || 0}개 정산이 전달 상태로 변경되었습니다.`);
+            // 이전 달 정산 목록 조회
+            document.getElementById('stAdminFilterYearMonth').value = prevYearMonth;
+            stAdminLoadDeliveredSettlements();
           } else {
             alert(data.message || '전달 상태 변경에 실패했습니다.');
           }
