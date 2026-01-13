@@ -1174,9 +1174,19 @@
           const data = await stUploadInChunks(file, fileType, settlementId, uploadTextEl);
           
           if (data.success) {
-            // 박스 안 텍스트 변경: 업로드 완료 (삭제 버튼 포함)
+            // 박스 안 텍스트 원래대로 복원
             if (uploadTextEl) {
-              uploadTextEl.innerHTML = `✅ 업로드 완료: ${file.name} <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="margin-left: 10px; padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>`;
+              uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+            }
+            // 박스 밑에 파일명(용량) X 버튼 표시
+            const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+            const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
+            if (displayDiv) {
+              const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+              displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+                <span>📄 ${file.name} (${fileSizeMB} MB)</span>
+                <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>
+              </div>`;
             }
             // stSelectedFiles에서 제거 (이미 업로드됨)
             delete stSelectedFiles[fileType];
@@ -1203,9 +1213,19 @@
           const result = await response.json();
           
           if (result.success) {
-            // 박스 안 텍스트 변경: 업로드 완료 (삭제 버튼 포함)
+            // 박스 안 텍스트 원래대로 복원
             if (uploadTextEl) {
-              uploadTextEl.innerHTML = `✅ 업로드 완료: ${file.name} <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="margin-left: 10px; padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>`;
+              uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+            }
+            // 박스 밑에 파일명(용량) X 버튼 표시
+            const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+            const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
+            if (displayDiv) {
+              const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+              displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+                <span>📄 ${file.name} (${fileSizeMB} MB)</span>
+                <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>
+              </div>`;
             }
             // stSelectedFiles에서 제거 (이미 업로드됨)
             delete stSelectedFiles[fileType];
@@ -1232,6 +1252,7 @@
       
       const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
       const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
+      const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
       const settlementId = document.getElementById('stSettlementId')?.value;
       
       if (!settlementId) {
@@ -1239,9 +1260,9 @@
         return;
       }
       
-      // 박스 안 텍스트 변경: 삭제 중
-      if (uploadTextEl) {
-        uploadTextEl.textContent = '⏳ 삭제 중...';
+      // 박스 밑 표시 영역에 삭제 중 표시
+      if (displayDiv) {
+        displayDiv.innerHTML = '<div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; color: #666;">⏳ 삭제 중...</div>';
       }
       
       try {
@@ -1260,11 +1281,11 @@
         const result = await response.json();
         
         if (result.success) {
-          // 박스 안 텍스트 원래대로 복원
-          if (uploadTextEl) {
-            uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+          // 박스 밑 표시 영역 비우기
+          if (displayDiv) {
+            displayDiv.innerHTML = '';
           }
-          alert('파일이 삭제되었습니다.');
+          // 박스 안 텍스트는 그대로 유지 (이미 "📄 클릭하여 파일 업로드" 상태)
         } else {
           throw new Error(result.message || '파일 삭제 실패');
         }
@@ -1272,9 +1293,9 @@
         console.error('[ST] 파일 삭제 오류:', error);
         alert(`파일 삭제 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`);
         
-        // 박스 안 텍스트: 오류
-        if (uploadTextEl) {
-          uploadTextEl.textContent = `❌ 삭제 실패: ${error.message || '알 수 없는 오류'}`;
+        // 박스 밑 표시 영역에 오류 표시
+        if (displayDiv) {
+          displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #fee; border-radius: 4px; color: #c33;">❌ 삭제 실패: ${error.message || '알 수 없는 오류'}</div>`;
         }
       }
     }
@@ -1735,44 +1756,77 @@
             stLoadErrorCounts();
             stCalculateTotal();
             
-            // 파일 정보 표시 (이미 업로드된 파일) - 박스 안 텍스트 변경 (삭제 버튼 포함)
+            // 파일 정보 표시 (이미 업로드된 파일) - 박스 안은 원래대로, 박스 밑에 파일명(용량) X 버튼 표시
             if (settlement.work_fee_file_url) {
               const uploadTextEl = document.getElementById('stWorkFeeFileUploadText');
+              const displayDiv = document.getElementById('stWorkFeeFileDisplay');
               if (uploadTextEl) {
-                // 파일명 추출 (URL에서 마지막 / 이후)
+                uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+              }
+              if (displayDiv) {
                 const fileName = settlement.work_fee_file_url.split('/').pop() || '파일';
-                uploadTextEl.innerHTML = `✅ 파일 업로드됨: ${fileName} <button type="button" onclick="stDeleteUploadedFile('work_fee', event)" style="margin-left: 10px; padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>`;
+                // 파일 크기는 알 수 없으므로 파일명만 표시
+                displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+                  <span>📄 ${fileName}</span>
+                  <button type="button" onclick="stDeleteUploadedFile('work_fee', event)" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>
+                </div>`;
               }
             } else {
               const uploadTextEl = document.getElementById('stWorkFeeFileUploadText');
+              const displayDiv = document.getElementById('stWorkFeeFileDisplay');
               if (uploadTextEl) {
                 uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+              }
+              if (displayDiv) {
+                displayDiv.innerHTML = '';
               }
             }
             
             if (settlement.inout_fee_file_url) {
               const uploadTextEl = document.getElementById('stInoutFeeFileUploadText');
+              const displayDiv = document.getElementById('stInoutFeeFileDisplay');
               if (uploadTextEl) {
+                uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+              }
+              if (displayDiv) {
                 const fileName = settlement.inout_fee_file_url.split('/').pop() || '파일';
-                uploadTextEl.innerHTML = `✅ 파일 업로드됨: ${fileName} <button type="button" onclick="stDeleteUploadedFile('inout_fee', event)" style="margin-left: 10px; padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>`;
+                displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+                  <span>📄 ${fileName}</span>
+                  <button type="button" onclick="stDeleteUploadedFile('inout_fee', event)" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>
+                </div>`;
               }
             } else {
               const uploadTextEl = document.getElementById('stInoutFeeFileUploadText');
+              const displayDiv = document.getElementById('stInoutFeeFileDisplay');
               if (uploadTextEl) {
                 uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+              }
+              if (displayDiv) {
+                displayDiv.innerHTML = '';
               }
             }
             
             if (settlement.shipping_fee_file_url) {
               const uploadTextEl = document.getElementById('stShippingFeeFileUploadText');
+              const displayDiv = document.getElementById('stShippingFeeFileDisplay');
               if (uploadTextEl) {
+                uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+              }
+              if (displayDiv) {
                 const fileName = settlement.shipping_fee_file_url.split('/').pop() || '파일';
-                uploadTextEl.innerHTML = `✅ 파일 업로드됨: ${fileName} <button type="button" onclick="stDeleteUploadedFile('shipping_fee', event)" style="margin-left: 10px; padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>`;
+                displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+                  <span>📄 ${fileName}</span>
+                  <button type="button" onclick="stDeleteUploadedFile('shipping_fee', event)" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>
+                </div>`;
               }
             } else {
               const uploadTextEl = document.getElementById('stShippingFeeFileUploadText');
+              const displayDiv = document.getElementById('stShippingFeeFileDisplay');
               if (uploadTextEl) {
                 uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+              }
+              if (displayDiv) {
+                displayDiv.innerHTML = '';
               }
             }
             
