@@ -404,8 +404,8 @@
             </div>
             <div class="st-form-group">
               <label class="st-form-label">이지어드민 상세내역 파일</label>
-              <div class="st-file-upload-area" onclick="document.getElementById('stWorkFeeFileInput').click()">
-                <p>📄 클릭하여 파일 업로드</p>
+              <div class="st-file-upload-area" id="stWorkFeeFileUploadArea" onclick="document.getElementById('stWorkFeeFileInput').click()">
+                <p id="stWorkFeeFileUploadText">📄 클릭하여 파일 업로드</p>
                 <input type="file" id="stWorkFeeFileInput" accept=".pdf,.xlsx,.xls,.csv" style="display: none;" onchange="stHandleFileSelect('work_fee', event)">
               </div>
               <div id="stWorkFeeFileDisplay"></div>
@@ -423,8 +423,8 @@
             </div>
             <div class="st-form-group">
               <label class="st-form-label">이지어드민 상세내역 파일</label>
-              <div class="st-file-upload-area" onclick="document.getElementById('stInoutFeeFileInput').click()">
-                <p>📄 클릭하여 파일 업로드</p>
+              <div class="st-file-upload-area" id="stInoutFeeFileUploadArea" onclick="document.getElementById('stInoutFeeFileInput').click()">
+                <p id="stInoutFeeFileUploadText">📄 클릭하여 파일 업로드</p>
                 <input type="file" id="stInoutFeeFileInput" accept=".pdf,.xlsx,.xls,.csv" style="display: none;" onchange="stHandleFileSelect('inout_fee', event)">
               </div>
               <div id="stInoutFeeFileDisplay"></div>
@@ -442,8 +442,8 @@
             </div>
             <div class="st-form-group">
               <label class="st-form-label">택배사 파일</label>
-              <div class="st-file-upload-area" onclick="document.getElementById('stShippingFeeFileInput').click()">
-                <p>📄 클릭하여 파일 업로드</p>
+              <div class="st-file-upload-area" id="stShippingFeeFileUploadArea" onclick="document.getElementById('stShippingFeeFileInput').click()">
+                <p id="stShippingFeeFileUploadText">📄 클릭하여 파일 업로드</p>
                 <input type="file" id="stShippingFeeFileInput" accept=".pdf,.xlsx,.xls,.csv" style="display: none;" onchange="stHandleFileSelect('shipping_fee', event)">
               </div>
               <div id="stShippingFeeFileDisplay"></div>
@@ -933,36 +933,40 @@
       const file = event.target.files[0];
       if (!file) return;
       
-      const displayDiv = document.getElementById(`st${fileType.charAt(0).toUpperCase() + fileType.slice(1)}FileDisplay`);
+      const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+      const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
+      const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
       const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-      
-      // 파일 선택 즉시 피드백 표시
-      if (displayDiv) {
-        displayDiv.innerHTML = `
-          <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border-radius: 6px;">
-            <span>📄 ${file.name}</span>
-            <span style="margin-left: 10px; color: #856404;">⏳ 파일 준비 중... (${fileSizeMB} MB)</span>
-          </div>
-        `;
-      }
       
       // 정산 ID가 있으면 즉시 업로드 (수정 모드)
       const settlementId = document.getElementById('stSettlementId')?.value;
       if (settlementId) {
         // 파일 객체만 저장하고 즉시 업로드
         stSelectedFiles[fileType] = { file: file };
+        
+        // 박스 안 텍스트 변경: 업로드 중
+        if (uploadTextEl) {
+          uploadTextEl.textContent = `⏳ 업로드 중... (${fileSizeMB} MB)`;
+        }
+        
+        // 별도 표시 영역 비우기
+        if (displayDiv) {
+          displayDiv.innerHTML = '';
+        }
+        
         stUploadFileImmediately(fileType, settlementId, file);
       } else {
         // 정산 ID가 없으면 파일 객체만 저장 (저장 후 업로드 예정)
         stSelectedFiles[fileType] = { file: file };
+        
+        // 박스 안 텍스트 변경: 파일 선택됨
+        if (uploadTextEl) {
+          uploadTextEl.textContent = `📄 ${file.name} (${fileSizeMB} MB) - 저장 후 업로드`;
+        }
+        
+        // 별도 표시 영역 비우기
         if (displayDiv) {
-          displayDiv.innerHTML = `
-            <div style="margin-top: 8px; padding: 8px; background: #d1ecf1; border-radius: 6px;">
-              <span>📄 ${file.name}</span>
-              <span style="margin-left: 10px; color: #0c5460;">✅ 파일 선택됨 (${fileSizeMB} MB) - 저장 후 업로드 예정</span>
-              <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
-            </div>
-          `;
+          displayDiv.innerHTML = '';
         }
       }
     }
@@ -981,7 +985,7 @@
     }
     
     // 청크로 나누어 업로드 (테스트 파일과 동일한 방식)
-    async function stUploadInChunks(file, fileType, settlementId, displayDiv = null) {
+    async function stUploadInChunks(file, fileType, settlementId, uploadTextEl = null) {
       const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB 청크
       const fileData = await stFileToBase64(file);
       const totalChunks = Math.ceil(fileData.length / CHUNK_SIZE);
@@ -1023,15 +1027,10 @@
         
         console.log(`[ST] 청크 ${chunkIndex + 1}/${totalChunks} 업로드 중...`);
         
-        // 진행 상황 표시
-        if (displayDiv) {
+        // 진행 상황 표시 (박스 안 텍스트 변경)
+        if (uploadTextEl) {
           const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
-          displayDiv.innerHTML = `
-            <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border-radius: 6px;">
-              <span>📄 ${file.name}</span>
-              <span style="margin-left: 10px; color: #856404;">⏳ 청크 ${chunkIndex + 1}/${totalChunks} 업로드 중... (${progress}%)</span>
-            </div>
-          `;
+          uploadTextEl.textContent = `⏳ 청크 ${chunkIndex + 1}/${totalChunks} 업로드 중... (${progress}%)`;
         }
         
         const chunkResponse = await fetch('/api/settlements/upload-file-chunk', {
@@ -1078,31 +1077,17 @@
     
     // 파일 즉시 업로드 (수정 모드) - 4MB 이상은 청크 업로드, 미만은 FormData
     async function stUploadFileImmediately(fileType, settlementId, file) {
-      const displayDiv = document.getElementById(`st${fileType.charAt(0).toUpperCase() + fileType.slice(1)}FileDisplay`);
+      const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+      const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
       const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-      
-      // 업로드 중 상태 표시
-      if (displayDiv) {
-        displayDiv.innerHTML = `
-          <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border-radius: 6px;">
-            <span>📄 ${file.name}</span>
-            <span style="margin-left: 10px; color: #856404;">⏳ 업로드 중... (${fileSizeMB} MB)</span>
-          </div>
-        `;
-      }
       
       const companyName = document.getElementById('stSettlementCompanyName')?.value;
       const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
       
       if (!companyName || !yearMonth) {
-        if (displayDiv) {
-          displayDiv.innerHTML = `
-            <div style="margin-top: 8px; padding: 8px; background: #f8d7da; border-radius: 6px;">
-              <span>📄 ${file.name}</span>
-              <span style="margin-left: 10px; color: #721c24;">❌ 화주사와 정산년월을 먼저 선택해주세요.</span>
-              <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
-            </div>
-          `;
+        // 박스 안 텍스트 변경: 오류
+        if (uploadTextEl) {
+          uploadTextEl.textContent = '❌ 화주사와 정산년월을 먼저 선택해주세요.';
         }
         return;
       }
@@ -1114,18 +1099,12 @@
         if (file.size >= FILE_SIZE_LIMIT) {
           // 청크 업로드
           console.log('[ST] 청크 업로드 모드');
-          const data = await stUploadInChunks(file, fileType, settlementId, displayDiv);
+          const data = await stUploadInChunks(file, fileType, settlementId, uploadTextEl);
           
           if (data.success) {
-            // 업로드 성공 상태 표시
-            if (displayDiv) {
-              displayDiv.innerHTML = `
-                <div style="margin-top: 8px; padding: 8px; background: #d4edda; border-radius: 6px;">
-                  <span>📄 ${file.name}</span>
-                  <span style="margin-left: 10px; color: #155724;">✅ 업로드 완료</span>
-                  <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
-                </div>
-              `;
+            // 박스 안 텍스트 변경: 업로드 완료
+            if (uploadTextEl) {
+              uploadTextEl.textContent = `✅ 업로드 완료: ${file.name}`;
             }
             // stSelectedFiles에서 제거 (이미 업로드됨)
             delete stSelectedFiles[fileType];
@@ -1152,15 +1131,9 @@
           const result = await response.json();
           
           if (result.success) {
-            // 업로드 성공 상태 표시
-            if (displayDiv) {
-              displayDiv.innerHTML = `
-                <div style="margin-top: 8px; padding: 8px; background: #d4edda; border-radius: 6px;">
-                  <span>📄 ${file.name}</span>
-                  <span style="margin-left: 10px; color: #155724;">✅ 업로드 완료</span>
-                  <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
-                </div>
-              `;
+            // 박스 안 텍스트 변경: 업로드 완료
+            if (uploadTextEl) {
+              uploadTextEl.textContent = `✅ 업로드 완료: ${file.name}`;
             }
             // stSelectedFiles에서 제거 (이미 업로드됨)
             delete stSelectedFiles[fileType];
@@ -1170,14 +1143,9 @@
         }
       } catch (error) {
         console.error('[ST] 파일 업로드 오류:', error);
-        if (displayDiv) {
-          displayDiv.innerHTML = `
-            <div style="margin-top: 8px; padding: 8px; background: #f8d7da; border-radius: 6px;">
-              <span>📄 ${file.name}</span>
-              <span style="margin-left: 10px; color: #721c24;">❌ 업로드 오류: ${error.message || '알 수 없는 오류'}</span>
-              <button type="button" onclick="stRemoveFile('${fileType}')" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">삭제</button>
-            </div>
-          `;
+        // 박스 안 텍스트 변경: 업로드 실패
+        if (uploadTextEl) {
+          uploadTextEl.textContent = `❌ 업로드 실패: ${error.message || '알 수 없는 오류'}`;
         }
       }
     }
@@ -1185,11 +1153,19 @@
     // 파일 제거
     function stRemoveFile(fileType) {
       delete stSelectedFiles[fileType];
-      const displayDiv = document.getElementById(`st${fileType.charAt(0).toUpperCase() + fileType.slice(1)}FileDisplay`);
+      const fileTypeCapitalized = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+      const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
+      const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
+      
+      // 박스 안 텍스트 원래대로 복원
+      if (uploadTextEl) {
+        uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+      }
+      
       if (displayDiv) {
         displayDiv.innerHTML = '';
       }
-      const input = document.getElementById(`st${fileType.charAt(0).toUpperCase() + fileType.slice(1)}FileInput`);
+      const input = document.getElementById(`st${fileTypeCapitalized}FileInput`);
       if (input) {
         input.value = '';
       }
@@ -1571,38 +1547,41 @@
             stLoadErrorCounts();
             stCalculateTotal();
             
-            // 파일 정보 표시 (이미 업로드된 파일)
+            // 파일 정보 표시 (이미 업로드된 파일) - 박스 안 텍스트 변경
             if (settlement.work_fee_file_url) {
-              document.getElementById('stWorkFeeFileDisplay').innerHTML = `
-                <div style="margin-top: 8px; padding: 8px; background: #d4edda; border-radius: 6px;">
-                  <span>📄 기존 파일 업로드됨</span>
-                  <a href="${settlement.work_fee_file_url}" target="_blank" style="margin-left: 10px; color: #155724; text-decoration: underline;">보기</a>
-                </div>
-              `;
+              const uploadTextEl = document.getElementById('stWorkFeeFileUploadText');
+              if (uploadTextEl) {
+                uploadTextEl.textContent = '✅ 파일 업로드됨 (클릭하여 변경)';
+              }
             } else {
-              document.getElementById('stWorkFeeFileDisplay').innerHTML = '';
+              const uploadTextEl = document.getElementById('stWorkFeeFileUploadText');
+              if (uploadTextEl) {
+                uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+              }
             }
             
             if (settlement.inout_fee_file_url) {
-              document.getElementById('stInoutFeeFileDisplay').innerHTML = `
-                <div style="margin-top: 8px; padding: 8px; background: #d4edda; border-radius: 6px;">
-                  <span>📄 기존 파일 업로드됨</span>
-                  <a href="${settlement.inout_fee_file_url}" target="_blank" style="margin-left: 10px; color: #155724; text-decoration: underline;">보기</a>
-                </div>
-              `;
+              const uploadTextEl = document.getElementById('stInoutFeeFileUploadText');
+              if (uploadTextEl) {
+                uploadTextEl.textContent = '✅ 파일 업로드됨 (클릭하여 변경)';
+              }
             } else {
-              document.getElementById('stInoutFeeFileDisplay').innerHTML = '';
+              const uploadTextEl = document.getElementById('stInoutFeeFileUploadText');
+              if (uploadTextEl) {
+                uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+              }
             }
             
             if (settlement.shipping_fee_file_url) {
-              document.getElementById('stShippingFeeFileDisplay').innerHTML = `
-                <div style="margin-top: 8px; padding: 8px; background: #d4edda; border-radius: 6px;">
-                  <span>📄 기존 파일 업로드됨</span>
-                  <a href="${settlement.shipping_fee_file_url}" target="_blank" style="margin-left: 10px; color: #155724; text-decoration: underline;">보기</a>
-                </div>
-              `;
+              const uploadTextEl = document.getElementById('stShippingFeeFileUploadText');
+              if (uploadTextEl) {
+                uploadTextEl.textContent = '✅ 파일 업로드됨 (클릭하여 변경)';
+              }
             } else {
-              document.getElementById('stShippingFeeFileDisplay').innerHTML = '';
+              const uploadTextEl = document.getElementById('stShippingFeeFileUploadText');
+              if (uploadTextEl) {
+                uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+              }
             }
             
             // 선택된 파일 초기화
