@@ -945,11 +945,13 @@
               <button class="st-btn" onclick="stDeleteTaxInvoice(${item.id})" style="padding: 4px 8px; font-size: 11px; background: linear-gradient(135deg, #e17055 0%, #d63031 100%);">삭제</button>
             </div>
           `;
-        } else if (status === '정산확인' || status === '입금완료') {
-          // 정산확인 또는 입금완료 상태일 때 세금계산서 업로드 가능
-          taxInvoiceCell = `<button class="st-btn" onclick="stUploadTaxInvoice(${item.id})" style="padding: 6px 12px; font-size: 12px;">📄 업로드</button>`;
         } else {
-          taxInvoiceCell = '<span style="color: #999;">-</span>';
+          // 세금계산서가 없으면 업로드 버튼 표시 (정산확인 또는 입금완료 상태일 때만)
+          if (status === '정산확인' || status === '입금완료') {
+            taxInvoiceCell = `<button class="st-btn" onclick="stUploadTaxInvoice(${item.id})" style="padding: 6px 12px; font-size: 12px;">📄 업로드</button>`;
+          } else {
+            taxInvoiceCell = '<span style="color: #999;">-</span>';
+          }
         }
         
         // 상태별 액션 버튼 (확정, 입금확인, 되돌리기)
