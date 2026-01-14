@@ -1626,13 +1626,6 @@ def update_settlement_status(settlement_id):
         role = user_context['role']
         company_name = user_context['company_name']
         
-        # 관리자만 상태 변경 가능
-        if role != '관리자':
-            return jsonify({
-                'success': False,
-                'message': '관리자만 정산 상태를 변경할 수 있습니다.'
-            }), 403
-        
         data = request.get_json()
         new_status = data.get('status', '').strip()
         
@@ -1650,10 +1643,62 @@ def update_settlement_status(settlement_id):
                 'message': f'유효하지 않은 상태값입니다. 가능한 값: {", ".join(valid_statuses)}'
             }), 400
         
+        # 정산 정보 조회
         conn = get_db_connection()
-        cursor = conn.cursor()
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
         
         try:
+            if USE_POSTGRESQL:
+                cursor.execute('SELECT company_name, status FROM settlements WHERE id = %s', (settlement_id,))
+            else:
+                cursor.execute('SELECT company_name, status FROM settlements WHERE id = ?', (settlement_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({
+                    'success': False,
+                    'message': '정산을 찾을 수 없습니다.'
+                }), 404
+            
+            settlement = dict(row) if USE_POSTGRESQL else dict(zip([desc[0] for desc in cursor.description], row))
+            settlement_company_name = settlement.get('company_name', '')
+            current_status = settlement.get('status', '')
+            
+            # 권한 확인
+            if role == '관리자':
+                # 관리자는 모든 상태 변경 가능
+                pass
+            elif role != '관리자' and new_status == '정산확인':
+                # 화주사는 자신의 정산만 '정산확인' 상태로 변경 가능
+                if not company_name:
+                    return jsonify({
+                        'success': False,
+                        'message': '화주사 정보를 확인할 수 없습니다.'
+                    }), 400
+                
+                if settlement_company_name != company_name:
+                    return jsonify({
+                        'success': False,
+                        'message': '자신의 정산만 확인할 수 있습니다.'
+                    }), 403
+                
+                # 화주사는 '전달' 상태에서만 '정산확인'으로 변경 가능
+                if current_status != '전달':
+                    return jsonify({
+                        'success': False,
+                        'message': '전달 상태인 정산만 확인할 수 있습니다.'
+                    }), 400
+            else:
+                # 화주사는 정산확인 외의 상태 변경 불가
+                return jsonify({
+                    'success': False,
+                    'message': '권한이 없습니다.'
+                }), 403
+            
+            # 상태 업데이트
             if USE_POSTGRESQL:
                 cursor.execute('UPDATE settlements SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s', (new_status, settlement_id))
             else:

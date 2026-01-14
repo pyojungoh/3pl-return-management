@@ -540,16 +540,7 @@
       </div>
     </div>
     
-    <!-- 화주사 전용 필터 섹션 -->
-    <div id="stConsignorFilterSection" class="st-consignor-only st-section">
-      <div class="st-filters">
-        <div class="st-filter-group">
-          <label for="stConsignorFilterYearMonth">정산년월</label>
-          <input type="month" id="stConsignorFilterYearMonth">
-        </div>
-        <button class="st-btn" onclick="stConsignorLoadSettlements()">조회</button>
-      </div>
-    </div>
+    <!-- 화주사 전용 필터 섹션 (제거됨 - 전체 리스트 표시) -->
     
     <!-- 정산 목록 테이블 -->
     <div id="stCommonTableSection" class="st-section">
@@ -731,12 +722,7 @@
       const container = document.getElementById('stContainer');
       if (!container) return;
       
-      // 오늘 날짜로 정산년월 초기화
-      const today = new Date().toISOString().split('T')[0];
-      const yearMonthInput = container.querySelector('#stConsignorFilterYearMonth');
-      if (yearMonthInput) yearMonthInput.value = today.slice(0, 7);
-      
-      // 정산 목록 로드
+      // 정산 목록 로드 (전체 리스트)
       stConsignorLoadSettlements();
     }
 
@@ -886,12 +872,11 @@
         });
     }
 
-    // 화주사 정산 목록 로드
+    // 화주사 정산 목록 로드 (전체 리스트)
     function stConsignorLoadSettlements() {
       const container = document.getElementById('stContainer');
       if (!container) return;
       
-      const yearMonth = container.querySelector('#stConsignorFilterYearMonth')?.value || '';
       const companyName = stCurrentCompany;
       
       if (!companyName) {
@@ -900,9 +885,8 @@
         return;
       }
       
-      let url = '/api/settlements/list?';
-      if (yearMonth) url += `settlement_year_month=${yearMonth}&`;
-      url += `company_name=${encodeURIComponent(companyName)}&`;
+      // 월별 필터 없이 전체 리스트 로드
+      const url = `/api/settlements/list?company_name=${encodeURIComponent(companyName)}`;
       
       const tbody = container.querySelector('#stTableBody');
       if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="no-data">로딩 중...</td></tr>';
