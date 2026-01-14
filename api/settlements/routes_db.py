@@ -1712,13 +1712,25 @@ def update_settlement_status(settlement_id):
                 cursor.execute('UPDATE settlements SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', (new_status, settlement_id))
             
             conn.commit()
+            print(f'[정산상태변경] UPDATE 실행 완료, rowcount={cursor.rowcount}, settlement_id={settlement_id}, new_status={new_status}')
             
             if cursor.rowcount > 0:
+                # 업데이트된 상태 확인
+                if USE_POSTGRESQL:
+                    cursor.execute('SELECT status FROM settlements WHERE id = %s', (settlement_id,))
+                else:
+                    cursor.execute('SELECT status FROM settlements WHERE id = ?', (settlement_id,))
+                updated_row = cursor.fetchone()
+                if updated_row:
+                    updated_status = dict(updated_row).get('status') if USE_POSTGRESQL else updated_row[0]
+                    print(f'[정산상태변경] 업데이트 확인, settlement_id={settlement_id}, DB상태={updated_status}')
+                
                 return jsonify({
                     'success': True,
                     'message': f'정산 상태가 {new_status}로 변경되었습니다.'
                 })
             else:
+                print(f'[정산상태변경] 업데이트 실패, rowcount=0, settlement_id={settlement_id}')
                 return jsonify({
                     'success': False,
                     'message': '정산을 찾을 수 없습니다.'
