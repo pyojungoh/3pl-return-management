@@ -110,6 +110,7 @@ def get_settlements_list():
                     s.error_deduction,
                     s.total_amount,
                     s.status,
+                    s.tax_invoice_file_url,
                     s.memo,
                     s.created_at,
                     s.updated_at
@@ -1480,5 +1481,229 @@ def bulk_update_settlement_status():
         return jsonify({
             'success': False,
             'message': f'일괄 상태 변경 중 오류: {str(e)}'
+        }), 500
+
+
+# ========== 세금계산서 업로드 (화주사용) ==========
+
+@settlements_bp.route('/<int:settlement_id>/upload-tax-invoice', methods=['POST'])
+def upload_tax_invoice(settlement_id):
+    """세금계산서 업로드 (화주사용)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        company_name = user_context['company_name']
+        
+        # 화주사만 세금계산서 업로드 가능
+        if role == '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자는 세금계산서를 업로드할 수 없습니다. 화주사 계정으로 로그인해주세요.'
+            }), 403
+        
+        if not company_name:
+            return jsonify({
+                'success': False,
+                'message': '화주사 정보를 확인할 수 없습니다.'
+            }), 400
+        
+        # 정산 정보 조회 및 권한 확인
+        conn = get_db_connection()
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
+        
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute('SELECT company_name, settlement_year_month FROM settlements WHERE id = %s', (settlement_id,))
+            else:
+                cursor.execute('SELECT company_name, settlement_year_month FROM settlements WHERE id = ?', (settlement_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({
+                    'success': False,
+                    'message': '정산을 찾을 수 없습니다.'
+                }), 404
+            
+            settlement = dict(row)
+            settlement_company_name = settlement.get('company_name', '')
+            
+            # 화주사는 자신의 정산에만 세금계산서 업로드 가능
+            if settlement_company_name != company_name:
+                return jsonify({
+                    'success': False,
+                    'message': '권한이 없습니다. 자신의 정산에만 세금계산서를 업로드할 수 있습니다.'
+                }), 403
+            
+            settlement_year_month = settlement.get('settlement_year_month', '')
+        finally:
+            cursor.close()
+            conn.close()
+        
+        # 파일 업로드 처리 (FormData 방식)
+        if 'file' not in request.files:
+            return jsonify({
+                'success': False,
+                'message': '파일이 없습니다.'
+            }), 400
+        
+        file = request.files['file']
+        if not file.filename:
+            return jsonify({
+                'success': False,
+                'message': '파일명이 없습니다.'
+            }), 400
+        
+        file_data = file.read()
+        file_name = file.filename
+        
+        # Google Drive 업로드
+        try:
+            from api.uploads.oauth_drive import upload_settlement_excel_to_drive
+            
+            result = upload_settlement_excel_to_drive(
+                file_data=file_data,
+                filename=f'세금계산서_{file_name}',
+                company_name=settlement_company_name,
+                settlement_year_month=settlement_year_month
+            )
+            
+            if not result.get('success'):
+                return jsonify({
+                    'success': False,
+                    'message': result.get('message', '파일 업로드 실패')
+                }), 500
+            
+            file_url = result.get('web_view_link', result.get('file_url', ''))
+            
+            if not file_url:
+                return jsonify({
+                    'success': False,
+                    'message': '파일 업로드는 성공했지만 파일 URL을 가져올 수 없습니다.'
+                }), 500
+            
+            # DB 업데이트
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            try:
+                if USE_POSTGRESQL:
+                    cursor.execute('UPDATE settlements SET tax_invoice_file_url = %s, status = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s', (file_url, '세금계산서_업로드_완료', settlement_id))
+                else:
+                    cursor.execute('UPDATE settlements SET tax_invoice_file_url = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', (file_url, '세금계산서_업로드_완료', settlement_id))
+                
+                conn.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'message': '세금계산서가 업로드되었습니다.',
+                    'file_url': file_url
+                })
+            except Exception as e:
+                conn.rollback() if USE_POSTGRESQL else None
+                print(f'[오류] 세금계산서 정보 저장 오류: {e}')
+                import traceback
+                traceback.print_exc()
+                return jsonify({
+                    'success': False,
+                    'message': f'세금계산서 정보 저장 중 오류: {str(e)}'
+                }), 500
+            finally:
+                cursor.close()
+                conn.close()
+        except Exception as e:
+            print(f'[오류] 세금계산서 업로드 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'세금계산서 업로드 중 오류: {str(e)}'
+            }), 500
+    except Exception as e:
+        print(f'[오류] 세금계산서 업로드 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'세금계산서 업로드 중 오류: {str(e)}'
+        }), 500
+
+
+# ========== 상태 변경 (정산 확정, 입금완료) ==========
+
+@settlements_bp.route('/<int:settlement_id>/update-status', methods=['POST'])
+def update_settlement_status(settlement_id):
+    """정산 상태 변경 (정산 확정, 입금완료)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        company_name = user_context['company_name']
+        
+        # 관리자만 상태 변경 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 정산 상태를 변경할 수 있습니다.'
+            }), 403
+        
+        data = request.get_json()
+        new_status = data.get('status', '').strip()
+        
+        if not new_status:
+            return jsonify({
+                'success': False,
+                'message': '상태값이 필요합니다.'
+            }), 400
+        
+        # 유효한 상태값 확인
+        valid_statuses = ['대기', '전달', '세금계산서_업로드_완료', '정산확정', '입금완료']
+        if new_status not in valid_statuses:
+            return jsonify({
+                'success': False,
+                'message': f'유효하지 않은 상태값입니다. 가능한 값: {", ".join(valid_statuses)}'
+            }), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute('UPDATE settlements SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s', (new_status, settlement_id))
+            else:
+                cursor.execute('UPDATE settlements SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', (new_status, settlement_id))
+            
+            conn.commit()
+            
+            if cursor.rowcount > 0:
+                return jsonify({
+                    'success': True,
+                    'message': f'정산 상태가 {new_status}로 변경되었습니다.'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '정산을 찾을 수 없습니다.'
+                }), 404
+        except Exception as e:
+            conn.rollback() if USE_POSTGRESQL else None
+            print(f'[오류] 정산 상태 변경 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'정산 상태 변경 중 오류: {str(e)}'
+            }), 500
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f'[오류] 정산 상태 변경 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'정산 상태 변경 중 오류: {str(e)}'
         }), 500
 

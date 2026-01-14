@@ -857,6 +857,15 @@ def init_db():
                 ON settlement_files(settlement_id)
             ''')
             
+            # tax_invoice_file_url 컬럼 추가 (없는 경우에만)
+            try:
+                cursor.execute('ALTER TABLE settlements ADD COLUMN tax_invoice_file_url TEXT')
+                print("[성공] settlements 테이블에 tax_invoice_file_url 컬럼이 추가되었습니다.")
+            except Exception as e:
+                # 컬럼이 이미 존재하는 경우 무시
+                if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
+                    print(f"[경고] tax_invoice_file_url 컬럼 추가 중 오류 (무시 가능): {e}")
+            
             print("[성공] 정산 관리 시스템 테이블 생성 완료 (PostgreSQL)")
             
         else:
@@ -1623,6 +1632,15 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_settlement_files_settlement 
                 ON settlement_files(settlement_id)
             ''')
+            
+            # tax_invoice_file_url 컬럼 추가 (없는 경우에만)
+            try:
+                cursor.execute('ALTER TABLE settlements ADD COLUMN tax_invoice_file_url TEXT')
+                print("[성공] settlements 테이블에 tax_invoice_file_url 컬럼이 추가되었습니다.")
+            except Exception as e:
+                # 컬럼이 이미 존재하는 경우 무시
+                if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
+                    print(f"[경고] tax_invoice_file_url 컬럼 추가 중 오류 (무시 가능): {e}")
             
             print("[성공] 정산 관리 시스템 테이블 생성 완료 (SQLite)")
         
