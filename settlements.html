@@ -680,11 +680,15 @@
       const isAdmin = (roleNormalized === '관리자');
       
       container.querySelectorAll('.st-admin-only').forEach(el => {
-        el.style.display = isAdmin ? 'block' : 'none';
+        // 테이블 셀(<th>, <td>)인 경우 table-cell/none 사용, 그 외는 block/none 사용
+        const isTableCell = el.tagName === 'TH' || el.tagName === 'TD';
+        el.style.display = isAdmin ? (isTableCell ? 'table-cell' : 'block') : 'none';
       });
       
       container.querySelectorAll('.st-consignor-only').forEach(el => {
-        el.style.display = isAdmin ? 'none' : 'block';
+        // 테이블 셀(<th>, <td>)인 경우 table-cell/none 사용, 그 외는 block/none 사용
+        const isTableCell = el.tagName === 'TH' || el.tagName === 'TD';
+        el.style.display = isAdmin ? 'none' : (isTableCell ? 'table-cell' : 'block');
       });
     }
 
