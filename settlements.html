@@ -937,13 +937,14 @@
         // 세금계산서 컬럼: 관리자가 업로드/변경/삭제 버튼 또는 다운로드 링크
         let taxInvoiceCell = '';
         // tax_invoice_file_url이 null, undefined, 빈 문자열인지 확인
-        const hasTaxInvoice = item.tax_invoice_file_url && item.tax_invoice_file_url.trim() !== '';
+        const taxInvoiceUrl = item.tax_invoice_file_url;
+        const hasTaxInvoice = taxInvoiceUrl && String(taxInvoiceUrl).trim() !== '' && taxInvoiceUrl !== 'null' && taxInvoiceUrl !== 'undefined';
         
         if (hasTaxInvoice) {
           // 세금계산서가 업로드되어 있으면 다운로드, 변경, 삭제 버튼 표시
           taxInvoiceCell = `
             <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
-              <a href="${item.tax_invoice_file_url}" target="_blank" class="st-file-link" download style="font-size: 12px; margin-right: 4px;">📄 다운로드</a>
+              <a href="${taxInvoiceUrl}" target="_blank" class="st-file-link" download style="font-size: 12px; margin-right: 4px;">📄 다운로드</a>
               <button class="st-btn" onclick="stUploadTaxInvoice(${item.id})" style="padding: 4px 8px; font-size: 11px;">변경</button>
               <button class="st-btn" onclick="stDeleteTaxInvoice(${item.id})" style="padding: 4px 8px; font-size: 11px; background: linear-gradient(135deg, #e17055 0%, #d63031 100%);">삭제</button>
             </div>
