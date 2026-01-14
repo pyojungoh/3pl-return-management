@@ -1643,7 +1643,7 @@ def update_settlement_status(settlement_id):
             }), 400
         
         # 유효한 상태값 확인
-        valid_statuses = ['대기', '전달', '세금계산서_업로드_완료', '정산확정', '입금완료']
+        valid_statuses = ['대기', '전달', '정산확인', '입금완료']
         if new_status not in valid_statuses:
             return jsonify({
                 'success': False,

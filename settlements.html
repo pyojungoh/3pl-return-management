@@ -946,25 +946,29 @@
         
         // 상태별 색상
         let statusColor = '#2d3436';
-        if (status === '정산확정') statusColor = '#00b894';
+        if (status === '전달') statusColor = '#0984e3';
+        else if (status === '정산확인') statusColor = '#00b894';
         else if (status === '입금완료') statusColor = '#00a085';
         
         // 세금계산서 컬럼: 관리자가 업로드 버튼 또는 다운로드 링크
         let taxInvoiceCell = '';
         if (item.tax_invoice_file_url) {
           taxInvoiceCell = `<a href="${item.tax_invoice_file_url}" target="_blank" class="st-file-link" download style="font-size: 12px;">📄 다운로드</a>`;
-        } else {
+        } else if (status === '정산확인') {
+          // 정산확인 상태일 때만 세금계산서 업로드 가능
           taxInvoiceCell = `<button class="st-btn" onclick="stUploadTaxInvoice(${item.id})" style="padding: 6px 12px; font-size: 12px;">📄 업로드</button>`;
+        } else {
+          taxInvoiceCell = '<span style="color: #999;">-</span>';
         }
         
-        // 상태별 액션 버튼 (정산 확정, 입금완료)
+        // 상태별 액션 버튼 (확정, 입금확인)
         let actionButtons = '';
-        if (item.tax_invoice_file_url && status !== '정산확정' && status !== '입금완료') {
-          // 세금계산서가 업로드되어 있고, 아직 정산확정/입금완료가 아니면 정산 확정 버튼 표시
-          actionButtons = `<button class="st-btn" onclick="stConfirmSettlement(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #00b894 0%, #00a085 100%);">✅ 정산 확정</button>`;
-        } else if (status === '정산확정') {
-          // 정산확정 상태면 입금완료 버튼 표시
-          actionButtons = `<button class="st-btn" onclick="stCompletePayment(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #00a085 0%, #008874 100%);">💰 입금완료</button>`;
+        if (status === '대기') {
+          // 대기 상태면 확정 버튼 표시 (세금계산서 업로드 전)
+          actionButtons = `<button class="st-btn" onclick="stConfirmSettlement(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #00b894 0%, #00a085 100%);">✅ 확정</button>`;
+        } else if (status === '정산확인' && item.tax_invoice_file_url) {
+          // 정산확인 상태이고 세금계산서가 업로드되어 있으면 입금확인 버튼 표시
+          actionButtons = `<button class="st-btn" onclick="stCompletePayment(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #00a085 0%, #008874 100%);">💰 입금확인</button>`;
         }
         
         return `
@@ -1007,7 +1011,8 @@
         
         // 상태별 색상
         let statusColor = '#2d3436';
-        if (status === '정산확정') statusColor = '#00b894';
+        if (status === '전달') statusColor = '#0984e3';
+        else if (status === '정산확인') statusColor = '#00b894';
         else if (status === '입금완료') statusColor = '#00a085';
         
         // 세금계산서 컬럼: 화주사는 다운로드만 가능 (업로드 버튼 없음)
@@ -1016,6 +1021,13 @@
           taxInvoiceCell = `<a href="${item.tax_invoice_file_url}" target="_blank" class="st-file-link" download style="font-size: 12px;">📄 다운로드</a>`;
         } else {
           taxInvoiceCell = '<span style="color: #999;">-</span>';
+        }
+        
+        // 화주사 액션 버튼 (정산확인)
+        let actionButtons = '';
+        if (status === '전달') {
+          // 전달 상태면 정산확인 버튼 표시
+          actionButtons = `<button class="st-btn" onclick="stConfirmSettlementByConsignor(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #00b894 0%, #00a085 100%);">✅ 정산확인</button>`;
         }
         
         return `
@@ -1028,6 +1040,7 @@
             <td style="color: ${statusColor}; font-weight: 600;">${status}</td>
             <td>${taxInvoiceCell}</td>
             <td>
+              ${actionButtons}
               <button class="st-btn" onclick="stShowSettlementDetail(${item.id})" style="padding: 6px 12px; font-size: 12px;">상세</button>
             </td>
           </tr>
@@ -2149,9 +2162,9 @@
       input.click();
     }
 
-    // 정산 확정 (관리자)
+    // 확정 (관리자) - 세금계산서 업로드 전
     function stConfirmSettlement(settlementId) {
-      if (!confirm('정산을 확정하시겠습니까?')) return;
+      if (!confirm('정산을 확정하여 화주사에게 공개하시겠습니까?')) return;
       
       fetch(`/api/settlements/${settlementId}/update-status`, {
         method: 'POST',
@@ -2161,13 +2174,13 @@
         },
         credentials: 'include',
         body: JSON.stringify({
-          status: '정산확정'
+          status: '전달'
         })
       })
         .then(response => response.json())
         .then(data => {
           if (data.success) {
-            alert('정산이 확정되었습니다.');
+            alert('정산이 확정되어 화주사에게 공개되었습니다.');
             stAdminLoadSettlements();
           } else {
             alert(data.message || '정산 확정에 실패했습니다.');
@@ -2179,9 +2192,39 @@
         });
     }
 
-    // 입금완료 (관리자)
+    // 정산확인 (화주사)
+    function stConfirmSettlementByConsignor(settlementId) {
+      if (!confirm('정산 내역을 확인하셨습니까?')) return;
+      
+      fetch(`/api/settlements/${settlementId}/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...stGetUserHeaders()
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          status: '정산확인'
+        })
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert('정산확인이 완료되었습니다.');
+            stConsignorLoadSettlements();
+          } else {
+            alert(data.message || '정산확인에 실패했습니다.');
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 정산확인 오류:', error);
+          alert('정산확인 중 오류가 발생했습니다.');
+        });
+    }
+
+    // 입금확인 (관리자) - 입금 완료 후
     function stCompletePayment(settlementId) {
-      if (!confirm('입금이 완료되었습니까?')) return;
+      if (!confirm('입금이 확인되었습니까?')) return;
       
       fetch(`/api/settlements/${settlementId}/update-status`, {
         method: 'POST',
@@ -2197,15 +2240,15 @@
         .then(response => response.json())
         .then(data => {
           if (data.success) {
-            alert('입금완료 처리되었습니다.');
+            alert('입금확인이 완료되었습니다.');
             stAdminLoadSettlements();
           } else {
-            alert(data.message || '입금완료 처리에 실패했습니다.');
+            alert(data.message || '입금확인 처리에 실패했습니다.');
           }
         })
         .catch(error => {
-          console.error('[ST] 입금완료 처리 오류:', error);
-          alert('입금완료 처리 중 오류가 발생했습니다.');
+          console.error('[ST] 입금확인 처리 오류:', error);
+          alert('입금확인 처리 중 오류가 발생했습니다.');
         });
     }
 
