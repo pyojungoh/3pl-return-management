@@ -978,10 +978,8 @@
         } else if (status === '정산확인') {
           // 정산확인 상태면 되돌리기 버튼 표시 (전달로)
           rollbackButton = `<button class="st-btn" onclick="stRollbackStatus(${item.id}, '전달')" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #e17055 0%, #d63031 100%);">↩️ 되돌리기</button>`;
-          if (item.tax_invoice_file_url) {
-            // 세금계산서가 업로드되어 있으면 입금확인 버튼 표시
-            actionButtons = `<button class="st-btn" onclick="stCompletePayment(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #00a085 0%, #008874 100%);">💰 입금확인</button>`;
-          }
+          // 세금계산서 업로드 여부와 상관없이 정산확인 상태면 입금확인 버튼 표시
+          actionButtons = `<button class="st-btn" onclick="stCompletePayment(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #00a085 0%, #008874 100%);">💰 입금확인</button>`;
         } else if (status === '입금완료') {
           // 입금완료 상태면 되돌리기 버튼 표시 (정산확인으로)
           rollbackButton = `<button class="st-btn" onclick="stRollbackStatus(${item.id}, '정산확인')" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #e17055 0%, #d63031 100%);">↩️ 되돌리기</button>`;
