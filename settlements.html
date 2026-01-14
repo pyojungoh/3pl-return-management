@@ -2193,6 +2193,8 @@
     function stConfirmSettlementByConsignor(settlementId) {
       if (!confirm('정산 내역을 확인하셨습니까?')) return;
       
+      console.log('[ST] 정산확인 시작, settlementId:', settlementId);
+      
       fetch(`/api/settlements/${settlementId}/update-status`, {
         method: 'POST',
         headers: {
@@ -2204,8 +2206,17 @@
           status: '정산확인'
         })
       })
-        .then(response => response.json())
+        .then(response => {
+          console.log('[ST] 정산확인 API 응답 상태:', response.status, response.statusText);
+          if (!response.ok) {
+            return response.json().then(data => {
+              throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`);
+            });
+          }
+          return response.json();
+        })
         .then(data => {
+          console.log('[ST] 정산확인 API 응답 데이터:', data);
           if (data.success) {
             alert('정산확인이 완료되었습니다.');
             stConsignorLoadSettlements();
@@ -2215,7 +2226,7 @@
         })
         .catch(error => {
           console.error('[ST] 정산확인 오류:', error);
-          alert('정산확인 중 오류가 발생했습니다.');
+          alert(error.message || '정산확인 중 오류가 발생했습니다.');
         });
     }
 

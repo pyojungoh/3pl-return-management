@@ -1667,19 +1667,23 @@ def update_settlement_status(settlement_id):
             settlement_company_name = settlement.get('company_name', '')
             current_status = settlement.get('status', '')
             
+            print(f'[정산상태변경] role={role}, company_name={company_name}, settlement_company_name={settlement_company_name}, current_status={current_status}, new_status={new_status}')
+            
             # 권한 확인
             if role == '관리자':
                 # 관리자는 모든 상태 변경 가능
                 pass
-            elif role != '관리자' and new_status == '정산확인':
+            elif new_status == '정산확인':
                 # 화주사는 자신의 정산만 '정산확인' 상태로 변경 가능
                 if not company_name:
+                    print(f'[정산상태변경] 화주사 정보 없음')
                     return jsonify({
                         'success': False,
                         'message': '화주사 정보를 확인할 수 없습니다.'
                     }), 400
                 
                 if settlement_company_name != company_name:
+                    print(f'[정산상태변경] 화주사 불일치: {company_name} != {settlement_company_name}')
                     return jsonify({
                         'success': False,
                         'message': '자신의 정산만 확인할 수 있습니다.'
@@ -1687,16 +1691,19 @@ def update_settlement_status(settlement_id):
                 
                 # 화주사는 '전달' 상태에서만 '정산확인'으로 변경 가능
                 if current_status != '전달':
+                    print(f'[정산상태변경] 상태 불일치: {current_status} != 전달')
                     return jsonify({
                         'success': False,
                         'message': '전달 상태인 정산만 확인할 수 있습니다.'
                     }), 400
             else:
-                # 화주사는 정산확인 외의 상태 변경 불가
-                return jsonify({
-                    'success': False,
-                    'message': '권한이 없습니다.'
-                }), 403
+                # 화주사는 정산확인 외의 상태 변경 불가 (관리자가 아닌 경우)
+                if role != '관리자':
+                    print(f'[정산상태변경] 권한 없음: role={role}, new_status={new_status}')
+                    return jsonify({
+                        'success': False,
+                        'message': '권한이 없습니다.'
+                    }), 403
             
             # 상태 업데이트
             if USE_POSTGRESQL:
