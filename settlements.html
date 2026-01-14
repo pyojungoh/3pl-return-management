@@ -961,14 +961,26 @@
           taxInvoiceCell = '<span style="color: #999;">-</span>';
         }
         
-        // 상태별 액션 버튼 (확정, 입금확인)
+        // 상태별 액션 버튼 (확정, 입금확인, 되돌리기)
         let actionButtons = '';
+        let rollbackButton = '';
+        
         if (status === '대기') {
           // 대기 상태면 확정 버튼 표시 (세금계산서 업로드 전)
           actionButtons = `<button class="st-btn" onclick="stConfirmSettlement(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #00b894 0%, #00a085 100%);">✅ 확정</button>`;
-        } else if (status === '정산확인' && item.tax_invoice_file_url) {
-          // 정산확인 상태이고 세금계산서가 업로드되어 있으면 입금확인 버튼 표시
-          actionButtons = `<button class="st-btn" onclick="stCompletePayment(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #00a085 0%, #008874 100%);">💰 입금확인</button>`;
+        } else if (status === '전달') {
+          // 전달 상태면 되돌리기 버튼 표시 (대기로)
+          rollbackButton = `<button class="st-btn" onclick="stRollbackStatus(${item.id}, '대기')" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #e17055 0%, #d63031 100%);">↩️ 되돌리기</button>`;
+        } else if (status === '정산확인') {
+          // 정산확인 상태면 되돌리기 버튼 표시 (전달로)
+          rollbackButton = `<button class="st-btn" onclick="stRollbackStatus(${item.id}, '전달')" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #e17055 0%, #d63031 100%);">↩️ 되돌리기</button>`;
+          if (item.tax_invoice_file_url) {
+            // 세금계산서가 업로드되어 있으면 입금확인 버튼 표시
+            actionButtons = `<button class="st-btn" onclick="stCompletePayment(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #00a085 0%, #008874 100%);">💰 입금확인</button>`;
+          }
+        } else if (status === '입금완료') {
+          // 입금완료 상태면 되돌리기 버튼 표시 (정산확인으로)
+          rollbackButton = `<button class="st-btn" onclick="stRollbackStatus(${item.id}, '정산확인')" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #e17055 0%, #d63031 100%);">↩️ 되돌리기</button>`;
         }
         
         return `
@@ -983,6 +995,7 @@
             <td>${taxInvoiceCell}</td>
             <td>
               ${actionButtons}
+              ${rollbackButton}
               <button class="st-btn" onclick="stShowSettlementDetail(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px;">상세</button>
               <button class="st-btn" onclick="stEditSettlement(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px;">수정</button>
               <button class="st-btn-danger" onclick="stDeleteSettlement(${item.id})" style="padding: 6px 12px; font-size: 12px;">삭제</button>
@@ -2249,6 +2262,43 @@
         .catch(error => {
           console.error('[ST] 입금확인 처리 오류:', error);
           alert('입금확인 처리 중 오류가 발생했습니다.');
+        });
+    }
+
+    // 상태 되돌리기 (관리자)
+    function stRollbackStatus(settlementId, targetStatus) {
+      const statusNames = {
+        '대기': '대기',
+        '전달': '전달',
+        '정산확인': '정산확인'
+      };
+      const statusName = statusNames[targetStatus] || targetStatus;
+      
+      if (!confirm(`상태를 "${statusName}"로 되돌리시겠습니까?`)) return;
+      
+      fetch(`/api/settlements/${settlementId}/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...stGetUserHeaders()
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          status: targetStatus
+        })
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert(`상태가 "${statusName}"로 변경되었습니다.`);
+            stAdminLoadSettlements();
+          } else {
+            alert(data.message || '상태 변경에 실패했습니다.');
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 상태 되돌리기 오류:', error);
+          alert('상태 변경 중 오류가 발생했습니다.');
         });
     }
 
