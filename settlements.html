@@ -1792,10 +1792,10 @@
                 </div>
                 <div class="st-settlement-detail-row">
                   <div class="st-settlement-detail-label">작업비</div>
-                  <div class="st-settlement-detail-value">
-                    ${(settlement.work_fee || 0).toLocaleString()}원
+                  <div class="st-settlement-detail-value" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <span>${(settlement.work_fee || 0).toLocaleString()}원</span>
                     ${settlement.work_fee_file_url ? `
-                      <div style="margin-top: 8px; display: flex; gap: 10px;">
+                      <div style="display: flex; gap: 10px;">
                         <a href="${settlement.work_fee_file_url}" target="_blank" class="st-file-link" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">👁️ 미리보기</a>
                         <a href="${settlement.work_fee_file_url}" target="_blank" class="st-file-link" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">📥 다운로드</a>
                       </div>
@@ -1804,10 +1804,10 @@
                 </div>
                 <div class="st-settlement-detail-row">
                   <div class="st-settlement-detail-label">입출고비</div>
-                  <div class="st-settlement-detail-value">
-                    ${(settlement.inout_fee || 0).toLocaleString()}원
+                  <div class="st-settlement-detail-value" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <span>${(settlement.inout_fee || 0).toLocaleString()}원</span>
                     ${settlement.inout_fee_file_url ? `
-                      <div style="margin-top: 8px; display: flex; gap: 10px;">
+                      <div style="display: flex; gap: 10px;">
                         <a href="${settlement.inout_fee_file_url}" target="_blank" class="st-file-link" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">👁️ 미리보기</a>
                         <a href="${settlement.inout_fee_file_url}" target="_blank" class="st-file-link" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">📥 다운로드</a>
                       </div>
@@ -1816,10 +1816,10 @@
                 </div>
                 <div class="st-settlement-detail-row">
                   <div class="st-settlement-detail-label">택배비</div>
-                  <div class="st-settlement-detail-value">
-                    ${(settlement.shipping_fee || 0).toLocaleString()}원
+                  <div class="st-settlement-detail-value" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <span>${(settlement.shipping_fee || 0).toLocaleString()}원</span>
                     ${settlement.shipping_fee_file_url ? `
-                      <div style="margin-top: 8px; display: flex; gap: 10px;">
+                      <div style="display: flex; gap: 10px;">
                         <a href="${settlement.shipping_fee_file_url}" target="_blank" class="st-file-link" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">👁️ 미리보기</a>
                         <a href="${settlement.shipping_fee_file_url}" target="_blank" class="st-file-link" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">📥 다운로드</a>
                       </div>
@@ -1843,10 +1843,10 @@
                 </div>
                 <div class="st-settlement-detail-row">
                   <div class="st-settlement-detail-label">총액</div>
-                  <div class="st-settlement-detail-value" style="font-weight: 700; font-size: 18px; color: #ff6b35;">${totalAmount.toLocaleString()}원</div>
+                  <div class="st-settlement-detail-value" style="font-weight: 700; font-size: 18px; color: #2d3436;">${totalAmount.toLocaleString()}원</div>
                 </div>
                 <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">세금</div>
+                  <div class="st-settlement-detail-label">부가세</div>
                   <div class="st-settlement-detail-value" style="font-weight: 600; color: #0984e3;">${tax.toLocaleString()}원</div>
                 </div>
                 <div class="st-settlement-detail-row">
