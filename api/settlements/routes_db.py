@@ -1488,26 +1488,19 @@ def bulk_update_settlement_status():
 
 @settlements_bp.route('/<int:settlement_id>/upload-tax-invoice', methods=['POST'])
 def upload_tax_invoice(settlement_id):
-    """세금계산서 업로드 (화주사용)"""
+    """세금계산서 업로드 (관리자용)"""
     try:
         user_context = get_user_context()
         role = user_context['role']
-        company_name = user_context['company_name']
         
-        # 화주사만 세금계산서 업로드 가능
-        if role == '관리자':
+        # 관리자만 세금계산서 업로드 가능
+        if role != '관리자':
             return jsonify({
                 'success': False,
-                'message': '관리자는 세금계산서를 업로드할 수 없습니다. 화주사 계정으로 로그인해주세요.'
+                'message': '관리자만 세금계산서를 업로드할 수 있습니다.'
             }), 403
         
-        if not company_name:
-            return jsonify({
-                'success': False,
-                'message': '화주사 정보를 확인할 수 없습니다.'
-            }), 400
-        
-        # 정산 정보 조회 및 권한 확인
+        # 정산 정보 조회
         conn = get_db_connection()
         if USE_POSTGRESQL:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -1529,14 +1522,6 @@ def upload_tax_invoice(settlement_id):
             
             settlement = dict(row)
             settlement_company_name = settlement.get('company_name', '')
-            
-            # 화주사는 자신의 정산에만 세금계산서 업로드 가능
-            if settlement_company_name != company_name:
-                return jsonify({
-                    'success': False,
-                    'message': '권한이 없습니다. 자신의 정산에만 세금계산서를 업로드할 수 있습니다.'
-                }), 403
-            
             settlement_year_month = settlement.get('settlement_year_month', '')
         finally:
             cursor.close()
@@ -1590,9 +1575,9 @@ def upload_tax_invoice(settlement_id):
             
             try:
                 if USE_POSTGRESQL:
-                    cursor.execute('UPDATE settlements SET tax_invoice_file_url = %s, status = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s', (file_url, '세금계산서_업로드_완료', settlement_id))
+                    cursor.execute('UPDATE settlements SET tax_invoice_file_url = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s', (file_url, settlement_id))
                 else:
-                    cursor.execute('UPDATE settlements SET tax_invoice_file_url = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', (file_url, '세금계산서_업로드_완료', settlement_id))
+                    cursor.execute('UPDATE settlements SET tax_invoice_file_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', (file_url, settlement_id))
                 
                 conn.commit()
                 

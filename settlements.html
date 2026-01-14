@@ -573,7 +573,7 @@
                 <th>총액</th>
                 <th>상태</th>
                 <th>세금계산서</th>
-                <th class="st-admin-only">액션</th>
+                <th class="st-admin-only">관리</th>
               </tr>
             </thead>
             <tbody id="stTableBody">
@@ -948,15 +948,24 @@
         
         // 상태별 색상
         let statusColor = '#2d3436';
-        if (status === '세금계산서_업로드_완료') statusColor = '#0984e3';
-        else if (status === '정산확정') statusColor = '#00b894';
+        if (status === '정산확정') statusColor = '#00b894';
         else if (status === '입금완료') statusColor = '#00a085';
         
-        // 상태별 액션 버튼
+        // 세금계산서 컬럼: 관리자가 업로드 버튼 또는 다운로드 링크
+        let taxInvoiceCell = '';
+        if (item.tax_invoice_file_url) {
+          taxInvoiceCell = `<a href="${item.tax_invoice_file_url}" target="_blank" class="st-file-link" download style="font-size: 12px;">📄 다운로드</a>`;
+        } else {
+          taxInvoiceCell = `<button class="st-btn" onclick="stUploadTaxInvoice(${item.id})" style="padding: 6px 12px; font-size: 12px;">📄 업로드</button>`;
+        }
+        
+        // 상태별 액션 버튼 (정산 확정, 입금완료)
         let actionButtons = '';
-        if (status === '세금계산서_업로드_완료') {
+        if (item.tax_invoice_file_url && status !== '정산확정' && status !== '입금완료') {
+          // 세금계산서가 업로드되어 있고, 아직 정산확정/입금완료가 아니면 정산 확정 버튼 표시
           actionButtons = `<button class="st-btn" onclick="stConfirmSettlement(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #00b894 0%, #00a085 100%);">✅ 정산 확정</button>`;
         } else if (status === '정산확정') {
+          // 정산확정 상태면 입금완료 버튼 표시
           actionButtons = `<button class="st-btn" onclick="stCompletePayment(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px; background: linear-gradient(135deg, #00a085 0%, #008874 100%);">💰 입금완료</button>`;
         }
         
@@ -982,9 +991,7 @@
             <td style="color: #e74c3c;">-${(item.error_deduction || 0).toLocaleString()}원</td>
             <td style="font-weight: 700; color: #ff6b35;">${totalAmount.toLocaleString()}원</td>
             <td style="color: ${statusColor}; font-weight: 600;">${status}</td>
-            <td>
-              ${item.tax_invoice_file_url ? `<a href="${item.tax_invoice_file_url}" target="_blank" class="st-file-link" download style="font-size: 12px;">📄 다운로드</a>` : '<span style="color: #999;">-</span>'}
-            </td>
+            <td>${taxInvoiceCell}</td>
             <td>
               ${actionButtons}
               <button class="st-btn" onclick="stShowSettlementDetail(${item.id})" style="padding: 6px 12px; font-size: 12px; margin-right: 4px;">상세</button>
@@ -1013,17 +1020,13 @@
         
         // 상태별 색상
         let statusColor = '#2d3436';
-        if (status === '세금계산서_업로드_완료') statusColor = '#0984e3';
-        else if (status === '정산확정') statusColor = '#00b894';
+        if (status === '정산확정') statusColor = '#00b894';
         else if (status === '입금완료') statusColor = '#00a085';
         
-        // 세금계산서 컬럼: 업로드 버튼 또는 다운로드 링크
+        // 세금계산서 컬럼: 화주사는 다운로드만 가능 (업로드 버튼 없음)
         let taxInvoiceCell = '';
         if (item.tax_invoice_file_url) {
           taxInvoiceCell = `<a href="${item.tax_invoice_file_url}" target="_blank" class="st-file-link" download style="font-size: 12px;">📄 다운로드</a>`;
-        } else if (status === '전달' || status === '세금계산서_업로드_완료' || status === '정산확정' || status === '입금완료') {
-          // 전달 상태 이상이면 업로드 버튼 표시
-          taxInvoiceCell = `<button class="st-btn" onclick="stUploadTaxInvoice(${item.id})" style="padding: 6px 12px; font-size: 12px;">📄 업로드</button>`;
         } else {
           taxInvoiceCell = '<span style="color: #999;">-</span>';
         }
@@ -2130,7 +2133,7 @@
       });
     }
 
-    // 세금계산서 업로드 (화주사용)
+    // 세금계산서 업로드 (관리자용)
     function stUploadTaxInvoice(settlementId) {
       const input = document.createElement('input');
       input.type = 'file';
