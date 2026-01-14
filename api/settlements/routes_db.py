@@ -1,7 +1,7 @@
 """
 정산 관리 API 라우트
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response
 from api.database.models import (
     get_db_connection,
     USE_POSTGRESQL
@@ -1816,5 +1816,82 @@ def update_settlement_status(settlement_id):
         return jsonify({
             'success': False,
             'message': f'정산 상태 변경 중 오류: {str(e)}'
+        }), 500
+
+
+# ========== 명세서 생성 ==========
+
+@settlements_bp.route('/<int:settlement_id>/statement', methods=['GET'])
+def generate_settlement_statement(settlement_id):
+    """정산 명세서 생성 (엑셀)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        company_name = user_context['company_name']
+        
+        conn = get_db_connection()
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
+        
+        try:
+            # 정산 정보 조회
+            if USE_POSTGRESQL:
+                cursor.execute('SELECT * FROM settlements WHERE id = %s', (settlement_id,))
+            else:
+                cursor.execute('SELECT * FROM settlements WHERE id = ?', (settlement_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({
+                    'success': False,
+                    'message': '정산을 찾을 수 없습니다.'
+                }), 404
+            
+            settlement = dict(row) if USE_POSTGRESQL else dict(zip([desc[0] for desc in cursor.description], row))
+            
+            # 화주사는 자신의 정산만 조회 가능
+            if role != '관리자':
+                if settlement.get('company_name') != company_name:
+                    return jsonify({
+                        'success': False,
+                        'message': '권한이 없습니다.'
+                    }), 403
+            
+            # datetime 객체를 문자열로 변환
+            for key, value in settlement.items():
+                if isinstance(value, datetime):
+                    settlement[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+                elif isinstance(value, date):
+                    settlement[key] = value.strftime('%Y-%m-%d') if value else None
+            
+            # 명세서 생성
+            from api.settlements.statement_generator import create_settlement_statement
+            excel_file = create_settlement_statement(settlement)
+            
+            # 파일명 생성
+            year_month = settlement.get('settlement_year_month', '').replace('-', '')
+            company = settlement.get('company_name', '정산')
+            filename = f'정산명세서_{company}_{year_month}.xlsx'
+            
+            return Response(
+                excel_file.read(),
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                headers={
+                    'Content-Disposition': f'attachment; filename="{filename}"',
+                    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                }
+            )
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f'[오류] 명세서 생성 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'명세서 생성 중 오류: {str(e)}'
         }), 500
 
