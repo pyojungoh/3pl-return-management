@@ -936,7 +936,10 @@
         
         // 세금계산서 컬럼: 관리자가 업로드/변경/삭제 버튼 또는 다운로드 링크
         let taxInvoiceCell = '';
-        if (item.tax_invoice_file_url) {
+        // tax_invoice_file_url이 null, undefined, 빈 문자열인지 확인
+        const hasTaxInvoice = item.tax_invoice_file_url && item.tax_invoice_file_url.trim() !== '';
+        
+        if (hasTaxInvoice) {
           // 세금계산서가 업로드되어 있으면 다운로드, 변경, 삭제 버튼 표시
           taxInvoiceCell = `
             <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
