@@ -2279,14 +2279,27 @@
         <head>
           <title>정산 명세서</title>
           <style>
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
             body {
               font-family: 'Malgun Gothic', sans-serif;
-              padding: 40px;
+              padding: 15px;
               margin: 0;
             }
             @media print {
               @page {
-                margin: 20mm;
+                size: A4 portrait;
+                margin: 10mm;
+              }
+              body {
+                padding: 0;
+                margin: 0;
+              }
+              * {
+                page-break-inside: avoid;
               }
             }
           </style>
