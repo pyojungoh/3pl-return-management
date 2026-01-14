@@ -2057,9 +2057,36 @@
         return;
       }
       
-      // API 엔드포인트로 명세서 다운로드
+      // fetch로 헤더를 포함하여 파일 다운로드
       const url = `/api/settlements/${stCurrentSettlementId}/statement`;
-      window.open(url, '_blank');
+      fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        headers: stGetUserHeaders()
+      })
+        .then(response => {
+          if (!response.ok) {
+            return response.json().then(data => {
+              throw new Error(data.message || '명세서 다운로드에 실패했습니다.');
+            });
+          }
+          return response.blob();
+        })
+        .then(blob => {
+          // 파일명 추출 (Content-Disposition 헤더에서)
+          const urlObj = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = urlObj;
+          link.download = `정산명세서_${stCurrentSettlementId}.xlsx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(urlObj);
+        })
+        .catch(error => {
+          console.error('[ST] 명세서 다운로드 오류:', error);
+          alert(error.message || '명세서 다운로드 중 오류가 발생했습니다.');
+        });
     }
 
     // 화주사 목록 로드 (관리자용)
