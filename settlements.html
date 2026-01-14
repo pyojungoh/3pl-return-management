@@ -2137,7 +2137,7 @@
     function stUploadTaxInvoice(settlementId) {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.pdf,.xlsx,.xls,.csv';
+      input.accept = '.pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.gif,.bmp';
       input.onchange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
