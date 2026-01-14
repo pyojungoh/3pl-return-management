@@ -1416,6 +1416,66 @@ def delete_settlement_file(settlement_id):
         }), 500
 
 
+# ========== 세금계산서 삭제 ==========
+
+@settlements_bp.route('/<int:settlement_id>/delete-tax-invoice', methods=['POST'])
+def delete_tax_invoice(settlement_id):
+    """세금계산서 삭제 (관리자용)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        
+        # 관리자만 세금계산서 삭제 가능
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 세금계산서를 삭제할 수 있습니다.'
+            }), 403
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # 세금계산서 URL을 NULL로 업데이트
+            if USE_POSTGRESQL:
+                cursor.execute('UPDATE settlements SET tax_invoice_file_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = %s', (settlement_id,))
+            else:
+                cursor.execute('UPDATE settlements SET tax_invoice_file_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?', (settlement_id,))
+            
+            conn.commit()
+            
+            if cursor.rowcount > 0:
+                return jsonify({
+                    'success': True,
+                    'message': '세금계산서가 삭제되었습니다.'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '정산을 찾을 수 없습니다.'
+                }), 404
+        except Exception as e:
+            conn.rollback() if USE_POSTGRESQL else None
+            print(f'[오류] 세금계산서 삭제 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'세금계산서 삭제 중 오류: {str(e)}'
+            }), 500
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f'[오류] 세금계산서 삭제 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'세금계산서 삭제 중 오류: {str(e)}'
+        }), 500
+
+
 # ========== 일괄 상태 변경 ==========
 
 @settlements_bp.route('/bulk-update-status', methods=['POST'])

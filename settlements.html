@@ -934,12 +934,19 @@
         else if (status === '정산확인') statusColor = '#00b894';
         else if (status === '입금완료') statusColor = '#00a085';
         
-        // 세금계산서 컬럼: 관리자가 업로드 버튼 또는 다운로드 링크
+        // 세금계산서 컬럼: 관리자가 업로드/변경/삭제 버튼 또는 다운로드 링크
         let taxInvoiceCell = '';
         if (item.tax_invoice_file_url) {
-          taxInvoiceCell = `<a href="${item.tax_invoice_file_url}" target="_blank" class="st-file-link" download style="font-size: 12px;">📄 다운로드</a>`;
-        } else if (status === '정산확인') {
-          // 정산확인 상태일 때만 세금계산서 업로드 가능
+          // 세금계산서가 업로드되어 있으면 다운로드, 변경, 삭제 버튼 표시
+          taxInvoiceCell = `
+            <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
+              <a href="${item.tax_invoice_file_url}" target="_blank" class="st-file-link" download style="font-size: 12px; margin-right: 4px;">📄 다운로드</a>
+              <button class="st-btn" onclick="stUploadTaxInvoice(${item.id})" style="padding: 4px 8px; font-size: 11px;">변경</button>
+              <button class="st-btn" onclick="stDeleteTaxInvoice(${item.id})" style="padding: 4px 8px; font-size: 11px; background: linear-gradient(135deg, #e17055 0%, #d63031 100%);">삭제</button>
+            </div>
+          `;
+        } else if (status === '정산확인' || status === '입금완료') {
+          // 정산확인 또는 입금완료 상태일 때 세금계산서 업로드 가능
           taxInvoiceCell = `<button class="st-btn" onclick="stUploadTaxInvoice(${item.id})" style="padding: 6px 12px; font-size: 12px;">📄 업로드</button>`;
         } else {
           taxInvoiceCell = '<span style="color: #999;">-</span>';
