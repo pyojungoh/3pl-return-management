@@ -585,8 +585,24 @@
       </div>
       <div id="stSettlementDetailContent"></div>
       <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: flex-end;">
-        <button class="st-btn" onclick="stDownloadStatement()">📥 명세서 다운로드</button>
+        <button class="st-btn" onclick="stShowStatementPreview()">👁️ 명세서 미리보기</button>
         <button class="st-btn-secondary" onclick="stCloseDetailModal()">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 명세서 미리보기 모달 -->
+  <div id="stStatementPreviewModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; overflow-y: auto;">
+    <div style="max-width: 1000px; margin: 30px auto; background: white; border-radius: 14px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h2 style="margin: 0; color: #ff6b35; font-weight: 700;">정산 명세서</h2>
+        <button onclick="stCloseStatementPreview()" style="background: #e17055; color: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 18px;">×</button>
+      </div>
+      <div id="stStatementPreviewContent" style="margin-bottom: 24px;"></div>
+      <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 20px; border-top: 2px solid #f0f0f0;">
+        <button class="st-btn" onclick="stDownloadStatementFromPreview()">📥 다운로드</button>
+        <button class="st-btn" onclick="stPrintStatement()" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);">🖨️ 프린트</button>
+        <button class="st-btn-secondary" onclick="stCloseStatementPreview()">닫기</button>
       </div>
     </div>
   </div>
@@ -2050,8 +2066,168 @@
       stCurrentSettlementId = null;
     }
 
-    // 명세서 다운로드
-    function stDownloadStatement() {
+    // 명세서 미리보기
+    function stShowStatementPreview() {
+      if (!stCurrentSettlementId) {
+        alert('정산 정보를 불러올 수 없습니다.');
+        return;
+      }
+      
+      // 정산 데이터 가져오기
+      fetch(`/api/settlements/${stCurrentSettlementId}`, {
+        credentials: 'include',
+        headers: stGetUserHeaders()
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const settlement = data.data;
+            const totalAmount = (settlement.work_fee || 0) + (settlement.inout_fee || 0) + 
+                              (settlement.shipping_fee || 0) + (settlement.storage_fee || 0) + 
+                              (settlement.special_work_fee || 0) - (settlement.error_deduction || 0);
+            const tax = Math.floor(totalAmount * 0.1);
+            const finalAmount = totalAmount + tax;
+            
+            // 명세서 HTML 생성
+            const previewContent = `
+              <div style="font-family: 'Malgun Gothic', sans-serif;">
+                <div style="text-align: center; margin-bottom: 30px;">
+                  <h1 style="margin: 0; color: #2d3436; font-size: 24px; font-weight: 700;">정산 명세서</h1>
+                </div>
+                
+                <div style="margin-bottom: 30px;">
+                  <h3 style="color: #2d3436; font-size: 16px; font-weight: 700; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #ddd;">■ 공급자 정보</h3>
+                  <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                    <tr>
+                      <td style="padding: 8px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600; width: 150px;">상호</td>
+                      <td style="padding: 8px; border: 1px solid #ddd;">제이제이</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600;">사업자등록번호</td>
+                      <td style="padding: 8px; border: 1px solid #ddd;">803-15-01907</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600;">대표자</td>
+                      <td style="padding: 8px; border: 1px solid #ddd;">이정민</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600;">사업장소재지</td>
+                      <td style="padding: 8px; border: 1px solid #ddd;">경기도 김포시 통진읍 월하로 352-18</td>
+                    </tr>
+                  </table>
+                </div>
+                
+                <div style="margin-bottom: 30px;">
+                  <h3 style="color: #2d3436; font-size: 16px; font-weight: 700; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #ddd;">■ 공급받는자 정보</h3>
+                  <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                    <tr>
+                      <td style="padding: 8px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600; width: 150px;">상호</td>
+                      <td style="padding: 8px; border: 1px solid #ddd;">${settlement.company_name || ''}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600;">정산년월</td>
+                      <td style="padding: 8px; border: 1px solid #ddd;">${settlement.settlement_year_month || ''}</td>
+                    </tr>
+                  </table>
+                </div>
+                
+                <div style="margin-bottom: 30px;">
+                  <h3 style="color: #2d3436; font-size: 16px; font-weight: 700; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #ddd;">■ 정산 내역</h3>
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                      <tr style="background: #4472C4; color: white;">
+                        <th style="padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: 600;">항목</th>
+                        <th style="padding: 12px; border: 1px solid #ddd; text-align: right; font-weight: 600;">금액 (원)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd;">작업비</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${(settlement.work_fee || 0).toLocaleString()}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd;">입출고비</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${(settlement.inout_fee || 0).toLocaleString()}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd;">택배비</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${(settlement.shipping_fee || 0).toLocaleString()}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd;">보관료</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${(settlement.storage_fee || 0).toLocaleString()}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd;">특수작업</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${(settlement.special_work_fee || 0).toLocaleString()}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd;">오배송/누락 차감</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; text-align: right; color: #e74c3c;">-${(settlement.error_deduction || 0).toLocaleString()}</td>
+                      </tr>
+                      <tr style="background: #D9E1F2;">
+                        <td style="padding: 10px; border: 1px solid #ddd; font-weight: 700;">총액</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; text-align: right; font-weight: 700;">${totalAmount.toLocaleString()}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd;">부가세 (10%)</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${tax.toLocaleString()}</td>
+                      </tr>
+                      <tr style="background: #D9E1F2;">
+                        <td style="padding: 10px; border: 1px solid #ddd; font-weight: 700; font-size: 16px;">결제금액</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; text-align: right; font-weight: 700; font-size: 16px;">${finalAmount.toLocaleString()}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                
+                <div style="margin-bottom: 30px;">
+                  <h3 style="color: #2d3436; font-size: 16px; font-weight: 700; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #ddd;">■ 입금 계좌 정보</h3>
+                  <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                    <tr>
+                      <td style="padding: 8px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600; width: 150px;">은행</td>
+                      <td style="padding: 8px; border: 1px solid #ddd;">KB국민은행</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600;">계좌번호</td>
+                      <td style="padding: 8px; border: 1px solid #ddd;">910601-01-494700</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600;">예금주</td>
+                      <td style="padding: 8px; border: 1px solid #ddd;">이정민(제이제이)</td>
+                    </tr>
+                  </table>
+                </div>
+                ${settlement.memo ? `
+                <div style="margin-bottom: 30px;">
+                  <h3 style="color: #2d3436; font-size: 16px; font-weight: 700; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #ddd;">■ 비고</h3>
+                  <div style="padding: 15px; border: 1px solid #ddd; background: #f8f9fa; border-radius: 4px;">
+                    ${settlement.memo}
+                  </div>
+                </div>
+                ` : ''}
+              </div>
+            `;
+            
+            document.getElementById('stStatementPreviewContent').innerHTML = previewContent;
+            document.getElementById('stStatementPreviewModal').style.display = 'block';
+          } else {
+            alert('정산 정보를 불러올 수 없습니다.');
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 명세서 미리보기 오류:', error);
+          alert('명세서 미리보기 중 오류가 발생했습니다.');
+        });
+    }
+    
+    // 명세서 미리보기 모달 닫기
+    function stCloseStatementPreview() {
+      document.getElementById('stStatementPreviewModal').style.display = 'none';
+    }
+    
+    // 명세서 다운로드 (미리보기 모달에서)
+    function stDownloadStatementFromPreview() {
       if (!stCurrentSettlementId) {
         alert('정산 정보를 불러올 수 없습니다.');
         return;
@@ -2073,7 +2249,6 @@
           return response.blob();
         })
         .then(blob => {
-          // 파일명 추출 (Content-Disposition 헤더에서)
           const urlObj = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = urlObj;
@@ -2087,6 +2262,46 @@
           console.error('[ST] 명세서 다운로드 오류:', error);
           alert(error.message || '명세서 다운로드 중 오류가 발생했습니다.');
         });
+    }
+    
+    // 명세서 프린트
+    function stPrintStatement() {
+      const previewContent = document.getElementById('stStatementPreviewContent');
+      if (!previewContent) {
+        alert('명세서 내용을 찾을 수 없습니다.');
+        return;
+      }
+      
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>정산 명세서</title>
+          <style>
+            body {
+              font-family: 'Malgun Gothic', sans-serif;
+              padding: 40px;
+              margin: 0;
+            }
+            @media print {
+              @page {
+                margin: 20mm;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${previewContent.innerHTML}
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
     }
 
     // 화주사 목록 로드 (관리자용)
