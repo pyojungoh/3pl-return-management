@@ -1777,6 +1777,8 @@
             const totalAmount = (settlement.work_fee || 0) + (settlement.inout_fee || 0) + 
                               (settlement.shipping_fee || 0) + (settlement.storage_fee || 0) + 
                               (settlement.special_work_fee || 0) - (settlement.error_deduction || 0);
+            const tax = Math.floor(totalAmount * 0.1); // 세금 (부가세 10%)
+            const finalAmount = totalAmount + tax; // 결제금액 (총액 + 세금)
             
             let content = `
               <div class="st-settlement-detail">
@@ -1842,6 +1844,14 @@
                 <div class="st-settlement-detail-row">
                   <div class="st-settlement-detail-label">총액</div>
                   <div class="st-settlement-detail-value" style="font-weight: 700; font-size: 18px; color: #ff6b35;">${totalAmount.toLocaleString()}원</div>
+                </div>
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">세금</div>
+                  <div class="st-settlement-detail-value" style="font-weight: 600; color: #0984e3;">${tax.toLocaleString()}원</div>
+                </div>
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">결제금액</div>
+                  <div class="st-settlement-detail-value" style="font-weight: 700; font-size: 18px; color: #ff6b35;">${finalAmount.toLocaleString()}원</div>
                 </div>
                 <div class="st-settlement-detail-row">
                   <div class="st-settlement-detail-label">상태</div>
