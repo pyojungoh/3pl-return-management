@@ -2290,6 +2290,10 @@
               padding: 0;
               margin: 0;
             }
+            .print-wrapper {
+              padding: 20px;
+              max-width: 100%;
+            }
             @media print {
               @page {
                 size: A4 portrait;
@@ -2305,11 +2309,17 @@
                 height: 100%;
                 overflow: hidden;
               }
+              .print-wrapper {
+                padding: 15px;
+                margin: 0 auto;
+              }
             }
           </style>
         </head>
         <body>
-          ${previewContent.innerHTML}
+          <div class="print-wrapper">
+            ${previewContent.innerHTML}
+          </div>
         </body>
         </html>
       `);
