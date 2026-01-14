@@ -2124,6 +2124,36 @@
       });
     }
 
+    // 세금계산서 삭제 (관리자용)
+    function stDeleteTaxInvoice(settlementId) {
+      if (!confirm('세금계산서를 삭제하시겠습니까?')) return;
+      
+      fetch(`/api/settlements/${settlementId}/delete-tax-invoice`, {
+        method: 'POST',
+        headers: stGetUserHeaders(),
+        credentials: 'include'
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert('세금계산서가 삭제되었습니다.');
+            // 목록 새로고침
+            const roleNormalized = stCurrentRole.toString().trim();
+            if (roleNormalized === '관리자') {
+              stAdminLoadSettlements();
+            } else {
+              stConsignorLoadSettlements();
+            }
+          } else {
+            alert(data.message || '세금계산서 삭제에 실패했습니다.');
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 세금계산서 삭제 오류:', error);
+          alert('세금계산서 삭제 중 오류가 발생했습니다.');
+        });
+    }
+
     // 세금계산서 업로드 (관리자용)
     function stUploadTaxInvoice(settlementId) {
       const input = document.createElement('input');
