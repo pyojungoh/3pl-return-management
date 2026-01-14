@@ -1441,21 +1441,25 @@ def bulk_update_settlement_status():
         
         try:
             # 해당 정산년월의 모든 정산 상태 변경
+            # 단, 이미 '정산확인' 이상 상태인 정산은 변경하지 않음 (화주사가 확인한 정산 보호)
             if USE_POSTGRESQL:
                 cursor.execute('''
                     UPDATE settlements 
                     SET status = %s, updated_at = CURRENT_TIMESTAMP
                     WHERE settlement_year_month = %s
+                    AND status NOT IN ('정산확인', '입금완료')
                 ''', (status, settlement_year_month))
             else:
                 cursor.execute('''
                     UPDATE settlements 
                     SET status = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE settlement_year_month = ?
+                    AND status NOT IN ('정산확인', '입금완료')
                 ''', (status, settlement_year_month))
             
             updated_count = cursor.rowcount
             conn.commit()
+            print(f'[일괄상태변경] 정산년월={settlement_year_month}, 상태={status}, 변경된개수={updated_count}')
             
             return jsonify({
                 'success': True,
