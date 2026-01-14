@@ -957,14 +957,8 @@
             </div>
           `;
         } else {
-          // 세금계산서가 없으면 업로드 버튼 표시
-          // 관리자는 정산확인 또는 입금완료 상태일 때 업로드 가능
-          if (status === '정산확인' || status === '입금완료') {
-            taxInvoiceCell = `<button class="st-btn" onclick="stUploadTaxInvoice(${item.id})" style="padding: 6px 12px; font-size: 12px;">📄 업로드</button>`;
-          } else {
-            // 다른 상태일 때는 빈칸 표시
-            taxInvoiceCell = '<span style="color: #999;">-</span>';
-          }
+          // 세금계산서가 없으면 상태에 관계없이 무조건 업로드 버튼 표시
+          taxInvoiceCell = `<button class="st-btn" onclick="stUploadTaxInvoice(${item.id})" style="padding: 6px 12px; font-size: 12px;">📄 업로드</button>`;
         }
         
         // 상태별 액션 버튼 (확정, 입금확인, 되돌리기)
