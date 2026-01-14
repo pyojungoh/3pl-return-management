@@ -938,7 +938,14 @@
         let taxInvoiceCell = '';
         // tax_invoice_file_url이 null, undefined, 빈 문자열인지 확인
         const taxInvoiceUrl = item.tax_invoice_file_url;
-        const hasTaxInvoice = taxInvoiceUrl && String(taxInvoiceUrl).trim() !== '' && taxInvoiceUrl !== 'null' && taxInvoiceUrl !== 'undefined';
+        // 더 명확한 체크: null, undefined, 빈 문자열, 문자열 'null', 'undefined' 모두 제외
+        let hasTaxInvoice = false;
+        if (taxInvoiceUrl !== null && taxInvoiceUrl !== undefined && taxInvoiceUrl !== '') {
+          const urlStr = String(taxInvoiceUrl).trim();
+          if (urlStr !== '' && urlStr !== 'null' && urlStr !== 'undefined') {
+            hasTaxInvoice = true;
+          }
+        }
         
         if (hasTaxInvoice) {
           // 세금계산서가 업로드되어 있으면 다운로드, 변경, 삭제 버튼 표시
