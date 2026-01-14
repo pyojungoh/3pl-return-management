@@ -89,8 +89,13 @@ def get_settlements_list():
                 params.append(filter_company_name)
             
             if filter_status:
-                where_clauses.append('s.status = %s' if USE_POSTGRESQL else 's.status = ?')
-                params.append(filter_status)
+                # '전달' 상태 필터인 경우, '전달' 이상의 상태 (전달, 정산확인, 입금완료) 모두 조회
+                if filter_status == '전달':
+                    where_clauses.append('s.status IN (%s, %s, %s)' if USE_POSTGRESQL else 's.status IN (?, ?, ?)')
+                    params.extend(['전달', '정산확인', '입금완료'])
+                else:
+                    where_clauses.append('s.status = %s' if USE_POSTGRESQL else 's.status = ?')
+                    params.append(filter_status)
             
             where_sql = ' AND '.join(where_clauses) if where_clauses else '1=1'
             
