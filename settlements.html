@@ -564,13 +564,9 @@
                 <th>순번</th>
                 <th>정산년월</th>
                 <th class="st-admin-only">화주사</th>
-                <th>작업비</th>
-                <th>입출고비</th>
-                <th>택배비</th>
-                <th>보관료</th>
-                <th>특수작업</th>
-                <th>오배송/누락</th>
                 <th>총액</th>
+                <th>세금</th>
+                <th>결제금액</th>
                 <th>상태</th>
                 <th>세금계산서</th>
                 <th class="st-admin-only">관리</th>
@@ -578,7 +574,7 @@
             </thead>
             <tbody id="stTableBody">
               <tr>
-                <td colspan="13" class="no-data">로딩 중...</td>
+                <td colspan="9" class="no-data">로딩 중...</td>
               </tr>
             </tbody>
           </table>
@@ -757,7 +753,7 @@
       if (companyName) url += `company_name=${encodeURIComponent(companyName)}&`;
       
       const tbody = container.querySelector('#stTableBody');
-      if (tbody) tbody.innerHTML = '<tr><td colspan="13" class="no-data">로딩 중...</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="no-data">로딩 중...</td></tr>';
       
       fetch(url, {
         credentials: 'include',
@@ -775,12 +771,12 @@
             });
             stAdminRenderSettlements(items);
           } else {
-            if (tbody) tbody.innerHTML = `<tr><td colspan="13" class="no-data">${data.message || '목록을 불러오는 중 오류가 발생했습니다.'}</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="no-data">${data.message || '목록을 불러오는 중 오류가 발생했습니다.'}</td></tr>`;
           }
         })
         .catch(error => {
           console.error('[ST] 관리자 목록 로드 오류:', error);
-          if (tbody) tbody.innerHTML = '<tr><td colspan="13" class="no-data">목록을 불러오는 중 오류가 발생했습니다.</td></tr>';
+          if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="no-data">목록을 불러오는 중 오류가 발생했습니다.</td></tr>';
         });
     }
     
@@ -805,7 +801,7 @@
       console.log('[ST] 전달 조회 URL:', url);
       
       const tbody = container.querySelector('#stTableBody');
-      if (tbody) tbody.innerHTML = '<tr><td colspan="13" class="no-data">로딩 중...</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="no-data">로딩 중...</td></tr>';
       
       fetch(url, {
         credentials: 'include',
@@ -834,7 +830,7 @@
             console.error('[ST] 전달 조회 실패:', data.message);
             const tbody = container.querySelector('#stTableBody');
             if (tbody) {
-              tbody.innerHTML = `<tr><td colspan="13" class="no-data">${data.message || '전달 정산 목록을 불러올 수 없습니다.'}</td></tr>`;
+              tbody.innerHTML = `<tr><td colspan="9" class="no-data">${data.message || '전달 정산 목록을 불러올 수 없습니다.'}</td></tr>`;
             }
           }
         })
@@ -842,7 +838,7 @@
           console.error('[ST] 전달 정산 목록 로드 오류:', error);
           const tbody = container.querySelector('#stTableBody');
           if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="13" class="no-data">전달 정산 목록을 불러오는 중 오류가 발생했습니다: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="no-data">전달 정산 목록을 불러오는 중 오류가 발생했습니다: ${error.message}</td></tr>`;
           }
         });
     }
@@ -909,7 +905,7 @@
       url += `company_name=${encodeURIComponent(companyName)}&`;
       
       const tbody = container.querySelector('#stTableBody');
-      if (tbody) tbody.innerHTML = '<tr><td colspan="12" class="no-data">로딩 중...</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="no-data">로딩 중...</td></tr>';
       
       fetch(url, {
         credentials: 'include',
@@ -922,12 +918,12 @@
             items.sort((a, b) => b.settlement_year_month.localeCompare(a.settlement_year_month));
             stConsignorRenderSettlements(items);
           } else {
-            if (tbody) tbody.innerHTML = `<tr><td colspan="12" class="no-data">${data.message || '목록을 불러오는 중 오류가 발생했습니다.'}</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="no-data">${data.message || '목록을 불러오는 중 오류가 발생했습니다.'}</td></tr>`;
           }
         })
         .catch(error => {
           console.error('[ST] 화주사 목록 로드 오류:', error);
-          if (tbody) tbody.innerHTML = '<tr><td colspan="12" class="no-data">목록을 불러오는 중 오류가 발생했습니다.</td></tr>';
+          if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="no-data">목록을 불러오는 중 오류가 발생했습니다.</td></tr>';
         });
     }
 
@@ -937,13 +933,15 @@
       if (!tbody) return;
       
       if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="13" class="no-data">정산 내역이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="no-data">정산 내역이 없습니다.</td></tr>';
         return;
       }
       
       tbody.innerHTML = items.map((item, index) => {
         const totalAmount = (item.work_fee || 0) + (item.inout_fee || 0) + (item.shipping_fee || 0) + 
                            (item.storage_fee || 0) + (item.special_work_fee || 0) - (item.error_deduction || 0);
+        const tax = Math.floor(totalAmount * 0.1); // 세금 (부가세 10%)
+        const finalAmount = totalAmount + tax; // 결제금액 (총액 + 세금)
         const status = item.status || '대기';
         
         // 상태별 색상
@@ -974,22 +972,9 @@
             <td>${index + 1}</td>
             <td>${item.settlement_year_month || ''}</td>
             <td>${item.company_name || ''}</td>
-            <td>
-              ${(item.work_fee || 0).toLocaleString()}원
-              ${item.work_fee_file_url ? `<br><a href="${item.work_fee_file_url}" target="_blank" class="st-file-link" download style="font-size: 11px;" title="파일 다운로드">📄</a>` : ''}
-            </td>
-            <td>
-              ${(item.inout_fee || 0).toLocaleString()}원
-              ${item.inout_fee_file_url ? `<br><a href="${item.inout_fee_file_url}" target="_blank" class="st-file-link" download style="font-size: 11px;" title="파일 다운로드">📄</a>` : ''}
-            </td>
-            <td>
-              ${(item.shipping_fee || 0).toLocaleString()}원
-              ${item.shipping_fee_file_url ? `<br><a href="${item.shipping_fee_file_url}" target="_blank" class="st-file-link" download style="font-size: 11px;" title="파일 다운로드">📄</a>` : ''}
-            </td>
-            <td>${(item.storage_fee || 0).toLocaleString()}원</td>
-            <td>${(item.special_work_fee || 0).toLocaleString()}원</td>
-            <td style="color: #e74c3c;">-${(item.error_deduction || 0).toLocaleString()}원</td>
-            <td style="font-weight: 700; color: #ff6b35;">${totalAmount.toLocaleString()}원</td>
+            <td style="font-weight: 600;">${totalAmount.toLocaleString()}원</td>
+            <td style="color: #0984e3; font-weight: 600;">${tax.toLocaleString()}원</td>
+            <td style="font-weight: 700; color: #ff6b35;">${finalAmount.toLocaleString()}원</td>
             <td style="color: ${statusColor}; font-weight: 600;">${status}</td>
             <td>${taxInvoiceCell}</td>
             <td>
@@ -1009,13 +994,15 @@
       if (!tbody) return;
       
       if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" class="no-data">정산 내역이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="no-data">정산 내역이 없습니다.</td></tr>';
         return;
       }
       
       tbody.innerHTML = items.map((item, index) => {
         const totalAmount = (item.work_fee || 0) + (item.inout_fee || 0) + (item.shipping_fee || 0) + 
                            (item.storage_fee || 0) + (item.special_work_fee || 0) - (item.error_deduction || 0);
+        const tax = Math.floor(totalAmount * 0.1); // 세금 (부가세 10%)
+        const finalAmount = totalAmount + tax; // 결제금액 (총액 + 세금)
         const status = item.status || '대기';
         
         // 상태별 색상
@@ -1035,22 +1022,9 @@
           <tr>
             <td>${index + 1}</td>
             <td>${item.settlement_year_month || ''}</td>
-            <td>
-              ${(item.work_fee || 0).toLocaleString()}원
-              ${item.work_fee_file_url ? `<br><a href="${item.work_fee_file_url}" target="_blank" class="st-file-link" download style="font-size: 11px;">📄</a>` : ''}
-            </td>
-            <td>
-              ${(item.inout_fee || 0).toLocaleString()}원
-              ${item.inout_fee_file_url ? `<br><a href="${item.inout_fee_file_url}" target="_blank" class="st-file-link" download style="font-size: 11px;">📄</a>` : ''}
-            </td>
-            <td>
-              ${(item.shipping_fee || 0).toLocaleString()}원
-              ${item.shipping_fee_file_url ? `<br><a href="${item.shipping_fee_file_url}" target="_blank" class="st-file-link" download style="font-size: 11px;">📄</a>` : ''}
-            </td>
-            <td>${(item.storage_fee || 0).toLocaleString()}원</td>
-            <td>${(item.special_work_fee || 0).toLocaleString()}원</td>
-            <td style="color: #e74c3c;">-${(item.error_deduction || 0).toLocaleString()}원</td>
-            <td style="font-weight: 700; color: #ff6b35;">${totalAmount.toLocaleString()}원</td>
+            <td style="font-weight: 600;">${totalAmount.toLocaleString()}원</td>
+            <td style="color: #0984e3; font-weight: 600;">${tax.toLocaleString()}원</td>
+            <td style="font-weight: 700; color: #ff6b35;">${finalAmount.toLocaleString()}원</td>
             <td style="color: ${statusColor}; font-weight: 600;">${status}</td>
             <td>${taxInvoiceCell}</td>
             <td>
