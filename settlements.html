@@ -1089,7 +1089,7 @@
             <td class="st-consignor-only">
               ${actionButtons || '<span style="color: #999;">-</span>'}
             </td>
-            <td class="st-admin-only" style="white-space: nowrap;">
+            <td class="st-admin-only" style="white-space: nowrap; display: table-cell;">
               ${actionButtons || ''}
               ${rollbackButton || ''}
               <button class="st-btn" onclick="stEditSettlement(${item.id})" style="padding: 4px 8px; font-size: 11px;">수정</button>
@@ -1097,6 +1097,11 @@
           </tr>
         `;
       }).join('');
+      
+      // 렌더링 후 관리자 전용 요소 표시 업데이트
+      setTimeout(() => {
+        stToggleAdminOnlyVisibility();
+      }, 0);
     }
 
     // 화주사 정산 목록 렌더링
