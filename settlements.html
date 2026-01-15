@@ -987,6 +987,10 @@
       const tbody = document.getElementById('stTableBody');
       if (!tbody) return;
       
+      // 관리자 모드 확인
+      const roleNormalized = (stCurrentRole || '').toString().trim();
+      const isAdmin = (roleNormalized === '관리자');
+      
       if (items.length === 0) {
         tbody.innerHTML = '<tr><td colspan="11" class="no-data">정산 내역이 없습니다.</td></tr>';
         return;
@@ -1089,7 +1093,7 @@
             <td class="st-consignor-only">
               ${actionButtons || '<span style="color: #999;">-</span>'}
             </td>
-            <td class="st-admin-only" style="white-space: nowrap; display: table-cell;">
+            <td class="st-admin-only" style="white-space: nowrap; ${isAdmin ? 'display: table-cell;' : 'display: none;'}">
               ${actionButtons || ''}
               ${rollbackButton || ''}
               <button class="st-btn" onclick="stEditSettlement(${item.id})" style="padding: 4px 8px; font-size: 11px;">수정</button>
