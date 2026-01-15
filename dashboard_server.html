@@ -6199,6 +6199,15 @@
         loadPalletsContent();
       } else if (tabName === 'settlements') {
         // 정산 관리 탭
+        const settlementsTab = document.getElementById('settlementsTab');
+        if (settlementsTab) {
+          settlementsTab.classList.remove('hidden');
+          settlementsTab.style.display = 'block';
+        }
+        // 정산 초기화 플래그 리셋 (정산 탭으로 다시 돌아올 때 재초기화)
+        if (typeof window.stInitialized !== 'undefined') {
+          window.stInitialized = false;
+        }
         loadSettlementsContent();
       }
       
