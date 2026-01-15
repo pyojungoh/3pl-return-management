@@ -669,6 +669,22 @@
 
     // 공통 초기화 함수
     function stCommonInit() {
+      // 정산 메뉴가 활성화되어 있는지 확인
+      const settlementsTab = document.getElementById('settlementsTab');
+      const stContainer = document.getElementById('stContainer');
+      
+      // 정산 메뉴가 표시되지 않았거나 컨테이너가 없으면 초기화하지 않음
+      if (!settlementsTab || !stContainer) {
+        console.log('[ST] 정산 메뉴가 활성화되지 않음, 초기화 건너뜀');
+        return;
+      }
+      
+      // 정산 탭이 숨겨져 있으면 초기화하지 않음
+      if (settlementsTab.style.display === 'none' || settlementsTab.classList.contains('hidden')) {
+        console.log('[ST] 정산 탭이 숨겨져 있음, 초기화 건너뜀');
+        return;
+      }
+      
       if (stInitialized) {
         console.log('[ST] 이미 초기화됨, 중복 실행 방지');
         return;
@@ -3043,12 +3059,9 @@
     
     // ========== 정산 상태 변경 모달 끝 ==========
 
-    // 페이지 로드 시 자동 초기화
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', stCommonInit);
-    } else {
-      stCommonInit();
-    }
+    // 페이지 로드 시 자동 초기화 제거
+    // 정산 메뉴로 전환할 때만 loadSettlementsContent()에서 stCommonInit() 호출
+    // 이렇게 하면 정산 메뉴에서만 정산 목록이 로드됨
   </script>
 </body>
 </html>
