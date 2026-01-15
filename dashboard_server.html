@@ -13009,6 +13009,7 @@
     /**
      * 정산 전달 팝업 표시
      * 기존 팝업 레이어 재사용 (별도 레이어 생성 안 함)
+     * 팝업 내에서 정산 상세 내역 확인 및 정산확인 가능
      */
     function showSettlementDeliveryPopup(settlements) {
       const layer = document.getElementById('popupLayer');
@@ -13021,45 +13022,103 @@
         return;
       }
       
+      // 전역 변수에 정산 목록 저장 (상세 보기 및 정산확인 시 사용)
+      window.settlementDeliveryPopupData = {
+        settlements: settlements,
+        currentDetailId: null,
+        confirmedSettlements: new Set() // 정산확인 완료된 정산 ID 저장
+      };
+      
       // 팝업 제목
       title.textContent = '💰 정산 전달 알림';
       
-      // 팝업 내용 생성
-      let bodyContent = '<div style="line-height: 1.8;">';
-      bodyContent += '<p style="margin: 0 0 15px 0; font-size: 16px; font-weight: 600; color: #2d3436;">';
-      bodyContent += `전달 상태인 정산이 <strong style="color: #ff6b35;">${settlements.length}건</strong> 있습니다.`;
-      bodyContent += '</p>';
-      bodyContent += '<p style="margin: 0 0 20px 0; font-size: 14px; color: #636e72;">';
-      bodyContent += '정산 메뉴에서 확인하시고 정산확인을 진행해주세요.';
-      bodyContent += '</p>';
+      // 총 금액 계산
+      let totalFinalAmount = 0;
+      settlements.forEach(settlement => {
+        const totalAmount = (settlement.work_fee || 0) + (settlement.inout_fee || 0) + 
+                          (settlement.shipping_fee || 0) + (settlement.storage_fee || 0) + 
+                          (settlement.special_work_fee || 0) - (settlement.error_deduction || 0);
+        const tax = Math.floor(totalAmount * 0.1);
+        const finalAmount = totalAmount + tax;
+        totalFinalAmount += finalAmount;
+      });
       
-      // 정산 목록 표시 (최대 5개)
-      const displayCount = Math.min(settlements.length, 5);
-      bodyContent += '<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">';
-      bodyContent += '<div style="font-weight: 600; margin-bottom: 10px; color: #2d3436;">정산 내역:</div>';
-      bodyContent += '<ul style="margin: 0; padding-left: 20px; color: #636e72;">';
-      for (let i = 0; i < displayCount; i++) {
-        const settlement = settlements[i];
-        const yearMonth = settlement.settlement_year_month || '';
-        bodyContent += `<li style="margin-bottom: 5px;">${yearMonth}</li>`;
-      }
-      if (settlements.length > 5) {
-        bodyContent += `<li style="color: #999;">외 ${settlements.length - 5}건...</li>`;
-      }
-      bodyContent += '</ul>';
+      // 팝업 내용 생성
+      let bodyContent = '<div id="settlementDeliveryPopupContent" style="line-height: 1.8;">';
+      
+      // 정산 개수 및 총 금액 표시
+      bodyContent += '<div style="background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #ffc107;">';
+      bodyContent += '<div style="font-size: 16px; font-weight: 600; color: #856404; margin-bottom: 8px;">';
+      bodyContent += `전달 상태인 정산이 <strong style="color: #ff6b35;">${settlements.length}건</strong> 있습니다.`;
+      bodyContent += '</div>';
+      bodyContent += '<div style="font-size: 18px; font-weight: 700; color: #ff6b35;">';
+      bodyContent += `총 결제금액: ${totalFinalAmount.toLocaleString()}원`;
+      bodyContent += '</div>';
       bodyContent += '</div>';
       
-      bodyContent += '<p style="margin: 0; font-size: 13px; color: #999; text-align: center;">';
-      bodyContent += '정산 메뉴로 이동하려면 "정산 메뉴로 이동" 버튼을 클릭하세요.';
-      bodyContent += '</p>';
+      // 정산 목록 표시 (클릭 시 상세 보기)
+      bodyContent += '<div style="margin-bottom: 20px;">';
+      bodyContent += '<div style="font-weight: 600; margin-bottom: 10px; color: #2d3436; font-size: 14px;">정산 내역 (클릭하여 상세 보기):</div>';
+      bodyContent += '<div id="settlementDeliveryList" style="max-height: 200px; overflow-y: auto; border: 2px solid #ffeaa7; border-radius: 8px; padding: 10px;">';
+      settlements.forEach((settlement, index) => {
+        const yearMonth = settlement.settlement_year_month || '';
+        const totalAmount = (settlement.work_fee || 0) + (settlement.inout_fee || 0) + 
+                          (settlement.shipping_fee || 0) + (settlement.storage_fee || 0) + 
+                          (settlement.special_work_fee || 0) - (settlement.error_deduction || 0);
+        const tax = Math.floor(totalAmount * 0.1);
+        const finalAmount = totalAmount + tax;
+        const isConfirmed = window.settlementDeliveryPopupData.confirmedSettlements.has(settlement.id);
+        
+        bodyContent += `<div id="settlementItem_${settlement.id}" 
+          onclick="showSettlementDetailInPopup(${settlement.id})" 
+          style="padding: 12px; margin-bottom: 8px; background: ${isConfirmed ? '#d4edda' : '#ffffff'}; 
+          border: 2px solid ${isConfirmed ? '#28a745' : '#ffeaa7'}; border-radius: 8px; cursor: pointer; 
+          transition: all 0.2s;" 
+          onmouseover="this.style.background='${isConfirmed ? '#c3e6cb' : '#fffef9'}'" 
+          onmouseout="this.style.background='${isConfirmed ? '#d4edda' : '#ffffff'}'">`;
+        bodyContent += `<div style="display: flex; justify-content: space-between; align-items: center;">`;
+        bodyContent += `<div style="font-weight: 600; color: #2d3436;">${yearMonth}</div>`;
+        bodyContent += `<div style="font-weight: 700; color: #ff6b35;">${finalAmount.toLocaleString()}원</div>`;
+        if (isConfirmed) {
+          bodyContent += `<div style="color: #28a745; font-weight: 600; font-size: 12px;">✅ 정산확인 완료</div>`;
+        }
+        bodyContent += `</div>`;
+        bodyContent += `</div>`;
+      });
+      bodyContent += '</div>';
+      bodyContent += '</div>';
+      
+      // 상세 내역 영역 (초기에는 숨김)
+      bodyContent += '<div id="settlementDeliveryDetailArea" style="display: none; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 2px solid #ffeaa7; max-height: 400px; overflow-y: auto;">';
+      bodyContent += '<div id="settlementDeliveryDetailContent"></div>';
+      bodyContent += '<div style="margin-top: 15px; text-align: center;">';
+      bodyContent += '<button onclick="hideSettlementDetailInPopup()" class="save-btn" style="background: linear-gradient(135deg, #636e72 0%, #2d3436 100%);">목록으로 돌아가기</button>';
+      bodyContent += '</div>';
+      bodyContent += '</div>';
+      
+      // 정산내역 확인 동의 체크박스
+      bodyContent += '<div style="margin-bottom: 15px; padding: 15px; background: #fff3cd; border-radius: 8px; border: 2px solid #ffc107;">';
+      bodyContent += '<label style="display: flex; align-items: center; cursor: pointer; font-size: 14px; color: #856404;">';
+      bodyContent += '<input type="checkbox" id="settlementDeliveryAgreeCheckbox" onchange="toggleSettlementConfirmButton()" style="width: 20px; height: 20px; margin-right: 10px; cursor: pointer;">';
+      bodyContent += '<span>정산내역을 확인했고 이에 동의합니다.</span>';
+      bodyContent += '</label>';
+      bodyContent += '</div>';
+      
+      // 정산확인 버튼 (초기에는 비활성화)
+      bodyContent += '<div style="text-align: center; margin-bottom: 15px;">';
+      bodyContent += '<button id="settlementConfirmButton" onclick="confirmAllSettlementsInPopup()" disabled style="padding: 12px 24px; font-size: 16px; font-weight: 700; background: linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%); color: white; border: none; border-radius: 8px; cursor: not-allowed; transition: all 0.3s;">';
+      bodyContent += '✅ 정산확인';
+      bodyContent += '</button>';
+      bodyContent += '</div>';
+      
       bodyContent += '</div>';
       
       body.innerHTML = bodyContent;
       
-      // 팝업 사이즈 설정 (기본값)
-      popupContentDiv.style.width = '500px';
-      popupContentDiv.style.maxWidth = '500px';
-      popupContentDiv.style.maxHeight = '600px';
+      // 팝업 사이즈 설정 (더 크게)
+      popupContentDiv.style.width = '700px';
+      popupContentDiv.style.maxWidth = '700px';
+      popupContentDiv.style.maxHeight = '90vh';
       
       // 팝업 표시
       layer.style.display = 'flex';
@@ -13067,13 +13126,295 @@
       // 정산 팝업임을 표시하기 위한 data 속성 (닫을 때 사용)
       layer.setAttribute('data-popup-type', 'settlement-delivery');
       
-      // 정산 메뉴로 이동 버튼 표시
+      // 정산 메뉴로 이동 버튼 숨기기 (팝업 내에서 모든 작업 완료)
       const goToMenuBtn = document.getElementById('settlementPopupGoToMenuBtn');
       if (goToMenuBtn) {
-        goToMenuBtn.style.display = 'inline-block';
+        goToMenuBtn.style.display = 'none';
       }
     }
     window.showSettlementDeliveryPopup = showSettlementDeliveryPopup;
+    
+    /**
+     * 팝업 내에서 정산 상세 내역 표시
+     * 정산 메뉴로 가지 않고 팝업 내에서 바로 확인 가능
+     */
+    async function showSettlementDetailInPopup(settlementId) {
+      if (!window.settlementDeliveryPopupData) {
+        console.error('[정산 팝업] 정산 데이터를 찾을 수 없습니다.');
+        return;
+      }
+      
+      const settlement = window.settlementDeliveryPopupData.settlements.find(s => s.id === settlementId);
+      if (!settlement) {
+        alert('정산 정보를 찾을 수 없습니다.');
+        return;
+      }
+      
+      // 현재 상세 보기 중인 정산 ID 저장
+      window.settlementDeliveryPopupData.currentDetailId = settlementId;
+      
+      // 목록 숨기기, 상세 영역 표시
+      const listArea = document.getElementById('settlementDeliveryList');
+      const detailArea = document.getElementById('settlementDeliveryDetailArea');
+      if (listArea) listArea.style.display = 'none';
+      if (detailArea) detailArea.style.display = 'block';
+      
+      // 상세 내용 로딩 표시
+      const detailContent = document.getElementById('settlementDeliveryDetailContent');
+      if (detailContent) {
+        detailContent.innerHTML = '<div style="text-align: center; padding: 20px; color: #636e72;">로딩 중...</div>';
+      }
+      
+      try {
+        // 헤더 생성
+        const encodeHeader = (value) => encodeURIComponent((value || '').toString().trim());
+        const headers = {
+          'X-User-Role': encodeHeader('화주사'),
+          'X-User-Name': encodeHeader(currentUsername),
+          'X-Company-Name': encodeHeader(currentCompany)
+        };
+        
+        // 정산 상세 조회
+        const response = await fetch(`/api/settlements/${settlementId}`, {
+          method: 'GET',
+          headers: headers,
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          throw new Error('정산 상세 정보를 불러올 수 없습니다.');
+        }
+        
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const settlementDetail = result.data;
+          const totalAmount = (settlementDetail.work_fee || 0) + (settlementDetail.inout_fee || 0) + 
+                            (settlementDetail.shipping_fee || 0) + (settlementDetail.storage_fee || 0) + 
+                            (settlementDetail.special_work_fee || 0) - (settlementDetail.error_deduction || 0);
+          const tax = Math.floor(totalAmount * 0.1);
+          const finalAmount = totalAmount + tax;
+          
+          // 상세 내용 생성
+          let detailHtml = '<div style="line-height: 1.8;">';
+          detailHtml += '<h3 style="margin: 0 0 20px 0; color: #ff6b35; font-weight: 700; font-size: 18px;">정산 상세 내역</h3>';
+          
+          detailHtml += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px;">';
+          detailHtml += `<div><strong>화주사:</strong> ${settlementDetail.company_name || ''}</div>`;
+          detailHtml += `<div><strong>정산년월:</strong> ${settlementDetail.settlement_year_month || ''}</div>`;
+          detailHtml += '</div>';
+          
+          detailHtml += '<div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #e0e0e0;">';
+          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '<span>작업비</span>';
+          detailHtml += `<span style="font-weight: 600;">${(settlementDetail.work_fee || 0).toLocaleString()}원</span>`;
+          detailHtml += '</div>';
+          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '<span>입출고비</span>';
+          detailHtml += `<span style="font-weight: 600;">${(settlementDetail.inout_fee || 0).toLocaleString()}원</span>`;
+          detailHtml += '</div>';
+          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '<span>택배비</span>';
+          detailHtml += `<span style="font-weight: 600;">${(settlementDetail.shipping_fee || 0).toLocaleString()}원</span>`;
+          detailHtml += '</div>';
+          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '<span>보관료</span>';
+          detailHtml += `<span style="font-weight: 600;">${(settlementDetail.storage_fee || 0).toLocaleString()}원</span>`;
+          detailHtml += '</div>';
+          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '<span>특수작업</span>';
+          detailHtml += `<span style="font-weight: 600;">${(settlementDetail.special_work_fee || 0).toLocaleString()}원</span>`;
+          detailHtml += '</div>';
+          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 2px solid #ffeaa7;">';
+          detailHtml += '<span style="color: #e74c3c;">오배송/누락 차감</span>';
+          detailHtml += `<span style="font-weight: 600; color: #e74c3c;">-${(settlementDetail.error_deduction || 0).toLocaleString()}원</span>`;
+          detailHtml += '</div>';
+          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '<span><strong>총액</strong></span>';
+          detailHtml += `<span style="font-weight: 700; font-size: 16px; color: #2d3436;">${totalAmount.toLocaleString()}원</span>`;
+          detailHtml += '</div>';
+          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '<span><strong>부가세 (10%)</strong></span>';
+          detailHtml += `<span style="font-weight: 600; color: #0984e3;">${tax.toLocaleString()}원</span>`;
+          detailHtml += '</div>';
+          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 12px 0; background: #fff3cd; border-radius: 6px; margin-top: 8px; padding-left: 12px; padding-right: 12px;">';
+          detailHtml += '<span style="font-weight: 700; font-size: 18px; color: #ff6b35;">결제금액</span>';
+          detailHtml += `<span style="font-weight: 700; font-size: 18px; color: #ff6b35;">${finalAmount.toLocaleString()}원</span>`;
+          detailHtml += '</div>';
+          detailHtml += '</div>';
+          
+          if (settlementDetail.memo) {
+            detailHtml += '<div style="margin-top: 15px; padding: 12px; background: #f8f9fa; border-radius: 8px;">';
+            detailHtml += `<div style="font-weight: 600; margin-bottom: 5px;">비고:</div>`;
+            detailHtml += `<div style="color: #636e72;">${settlementDetail.memo}</div>`;
+            detailHtml += '</div>';
+          }
+          
+          detailHtml += '</div>';
+          
+          if (detailContent) {
+            detailContent.innerHTML = detailHtml;
+          }
+        } else {
+          throw new Error(result.message || '정산 상세 정보를 불러올 수 없습니다.');
+        }
+      } catch (error) {
+        console.error('[정산 팝업] 상세 조회 오류:', error);
+        const detailContent = document.getElementById('settlementDeliveryDetailContent');
+        if (detailContent) {
+          detailContent.innerHTML = `<div style="text-align: center; padding: 20px; color: #e74c3c;">오류: ${error.message}</div>`;
+        }
+      }
+    }
+    window.showSettlementDetailInPopup = showSettlementDetailInPopup;
+    
+    /**
+     * 팝업 내에서 정산 상세 내역 숨기기 (목록으로 돌아가기)
+     */
+    function hideSettlementDetailInPopup() {
+      const listArea = document.getElementById('settlementDeliveryList');
+      const detailArea = document.getElementById('settlementDeliveryDetailArea');
+      if (listArea) listArea.style.display = 'block';
+      if (detailArea) detailArea.style.display = 'none';
+      if (window.settlementDeliveryPopupData) {
+        window.settlementDeliveryPopupData.currentDetailId = null;
+      }
+    }
+    window.hideSettlementDetailInPopup = hideSettlementDetailInPopup;
+    
+    /**
+     * 정산확인 버튼 활성화/비활성화 토글
+     * 체크박스 체크 시에만 활성화
+     */
+    function toggleSettlementConfirmButton() {
+      const checkbox = document.getElementById('settlementDeliveryAgreeCheckbox');
+      const confirmButton = document.getElementById('settlementConfirmButton');
+      
+      if (!checkbox || !confirmButton) return;
+      
+      if (checkbox.checked) {
+        confirmButton.disabled = false;
+        confirmButton.style.cursor = 'pointer';
+        confirmButton.style.background = 'linear-gradient(135deg, #00b894 0%, #00a085 100%)';
+      } else {
+        confirmButton.disabled = true;
+        confirmButton.style.cursor = 'not-allowed';
+        confirmButton.style.background = 'linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%)';
+      }
+    }
+    window.toggleSettlementConfirmButton = toggleSettlementConfirmButton;
+    
+    /**
+     * 팝업 내에서 모든 정산 정산확인 처리
+     * 체크박스가 체크되어 있을 때만 실행 가능
+     */
+    async function confirmAllSettlementsInPopup() {
+      const checkbox = document.getElementById('settlementDeliveryAgreeCheckbox');
+      const confirmButton = document.getElementById('settlementConfirmButton');
+      
+      if (!checkbox || !checkbox.checked) {
+        alert('정산내역 확인 동의 체크박스를 먼저 체크해주세요.');
+        return;
+      }
+      
+      if (!window.settlementDeliveryPopupData || !window.settlementDeliveryPopupData.settlements) {
+        alert('정산 정보를 찾을 수 없습니다.');
+        return;
+      }
+      
+      const settlements = window.settlementDeliveryPopupData.settlements;
+      const unconfirmedSettlements = settlements.filter(s => 
+        !window.settlementDeliveryPopupData.confirmedSettlements.has(s.id)
+      );
+      
+      if (unconfirmedSettlements.length === 0) {
+        alert('모든 정산이 이미 정산확인 완료되었습니다.');
+        return;
+      }
+      
+      // 확인 메시지
+      if (!confirm(`${unconfirmedSettlements.length}건의 정산을 정산확인 처리하시겠습니까?`)) {
+        return;
+      }
+      
+      // 버튼 비활성화 및 로딩 표시
+      const originalText = confirmButton.textContent;
+      confirmButton.disabled = true;
+      confirmButton.textContent = '처리 중...';
+      
+      // 헤더 생성
+      const encodeHeader = (value) => encodeURIComponent((value || '').toString().trim());
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-User-Role': encodeHeader('화주사'),
+        'X-User-Name': encodeHeader(currentUsername),
+        'X-Company-Name': encodeHeader(currentCompany)
+      };
+      
+      // 각 정산을 순차적으로 정산확인 처리
+      let successCount = 0;
+      let failCount = 0;
+      const errors = [];
+      
+      for (const settlement of unconfirmedSettlements) {
+        try {
+          const response = await fetch(`/api/settlements/${settlement.id}/update-status`, {
+            method: 'POST',
+            headers: headers,
+            credentials: 'include',
+            body: JSON.stringify({ status: '정산확인' })
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP ${response.status}`);
+          }
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            successCount++;
+            window.settlementDeliveryPopupData.confirmedSettlements.add(settlement.id);
+          } else {
+            failCount++;
+            errors.push(`정산 ${settlement.settlement_year_month || settlement.id}: ${result.message || '알 수 없는 오류'}`);
+          }
+        } catch (error) {
+          failCount++;
+          errors.push(`정산 ${settlement.settlement_year_month || settlement.id}: ${error.message}`);
+          console.error(`[정산 팝업] 정산 ${settlement.id} 정산확인 오류:`, error);
+        }
+      }
+      
+      // 처리 완료
+      let message = `처리 완료: 성공 ${successCount}건`;
+      if (failCount > 0) {
+        message += `, 실패 ${failCount}건`;
+        if (errors.length > 0 && errors.length <= 5) {
+          message += '\n\n오류 상세:\n' + errors.join('\n');
+        }
+      }
+      alert(message);
+      
+      // 목록 새로고침 (정산확인 완료 표시 업데이트)
+      if (successCount > 0) {
+        // 팝업 내용 다시 렌더링
+        showSettlementDeliveryPopup(window.settlementDeliveryPopupData.settlements);
+        
+        // 체크박스 체크 상태 유지
+        const checkbox = document.getElementById('settlementDeliveryAgreeCheckbox');
+        if (checkbox) {
+          checkbox.checked = true;
+          toggleSettlementConfirmButton();
+        }
+      } else {
+        // 실패한 경우 버튼 복원
+        confirmButton.disabled = false;
+        confirmButton.textContent = originalText;
+        toggleSettlementConfirmButton();
+      }
+    }
+    window.confirmAllSettlementsInPopup = confirmAllSettlementsInPopup;
     
     /**
      * 정산 메뉴로 이동
