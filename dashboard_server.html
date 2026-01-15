@@ -1856,6 +1856,7 @@
           <div style="margin-top: 20px; text-align: center; display: flex; gap: 10px; justify-content: center;">
             <button onclick="closePopup()" class="save-btn" style="background: linear-gradient(135deg, #636e72 0%, #2d3436 100%);">닫기</button>
             <button onclick="closePopupForToday()" class="save-btn" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);">하루 동안 보지 않기</button>
+            <button id="settlementPopupGoToMenuBtn" onclick="goToSettlementMenu()" class="save-btn" style="display: none; background: linear-gradient(135deg, #0984e3 0%, #74b9ff 100%);">💰 정산 메뉴로 이동</button>
           </div>
         </div>
       </div>
@@ -6219,6 +6220,17 @@
         console.error('화주사 정보 확인 오류:', error);
         localStorage.setItem('activeConsignorMenu', 'board');
         setTimeout(() => switchMenu('board'), 100);
+      }
+      
+      // 정산 전달 상태 확인 (독립 모듈 - 실패해도 다른 기능에 영향 없음)
+      // 이 줄만 삭제하면 정산 팝업 기능 완전히 제거됨
+      if (typeof checkSettlementDeliveryStatus === 'function') {
+        setTimeout(() => {
+          checkSettlementDeliveryStatus().catch(err => {
+            // 에러 발생해도 무시 (다른 기능에 영향 없도록)
+            console.warn('[정산 팝업] 확인 중 오류 (무시):', err);
+          });
+        }, 1000); // 1초 후 실행 (다른 초기화 완료 후)
       }
     }
     window.checkCompanyInfoAndNavigate = checkCompanyInfoAndNavigate;
@@ -12856,6 +12868,11 @@
     function closePopup() {
       const layer = document.getElementById('popupLayer');
       if (layer) {
+        // 정산 메뉴로 이동 버튼 숨기기
+        const goToMenuBtn = document.getElementById('settlementPopupGoToMenuBtn');
+        if (goToMenuBtn) {
+          goToMenuBtn.style.display = 'none';
+        }
         layer.style.display = 'none';
       }
     }
@@ -12865,6 +12882,17 @@
     function closePopupForToday() {
       const layer = document.getElementById('popupLayer');
       if (layer) {
+        // 정산 팝업인지 확인
+        const popupType = layer.getAttribute('data-popup-type');
+        if (popupType === 'settlement-delivery') {
+          // 정산 팝업이면 정산 팝업 닫기 함수 호출
+          if (typeof closeSettlementDeliveryPopupForToday === 'function') {
+            closeSettlementDeliveryPopupForToday();
+            return;
+          }
+        }
+        
+        // 기존 팝업 처리
         const popupId = layer.getAttribute('data-popup-id');
         if (popupId) {
           // 닫은 팝업 정보를 localStorage에 저장 (오늘 날짜와 함께 저장하여 하루 동안 다시 표시하지 않음)
@@ -12875,10 +12903,208 @@
           };
           localStorage.setItem('closedPopupData', JSON.stringify(closedPopupData));
         }
+        
+        // 정산 메뉴로 이동 버튼 숨기기
+        const goToMenuBtn = document.getElementById('settlementPopupGoToMenuBtn');
+        if (goToMenuBtn) {
+          goToMenuBtn.style.display = 'none';
+        }
+        
         layer.style.display = 'none';
       }
     }
     window.closePopupForToday = closePopupForToday;
+    
+    // ========== 정산 전달 상태 팝업 (독립 모듈 - 삭제 시 이 섹션만 제거하면 됨) ==========
+    
+    /**
+     * 정산 전달 상태 확인 및 팝업 표시
+     * 화주사 로그인 시 전달 상태 정산이 있으면 팝업 표시
+     * 독립 모듈: 이 함수와 관련 함수들만 삭제하면 완전히 제거됨
+     */
+    async function checkSettlementDeliveryStatus() {
+      // 관리자가 아니고, 화주사 정보가 있을 때만 확인
+      const roleNormalized = (currentRole || '').toString().trim();
+      if (roleNormalized === '관리자') {
+        return; // 관리자는 팝업 표시 안 함
+      }
+      
+      if (!currentCompany || !currentUsername) {
+        return; // 화주사 정보가 없으면 확인 안 함
+      }
+      
+      // 이미 닫은 팝업인지 확인 (localStorage - 하루 동안 표시 안 함)
+      const closedSettlementPopupData = localStorage.getItem('closedSettlementDeliveryPopup');
+      let closedPopupInfo = null;
+      
+      if (closedSettlementPopupData) {
+        try {
+          closedPopupInfo = JSON.parse(closedSettlementPopupData);
+          // 오늘 날짜와 비교
+          const today = new Date().toISOString().split('T')[0];
+          if (closedPopupInfo.date !== today) {
+            // 하루가 지났으면 삭제
+            localStorage.removeItem('closedSettlementDeliveryPopup');
+            closedPopupInfo = null;
+          }
+        } catch (e) {
+          // 파싱 오류 시 삭제
+          localStorage.removeItem('closedSettlementDeliveryPopup');
+        }
+      }
+      
+      // 이미 오늘 닫은 팝업이면 표시하지 않음
+      if (closedPopupInfo) {
+        return;
+      }
+      
+      try {
+        // 헤더 생성 (정산 API 형식에 맞춤)
+        const encodeHeader = (value) => encodeURIComponent((value || '').toString().trim());
+        const headers = {
+          'X-User-Role': encodeHeader('화주사'),
+          'X-User-Name': encodeHeader(currentUsername),
+          'X-Company-Name': encodeHeader(currentCompany)
+        };
+        
+        // 정산 전달 상태 조회 (status=전달 파라미터 사용)
+        const response = await fetch(`/api/settlements/list?status=전달`, {
+          method: 'GET',
+          headers: headers,
+          credentials: 'include',
+          signal: AbortSignal.timeout(5000) // 5초 타임아웃
+        });
+        
+        if (!response.ok) {
+          // 오류 시 무시하고 계속 진행 (다른 기능에 영향 없도록)
+          return;
+        }
+        
+        const result = await response.json();
+        
+        if (result.success && result.data && result.data.length > 0) {
+          // 전달 상태 정산이 있으면 팝업 표시
+          showSettlementDeliveryPopup(result.data);
+        }
+      } catch (error) {
+        // 타임아웃이나 네트워크 오류 시 무시 (사이트 로딩 방지)
+        if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+          console.warn('[정산 팝업] 조회 타임아웃 (무시)');
+        } else {
+          console.error('[정산 팝업] 전달 상태 확인 오류:', error);
+        }
+        // 에러가 발생해도 다른 기능에 영향 없도록 무시
+      }
+    }
+    window.checkSettlementDeliveryStatus = checkSettlementDeliveryStatus;
+    
+    /**
+     * 정산 전달 팝업 표시
+     * 기존 팝업 레이어 재사용 (별도 레이어 생성 안 함)
+     */
+    function showSettlementDeliveryPopup(settlements) {
+      const layer = document.getElementById('popupLayer');
+      const popupContentDiv = document.getElementById('popupContent');
+      const title = document.getElementById('popupTitle');
+      const body = document.getElementById('popupBody');
+      
+      if (!layer || !popupContentDiv || !title || !body) {
+        console.error('[정산 팝업] 팝업 요소를 찾을 수 없습니다.');
+        return;
+      }
+      
+      // 팝업 제목
+      title.textContent = '💰 정산 전달 알림';
+      
+      // 팝업 내용 생성
+      let bodyContent = '<div style="line-height: 1.8;">';
+      bodyContent += '<p style="margin: 0 0 15px 0; font-size: 16px; font-weight: 600; color: #2d3436;">';
+      bodyContent += `전달 상태인 정산이 <strong style="color: #ff6b35;">${settlements.length}건</strong> 있습니다.`;
+      bodyContent += '</p>';
+      bodyContent += '<p style="margin: 0 0 20px 0; font-size: 14px; color: #636e72;">';
+      bodyContent += '정산 메뉴에서 확인하시고 정산확인을 진행해주세요.';
+      bodyContent += '</p>';
+      
+      // 정산 목록 표시 (최대 5개)
+      const displayCount = Math.min(settlements.length, 5);
+      bodyContent += '<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">';
+      bodyContent += '<div style="font-weight: 600; margin-bottom: 10px; color: #2d3436;">정산 내역:</div>';
+      bodyContent += '<ul style="margin: 0; padding-left: 20px; color: #636e72;">';
+      for (let i = 0; i < displayCount; i++) {
+        const settlement = settlements[i];
+        const yearMonth = settlement.settlement_year_month || '';
+        bodyContent += `<li style="margin-bottom: 5px;">${yearMonth}</li>`;
+      }
+      if (settlements.length > 5) {
+        bodyContent += `<li style="color: #999;">외 ${settlements.length - 5}건...</li>`;
+      }
+      bodyContent += '</ul>';
+      bodyContent += '</div>';
+      
+      bodyContent += '<p style="margin: 0; font-size: 13px; color: #999; text-align: center;">';
+      bodyContent += '정산 메뉴로 이동하려면 "정산 메뉴로 이동" 버튼을 클릭하세요.';
+      bodyContent += '</p>';
+      bodyContent += '</div>';
+      
+      body.innerHTML = bodyContent;
+      
+      // 팝업 사이즈 설정 (기본값)
+      popupContentDiv.style.width = '500px';
+      popupContentDiv.style.maxWidth = '500px';
+      popupContentDiv.style.maxHeight = '600px';
+      
+      // 팝업 표시
+      layer.style.display = 'flex';
+      
+      // 정산 팝업임을 표시하기 위한 data 속성 (닫을 때 사용)
+      layer.setAttribute('data-popup-type', 'settlement-delivery');
+      
+      // 정산 메뉴로 이동 버튼 표시
+      const goToMenuBtn = document.getElementById('settlementPopupGoToMenuBtn');
+      if (goToMenuBtn) {
+        goToMenuBtn.style.display = 'inline-block';
+      }
+    }
+    window.showSettlementDeliveryPopup = showSettlementDeliveryPopup;
+    
+    /**
+     * 정산 메뉴로 이동
+     * 정산 팝업에서 정산 메뉴로 이동하는 함수
+     */
+    function goToSettlementMenu() {
+      // 정산 팝업 닫기
+      closeSettlementDeliveryPopupForToday();
+      
+      // 정산 메뉴로 이동
+      if (typeof switchMenu === 'function') {
+        switchMenu('settlements');
+      }
+    }
+    window.goToSettlementMenu = goToSettlementMenu;
+    
+    /**
+     * 정산 전달 팝업 닫기 (하루 동안 표시 안 함)
+     * 기존 closePopupForToday 함수와 별도로 동작
+     */
+    function closeSettlementDeliveryPopupForToday() {
+      const layer = document.getElementById('popupLayer');
+      if (layer) {
+        // 정산 팝업인지 확인
+        const popupType = layer.getAttribute('data-popup-type');
+        if (popupType === 'settlement-delivery') {
+          // 닫은 팝업 정보를 localStorage에 저장 (오늘 날짜와 함께 저장하여 하루 동안 다시 표시하지 않음)
+          const today = new Date().toISOString().split('T')[0];
+          const closedPopupData = {
+            date: today
+          };
+          localStorage.setItem('closedSettlementDeliveryPopup', JSON.stringify(closedPopupData));
+        }
+        layer.style.display = 'none';
+      }
+    }
+    window.closeSettlementDeliveryPopupForToday = closeSettlementDeliveryPopupForToday;
+    
+    // ========== 정산 전달 상태 팝업 끝 ==========
     
     // 화주사 모드: 카테고리 필터로 게시글 로드
     async function loadBoardPostsByCategoryFilter(categoryId = null) {

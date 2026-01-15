@@ -593,6 +593,51 @@
     </div>
   </div>
 
+  <!-- 정산 상태 변경 모달 (관리자 전용 - 독립 모듈: 삭제 시 이 모달만 제거하면 됨) -->
+  <div id="stStatusChangeModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10002; overflow-y: auto;" onclick="if(event.target.id === 'stStatusChangeModal') stCloseStatusChangeModal()">
+    <div style="max-width: 400px; margin: 50px auto; background: white; border-radius: 14px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h2 style="margin: 0; color: #ff6b35; font-weight: 700;">정산 상태 변경</h2>
+        <button onclick="stCloseStatusChangeModal()" style="background: #e17055; color: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 18px;">×</button>
+      </div>
+      
+      <!-- 현재 상태 표시 -->
+      <div style="margin-bottom: 20px; padding: 12px; background: #fff3cd; border-radius: 8px; border: 2px solid #ffc107;">
+        <strong style="color: #856404;">현재 상태:</strong>
+        <span id="stCurrentStatusDisplay" style="color: #856404; font-weight: 600; margin-left: 8px;"></span>
+      </div>
+      
+      <!-- 상태 선택 (라디오 버튼) -->
+      <div style="margin-bottom: 24px;">
+        <label style="display: block; margin-bottom: 12px; font-weight: 600; color: #2d3436;">변경할 상태 선택:</label>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <label style="display: flex; align-items: center; padding: 12px; border: 2px solid #ffeaa7; border-radius: 8px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#fffef9'" onmouseout="this.style.background='white'">
+            <input type="radio" name="stStatusSelection" value="대기" style="margin-right: 12px; width: 18px; height: 18px; cursor: pointer;">
+            <span style="font-size: 14px; color: #2d3436;">대기</span>
+          </label>
+          <label style="display: flex; align-items: center; padding: 12px; border: 2px solid #ffeaa7; border-radius: 8px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#fffef9'" onmouseout="this.style.background='white'">
+            <input type="radio" name="stStatusSelection" value="전달" style="margin-right: 12px; width: 18px; height: 18px; cursor: pointer;">
+            <span style="font-size: 14px; color: #0984e3;">전달</span>
+          </label>
+          <label style="display: flex; align-items: center; padding: 12px; border: 2px solid #ffeaa7; border-radius: 8px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#fffef9'" onmouseout="this.style.background='white'">
+            <input type="radio" name="stStatusSelection" value="정산확인" style="margin-right: 12px; width: 18px; height: 18px; cursor: pointer;">
+            <span style="font-size: 14px; color: #00b894;">정산확인</span>
+          </label>
+          <label style="display: flex; align-items: center; padding: 12px; border: 2px solid #ffeaa7; border-radius: 8px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#fffef9'" onmouseout="this.style.background='white'">
+            <input type="radio" name="stStatusSelection" value="입금완료" style="margin-right: 12px; width: 18px; height: 18px; cursor: pointer;">
+            <span style="font-size: 14px; color: #00a085;">입금완료</span>
+          </label>
+        </div>
+      </div>
+      
+      <!-- 버튼 -->
+      <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 20px; border-top: 2px solid #f0f0f0;">
+        <button class="st-btn" onclick="stSaveStatusChange()" style="background: linear-gradient(135deg, #00b894 0%, #00a085 100%);">저장</button>
+        <button class="st-btn-secondary" onclick="stCloseStatusChangeModal()">취소</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 명세서 미리보기 모달 -->
   <div id="stStatementPreviewModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; overflow-y: auto;">
     <div style="max-width: 700px; margin: 30px auto; background: white; border-radius: 14px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
@@ -617,6 +662,7 @@
     var stInitialized = false;
     var stSelectedFiles = {}; // {file_type: {file: File}} (FormData 방식 사용)
     var stCurrentSettlementId = null;
+    var stCurrentStatusModalSettlementId = null; // 상태 변경 모달의 정산 ID
 
     // 공통 초기화 함수
     function stCommonInit() {
@@ -1014,6 +1060,15 @@
           </td>
         `;
         
+        // 상태 버튼 (관리자만 - 클릭 시 모달 표시)
+        const statusButton = `
+          <button class="st-btn" 
+                  onclick="stShowStatusChangeModal(${item.id}, '${status}')"
+                  style="padding: 6px 12px; font-size: 12px; background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+            ${status}
+          </button>
+        `;
+        
         return `
           <tr>
             <td>${index + 1}</td>
@@ -1023,7 +1078,7 @@
             <td style="font-weight: 600;">${totalAmount.toLocaleString()}원</td>
             <td style="color: #0984e3; font-weight: 600;">${tax.toLocaleString()}원</td>
             <td style="font-weight: 700; color: #ff6b35;">${finalAmount.toLocaleString()}원</td>
-            <td style="color: ${statusColor}; font-weight: 600;">${status}</td>
+            <td>${statusButton}</td>
             <td>${taxInvoiceCell}</td>
             <td>
               ${actionButtons}
@@ -2753,6 +2808,137 @@
       });
     }
     window.stBulkUpdateStatusToDelivery = stBulkUpdateStatusToDelivery;
+
+    // ========== 정산 상태 변경 모달 (관리자 전용 - 독립 모듈: 삭제 시 이 섹션만 제거하면 됨) ==========
+
+    // 상태 변경 모달 열기
+    function stShowStatusChangeModal(settlementId, currentStatus) {
+      // 모달의 현재 정산 ID 저장
+      stCurrentStatusModalSettlementId = settlementId;
+      
+      // 현재 상태 표시
+      const currentStatusDisplay = document.getElementById('stCurrentStatusDisplay');
+      if (currentStatusDisplay) {
+        currentStatusDisplay.textContent = currentStatus || '대기';
+      }
+      
+      // 라디오 버튼 초기화 (현재 상태 선택)
+      const radioButtons = document.querySelectorAll('input[name="stStatusSelection"]');
+      radioButtons.forEach(radio => {
+        radio.checked = (radio.value === currentStatus);
+      });
+      
+      // 모달 표시
+      const modal = document.getElementById('stStatusChangeModal');
+      if (modal) {
+        modal.style.display = 'block';
+      }
+    }
+    window.stShowStatusChangeModal = stShowStatusChangeModal;
+    
+    // 상태 변경 모달 닫기
+    function stCloseStatusChangeModal() {
+      const modal = document.getElementById('stStatusChangeModal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+      stCurrentStatusModalSettlementId = null;
+    }
+    window.stCloseStatusChangeModal = stCloseStatusChangeModal;
+    
+    // 상태 변경 저장
+    function stSaveStatusChange() {
+      if (!stCurrentStatusModalSettlementId) {
+        alert('정산 ID를 확인할 수 없습니다.');
+        return;
+      }
+      
+      // 선택된 상태 확인
+      const selectedRadio = document.querySelector('input[name="stStatusSelection"]:checked');
+      if (!selectedRadio) {
+        alert('변경할 상태를 선택해주세요.');
+        return;
+      }
+      
+      const newStatus = selectedRadio.value;
+      const currentStatus = document.getElementById('stCurrentStatusDisplay')?.textContent || '';
+      
+      // 현재 상태와 동일하면 변경하지 않음
+      if (newStatus === currentStatus) {
+        alert('현재 상태와 동일합니다.');
+        return;
+      }
+      
+      // 상태명 매핑
+      const statusNames = {
+        '대기': '대기',
+        '전달': '전달',
+        '정산확인': '정산확인',
+        '입금완료': '입금완료'
+      };
+      const statusName = statusNames[newStatus] || newStatus;
+      
+      // 확인 메시지
+      if (!confirm(`정산 상태를 "${statusName}"로 변경하시겠습니까?`)) {
+        return;
+      }
+      
+      // 저장 버튼 비활성화 및 로딩 표시
+      const saveButton = document.querySelector('button[onclick="stSaveStatusChange()"]');
+      const originalText = saveButton.textContent;
+      saveButton.disabled = true;
+      saveButton.textContent = '저장 중...';
+      
+      // API 호출
+      fetch(`/api/settlements/${stCurrentStatusModalSettlementId}/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...stGetUserHeaders()
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          status: newStatus
+        })
+      })
+        .then(response => {
+          console.log('[ST] 상태 변경 API 응답 상태:', response.status);
+          if (!response.ok) {
+            return response.json().then(data => {
+              throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`);
+            });
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log('[ST] 상태 변경 API 응답 데이터:', data);
+          if (data.success) {
+            alert(`정산 상태가 "${statusName}"로 변경되었습니다.`);
+            stCloseStatusChangeModal();
+            
+            // 목록 새로고침
+            const roleNormalized = (stCurrentRole || '').toString().trim();
+            if (roleNormalized === '관리자') {
+              stAdminLoadSettlements();
+            } else {
+              stConsignorLoadSettlements();
+            }
+          } else {
+            alert(data.message || '상태 변경에 실패했습니다.');
+            saveButton.disabled = false;
+            saveButton.textContent = originalText;
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 상태 변경 오류:', error);
+          alert(error.message || '상태 변경 중 오류가 발생했습니다.');
+          saveButton.disabled = false;
+          saveButton.textContent = originalText;
+        });
+    }
+    window.stSaveStatusChange = stSaveStatusChange;
+    
+    // ========== 정산 상태 변경 모달 끝 ==========
 
     // 페이지 로드 시 자동 초기화
     if (document.readyState === 'loading') {
