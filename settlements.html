@@ -539,6 +539,7 @@
         <div style="display: flex; gap: 8px;">
           <button class="st-btn" onclick="stAdminLoadSettlements()">조회</button>
           <button class="st-btn st-admin-only" onclick="stBulkUpdateStatusToDelivery()" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);">📤 일괄 전달</button>
+          <button class="st-btn st-admin-only" onclick="stBulkDeleteSettlements()" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">🗑️ 일괄 삭제</button>
         </div>
       </div>
     </div>
@@ -1091,8 +1092,7 @@
             <td class="st-admin-only" style="white-space: nowrap;">
               ${actionButtons || ''}
               ${rollbackButton || ''}
-              <button class="st-btn" onclick="stEditSettlement(${item.id})" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;">수정</button>
-              <button class="st-btn-danger" onclick="stDeleteSettlement(${item.id})" style="padding: 4px 8px; font-size: 11px;">삭제</button>
+              <button class="st-btn" onclick="stEditSettlement(${item.id})" style="padding: 4px 8px; font-size: 11px;">수정</button>
             </td>
           </tr>
         `;
@@ -2817,6 +2817,91 @@
       });
     }
     window.stBulkUpdateStatusToDelivery = stBulkUpdateStatusToDelivery;
+
+    // 일괄 삭제 처리
+    function stBulkDeleteSettlements() {
+      // 체크된 정산 ID 수집
+      const checkedCheckboxes = document.querySelectorAll('.st-settlement-checkbox:checked');
+      
+      if (checkedCheckboxes.length === 0) {
+        alert('삭제할 정산을 선택해주세요.');
+        return;
+      }
+      
+      const settlementIds = Array.from(checkedCheckboxes).map(cb => parseInt(cb.value));
+      
+      // 확인 메시지
+      const confirmMsg = `정말로 ${settlementIds.length}개의 정산을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`;
+      if (!confirm(confirmMsg)) {
+        return;
+      }
+      
+      // 버튼 비활성화 및 로딩 표시
+      const bulkButton = document.querySelector('button[onclick="stBulkDeleteSettlements()"]');
+      const originalText = bulkButton.textContent;
+      bulkButton.disabled = true;
+      bulkButton.textContent = '처리 중...';
+      
+      // 각 정산을 순차적으로 삭제 (Promise.all로 병렬 처리)
+      let successCount = 0;
+      let failCount = 0;
+      const errors = [];
+      
+      Promise.all(
+        settlementIds.map(id => 
+          fetch(`/api/settlements/${id}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              ...stGetUserHeaders()
+            },
+            credentials: 'include'
+          })
+          .then(response => {
+            if (!response.ok) {
+              return response.json().then(data => {
+                throw new Error(data.message || `HTTP ${response.status}`);
+              });
+            }
+            return response.json();
+          })
+          .then(data => {
+            if (data.success) {
+              successCount++;
+            } else {
+              failCount++;
+              errors.push(`정산 ID ${id}: ${data.message || '알 수 없는 오류'}`);
+            }
+          })
+          .catch(error => {
+            failCount++;
+            errors.push(`정산 ID ${id}: ${error.message}`);
+            console.error(`[ST] 정산 ${id} 삭제 오류:`, error);
+          })
+        )
+      ).then(() => {
+        let message = `처리 완료: 성공 ${successCount}개`;
+        if (failCount > 0) {
+          message += `, 실패 ${failCount}개`;
+          if (errors.length > 0 && errors.length <= 5) {
+            message += '\n\n오류 상세:\n' + errors.join('\n');
+          }
+        }
+        alert(message);
+        
+        // 체크박스 초기화
+        document.getElementById('stSelectAll').checked = false;
+        document.querySelectorAll('.st-settlement-checkbox').forEach(cb => cb.checked = false);
+        
+        // 버튼 복원
+        bulkButton.disabled = false;
+        bulkButton.textContent = originalText;
+        
+        // 목록 새로고침
+        stAdminLoadSettlements();
+      });
+    }
+    window.stBulkDeleteSettlements = stBulkDeleteSettlements;
 
     // ========== 정산 상태 변경 모달 (관리자 전용 - 독립 모듈: 삭제 시 이 섹션만 제거하면 됨) ==========
 
