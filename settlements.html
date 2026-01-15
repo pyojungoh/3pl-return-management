@@ -827,12 +827,12 @@
             });
             stAdminRenderSettlements(items);
           } else {
-            if (tbody) tbody.innerHTML = `<tr><td colspan="10" class="no-data">${data.message || '목록을 불러오는 중 오류가 발생했습니다.'}</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="11" class="no-data">${data.message || '목록을 불러오는 중 오류가 발생했습니다.'}</td></tr>`;
           }
         })
         .catch(error => {
           console.error('[ST] 관리자 목록 로드 오류:', error);
-          if (tbody) tbody.innerHTML = '<tr><td colspan="10" class="no-data">목록을 불러오는 중 오류가 발생했습니다.</td></tr>';
+          if (tbody) tbody.innerHTML = '<tr><td colspan="11" class="no-data">목록을 불러오는 중 오류가 발생했습니다.</td></tr>';
         });
     }
     
@@ -886,7 +886,7 @@
             console.error('[ST] 전달 조회 실패:', data.message);
             const tbody = container.querySelector('#stTableBody');
             if (tbody) {
-              tbody.innerHTML = `<tr><td colspan="10" class="no-data">${data.message || '전달 정산 목록을 불러올 수 없습니다.'}</td></tr>`;
+              tbody.innerHTML = `<tr><td colspan="11" class="no-data">${data.message || '전달 정산 목록을 불러올 수 없습니다.'}</td></tr>`;
             }
           }
         })
@@ -894,7 +894,7 @@
           console.error('[ST] 전달 정산 목록 로드 오류:', error);
           const tbody = container.querySelector('#stTableBody');
           if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="10" class="no-data">전달 정산 목록을 불러오는 중 오류가 발생했습니다: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11" class="no-data">전달 정산 목록을 불러오는 중 오류가 발생했습니다: ${error.message}</td></tr>`;
           }
         });
     }
@@ -987,7 +987,7 @@
       if (!tbody) return;
       
       if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="no-data">정산 내역이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="no-data">정산 내역이 없습니다.</td></tr>';
         return;
       }
       
