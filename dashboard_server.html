@@ -13281,17 +13281,44 @@
           detailHtml += '</div>';
           
           detailHtml += '<div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #e0e0e0;">';
-          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          // 작업비
+          detailHtml += '<div style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">';
           detailHtml += '<span>작업비</span>';
+          detailHtml += '<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">';
           detailHtml += `<span style="font-weight: 600;">${(settlementDetail.work_fee || 0).toLocaleString()}원</span>`;
+          if (settlementDetail.work_fee_file_url) {
+            detailHtml += `<a href="${settlementDetail.work_fee_file_url}" target="_blank" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 12px; white-space: nowrap;">👁️ 미리보기</a>`;
+            detailHtml += `<a href="${settlementDetail.work_fee_file_url}" target="_blank" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 12px; white-space: nowrap;">📥 다운로드</a>`;
+          }
           detailHtml += '</div>';
-          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '</div>';
+          detailHtml += '</div>';
+          // 입출고비
+          detailHtml += '<div style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">';
           detailHtml += '<span>입출고비</span>';
+          detailHtml += '<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">';
           detailHtml += `<span style="font-weight: 600;">${(settlementDetail.inout_fee || 0).toLocaleString()}원</span>`;
+          if (settlementDetail.inout_fee_file_url) {
+            detailHtml += `<a href="${settlementDetail.inout_fee_file_url}" target="_blank" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 12px; white-space: nowrap;">👁️ 미리보기</a>`;
+            detailHtml += `<a href="${settlementDetail.inout_fee_file_url}" target="_blank" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 12px; white-space: nowrap;">📥 다운로드</a>`;
+          }
           detailHtml += '</div>';
-          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '</div>';
+          detailHtml += '</div>';
+          // 택배비
+          detailHtml += '<div style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">';
           detailHtml += '<span>택배비</span>';
+          detailHtml += '<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">';
           detailHtml += `<span style="font-weight: 600;">${(settlementDetail.shipping_fee || 0).toLocaleString()}원</span>`;
+          if (settlementDetail.shipping_fee_file_url) {
+            detailHtml += `<a href="${settlementDetail.shipping_fee_file_url}" target="_blank" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 12px; white-space: nowrap;">👁️ 미리보기</a>`;
+            detailHtml += `<a href="${settlementDetail.shipping_fee_file_url}" target="_blank" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 12px; white-space: nowrap;">📥 다운로드</a>`;
+          }
+          detailHtml += '</div>';
+          detailHtml += '</div>';
           detailHtml += '</div>';
           detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
           detailHtml += '<span>보관료</span>';
