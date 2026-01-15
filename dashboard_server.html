@@ -5832,6 +5832,22 @@
         palletsContainer.style.display = 'none';
       }
       
+      // 정산 전용 컨테이너 숨김 (정산 메뉴가 아닐 때)
+      const settlementsContainer = document.getElementById('settlementsTab');
+      if (settlementsContainer && menuName !== 'settlements') {
+        settlementsContainer.classList.add('hidden');
+        settlementsContainer.style.display = 'none';
+        // 정산 초기화 플래그 리셋 (다른 메뉴로 이동 시 정산 목록이 표시되지 않도록)
+        if (typeof window.stInitialized !== 'undefined') {
+          window.stInitialized = false;
+        }
+        // 정산 컨테이너도 숨기기
+        const stContainer = document.getElementById('stContainer');
+        if (stContainer) {
+          stContainer.style.display = 'none';
+        }
+      }
+      
       // 메뉴별 콘텐츠 표시/숨김 처리 (화주사 모드 탭만 처리)
       // 관리자 탭은 건드리지 않음
       const consignorTabIds = ['companyInfoTab', 'returnsTab', 'csTab', 'scheduleTab', 'boardCategoryTab'];
@@ -6019,6 +6035,22 @@
           tab.style.display = 'none';
         }
       });
+      
+      // 정산 탭이 아닐 때 정산 초기화 플래그 리셋
+      if (tabName !== 'settlements') {
+        const settlementsTab = document.getElementById('settlementsTab');
+        if (settlementsTab) {
+          // 정산 초기화 플래그 리셋 (다른 탭으로 이동 시 정산 목록이 표시되지 않도록)
+          if (typeof window.stInitialized !== 'undefined') {
+            window.stInitialized = false;
+          }
+          // 정산 컨테이너도 숨기기
+          const stContainer = document.getElementById('stContainer');
+          if (stContainer) {
+            stContainer.style.display = 'none';
+          }
+        }
+      }
       
       // 선택된 탭 콘텐츠 표시
       if (tabName === 'returns') {
