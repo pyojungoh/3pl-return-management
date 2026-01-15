@@ -1088,9 +1088,9 @@
             <td class="st-consignor-only">
               ${actionButtons || '<span style="color: #999;">-</span>'}
             </td>
-            <td class="st-admin-only">
-              ${actionButtons}
-              ${rollbackButton}
+            <td class="st-admin-only" style="white-space: nowrap;">
+              ${actionButtons || ''}
+              ${rollbackButton || ''}
               <button class="st-btn" onclick="stEditSettlement(${item.id})" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;">수정</button>
               <button class="st-btn-danger" onclick="stDeleteSettlement(${item.id})" style="padding: 4px 8px; font-size: 11px;">삭제</button>
             </td>
