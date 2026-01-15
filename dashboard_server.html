@@ -12983,8 +12983,16 @@
         const result = await response.json();
         
         if (result.success && result.data && result.data.length > 0) {
+          // 정확히 '전달' 상태만 필터링 (API는 '전달' 이상의 상태를 반환하므로)
+          const deliveryOnlySettlements = result.data.filter(settlement => {
+            const status = (settlement.status || '').toString().trim();
+            return status === '전달';
+          });
+          
           // 전달 상태 정산이 있으면 팝업 표시
-          showSettlementDeliveryPopup(result.data);
+          if (deliveryOnlySettlements.length > 0) {
+            showSettlementDeliveryPopup(deliveryOnlySettlements);
+          }
         }
       } catch (error) {
         // 타임아웃이나 네트워크 오류 시 무시 (사이트 로딩 방지)
