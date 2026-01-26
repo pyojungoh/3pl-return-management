@@ -2321,11 +2321,17 @@
               </div>
               <div>
                 <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">시작일 *</label>
-                <input type="date" id="scheduleStartDate" class="request-input" style="min-height: auto;" required>
+                <input type="date" id="scheduleStartDate" class="request-input" style="min-height: auto;" required onchange="syncScheduleEndDateIfSameDay('consignor')">
               </div>
-              <div>
+              <div id="scheduleEndDateWrap">
                 <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">종료일 *</label>
-                <input type="date" id="scheduleEndDate" class="request-input" style="min-height: auto;" required>
+                <input type="date" id="scheduleEndDate" class="request-input" style="min-height: auto;">
+              </div>
+              <div style="display: flex; align-items: flex-end; padding-bottom: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; color: #2d3436;">
+                  <input type="checkbox" id="scheduleSameDayCheckbox" onchange="applyScheduleSameDayUi('consignor')">
+                  <span>당일</span>
+                </label>
               </div>
               <div style="grid-column: 1 / -1;">
                 <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">행사 내용 *</label>
@@ -2493,11 +2499,17 @@
               </div>
               <div>
                 <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">시작일 *</label>
-                <input type="date" id="adminScheduleStartDate" class="request-input" style="min-height: auto;" required>
+                <input type="date" id="adminScheduleStartDate" class="request-input" style="min-height: auto;" required onchange="syncScheduleEndDateIfSameDay('admin')">
               </div>
-              <div>
+              <div id="adminScheduleEndDateWrap">
                 <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">종료일 *</label>
-                <input type="date" id="adminScheduleEndDate" class="request-input" style="min-height: auto;" required>
+                <input type="date" id="adminScheduleEndDate" class="request-input" style="min-height: auto;">
+              </div>
+              <div style="display: flex; align-items: flex-end; padding-bottom: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; color: #2d3436;">
+                  <input type="checkbox" id="adminScheduleSameDayCheckbox" onchange="applyScheduleSameDayUi('admin')">
+                  <span>당일</span>
+                </label>
               </div>
               <div style="grid-column: 1 / -1;">
                 <label style="color: #2d3436; font-weight: 600; margin-bottom: 8px; display: block;">행사 내용 *</label>
@@ -6667,9 +6679,40 @@
         if (isHidden && typeof loadScheduleTypesForConsignor === 'function') {
           loadScheduleTypesForConsignor();
         }
+        if (isHidden) {
+          applyScheduleSameDayUi('consignor');
+        }
       }
     }
     window.toggleScheduleForm = toggleScheduleForm;
+    
+    // 당일 체크 시 종료일 표시/숨김 및 동기화
+    function applyScheduleSameDayUi(mode) {
+      const isConsignor = mode === 'consignor';
+      const startEl = document.getElementById(isConsignor ? 'scheduleStartDate' : 'adminScheduleStartDate');
+      const endEl = document.getElementById(isConsignor ? 'scheduleEndDate' : 'adminScheduleEndDate');
+      const wrapEl = document.getElementById(isConsignor ? 'scheduleEndDateWrap' : 'adminScheduleEndDateWrap');
+      const checkEl = document.getElementById(isConsignor ? 'scheduleSameDayCheckbox' : 'adminScheduleSameDayCheckbox');
+      if (!startEl || !endEl || !wrapEl || !checkEl) return;
+      const checked = checkEl.checked;
+      wrapEl.style.display = checked ? 'none' : 'block';
+      if (checked) {
+        endEl.value = startEl.value || '';
+        endEl.removeAttribute('required');
+      } else {
+        endEl.setAttribute('required', 'required');
+      }
+    }
+    window.applyScheduleSameDayUi = applyScheduleSameDayUi;
+    
+    function syncScheduleEndDateIfSameDay(mode) {
+      const isConsignor = mode === 'consignor';
+      const startEl = document.getElementById(isConsignor ? 'scheduleStartDate' : 'adminScheduleStartDate');
+      const endEl = document.getElementById(isConsignor ? 'scheduleEndDate' : 'adminScheduleEndDate');
+      const checkEl = document.getElementById(isConsignor ? 'scheduleSameDayCheckbox' : 'adminScheduleSameDayCheckbox');
+      if (checkEl && checkEl.checked && startEl && endEl) endEl.value = startEl.value || '';
+    }
+    window.syncScheduleEndDateIfSameDay = syncScheduleEndDateIfSameDay;
     
     // 화주사 모드용 스케줄 타입 목록 로드 (타입 추가 버튼 없이 드롭다운만)
     async function loadScheduleTypesForConsignor() {
@@ -6696,17 +6739,23 @@
     async function saveSchedule() {
       const scheduleType = document.getElementById('scheduleType').value.trim();
       const title = document.getElementById('scheduleTitle').value.trim();
-      const startDate = document.getElementById('scheduleStartDate').value;
-      const endDate = document.getElementById('scheduleEndDate').value;
+      let startDate = document.getElementById('scheduleStartDate').value;
+      let endDate = document.getElementById('scheduleEndDate').value;
+      const sameDay = document.getElementById('scheduleSameDayCheckbox');
+      const isSameDay = sameDay && sameDay.checked;
+      if (isSameDay) endDate = startDate;
       const eventDescription = document.getElementById('scheduleEventDescription').value.trim();
       const requestNote = document.getElementById('scheduleRequestNote').value.trim();
       const messageDiv = document.getElementById('scheduleMessage');
       
-      if (!scheduleType || !title || !startDate || !endDate || !eventDescription) {
+      if (!scheduleType || !title || !startDate || !eventDescription) {
         messageDiv.innerHTML = '<span style="color: #e74c3c;">필수 항목을 모두 입력해주세요.</span>';
         return;
       }
-      
+      if (!isSameDay && !endDate) {
+        messageDiv.innerHTML = '<span style="color: #e74c3c;">종료일을 입력하거나 당일을 체크해주세요.</span>';
+        return;
+      }
       if (new Date(endDate) < new Date(startDate)) {
         messageDiv.innerHTML = '<span style="color: #e74c3c;">종료일은 시작일보다 늦어야 합니다.</span>';
         return;
@@ -6762,6 +6811,9 @@
       document.getElementById('scheduleEventDescription').value = '';
       document.getElementById('scheduleRequestNote').value = '';
       document.getElementById('scheduleMessage').innerHTML = '';
+      const sameDay = document.getElementById('scheduleSameDayCheckbox');
+      if (sameDay) { sameDay.checked = false; }
+      applyScheduleSameDayUi('consignor');
       
       // 저장 버튼으로 되돌리기
       const saveBtn = document.querySelector('#scheduleTab .save-btn');
@@ -7519,17 +7571,23 @@
       const companyName = (companyHidden && companyHidden.value.trim()) || (companyInput && companyInput.value.trim()) || '';
       const scheduleType = document.getElementById('adminScheduleType').value.trim();
       const title = document.getElementById('adminScheduleTitle').value.trim();
-      const startDate = document.getElementById('adminScheduleStartDate').value;
-      const endDate = document.getElementById('adminScheduleEndDate').value;
+      let startDate = document.getElementById('adminScheduleStartDate').value;
+      let endDate = document.getElementById('adminScheduleEndDate').value;
+      const sameDay = document.getElementById('adminScheduleSameDayCheckbox');
+      const isSameDay = sameDay && sameDay.checked;
+      if (isSameDay) endDate = startDate;
       const eventDescription = document.getElementById('adminScheduleEventDescription').value.trim();
       const requestNote = document.getElementById('adminScheduleRequestNote').value.trim();
       const messageDiv = document.getElementById('adminScheduleMessage');
       
-      if (!companyName || !scheduleType || !title || !startDate || !endDate || !eventDescription) {
+      if (!companyName || !scheduleType || !title || !startDate || !eventDescription) {
         messageDiv.innerHTML = '<span style="color: #e74c3c;">필수 항목을 모두 입력해주세요.</span>';
         return;
       }
-      
+      if (!isSameDay && !endDate) {
+        messageDiv.innerHTML = '<span style="color: #e74c3c;">종료일을 입력하거나 당일을 체크해주세요.</span>';
+        return;
+      }
       if (new Date(endDate) < new Date(startDate)) {
         messageDiv.innerHTML = '<span style="color: #e74c3c;">종료일은 시작일보다 늦어야 합니다.</span>';
         return;
@@ -7586,6 +7644,9 @@
       document.getElementById('adminScheduleEventDescription').value = '';
       document.getElementById('adminScheduleRequestNote').value = '';
       document.getElementById('adminScheduleMessage').innerHTML = '';
+      const sameDay = document.getElementById('adminScheduleSameDayCheckbox');
+      if (sameDay) { sameDay.checked = false; }
+      applyScheduleSameDayUi('admin');
     }
     window.resetAdminScheduleForm = resetAdminScheduleForm;
     
@@ -7750,8 +7811,9 @@
         if (form.style.display === 'none' || !form.style.display) {
           form.style.display = 'block';
           icon.textContent = '▲';
-          // 화주사 목록 로드
           loadCompaniesForSchedule();
+          if (typeof loadScheduleTypes === 'function') loadScheduleTypes();
+          applyScheduleSameDayUi('admin');
         } else {
           form.style.display = 'none';
           icon.textContent = '▼';
@@ -8901,6 +8963,9 @@
       }
       
       modalHtml += `
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+              <button type="button" class="save-btn" onclick="closeScheduleModal(); openScheduleFormForDate('${date}')" style="width: 100%; max-width: 320px;">➕ 이 날짜로 일정 등록</button>
+            </div>
           </div>
         </div>
       `;
@@ -8926,6 +8991,43 @@
       }
     }
     window.closeScheduleModal = closeScheduleModal;
+    
+    // 캘린더 날짜 클릭 → 모달 '이 날짜로 일정 등록' 시 폼 열고 해당 날짜 자동 기입 (당일 체크)
+    function openScheduleFormForDate(dateKey) {
+      const roleNorm = (typeof currentRole !== 'undefined' ? currentRole : '').toString().trim();
+      const isAdmin = roleNorm === '관리자';
+      if (isAdmin) {
+        const form = document.getElementById('addAdminScheduleForm');
+        if (form && (form.style.display === 'none' || !form.style.display)) {
+          toggleAdminScheduleForm();
+        }
+        const startEl = document.getElementById('adminScheduleStartDate');
+        const endEl = document.getElementById('adminScheduleEndDate');
+        const checkEl = document.getElementById('adminScheduleSameDayCheckbox');
+        if (startEl) startEl.value = dateKey;
+        if (endEl) endEl.value = dateKey;
+        if (checkEl) { checkEl.checked = true; }
+        applyScheduleSameDayUi('admin');
+        if (typeof loadCompaniesForSchedule === 'function') loadCompaniesForSchedule();
+        if (typeof loadScheduleTypes === 'function') loadScheduleTypes();
+      } else {
+        const form = document.getElementById('scheduleForm');
+        if (form && (form.style.display === 'none' || !form.style.display)) {
+          toggleScheduleForm();
+        }
+        const startEl = document.getElementById('scheduleStartDate');
+        const endEl = document.getElementById('scheduleEndDate');
+        const checkEl = document.getElementById('scheduleSameDayCheckbox');
+        if (startEl) startEl.value = dateKey;
+        if (endEl) endEl.value = dateKey;
+        if (checkEl) { checkEl.checked = true; }
+        applyScheduleSameDayUi('consignor');
+        if (typeof loadScheduleTypesForConsignor === 'function') loadScheduleTypesForConsignor();
+      }
+      const formSection = isAdmin ? document.getElementById('addAdminScheduleForm') : document.getElementById('scheduleForm');
+      if (formSection) formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    window.openScheduleFormForDate = openScheduleFormForDate;
     
     // ========== C/S 관련 함수 ==========
     
