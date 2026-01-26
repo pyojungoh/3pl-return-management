@@ -2556,18 +2556,17 @@
               <button class="refresh-btn" onclick="loadScheduleMemoLogs()" style="padding: 6px 12px; font-size: 13px;">🔄 새로고침</button>
             </div>
             <div class="table-container" style="max-height: 280px; overflow-y: auto;">
-              <table style="width: 100%; min-width: 500px;">
+              <table style="width: 100%; min-width: 400px; table-layout: fixed;">
                 <thead>
                   <tr style="background: #fff9e6;">
-                    <th style="padding: 8px; text-align: center;">일시</th>
-                    <th style="padding: 8px; text-align: center;">메모</th>
-                    <th style="padding: 8px; text-align: center;">구분</th>
-                    <th style="padding: 8px; text-align: center;">진행상황</th>
-                    <th style="padding: 8px; text-align: center;">작성자</th>
+                    <th style="width: 90px; min-width: 90px; padding: 6px 8px; text-align: center; font-size: 13px;">일시</th>
+                    <th style="width: 1%; padding: 6px 8px; text-align: center;">메모</th>
+                    <th style="width: 72px; min-width: 72px; padding: 6px 8px; text-align: center; font-size: 13px;">진행상황</th>
+                    <th style="width: 70px; min-width: 70px; padding: 6px 8px; text-align: center; font-size: 13px;">작성자</th>
                   </tr>
                 </thead>
                 <tbody id="scheduleMemoLogsBody">
-                  <tr><td colspan="5" class="no-data" style="text-align: center; padding: 16px;">기록이 없습니다.</td></tr>
+                  <tr><td colspan="4" class="no-data" style="text-align: center; padding: 16px;">기록이 없습니다.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -8222,28 +8221,29 @@
         const res = await fetch('/api/schedules/admin-memo-logs?limit=50', { credentials: 'include', headers: headers });
         const data = await res.json();
         if (!data.success || !Array.isArray(data.data)) {
-          tbody.innerHTML = '<tr><td colspan="5" class="no-data" style="text-align: center; padding: 16px;">기록을 불러올 수 없습니다.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="4" class="no-data" style="text-align: center; padding: 16px;">기록을 불러올 수 없습니다.</td></tr>';
           return;
         }
-        const logs = data.data;
-        if (logs.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" class="no-data" style="text-align: center; padding: 16px;">기록이 없습니다.</td></tr>';
+        const items = data.data;
+        if (items.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="no-data" style="text-align: center; padding: 16px;">기록이 없습니다.</td></tr>';
           return;
         }
-        const actionLabel = (a) => { const m = { created: '메모 작성', updated: '수정', status_change: '진행상황 변경' }; return m[a] || a; };
-        const rows = logs.map(l => {
-          const dt = (l.created_at || '').replace('T', ' ');
-          const memoTitle = escapeHtml((l.memo_title || '').trim()) || '-';
-          const statusText = l.action === 'status_change' && (l.from_status || l.to_status)
-            ? `${l.from_status || '-'} → ${l.to_status || '-'}`
-            : l.action === 'created' ? (l.to_status || '대기') : '-';
-          const who = escapeHtml((l.created_by || '').trim()) || '-';
-          return `<tr><td style="padding: 8px; text-align: center;">${dt}</td><td style="padding: 8px; text-align: center;">${memoTitle}</td><td style="padding: 8px; text-align: center;">${actionLabel(l.action)}</td><td style="padding: 8px; text-align: center;">${escapeHtml(statusText)}</td><td style="padding: 8px; text-align: center;">${who}</td></tr>`;
+        const rows = items.map(m => {
+          const dt = escapeHtml((m.display_at || '').trim()) || '-';
+          const status = escapeHtml((m.status || '대기').trim());
+          const who = escapeHtml((m.updated_by || '').trim()) || '-';
+          const title = (m.title || '').trim();
+          const content = (m.content || '').trim();
+          const full = [title, content].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() || '-';
+          const safe = escapeHtml(full);
+          const memoCell = `<td class="memo-log-cell" style="padding: 6px 8px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${safe}">${safe}</td>`;
+          return `<tr><td style="width: 90px; padding: 6px 8px; text-align: center; font-size: 13px;">${dt}</td>${memoCell}<td style="width: 72px; padding: 6px 8px; text-align: center; font-size: 13px;">${status}</td><td style="width: 70px; padding: 6px 8px; text-align: center; font-size: 13px;">${who}</td></tr>`;
         });
         tbody.innerHTML = rows.join('');
       } catch (e) {
         console.error('기록장 로드 오류:', e);
-        tbody.innerHTML = '<tr><td colspan="5" class="no-data" style="text-align: center; padding: 16px;">기록을 불러오는 중 오류가 발생했습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="no-data" style="text-align: center; padding: 16px;">기록을 불러오는 중 오류가 발생했습니다.</td></tr>';
       }
     }
     window.loadScheduleMemoLogs = loadScheduleMemoLogs;

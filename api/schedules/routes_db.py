@@ -1035,74 +1035,52 @@ def update_schedule_memo_status(memo_id):
 
 @schedules_bp.route('/admin-memo-logs', methods=['GET'])
 def get_schedule_memo_logs():
-    """스케줄 메모 기록장 조회 API (관리자 전용)"""
+    """스케줄 메모 기록장 조회 API (관리자 전용). 메모당 1행, 현재 진행상황만 반환."""
     try:
         user_context = get_user_context()
         if user_context['role'] != '관리자':
             return jsonify({'success': False, 'data': [], 'message': '관리자만 접근할 수 있습니다.'}), 403
         
-        memo_id = request.args.get('memo_id', type=int)
         limit = max(1, min(100, request.args.get('limit', type=int) or 50))
         
         conn = get_db_connection()
         try:
             if USE_POSTGRESQL:
                 cur = conn.cursor(cursor_factory=RealDictCursor)
-                if memo_id:
-                    cur.execute('''
-                        SELECT l.id, l.memo_id, l.action, l.from_status, l.to_status, l.created_by, l.created_at,
-                               m.title AS memo_title
-                        FROM schedule_memo_logs l
-                        LEFT JOIN schedule_memos m ON m.id = l.memo_id
-                        WHERE l.memo_id = %s
-                        ORDER BY l.created_at DESC
-                        LIMIT %s
-                    ''', (memo_id, limit))
-                else:
-                    cur.execute('''
-                        SELECT l.id, l.memo_id, l.action, l.from_status, l.to_status, l.created_by, l.created_at,
-                               m.title AS memo_title
-                        FROM schedule_memo_logs l
-                        LEFT JOIN schedule_memos m ON m.id = l.memo_id
-                        ORDER BY l.created_at DESC
-                        LIMIT %s
-                    ''', (limit,))
+                cur.execute('''
+                    SELECT id, title, company_name, content, status, updated_at, updated_by, created_at
+                    FROM schedule_memos
+                    ORDER BY COALESCE(updated_at, created_at) DESC
+                    LIMIT %s
+                ''', (limit,))
                 rows = cur.fetchall()
-                logs = [dict(r) for r in rows]
+                items = [dict(r) for r in rows]
             else:
                 cur = conn.cursor()
-                if memo_id:
-                    cur.execute('''
-                        SELECT l.id, l.memo_id, l.action, l.from_status, l.to_status, l.created_by, l.created_at,
-                               m.title AS memo_title
-                        FROM schedule_memo_logs l
-                        LEFT JOIN schedule_memos m ON m.id = l.memo_id
-                        WHERE l.memo_id = ?
-                        ORDER BY l.created_at DESC
-                        LIMIT ?
-                    ''', (memo_id, limit))
-                else:
-                    cur.execute('''
-                        SELECT l.id, l.memo_id, l.action, l.from_status, l.to_status, l.created_by, l.created_at,
-                               m.title AS memo_title
-                        FROM schedule_memo_logs l
-                        LEFT JOIN schedule_memos m ON m.id = l.memo_id
-                        ORDER BY l.created_at DESC
-                        LIMIT ?
-                    ''', (limit,))
+                cur.execute('''
+                    SELECT id, title, company_name, content, status, updated_at, updated_by, created_at
+                    FROM schedule_memos
+                    ORDER BY COALESCE(updated_at, created_at) DESC
+                    LIMIT ?
+                ''', (limit,))
                 rows = cur.fetchall()
                 desc = [c[0] for c in cur.description] if cur.description else []
-                logs = [dict(zip(desc, r)) for r in rows]
+                items = [dict(zip(desc, r)) for r in rows]
             
-            for lo in logs:
-                if isinstance(lo.get('created_at'), datetime):
-                    lo['created_at'] = lo['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            for it in items:
+                ts = it.get('updated_at') or it.get('created_at')
+                if isinstance(ts, datetime):
+                    it['display_at'] = ts.strftime('%Y-%m-%d %H:%M')
+                elif ts:
+                    it['display_at'] = str(ts).replace('T', ' ')[:16]
+                else:
+                    it['display_at'] = '-'
             
-            return jsonify({'success': True, 'data': logs, 'count': len(logs)})
+            return jsonify({'success': True, 'data': items, 'count': len(items)})
         finally:
             conn.close()
     except Exception as e:
-        print(f'❌ 스케줄 메모 로그 조회 오류: {e}')
+        print(f'❌ 스케줄 메모 기록장 조회 오류: {e}')
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'data': [], 'message': str(e)}), 500
