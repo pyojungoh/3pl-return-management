@@ -639,17 +639,19 @@ def get_schedule_memos():
             cursor = conn.cursor()
         
         try:
-            # 모든 메모 조회 (최신순)
+            # 메모판: 처리완료 제외 (대기만 표시), 최신순
             if USE_POSTGRESQL:
                 cursor.execute('''
                     SELECT id, title, company_name, content, status, updated_by, updated_at, created_at
                     FROM schedule_memos
+                    WHERE COALESCE(status, '대기') != '처리완료'
                     ORDER BY updated_at DESC
                 ''')
             else:
                 cursor.execute('''
                     SELECT id, title, company_name, content, status, updated_by, updated_at, created_at
                     FROM schedule_memos
+                    WHERE COALESCE(status, '대기') != '처리완료'
                     ORDER BY updated_at DESC
                 ''')
             
@@ -982,8 +984,8 @@ def update_schedule_memo_status(memo_id):
         
         data = request.get_json() or {}
         new_status = (data.get('status') or '').strip()
-        if new_status not in ('대기', '진행중', '처리완료'):
-            return jsonify({'success': False, 'message': '진행상황은 대기, 진행중, 처리완료 중 하나여야 합니다.'}), 400
+        if new_status not in ('대기', '처리완료'):
+            return jsonify({'success': False, 'message': '진행상황은 대기, 처리완료 중 하나여야 합니다.'}), 400
         
         conn = get_db_connection()
         try:

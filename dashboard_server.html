@@ -2631,7 +2631,6 @@
                 <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
                   <span id="scheduleMemoDetailStatus" style="font-weight: 600; color: #ff6b35; margin-right: 8px;"></span>
                   <button type="button" class="save-btn schedule-memo-status-btn" data-status="대기" onclick="updateScheduleMemoStatus('대기')" style="padding: 6px 12px; font-size: 13px;">대기</button>
-                  <button type="button" class="save-btn schedule-memo-status-btn" data-status="진행중" onclick="updateScheduleMemoStatus('진행중')" style="padding: 6px 12px; font-size: 13px;">진행중</button>
                   <button type="button" class="save-btn schedule-memo-status-btn" data-status="처리완료" onclick="updateScheduleMemoStatus('처리완료')" style="padding: 6px 12px; font-size: 13px;">처리완료</button>
                 </div>
               </div>
@@ -8163,7 +8162,7 @@
         const companyName = (memo.company_name || '').trim();
         const updatedAt = memo.updated_at ? (memo.updated_at.split(' ')[0] || '') : '';
         const status = (memo.status || '대기').trim();
-        const statusColor = status === '처리완료' ? '#00b894' : status === '진행중' ? '#0984e3' : '#636e72';
+        const statusColor = status === '처리완료' ? '#00b894' : '#636e72';
         memoCards.push(`
           <div class="schedule-memo-card" onclick="showScheduleMemoDetail(${memo.id})" style="background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%); border: 2px solid #ffeaa7; border-radius: 12px; padding: 10px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(255, 152, 0, 0.1); height: 70px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; box-sizing: border-box;">
             <div style="flex: 1; overflow: hidden; min-height: 0; display: flex; align-items: center;">
@@ -8405,7 +8404,11 @@
         });
         const data = await res.json();
         if (data.success) {
-          showScheduleMemoDetail(parseInt(memoId, 10));
+          if (status === '처리완료') {
+            closeScheduleMemoDetailModal();
+          } else {
+            showScheduleMemoDetail(parseInt(memoId, 10));
+          }
           if (typeof loadScheduleMemos === 'function') loadScheduleMemos();
           if (typeof loadScheduleMemoLogs === 'function') loadScheduleMemoLogs();
         } else {
