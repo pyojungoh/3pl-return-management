@@ -2560,7 +2560,7 @@
                 <thead>
                   <tr style="background: #fff9e6;">
                     <th style="width: 90px; min-width: 90px; padding: 6px 8px; text-align: center; font-size: 13px;">일시</th>
-                    <th style="width: 1%; padding: 6px 8px; text-align: center;">메모</th>
+                    <th style="width: 50%; min-width: 180px; padding: 6px 8px; text-align: center;">메모</th>
                     <th style="width: 72px; min-width: 72px; padding: 6px 8px; text-align: center; font-size: 13px;">진행상황</th>
                     <th style="width: 70px; min-width: 70px; padding: 6px 8px; text-align: center; font-size: 13px;">작성자</th>
                   </tr>
@@ -8229,15 +8229,22 @@
           tbody.innerHTML = '<tr><td colspan="4" class="no-data" style="text-align: center; padding: 16px;">기록이 없습니다.</td></tr>';
           return;
         }
+        function safeAttr(s) {
+          const t = String(s == null ? '' : s);
+          return t.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/`/g, '&#96;');
+        }
         const rows = items.map(m => {
           const dt = escapeHtml((m.display_at || '').trim()) || '-';
           const status = escapeHtml((m.status || '대기').trim());
           const who = escapeHtml((m.updated_by || '').trim()) || '-';
-          const title = (m.title || '').trim();
-          const content = (m.content || '').trim();
-          const full = [title, content].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() || '-';
+          const title = String(m.title ?? '').trim();
+          const content = String(m.content ?? '').trim();
+          let full = title;
+          if (content && content !== title) full += ' ' + content;
+          full = full.replace(/\s+/g, ' ').trim() || '-';
           const safe = escapeHtml(full);
-          const memoCell = `<td class="memo-log-cell" style="padding: 6px 8px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${safe}">${safe}</td>`;
+          const titleAttr = safeAttr(full);
+          const memoCell = `<td class="memo-log-cell" style="padding: 6px 8px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 180px;" title="${titleAttr}">${safe}</td>`;
           return `<tr><td style="width: 90px; padding: 6px 8px; text-align: center; font-size: 13px;">${dt}</td>${memoCell}<td style="width: 72px; padding: 6px 8px; text-align: center; font-size: 13px;">${status}</td><td style="width: 70px; padding: 6px 8px; text-align: center; font-size: 13px;">${who}</td></tr>`;
         });
         tbody.innerHTML = rows.join('');
