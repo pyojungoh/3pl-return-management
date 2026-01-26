@@ -300,6 +300,24 @@ def init_db():
                 if 'duplicate column' not in str(e).lower() and 'does not exist' not in str(e).lower():
                     print(f"[경고] schedule_memos 테이블 마이그레이션 중 오류 (무시 가능): {e}")
             
+            try:
+                cursor.execute("ALTER TABLE schedule_memos ADD COLUMN IF NOT EXISTS status TEXT DEFAULT '대기'")
+            except Exception as e:
+                if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
+                    print(f"[경고] schedule_memos status 컬럼 추가 중 오류 (무시 가능): {e}")
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS schedule_memo_logs (
+                    id SERIAL PRIMARY KEY,
+                    memo_id INTEGER NOT NULL,
+                    action TEXT NOT NULL,
+                    from_status TEXT,
+                    to_status TEXT,
+                    created_by TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
             conn.commit()
             
             # PostgreSQL - 게시판 카테고리 테이블
@@ -1100,6 +1118,26 @@ def init_db():
                         cursor.execute('UPDATE schedule_memos SET content = COALESCE(memo_content, ""), title = COALESCE(memo_content, "") WHERE content = "" OR title = ""')
             except Exception as e:
                 print(f"[경고] schedule_memos 테이블 마이그레이션 중 오류 (무시 가능): {e}")
+            
+            try:
+                cursor.execute("PRAGMA table_info(schedule_memos)")
+                cols = [c[1] for c in cursor.fetchall()]
+                if 'status' not in cols:
+                    cursor.execute("ALTER TABLE schedule_memos ADD COLUMN status TEXT DEFAULT '대기'")
+            except Exception as e:
+                print(f"[경고] schedule_memos status 컬럼 추가 중 오류 (무시 가능): {e}")
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS schedule_memo_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    memo_id INTEGER NOT NULL,
+                    action TEXT NOT NULL,
+                    from_status TEXT,
+                    to_status TEXT,
+                    created_by TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
             
             conn.commit()
             

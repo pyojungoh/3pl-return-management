@@ -642,13 +642,13 @@ def get_schedule_memos():
             # 모든 메모 조회 (최신순)
             if USE_POSTGRESQL:
                 cursor.execute('''
-                    SELECT id, title, company_name, content, updated_by, updated_at, created_at
+                    SELECT id, title, company_name, content, status, updated_by, updated_at, created_at
                     FROM schedule_memos
                     ORDER BY updated_at DESC
                 ''')
             else:
                 cursor.execute('''
-                    SELECT id, title, company_name, content, updated_by, updated_at, created_at
+                    SELECT id, title, company_name, content, status, updated_by, updated_at, created_at
                     FROM schedule_memos
                     ORDER BY updated_at DESC
                 ''')
@@ -674,14 +674,17 @@ def get_schedule_memos():
                             'title': row[1] if len(row) > 1 else '',
                             'company_name': row[2] if len(row) > 2 else None,
                             'content': row[3] if len(row) > 3 else '',
-                            'updated_by': row[4] if len(row) > 4 else None,
-                            'updated_at': row[5] if len(row) > 5 else None,
-                            'created_at': row[6] if len(row) > 6 else None
+                            'status': row[4] if len(row) > 4 else '대기',
+                            'updated_by': row[5] if len(row) > 5 else None,
+                            'updated_at': row[6] if len(row) > 6 else None,
+                            'created_at': row[7] if len(row) > 7 else None
                         }
                 # datetime 객체를 문자열로 변환
                 for key, value in memo.items():
                     if isinstance(value, datetime):
                         memo[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
+                if 'status' not in memo or memo.get('status') is None:
+                    memo['status'] = '대기'
                 memos.append(memo)
             
             return jsonify({
@@ -729,13 +732,13 @@ def get_schedule_memo_detail(memo_id):
         try:
             if USE_POSTGRESQL:
                 cursor.execute('''
-                    SELECT id, title, company_name, content, updated_by, updated_at, created_at
+                    SELECT id, title, company_name, content, status, updated_by, updated_at, created_at
                     FROM schedule_memos
                     WHERE id = %s
                 ''', (memo_id,))
             else:
                 cursor.execute('''
-                    SELECT id, title, company_name, content, updated_by, updated_at, created_at
+                    SELECT id, title, company_name, content, status, updated_by, updated_at, created_at
                     FROM schedule_memos
                     WHERE id = ?
                 ''', (memo_id,))
@@ -746,25 +749,23 @@ def get_schedule_memo_detail(memo_id):
                 if USE_POSTGRESQL:
                     memo = dict(row)
                 else:
-                    # SQLite의 경우 - Row 객체는 dict처럼 사용 가능
                     if hasattr(row, 'keys'):
-                        # Row 객체인 경우
                         memo = dict(row)
                     elif cursor.description:
-                        # description이 있는 경우
                         memo = dict(zip([col[0] for col in cursor.description], row))
                     else:
-                        # 수동 변환
                         memo = {
                             'id': row[0] if len(row) > 0 else None,
                             'title': row[1] if len(row) > 1 else '',
                             'company_name': row[2] if len(row) > 2 else None,
                             'content': row[3] if len(row) > 3 else '',
-                            'updated_by': row[4] if len(row) > 4 else None,
-                            'updated_at': row[5] if len(row) > 5 else None,
-                            'created_at': row[6] if len(row) > 6 else None
+                            'status': row[4] if len(row) > 4 else '대기',
+                            'updated_by': row[5] if len(row) > 5 else None,
+                            'updated_at': row[6] if len(row) > 6 else None,
+                            'created_at': row[7] if len(row) > 7 else None
                         }
-                # datetime 객체를 문자열로 변환
+                if memo.get('status') is None:
+                    memo['status'] = '대기'
                 for key, value in memo.items():
                     if isinstance(value, datetime):
                         memo[key] = value.strftime('%Y-%m-%d %H:%M:%S') if value else None
@@ -833,17 +834,28 @@ def create_schedule_memo():
         try:
             if USE_POSTGRESQL:
                 cursor.execute('''
-                    INSERT INTO schedule_memos (title, company_name, content, updated_by, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    INSERT INTO schedule_memos (title, company_name, content, status, updated_by, created_at, updated_at)
+                    VALUES (%s, %s, %s, '대기', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     RETURNING id
                 ''', (title, company_name if company_name else None, content, username))
                 memo_id = cursor.fetchone()[0]
             else:
                 cursor.execute('''
-                    INSERT INTO schedule_memos (title, company_name, content, updated_by, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    INSERT INTO schedule_memos (title, company_name, content, status, updated_by, created_at, updated_at)
+                    VALUES (?, ?, ?, '대기', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 ''', (title, company_name if company_name else None, content, username))
                 memo_id = cursor.lastrowid
+            
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    INSERT INTO schedule_memo_logs (memo_id, action, to_status, created_by)
+                    VALUES (%s, 'created', '대기', %s)
+                ''', (memo_id, username))
+            else:
+                cursor.execute('''
+                    INSERT INTO schedule_memo_logs (memo_id, action, to_status, created_by)
+                    VALUES (?, 'created', '대기', ?)
+                ''', (memo_id, username))
             
             conn.commit()
             
@@ -924,6 +936,17 @@ def update_schedule_memo(memo_id):
                     'message': '메모를 찾을 수 없습니다.'
                 }), 404
             
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    INSERT INTO schedule_memo_logs (memo_id, action, created_by)
+                    VALUES (%s, 'updated', %s)
+                ''', (memo_id, username))
+            else:
+                cursor.execute('''
+                    INSERT INTO schedule_memo_logs (memo_id, action, created_by)
+                    VALUES (?, 'updated', ?)
+                ''', (memo_id, username))
+            
             conn.commit()
             
             return jsonify({
@@ -945,6 +968,144 @@ def update_schedule_memo(memo_id):
             'success': False,
             'message': f'메모 수정 중 오류: {str(e)}'
         }), 500
+
+
+@schedules_bp.route('/admin-memo/<int:memo_id>/status', methods=['PATCH', 'PUT'])
+def update_schedule_memo_status(memo_id):
+    """스케줄 메모 진행상황 변경 API (관리자 전용)"""
+    try:
+        user_context = get_user_context()
+        role = user_context['role']
+        username = user_context['username']
+        if role != '관리자':
+            return jsonify({'success': False, 'message': '관리자만 접근할 수 있습니다.'}), 403
+        
+        data = request.get_json() or {}
+        new_status = (data.get('status') or '').strip()
+        if new_status not in ('대기', '진행중', '처리완료'):
+            return jsonify({'success': False, 'message': '진행상황은 대기, 진행중, 처리완료 중 하나여야 합니다.'}), 400
+        
+        conn = get_db_connection()
+        try:
+            if USE_POSTGRESQL:
+                cur = conn.cursor(cursor_factory=RealDictCursor)
+                cur.execute('SELECT id, status FROM schedule_memos WHERE id = %s', (memo_id,))
+            else:
+                cur = conn.cursor()
+                cur.execute('SELECT id, status FROM schedule_memos WHERE id = ?', (memo_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({'success': False, 'message': '메모를 찾을 수 없습니다.'}), 404
+            
+            old_status = (row['status'] if USE_POSTGRESQL else row[1]) or '대기'
+            if old_status == new_status:
+                return jsonify({'success': True, 'message': '동일한 진행상황입니다.', 'status': new_status})
+            
+            if USE_POSTGRESQL:
+                cur.execute(
+                    "UPDATE schedule_memos SET status = %s, updated_by = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (new_status, username, memo_id)
+                )
+                cur.execute(
+                    "INSERT INTO schedule_memo_logs (memo_id, action, from_status, to_status, created_by) VALUES (%s, 'status_change', %s, %s, %s)",
+                    (memo_id, old_status, new_status, username)
+                )
+            else:
+                cur.execute(
+                    "UPDATE schedule_memos SET status = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (new_status, username, memo_id)
+                )
+                cur.execute(
+                    "INSERT INTO schedule_memo_logs (memo_id, action, from_status, to_status, created_by) VALUES (?, 'status_change', ?, ?, ?)",
+                    (memo_id, old_status, new_status, username)
+                )
+            conn.commit()
+            return jsonify({'success': True, 'message': '진행상황이 변경되었습니다.', 'status': new_status})
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f'❌ 스케줄 메모 진행상황 변경 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@schedules_bp.route('/admin-memo-logs', methods=['GET'])
+def get_schedule_memo_logs():
+    """스케줄 메모 기록장 조회 API (관리자 전용)"""
+    try:
+        user_context = get_user_context()
+        if user_context['role'] != '관리자':
+            return jsonify({'success': False, 'data': [], 'message': '관리자만 접근할 수 있습니다.'}), 403
+        
+        memo_id = request.args.get('memo_id', type=int)
+        limit = max(1, min(100, request.args.get('limit', type=int) or 50))
+        
+        conn = get_db_connection()
+        try:
+            if USE_POSTGRESQL:
+                cur = conn.cursor(cursor_factory=RealDictCursor)
+                if memo_id:
+                    cur.execute('''
+                        SELECT l.id, l.memo_id, l.action, l.from_status, l.to_status, l.created_by, l.created_at,
+                               m.title AS memo_title
+                        FROM schedule_memo_logs l
+                        LEFT JOIN schedule_memos m ON m.id = l.memo_id
+                        WHERE l.memo_id = %s
+                        ORDER BY l.created_at DESC
+                        LIMIT %s
+                    ''', (memo_id, limit))
+                else:
+                    cur.execute('''
+                        SELECT l.id, l.memo_id, l.action, l.from_status, l.to_status, l.created_by, l.created_at,
+                               m.title AS memo_title
+                        FROM schedule_memo_logs l
+                        LEFT JOIN schedule_memos m ON m.id = l.memo_id
+                        ORDER BY l.created_at DESC
+                        LIMIT %s
+                    ''', (limit,))
+                rows = cur.fetchall()
+                logs = [dict(r) for r in rows]
+            else:
+                cur = conn.cursor()
+                if memo_id:
+                    cur.execute('''
+                        SELECT l.id, l.memo_id, l.action, l.from_status, l.to_status, l.created_by, l.created_at,
+                               m.title AS memo_title
+                        FROM schedule_memo_logs l
+                        LEFT JOIN schedule_memos m ON m.id = l.memo_id
+                        WHERE l.memo_id = ?
+                        ORDER BY l.created_at DESC
+                        LIMIT ?
+                    ''', (memo_id, limit))
+                else:
+                    cur.execute('''
+                        SELECT l.id, l.memo_id, l.action, l.from_status, l.to_status, l.created_by, l.created_at,
+                               m.title AS memo_title
+                        FROM schedule_memo_logs l
+                        LEFT JOIN schedule_memos m ON m.id = l.memo_id
+                        ORDER BY l.created_at DESC
+                        LIMIT ?
+                    ''', (limit,))
+                rows = cur.fetchall()
+                desc = [c[0] for c in cur.description] if cur.description else []
+                logs = [dict(zip(desc, r)) for r in rows]
+            
+            for lo in logs:
+                if isinstance(lo.get('created_at'), datetime):
+                    lo['created_at'] = lo['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            
+            return jsonify({'success': True, 'data': logs, 'count': len(logs)})
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f'❌ 스케줄 메모 로그 조회 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'data': [], 'message': str(e)}), 500
 
 
 @schedules_bp.route('/admin-memo/<int:memo_id>', methods=['DELETE'])

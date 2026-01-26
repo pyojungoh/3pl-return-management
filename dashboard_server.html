@@ -2550,6 +2550,28 @@
           <div id="scheduleMemoGrid" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; width: 100%; max-width: 100%; box-sizing: border-box;">
             <!-- 메모 카드들이 여기에 동적으로 생성됩니다 -->
           </div>
+          <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #eee;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h4 style="margin: 0; color: #ff6b35; font-size: 16px; font-weight: 700;">📋 기록장</h4>
+              <button class="refresh-btn" onclick="loadScheduleMemoLogs()" style="padding: 6px 12px; font-size: 13px;">🔄 새로고침</button>
+            </div>
+            <div class="table-container" style="max-height: 280px; overflow-y: auto;">
+              <table style="width: 100%; min-width: 500px;">
+                <thead>
+                  <tr style="background: #fff9e6;">
+                    <th style="padding: 8px; text-align: center;">일시</th>
+                    <th style="padding: 8px; text-align: center;">메모</th>
+                    <th style="padding: 8px; text-align: center;">구분</th>
+                    <th style="padding: 8px; text-align: center;">진행상황</th>
+                    <th style="padding: 8px; text-align: center;">작성자</th>
+                  </tr>
+                </thead>
+                <tbody id="scheduleMemoLogsBody">
+                  <tr><td colspan="5" class="no-data" style="text-align: center; padding: 16px;">기록이 없습니다.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
         
         <!-- 메모 작성 모달 -->
@@ -2604,6 +2626,15 @@
               <div style="margin-bottom: 20px;">
                 <label style="color: #636e72; font-weight: 600; margin-bottom: 8px; display: block;">내용</label>
                 <div id="scheduleMemoDetailContent" style="padding: 12px; background: #f8f9fa; border-radius: 8px; font-size: 14px; color: #2d3436; white-space: pre-wrap; min-height: 100px;"></div>
+              </div>
+              <div style="margin-bottom: 20px;">
+                <label style="color: #636e72; font-weight: 600; margin-bottom: 8px; display: block;">진행상황</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                  <span id="scheduleMemoDetailStatus" style="font-weight: 600; color: #ff6b35; margin-right: 8px;"></span>
+                  <button type="button" class="save-btn schedule-memo-status-btn" data-status="대기" onclick="updateScheduleMemoStatus('대기')" style="padding: 6px 12px; font-size: 13px;">대기</button>
+                  <button type="button" class="save-btn schedule-memo-status-btn" data-status="진행중" onclick="updateScheduleMemoStatus('진행중')" style="padding: 6px 12px; font-size: 13px;">진행중</button>
+                  <button type="button" class="save-btn schedule-memo-status-btn" data-status="처리완료" onclick="updateScheduleMemoStatus('처리완료')" style="padding: 6px 12px; font-size: 13px;">처리완료</button>
+                </div>
               </div>
               <div style="margin-bottom: 20px; padding: 12px; background: #fff9e6; border-radius: 8px; font-size: 12px; color: #999;">
                 <div id="scheduleMemoDetailInfo"></div>
@@ -8108,6 +8139,7 @@
         
         if (result.success) {
           renderScheduleMemoGrid(result.data || []);
+          if (typeof loadScheduleMemoLogs === 'function') loadScheduleMemoLogs();
         } else {
           memoGrid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: #e74c3c;">${result.message || '메모를 불러오는 중 오류가 발생했습니다.'}</div>`;
         }
@@ -8131,13 +8163,17 @@
         const title = (memo.title || '').trim();
         const companyName = (memo.company_name || '').trim();
         const updatedAt = memo.updated_at ? (memo.updated_at.split(' ')[0] || '') : '';
-        
+        const status = (memo.status || '대기').trim();
+        const statusColor = status === '처리완료' ? '#00b894' : status === '진행중' ? '#0984e3' : '#636e72';
         memoCards.push(`
           <div class="schedule-memo-card" onclick="showScheduleMemoDetail(${memo.id})" style="background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%); border: 2px solid #ffeaa7; border-radius: 12px; padding: 10px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(255, 152, 0, 0.1); height: 70px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; box-sizing: border-box;">
             <div style="flex: 1; overflow: hidden; min-height: 0; display: flex; align-items: center;">
               <div style="font-weight: 700; font-size: 14px; color: #ff6b35; word-break: break-word; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; width: 100%;">${escapeHtml(title)}</div>
             </div>
-            <div style="font-size: 9px; color: #999; flex-shrink: 0; margin-top: 4px;">${updatedAt}</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #999; flex-shrink: 0; margin-top: 4px;">
+              <span>${updatedAt}</span>
+              <span style="font-weight: 600; color: ${statusColor};">${escapeHtml(status)}</span>
+            </div>
           </div>
         `);
       });
@@ -8173,6 +8209,44 @@
         memoGrid.style.minWidth = '0';
       }
     }
+    
+    async function loadScheduleMemoLogs() {
+      const tbody = document.getElementById('scheduleMemoLogsBody');
+      if (!tbody) return;
+      try {
+        const headers = {
+          'X-User-Role': encodeURIComponent(currentRole || ''),
+          'X-User-Name': encodeURIComponent(currentUsername || ''),
+          'X-Company-Name': encodeURIComponent(currentCompany || '')
+        };
+        const res = await fetch('/api/schedules/admin-memo-logs?limit=50', { credentials: 'include', headers: headers });
+        const data = await res.json();
+        if (!data.success || !Array.isArray(data.data)) {
+          tbody.innerHTML = '<tr><td colspan="5" class="no-data" style="text-align: center; padding: 16px;">기록을 불러올 수 없습니다.</td></tr>';
+          return;
+        }
+        const logs = data.data;
+        if (logs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="no-data" style="text-align: center; padding: 16px;">기록이 없습니다.</td></tr>';
+          return;
+        }
+        const actionLabel = (a) => { const m = { created: '메모 작성', updated: '수정', status_change: '진행상황 변경' }; return m[a] || a; };
+        const rows = logs.map(l => {
+          const dt = (l.created_at || '').replace('T', ' ');
+          const memoTitle = escapeHtml((l.memo_title || '').trim()) || '-';
+          const statusText = l.action === 'status_change' && (l.from_status || l.to_status)
+            ? `${l.from_status || '-'} → ${l.to_status || '-'}`
+            : l.action === 'created' ? (l.to_status || '대기') : '-';
+          const who = escapeHtml((l.created_by || '').trim()) || '-';
+          return `<tr><td style="padding: 8px; text-align: center;">${dt}</td><td style="padding: 8px; text-align: center;">${memoTitle}</td><td style="padding: 8px; text-align: center;">${actionLabel(l.action)}</td><td style="padding: 8px; text-align: center;">${escapeHtml(statusText)}</td><td style="padding: 8px; text-align: center;">${who}</td></tr>`;
+        });
+        tbody.innerHTML = rows.join('');
+      } catch (e) {
+        console.error('기록장 로드 오류:', e);
+        tbody.innerHTML = '<tr><td colspan="5" class="no-data" style="text-align: center; padding: 16px;">기록을 불러오는 중 오류가 발생했습니다.</td></tr>';
+      }
+    }
+    window.loadScheduleMemoLogs = loadScheduleMemoLogs;
     
     // 메모 작성 모달 열기
     function openScheduleMemoCreateModal() {
@@ -8282,16 +8356,18 @@
           document.getElementById('scheduleMemoDetailTitle').textContent = memo.title || '';
           document.getElementById('scheduleMemoDetailCompany').textContent = memo.company_name || '전체';
           document.getElementById('scheduleMemoDetailContent').textContent = memo.content || '';
-          
+          const st = (memo.status || '대기').trim();
+          const statusEl = document.getElementById('scheduleMemoDetailStatus');
+          if (statusEl) statusEl.textContent = st;
+          document.querySelectorAll('.schedule-memo-status-btn').forEach(btn => {
+            const active = (btn.getAttribute('data-status') || '') === st;
+            btn.style.background = active ? 'linear-gradient(135deg, #ff6b35 0%, #feca57 100%)' : 'linear-gradient(135deg, #dfe6e9 0%, #b2bec3 100%)';
+            btn.style.color = active ? '#fff' : '#2d3436';
+          });
           const infoText = [];
-          if (memo.updated_at) {
-            infoText.push(`수정: ${memo.updated_at}`);
-          }
-          if (memo.updated_by) {
-            infoText.push(`작성자: ${memo.updated_by}`);
-          }
+          if (memo.updated_at) infoText.push(`수정: ${memo.updated_at}`);
+          if (memo.updated_by) infoText.push(`작성자: ${memo.updated_by}`);
           document.getElementById('scheduleMemoDetailInfo').textContent = infoText.join(' | ');
-          
           showScheduleMemoDetailView();
           modal.style.display = 'block';
         } else {
@@ -8303,6 +8379,37 @@
       }
     }
     window.showScheduleMemoDetail = showScheduleMemoDetail;
+    
+    async function updateScheduleMemoStatus(status) {
+      const memoId = document.getElementById('scheduleMemoEditId')?.value;
+      if (!memoId) return;
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-User-Role': encodeURIComponent(currentRole || ''),
+        'X-User-Name': encodeURIComponent(currentUsername || ''),
+        'X-Company-Name': encodeURIComponent(currentCompany || '')
+      };
+      try {
+        const res = await fetch(`/api/schedules/admin-memo/${memoId}/status`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: headers,
+          body: JSON.stringify({ status: status })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showScheduleMemoDetail(parseInt(memoId, 10));
+          if (typeof loadScheduleMemos === 'function') loadScheduleMemos();
+          if (typeof loadScheduleMemoLogs === 'function') loadScheduleMemoLogs();
+        } else {
+          alert(data.message || '진행상황 변경에 실패했습니다.');
+        }
+      } catch (e) {
+        console.error('진행상황 변경 오류:', e);
+        alert('진행상황 변경 중 오류가 발생했습니다.');
+      }
+    }
+    window.updateScheduleMemoStatus = updateScheduleMemoStatus;
     
     // 메모 상세보기 모달 닫기
     function closeScheduleMemoDetailModal() {
