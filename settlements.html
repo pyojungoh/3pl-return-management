@@ -424,6 +424,7 @@
                 <div>
                   <input type="number" id="stShippingFee" class="st-form-input" placeholder="택배비 금액 입력" style="width: 180px; display: inline-block; margin-right: 8px;" onchange="stCalculateTotal()">
                   <span>원</span>
+                  <button type="button" class="st-btn" onclick="stLoadCollectOnDeliveryFee()" style="margin-left: 10px; padding: 6px 12px; font-size: 12px;">🔄 착불택배비 불러오기</button>
                 </div>
               </div>
               
@@ -1673,6 +1674,47 @@
         .catch(error => {
           console.error('[ST] 오배송/누락 건수 확인 오류:', error);
           alert('오배송/누락 건수를 확인하는 중 오류가 발생했습니다.');
+        });
+    }
+    
+    // 착불 택배비 불러오기
+    function stLoadCollectOnDeliveryFee() {
+      // 화주사명 가져오기 (여러 방법 시도, 특수작업 메뉴와 동일한 방식)
+      const companyInput = document.getElementById('stSettlementCompanyInput')?.value?.trim();
+      const companyNameHidden = document.getElementById('stSettlementCompanyName')?.value?.trim();
+      const companyName = companyNameHidden || companyInput || stCurrentCompany;
+      const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
+      
+      if (!companyName || !yearMonth) {
+        alert('화주사와 정산년월을 먼저 선택해주세요.');
+        return;
+      }
+      
+      fetch(`/api/settlements/data-sources?settlement_year_month=${yearMonth}&company_name=${encodeURIComponent(companyName)}`, {
+        credentials: 'include',
+        headers: stGetUserHeaders()
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const collectFee = data.data.collect_on_delivery_fee || 0;
+            const shippingFeeInput = document.getElementById('stShippingFee');
+            if (shippingFeeInput) {
+              shippingFeeInput.value = collectFee;
+              stCalculateTotal();
+              if (collectFee === 0) {
+                alert('해당 기간의 착불 택배비가 없습니다.');
+              } else {
+                alert(`착불 택배비 ${collectFee.toLocaleString()}원이 불러와졌습니다.`);
+              }
+            }
+          } else {
+            alert(data.message || '착불 택배비를 가져올 수 없습니다.');
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 착불 택배비 로드 오류:', error);
+          alert('착불 택배비를 가져오는 중 오류가 발생했습니다.');
         });
     }
 

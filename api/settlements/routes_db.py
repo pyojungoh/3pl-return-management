@@ -602,7 +602,8 @@ def get_data_sources():
             'special_work_fee': 0,  # 특수작업 비용
             'error_wrong_delivery_count': 0,  # 오배송 건수
             'error_missing_count': 0,  # 누락 건수
-            'error_details': []  # 오배송/누락 상세
+            'error_details': [],  # 오배송/누락 상세
+            'collect_on_delivery_fee': 0  # 착불 택배비
         }
         
         # 1. 파레트 보관료 조회
@@ -777,6 +778,71 @@ def get_data_sources():
                 conn.close()
         except Exception as e:
             print(f'[경고] 오배송/누락 차감 조회 오류: {e}')
+        
+        # 4. 착불 택배비 집계 (반품관리)
+        try:
+            conn = get_db_connection()
+            if USE_POSTGRESQL:
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+            else:
+                cursor = conn.cursor()
+            
+            try:
+                # 정산년월을 월 형식으로 변환 (예: "2025-11" -> "2025년11월")
+                year, month = map(int, settlement_year_month.split('-'))
+                month_str = f'{year}년{month:02d}월'
+                
+                if USE_POSTGRESQL:
+                    cursor.execute('''
+                        SELECT shipping_fee
+                        FROM returns
+                        WHERE company_name = %s 
+                        AND month = %s
+                        AND shipping_fee IS NOT NULL
+                        AND shipping_fee != ''
+                    ''', (filter_company_name, month_str))
+                else:
+                    cursor.execute('''
+                        SELECT shipping_fee
+                        FROM returns
+                        WHERE company_name = ? 
+                        AND month = ?
+                        AND shipping_fee IS NOT NULL
+                        AND shipping_fee != ''
+                    ''', (filter_company_name, month_str))
+                
+                rows = cursor.fetchall()
+                total_collect_fee = 0
+                
+                for row in rows:
+                    shipping_fee = row.get('shipping_fee', '') if isinstance(row, dict) else row[0]
+                    if not shipping_fee:
+                        continue
+                    shipping_fee_str = str(shipping_fee).strip()
+                    # "착불"로 시작하는 경우만 처리
+                    if shipping_fee_str.startswith('착불'):
+                        # "착불 5000" 형식에서 금액 추출
+                        import re
+                        match = re.match(r'착불\s*([\d,]+)', shipping_fee_str)
+                        if match:
+                            amount_str = match.group(1).replace(',', '')
+                            try:
+                                amount = int(amount_str)
+                                total_collect_fee += amount
+                            except ValueError:
+                                pass
+                
+                result['collect_on_delivery_fee'] = total_collect_fee
+                print(f'[정보] 착불 택배비 집계: {filter_company_name}, {settlement_year_month}, {total_collect_fee}원')
+            finally:
+                cursor.close()
+                conn.close()
+        except Exception as e:
+            print(f'[경고] 착불 택배비 집계 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            # 에러가 발생해도 기본값 0으로 계속 진행
+            result['collect_on_delivery_fee'] = 0
         
         return jsonify({
             'success': True,
