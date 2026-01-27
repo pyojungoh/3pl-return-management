@@ -2022,6 +2022,11 @@
         </div>
       </div>
       
+      <!-- 착불 택배비 요약 (통계 박스 아래, 작게 표시) -->
+      <div id="returnsCollectOnDeliverySummary" style="display: none; margin-top: -8px; margin-bottom: 12px; padding: 8px 12px; background: #fffef9; border-radius: 10px; border: 1px solid #ffeaa7; font-size: 12px; color: #636e72;">
+        <!-- 관리자: 화주사별 착불택배비 | 화주사: 한 줄 요약 -->
+      </div>
+      
       <!-- 테이블 -->
       <div class="table-container">
         <div class="table-scroll-wrapper">
@@ -4458,7 +4463,60 @@
       document.getElementById('totalCount').textContent = total;
       document.getElementById('completedCount').textContent = completed;
       document.getElementById('pendingCount').textContent = pending;
+      
+      if (typeof updateCollectOnDeliverySummary === 'function') {
+        updateCollectOnDeliverySummary(data);
+      }
     }
+    
+    // 착불 배송비 파싱: "착불 5000" -> { isCollect: true, amount: 5000 }, "착불" -> { isCollect: true, amount: 0 }
+    function parseCollectOnDelivery(row) {
+      const s = (row['배송비'] || '').toString().trim();
+      if (!s || !s.startsWith('착불')) return { isCollect: false, amount: 0 };
+      const m = s.match(/착불\s*([\d,]+)/);
+      const amount = m ? (parseInt(String(m[1]).replace(/,/g, ''), 10) || 0) : 0;
+      return { isCollect: true, amount: amount };
+    }
+    
+    // 착불 집계: 관리자 -> 화주사별 { 화주명: { count, total } }, 화주사 -> { count, total }
+    function computeCollectOnDeliveryStats(data) {
+      const isAdmin = (currentRole || '').toString().trim() === '관리자';
+      const perCompany = {};
+      let totalCount = 0;
+      let totalAmount = 0;
+      (data || []).forEach(row => {
+        const p = parseCollectOnDelivery(row);
+        if (!p.isCollect) return;
+        const company = (row['화주명'] || '').toString().trim() || '(미지정)';
+        if (!perCompany[company]) perCompany[company] = { count: 0, total: 0 };
+        perCompany[company].count += 1;
+        perCompany[company].total += p.amount;
+        totalCount += 1;
+        totalAmount += p.amount;
+      });
+      return { isAdmin, perCompany, totalCount, totalAmount };
+    }
+    
+    // 착불 택배비 요약 UI 갱신 (통계 박스 아래, 작게)
+    function updateCollectOnDeliverySummary(data) {
+      const el = document.getElementById('returnsCollectOnDeliverySummary');
+      if (!el) return;
+      const st = computeCollectOnDeliveryStats(data);
+      if (st.totalCount === 0 && Object.keys(st.perCompany).length === 0) {
+        el.style.display = 'none';
+        return;
+      }
+      el.style.display = 'block';
+      if (st.isAdmin) {
+        const lines = Object.entries(st.perCompany)
+          .sort((a, b) => (b[1].count + b[1].total) - (a[1].count + a[1].total))
+          .map(([name, v]) => `${escapeHtml(name)}: ${v.count}건 총 ${(v.total || 0).toLocaleString()}원`);
+        el.innerHTML = '<strong style="color: #ff6b35;">🚚 화주사별 착불택배비</strong> &nbsp; ' + lines.join(' &nbsp; | &nbsp; ');
+      } else {
+        el.innerHTML = '<strong style="color: #ff6b35;">🚚 착불택배</strong> ' + st.totalCount + '건 &nbsp; 총 택배비: ' + (st.totalAmount || 0).toLocaleString() + '원';
+      }
+    }
+    window.updateCollectOnDeliverySummary = updateCollectOnDeliverySummary;
     
     // 요청사항 저장
     function saveRequest(dataIndex, rowIndex) {
