@@ -113,6 +113,7 @@ def get_settlements_list():
                     s.storage_fee,
                     s.special_work_fee,
                     s.error_deduction,
+                    s.collect_on_delivery_fee,
                     s.total_amount,
                     s.status,
                     s.tax_invoice_file_url,
@@ -284,6 +285,7 @@ def create_settlement():
                             work_fee = %s, inout_fee = %s, 
                             shipping_fee = %s, storage_fee = %s,
                             special_work_fee = %s, error_deduction = %s,
+                            collect_on_delivery_fee = %s,
                             total_amount = %s, status = %s, memo = %s,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s
@@ -291,6 +293,7 @@ def create_settlement():
                         data.get('work_fee', 0), data.get('inout_fee', 0),
                         data.get('shipping_fee', 0), data.get('storage_fee', 0),
                         data.get('special_work_fee', 0), data.get('error_deduction', 0),
+                        data.get('collect_on_delivery_fee', 0),
                         data.get('total_amount', 0), data.get('status', '대기'),
                         data.get('memo', ''), settlement_id
                     ))
@@ -300,6 +303,7 @@ def create_settlement():
                             work_fee = ?, inout_fee = ?, 
                             shipping_fee = ?, storage_fee = ?,
                             special_work_fee = ?, error_deduction = ?,
+                            collect_on_delivery_fee = ?,
                             total_amount = ?, status = ?, memo = ?,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
@@ -307,6 +311,7 @@ def create_settlement():
                         data.get('work_fee', 0), data.get('inout_fee', 0),
                         data.get('shipping_fee', 0), data.get('storage_fee', 0),
                         data.get('special_work_fee', 0), data.get('error_deduction', 0),
+                        data.get('collect_on_delivery_fee', 0),
                         data.get('total_amount', 0), data.get('status', '대기'),
                         data.get('memo', ''), settlement_id
                     ))
@@ -317,15 +322,16 @@ def create_settlement():
                         INSERT INTO settlements (
                             company_name, settlement_year_month, work_fee, inout_fee, 
                             shipping_fee, storage_fee, special_work_fee, error_deduction,
-                            total_amount, status, memo, created_at, updated_at
+                            collect_on_delivery_fee, total_amount, status, memo, created_at, updated_at
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         RETURNING id
                     ''', (
                         settlement_company_name, settlement_year_month,
                         data.get('work_fee', 0), data.get('inout_fee', 0),
                         data.get('shipping_fee', 0), data.get('storage_fee', 0),
                         data.get('special_work_fee', 0), data.get('error_deduction', 0),
+                        data.get('collect_on_delivery_fee', 0),
                         data.get('total_amount', 0), data.get('status', '대기'),
                         data.get('memo', '')
                     ))
@@ -335,14 +341,15 @@ def create_settlement():
                         INSERT INTO settlements (
                             company_name, settlement_year_month, work_fee, inout_fee, 
                             shipping_fee, storage_fee, special_work_fee, error_deduction,
-                            total_amount, status, memo, created_at, updated_at
+                            collect_on_delivery_fee, total_amount, status, memo, created_at, updated_at
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     ''', (
                         settlement_company_name, settlement_year_month,
                         data.get('work_fee', 0), data.get('inout_fee', 0),
                         data.get('shipping_fee', 0), data.get('storage_fee', 0),
                         data.get('special_work_fee', 0), data.get('error_deduction', 0),
+                        data.get('collect_on_delivery_fee', 0),
                         data.get('total_amount', 0), data.get('status', '대기'),
                         data.get('memo', '')
                     ))
@@ -423,6 +430,10 @@ def update_settlement(settlement_id):
             if 'shipping_fee_file_url' in data:
                 updates.append('shipping_fee_file_url = %s' if USE_POSTGRESQL else 'shipping_fee_file_url = ?')
                 params.append(data['shipping_fee_file_url'])
+            
+            if 'collect_on_delivery_fee' in data:
+                updates.append('collect_on_delivery_fee = %s' if USE_POSTGRESQL else 'collect_on_delivery_fee = ?')
+                params.append(data['collect_on_delivery_fee'])
             
             if 'storage_fee' in data:
                 updates.append('storage_fee = %s' if USE_POSTGRESQL else 'storage_fee = ?')
@@ -731,26 +742,28 @@ def get_data_sources():
                 cursor = conn.cursor()
             
             try:
-                # 정산년월을 월 형식으로 변환 (예: "2025-11" -> "2025년11월")
+                # 정산년월을 월 형식으로 변환. 반품 DB는 "2025년1월" 또는 "2025년01월" 둘 다 있을 수 있음.
                 year, month = map(int, settlement_year_month.split('-'))
-                month_str = f'{year}년{month:02d}월'
+                month_variants = list(dict.fromkeys([f'{year}년{month}월', f'{year}년{month:02d}월']))
                 
                 if USE_POSTGRESQL:
-                    cursor.execute('''
+                    placeholders = ','.join(['%s'] * len(month_variants))
+                    cursor.execute(f'''
                         SELECT tracking_number, shipping_fee, return_type, customer_name
                         FROM returns
                         WHERE company_name = %s 
-                        AND month = %s
+                        AND month IN ({placeholders})
                         AND (return_type = '오배송' OR return_type = '누락')
-                    ''', (filter_company_name, month_str))
+                    ''', (filter_company_name, *month_variants))
                 else:
-                    cursor.execute('''
+                    placeholders = ','.join(['?'] * len(month_variants))
+                    cursor.execute(f'''
                         SELECT tracking_number, shipping_fee, return_type, customer_name
                         FROM returns
                         WHERE company_name = ? 
-                        AND month = ?
+                        AND month IN ({placeholders})
                         AND (return_type = '오배송' OR return_type = '누락')
-                    ''', (filter_company_name, month_str))
+                    ''', (filter_company_name, *month_variants))
                 
                 rows = cursor.fetchall()
                 wrong_delivery_count = 0
@@ -788,28 +801,30 @@ def get_data_sources():
                 cursor = conn.cursor()
             
             try:
-                # 정산년월을 월 형식으로 변환 (예: "2025-11" -> "2025년11월")
+                # 정산년월 → 월 형식. 반품 DB는 "2025년1월" 또는 "2025년01월" 둘 다 있을 수 있음.
                 year, month = map(int, settlement_year_month.split('-'))
-                month_str = f'{year}년{month:02d}월'
+                month_variants = list(dict.fromkeys([f'{year}년{month}월', f'{year}년{month:02d}월']))
                 
                 if USE_POSTGRESQL:
-                    cursor.execute('''
+                    placeholders = ','.join(['%s'] * len(month_variants))
+                    cursor.execute(f'''
                         SELECT shipping_fee
                         FROM returns
                         WHERE company_name = %s 
-                        AND month = %s
+                        AND month IN ({placeholders})
                         AND shipping_fee IS NOT NULL
                         AND shipping_fee != ''
-                    ''', (filter_company_name, month_str))
+                    ''', (filter_company_name, *month_variants))
                 else:
-                    cursor.execute('''
+                    placeholders = ','.join(['?'] * len(month_variants))
+                    cursor.execute(f'''
                         SELECT shipping_fee
                         FROM returns
                         WHERE company_name = ? 
-                        AND month = ?
+                        AND month IN ({placeholders})
                         AND shipping_fee IS NOT NULL
                         AND shipping_fee != ''
-                    ''', (filter_company_name, month_str))
+                    ''', (filter_company_name, *month_variants))
                 
                 rows = cursor.fetchall()
                 total_collect_fee = 0

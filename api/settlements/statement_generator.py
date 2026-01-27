@@ -153,6 +153,7 @@ def create_settlement_statement(settlement_data):
     work_fee = settlement_data.get('work_fee', 0) or 0
     inout_fee = settlement_data.get('inout_fee', 0) or 0
     shipping_fee = settlement_data.get('shipping_fee', 0) or 0
+    collect_on_delivery_fee = settlement_data.get('collect_on_delivery_fee', 0) or 0
     storage_fee = settlement_data.get('storage_fee', 0) or 0
     special_work_fee = settlement_data.get('special_work_fee', 0) or 0
     error_deduction = settlement_data.get('error_deduction', 0) or 0
@@ -161,6 +162,7 @@ def create_settlement_statement(settlement_data):
         ('작업비', work_fee),
         ('입출고비', inout_fee),
         ('택배비', shipping_fee),
+        ('착불 택배비', collect_on_delivery_fee),
         ('보관료', storage_fee),
         ('특수작업', special_work_fee),
         ('오배송/누락 차감', -error_deduction),
@@ -179,7 +181,7 @@ def create_settlement_statement(settlement_data):
         row += 1
     
     # 총액
-    total_amount = work_fee + inout_fee + shipping_fee + storage_fee + special_work_fee - error_deduction
+    total_amount = work_fee + inout_fee + shipping_fee + collect_on_delivery_fee + storage_fee + special_work_fee - error_deduction
     
     ws.cell(row=row, column=1, value='총액').font = label_font
     ws.cell(row=row, column=1).alignment = left_align

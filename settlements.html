@@ -424,7 +424,16 @@
                 <div>
                   <input type="number" id="stShippingFee" class="st-form-input" placeholder="택배비 금액 입력" style="width: 180px; display: inline-block; margin-right: 8px;" onchange="stCalculateTotal()">
                   <span>원</span>
-                  <button type="button" class="st-btn" onclick="stLoadCollectOnDeliveryFee()" style="margin-left: 10px; padding: 6px 12px; font-size: 12px;">🔄 착불택배비 불러오기</button>
+                </div>
+              </div>
+              
+              <!-- 착불 택배비 -->
+              <div class="st-settlement-detail-row">
+                <div class="st-settlement-detail-label">착불 택배비</div>
+                <div>
+                  <input type="number" id="stCollectOnDeliveryFee" class="st-form-input" placeholder="착불 택배비 금액 입력" style="width: 180px; display: inline-block; margin-right: 8px;" onchange="stCalculateTotal()">
+                  <span>원</span>
+                  <button type="button" class="st-btn" onclick="stLoadCollectOnDeliveryFee()" style="margin-left: 10px; padding: 6px 12px; font-size: 12px;">🔄 반품에서 불러오기</button>
                 </div>
               </div>
               
@@ -1015,7 +1024,8 @@
       
       tbody.innerHTML = items.map((item, index) => {
         const totalAmount = (item.work_fee || 0) + (item.inout_fee || 0) + (item.shipping_fee || 0) + 
-                           (item.storage_fee || 0) + (item.special_work_fee || 0) - (item.error_deduction || 0);
+                           (item.collect_on_delivery_fee || 0) + (item.storage_fee || 0) + 
+                           (item.special_work_fee || 0) - (item.error_deduction || 0);
         const tax = Math.floor(totalAmount * 0.1); // 세금 (부가세 10%)
         const finalAmount = totalAmount + tax; // 결제금액 (총액 + 세금)
         const status = item.status || '대기';
@@ -1137,7 +1147,8 @@
       
       tbody.innerHTML = items.map((item, index) => {
         const totalAmount = (item.work_fee || 0) + (item.inout_fee || 0) + (item.shipping_fee || 0) + 
-                           (item.storage_fee || 0) + (item.special_work_fee || 0) - (item.error_deduction || 0);
+                           (item.collect_on_delivery_fee || 0) + (item.storage_fee || 0) + 
+                           (item.special_work_fee || 0) - (item.error_deduction || 0);
         const tax = Math.floor(totalAmount * 0.1); // 세금 (부가세 10%)
         const finalAmount = totalAmount + tax; // 결제금액 (총액 + 세금)
         const status = item.status || '대기';
@@ -1201,11 +1212,12 @@
       const workFee = parseInt(document.getElementById('stWorkFee')?.value || 0);
       const inoutFee = parseInt(document.getElementById('stInoutFee')?.value || 0);
       const shippingFee = parseInt(document.getElementById('stShippingFee')?.value || 0);
+      const collectOnDeliveryFee = parseInt(document.getElementById('stCollectOnDeliveryFee')?.value || 0);
       const storageFee = parseInt(document.getElementById('stStorageFee')?.value || 0);
       const specialWorkFee = parseInt(document.getElementById('stSpecialWorkFee')?.value || 0);
       const errorDeduction = parseInt(document.getElementById('stErrorDeduction')?.value || 0);
       
-      const total = workFee + inoutFee + shippingFee + storageFee + specialWorkFee - errorDeduction;
+      const total = workFee + inoutFee + shippingFee + collectOnDeliveryFee + storageFee + specialWorkFee - errorDeduction;
       document.getElementById('stTotalAmount').textContent = total.toLocaleString();
     }
 
@@ -1698,9 +1710,9 @@
         .then(data => {
           if (data.success && data.data) {
             const collectFee = data.data.collect_on_delivery_fee || 0;
-            const shippingFeeInput = document.getElementById('stShippingFee');
-            if (shippingFeeInput) {
-              shippingFeeInput.value = collectFee;
+            const collectInput = document.getElementById('stCollectOnDeliveryFee');
+            if (collectInput) {
+              collectInput.value = collectFee;
               stCalculateTotal();
               if (collectFee === 0) {
                 alert('해당 기간의 착불 택배비가 없습니다.');
@@ -1727,6 +1739,7 @@
       const workFee = parseInt(document.getElementById('stWorkFee')?.value || 0);
       const inoutFee = parseInt(document.getElementById('stInoutFee')?.value || 0);
       const shippingFee = parseInt(document.getElementById('stShippingFee')?.value || 0);
+      const collectOnDeliveryFee = parseInt(document.getElementById('stCollectOnDeliveryFee')?.value || 0);
       const storageFee = parseInt(document.getElementById('stStorageFee')?.value || 0);
       const specialWorkFee = parseInt(document.getElementById('stSpecialWorkFee')?.value || 0);
       const errorDeduction = parseInt(document.getElementById('stErrorDeduction')?.value || 0);
@@ -1738,7 +1751,7 @@
         return;
       }
       
-      const totalAmount = workFee + inoutFee + shippingFee + storageFee + specialWorkFee - errorDeduction;
+      const totalAmount = workFee + inoutFee + shippingFee + collectOnDeliveryFee + storageFee + specialWorkFee - errorDeduction;
       
       const data = {
         company_name: companyName,
@@ -1746,6 +1759,7 @@
         work_fee: workFee,
         inout_fee: inoutFee,
         shipping_fee: shippingFee,
+        collect_on_delivery_fee: collectOnDeliveryFee,
         storage_fee: storageFee,
         special_work_fee: specialWorkFee,
         error_deduction: errorDeduction,
@@ -1920,6 +1934,7 @@
       document.getElementById('stStorageFeeDisplay').textContent = '0';
       document.getElementById('stSpecialWorkFee').value = '0';
       document.getElementById('stSpecialWorkFeeDisplay').textContent = '0';
+      document.getElementById('stCollectOnDeliveryFee').value = '0';
       document.getElementById('stErrorDeduction').value = '0';
       document.getElementById('stErrorCountsDisplay').textContent = '오배송: 0건, 누락: 0건';
       stCalculateTotal();
@@ -1936,8 +1951,8 @@
           if (data.success && data.data) {
             const settlement = data.data;
             const totalAmount = (settlement.work_fee || 0) + (settlement.inout_fee || 0) + 
-                              (settlement.shipping_fee || 0) + (settlement.storage_fee || 0) + 
-                              (settlement.special_work_fee || 0) - (settlement.error_deduction || 0);
+                              (settlement.shipping_fee || 0) + (settlement.collect_on_delivery_fee || 0) + 
+                              (settlement.storage_fee || 0) + (settlement.special_work_fee || 0) - (settlement.error_deduction || 0);
             const tax = Math.floor(totalAmount * 0.1); // 세금 (부가세 10%)
             const finalAmount = totalAmount + tax; // 결제금액 (총액 + 세금)
             
@@ -1986,6 +2001,10 @@
                       </div>
                     ` : ''}
                   </div>
+                </div>
+                <div class="st-settlement-detail-row">
+                  <div class="st-settlement-detail-label">착불 택배비</div>
+                  <div class="st-settlement-detail-value">${(settlement.collect_on_delivery_fee || 0).toLocaleString()}원</div>
                 </div>
                 <div class="st-settlement-detail-row">
                   <div class="st-settlement-detail-label">보관료</div>
@@ -2081,6 +2100,7 @@
             document.getElementById('stWorkFee').value = settlement.work_fee || 0;
             document.getElementById('stInoutFee').value = settlement.inout_fee || 0;
             document.getElementById('stShippingFee').value = settlement.shipping_fee || 0;
+            document.getElementById('stCollectOnDeliveryFee').value = settlement.collect_on_delivery_fee || 0;
             document.getElementById('stStorageFee').value = settlement.storage_fee || 0;
             document.getElementById('stStorageFeeDisplay').textContent = (settlement.storage_fee || 0).toLocaleString();
             document.getElementById('stSpecialWorkFee').value = settlement.special_work_fee || 0;
@@ -2228,8 +2248,8 @@
           if (data.success && data.data) {
             const settlement = data.data;
             const totalAmount = (settlement.work_fee || 0) + (settlement.inout_fee || 0) + 
-                              (settlement.shipping_fee || 0) + (settlement.storage_fee || 0) + 
-                              (settlement.special_work_fee || 0) - (settlement.error_deduction || 0);
+                              (settlement.shipping_fee || 0) + (settlement.collect_on_delivery_fee || 0) + 
+                              (settlement.storage_fee || 0) + (settlement.special_work_fee || 0) - (settlement.error_deduction || 0);
             const tax = Math.floor(totalAmount * 0.1);
             const finalAmount = totalAmount + tax;
             
@@ -2298,6 +2318,10 @@
                       <tr>
                         <td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">택배비</td>
                         <td style="padding: 6px; border: 1px solid #ddd; text-align: right; font-size: 11px;">${(settlement.shipping_fee || 0).toLocaleString()}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">착불 택배비</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: right; font-size: 11px;">${(settlement.collect_on_delivery_fee || 0).toLocaleString()}</td>
                       </tr>
                       <tr>
                         <td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">보관료</td>
