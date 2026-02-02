@@ -380,8 +380,8 @@
         <form id="stSettlementForm" onsubmit="stAdminHandleSettlementSubmit(event)">
           <input type="hidden" id="stSettlementId">
           
-          <!-- 상단: 화주사, 정산년월 -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">
+          <!-- 상단: 화주사, 정산년월, 일괄 불러오기 -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; align-items: end;">
             <div class="st-form-group">
               <label class="st-form-label">화주사 *</label>
               <div class="st-searchable-select">
@@ -392,7 +392,13 @@
             </div>
             <div class="st-form-group">
               <label class="st-form-label">정산년월 *</label>
-              <input type="month" id="stSettlementYearMonth" class="st-form-input" required>
+              <input type="month" id="stSettlementYearMonth" class="st-form-input" required onchange="stMaybeAutoLoadDataSources()">
+            </div>
+            <div class="st-form-group">
+              <button type="button" class="st-btn" id="stLoadAllDataSourcesBtn" onclick="stLoadAllDataSources()" style="padding: 10px 20px; font-size: 14px; white-space: nowrap;">
+                🔄 일괄 불러오기
+              </button>
+              <div style="font-size: 11px; color: #666; margin-top: 4px;">착불·보관료·특수작업·오배송/누락</div>
             </div>
           </div>
           
@@ -1543,6 +1549,77 @@
       }
     }
 
+    // 착불·보관료·특수작업·오배송/누락 일괄 불러오기
+    function stLoadAllDataSources() {
+      const companyInput = document.getElementById('stSettlementCompanyInput')?.value?.trim();
+      const companyNameHidden = document.getElementById('stSettlementCompanyName')?.value?.trim();
+      const companyName = companyNameHidden || companyInput || stCurrentCompany;
+      const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
+      
+      if (!companyName || !yearMonth) {
+        alert('화주사와 정산년월을 먼저 선택해주세요.');
+        return;
+      }
+      
+      const btn = document.getElementById('stLoadAllDataSourcesBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = '불러오는 중...';
+      }
+      
+      fetch(`/api/settlements/data-sources?settlement_year_month=${yearMonth}&company_name=${encodeURIComponent(companyName)}`, {
+        credentials: 'include',
+        headers: stGetUserHeaders()
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const d = data.data;
+            // 착불 택배비
+            const collectFee = d.collect_on_delivery_fee || 0;
+            const collectInput = document.getElementById('stCollectOnDeliveryFee');
+            if (collectInput) collectInput.value = collectFee;
+            // 보관료
+            const storageFee = d.storage_fee || 0;
+            document.getElementById('stStorageFee').value = storageFee;
+            const storageDisplay = document.getElementById('stStorageFeeDisplay');
+            if (storageDisplay) storageDisplay.textContent = storageFee.toLocaleString();
+            // 특수작업
+            const specialFee = d.special_work_fee || 0;
+            document.getElementById('stSpecialWorkFee').value = specialFee;
+            const specialDisplay = document.getElementById('stSpecialWorkFeeDisplay');
+            if (specialDisplay) specialDisplay.textContent = specialFee.toLocaleString();
+            // 오배송/누락 건수
+            const wrongCount = d.error_wrong_delivery_count || 0;
+            const missingCount = d.error_missing_count || 0;
+            const countsEl = document.getElementById('stErrorCountsDisplay');
+            if (countsEl) countsEl.textContent = `오배송: ${wrongCount}건, 누락: ${missingCount}건`;
+            
+            stCalculateTotal();
+          }
+        })
+        .catch(error => {
+          console.error('[ST] 일괄 불러오기 오류:', error);
+          alert('데이터를 불러오는 중 오류가 발생했습니다.');
+        })
+        .finally(() => {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '🔄 일괄 불러오기';
+          }
+        });
+    }
+    
+    // 화주사·정산년월 선택 시 자동 일괄 불러오기
+    function stMaybeAutoLoadDataSources() {
+      const companyName = document.getElementById('stSettlementCompanyName')?.value?.trim() 
+        || document.getElementById('stSettlementCompanyInput')?.value?.trim() || stCurrentCompany;
+      const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
+      if (companyName && yearMonth) {
+        stLoadAllDataSources();
+      }
+    }
+
     // 파레트 보관료 가져오기
     function stLoadStorageFee() {
       const companyName = document.getElementById('stSettlementCompanyName')?.value || stCurrentCompany;
@@ -2511,8 +2588,8 @@
           if (data.success && data.companies) {
             const companies = data.companies.filter(c => c.role !== '관리자').map(c => c.company_name);
             
-            // 검색 가능한 드롭다운 초기화
-            stInitSearchableDropdown('stSettlementCompanyInput', 'stSettlementCompanyName', 'stSettlementCompanyDropdown', companies);
+            // 검색 가능한 드롭다운 초기화 (정산 화주사: 선택 시 일괄 불러오기 자동 실행)
+            stInitSearchableDropdown('stSettlementCompanyInput', 'stSettlementCompanyName', 'stSettlementCompanyDropdown', companies, stMaybeAutoLoadDataSources);
             stInitSearchableDropdown('stAdminFilterCompanyInput', 'stAdminFilterCompanyName', 'stAdminFilterCompanyDropdown', companies);
           }
         })
@@ -2521,8 +2598,8 @@
         });
     }
 
-    // 검색 가능한 드롭다운 초기화
-    function stInitSearchableDropdown(inputId, hiddenId, dropdownId, items) {
+    // 검색 가능한 드롭다운 초기화 (onSelect 콜백 선택)
+    function stInitSearchableDropdown(inputId, hiddenId, dropdownId, items, onSelect) {
       const inputEl = document.getElementById(inputId);
       const hiddenEl = document.getElementById(hiddenId);
       const dropdownEl = document.getElementById(dropdownId);
@@ -2575,6 +2652,7 @@
         hiddenEl.value = item.dataset.value;
         dropdownEl.classList.remove('show');
         isOpen = false;
+        if (typeof onSelect === 'function') onSelect();
       });
 
       document.addEventListener('mousedown', (e) => {
