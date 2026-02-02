@@ -569,6 +569,34 @@ def upload_certificate():
         }), 500
 
 
+@uploads_bp.route('/test/oauth-auth', methods=['GET'])
+def test_oauth_auth():
+    """
+    OAuth 2.0 인증 시작 (로컬 전용)
+    credentials.json이 있고 token.pickle이 없을 때 브라우저가 열려 Google 로그인을 진행합니다.
+    인증 완료 후 token.pickle이 생성됩니다.
+    """
+    try:
+        from api.uploads.oauth_drive import get_credentials
+        creds = get_credentials()
+        if creds and creds.valid:
+            return jsonify({
+                'success': True,
+                'message': 'OAuth 인증이 이미 완료되어 있습니다. token.pickle을 사용 중입니다.'
+            })
+        return jsonify({
+            'success': False,
+            'message': '인증을 가져올 수 없습니다.'
+        }), 500
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
 @uploads_bp.route('/test/upload-excel', methods=['POST'])
 def test_upload_excel():
     """

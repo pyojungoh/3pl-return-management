@@ -4,7 +4,8 @@
 from flask import Blueprint, request, jsonify, Response
 from api.database.models import (
     get_db_connection,
-    USE_POSTGRESQL
+    USE_POSTGRESQL,
+    normalize_company_name
 )
 from datetime import datetime, date
 from urllib.parse import unquote
@@ -626,8 +627,9 @@ def get_data_sources():
                 role=role
             )
             if pallet_settlements:
+                filter_normalized = normalize_company_name(filter_company_name)
                 for settlement in pallet_settlements:
-                    if settlement.get('company_name') == filter_company_name:
+                    if normalize_company_name(settlement.get('company_name', '') or '') == filter_normalized:
                         result['storage_fee'] = settlement.get('total_fee', 0)
                         break
         except Exception as e:
