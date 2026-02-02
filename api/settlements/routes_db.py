@@ -5,7 +5,8 @@ from flask import Blueprint, request, jsonify, Response
 from api.database.models import (
     get_db_connection,
     USE_POSTGRESQL,
-    normalize_company_name
+    normalize_company_name,
+    get_company_search_keywords
 )
 from datetime import datetime, date
 from urllib.parse import unquote
@@ -735,7 +736,8 @@ def get_data_sources():
             # 에러가 발생해도 기본값 0으로 계속 진행
             result['special_work_fee'] = 0
         
-        # 3. 오배송/누락 차감 조회 (반품관리)
+        # 3. 오배송/누락 차감 조회 (C/S 메뉴 - customer_service 테이블)
+        # C/S 메뉴의 해당 월 데이터와 일치시켜 조회 (월 형식: 2025년01월, 2025년1월)
         try:
             conn = get_db_connection()
             if USE_POSTGRESQL:
@@ -744,45 +746,65 @@ def get_data_sources():
                 cursor = conn.cursor()
             
             try:
-                # 정산년월을 월 형식으로 변환. 반품 DB는 "2025년1월" 또는 "2025년01월" 둘 다 있을 수 있음.
+                # 정산년월(2025-01) → C/S 월 형식 변환 ("2025년1월", "2025년01월")
                 year, month = map(int, settlement_year_month.split('-'))
                 month_variants = list(dict.fromkeys([f'{year}년{month}월', f'{year}년{month:02d}월']))
                 
+                # 화주사명 매칭용 키워드 (대소문자·띄어쓰기 무시)
+                try:
+                    company_keywords = get_company_search_keywords(filter_company_name)
+                    if not company_keywords:
+                        company_keywords = [normalize_company_name(filter_company_name)]
+                except Exception:
+                    company_keywords = [normalize_company_name(filter_company_name)]
+                
+                # C/S 테이블에서 해당 월의 오배송/누락 조회 (월만 필터, 화주사는 Python에서 매칭)
                 if USE_POSTGRESQL:
                     placeholders = ','.join(['%s'] * len(month_variants))
                     cursor.execute(f'''
-                        SELECT tracking_number, shipping_fee, return_type, customer_name
-                        FROM returns
-                        WHERE company_name = %s 
-                        AND month IN ({placeholders})
-                        AND (return_type = '오배송' OR return_type = '누락')
-                    ''', (filter_company_name, *month_variants))
+                        SELECT management_number, customer_name, issue_type, company_name
+                        FROM customer_service
+                        WHERE month IN ({placeholders})
+                        AND (issue_type = '오배송' OR issue_type = '누락')
+                    ''', tuple(month_variants))
                 else:
                     placeholders = ','.join(['?'] * len(month_variants))
                     cursor.execute(f'''
-                        SELECT tracking_number, shipping_fee, return_type, customer_name
-                        FROM returns
-                        WHERE company_name = ? 
-                        AND month IN ({placeholders})
-                        AND (return_type = '오배송' OR return_type = '누락')
-                    ''', (filter_company_name, *month_variants))
+                        SELECT management_number, customer_name, issue_type, company_name
+                        FROM customer_service
+                        WHERE month IN ({placeholders})
+                        AND (issue_type = '오배송' OR issue_type = '누락')
+                    ''', tuple(month_variants))
                 
                 rows = cursor.fetchall()
+                # SQLite는 tuple 반환 → dict 변환
+                if USE_POSTGRESQL:
+                    row_list = [dict(r) for r in rows]
+                else:
+                    col_names = [col[0] for col in cursor.description]
+                    row_list = [dict(zip(col_names, r)) for r in rows]
+                
                 wrong_delivery_count = 0
                 missing_count = 0
                 error_details = []
                 
-                for row in rows:
-                    return_type = row.get('return_type', '')
-                    if return_type == '오배송':
+                for row in row_list:
+                    cs_company = (row.get('company_name') or '').strip()
+                    cs_company_norm = normalize_company_name(cs_company)
+                    # 화주사 매칭 (대소문자·띄어쓰기 무시)
+                    if cs_company_norm not in company_keywords:
+                        continue
+                    
+                    issue_type = row.get('issue_type', '')
+                    if issue_type == '오배송':
                         wrong_delivery_count += 1
-                    elif return_type == '누락':
+                    elif issue_type == '누락':
                         missing_count += 1
                     
                     error_details.append({
-                        'tracking_number': row.get('tracking_number', ''),
-                        'customer_name': row.get('customer_name', ''),
-                        'return_type': return_type
+                        'tracking_number': row.get('management_number', '') or '',
+                        'customer_name': row.get('customer_name', '') or '',
+                        'return_type': issue_type
                     })
                 
                 result['error_wrong_delivery_count'] = wrong_delivery_count
@@ -793,6 +815,8 @@ def get_data_sources():
                 conn.close()
         except Exception as e:
             print(f'[경고] 오배송/누락 차감 조회 오류: {e}')
+            import traceback
+            traceback.print_exc()
         
         # 4. 착불 택배비 집계 (반품관리)
         try:
