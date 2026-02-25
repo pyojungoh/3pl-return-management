@@ -1789,17 +1789,21 @@ def export_settlements():
                 status = '서비스'
             
             # 갱신일 계산 (보관이 1달 이상이면 매월 1일)
+            # settlement_month 지정 시 해당 월 말일 기준으로 계산 (1월 상세보기 시 1월로 표시)
             renewal_date = None
             if in_date:
+                effective_end = date.today()
+                if settlement_month and start_date and end_date:
+                    effective_end = end_date
                 if out_date:
-                    months_diff = (out_date.year - in_date.year) * 12 + (out_date.month - in_date.month)
+                    compare_date = out_date if not (settlement_month and out_date > effective_end) else effective_end
+                    months_diff = (compare_date.year - in_date.year) * 12 + (compare_date.month - in_date.month)
                     if months_diff >= 1:
-                        renewal_date = date(out_date.year, out_date.month, 1)
+                        renewal_date = date(compare_date.year, compare_date.month, 1)
                 else:
-                    today = date.today()
-                    months_diff = (today.year - in_date.year) * 12 + (today.month - in_date.month)
+                    months_diff = (effective_end.year - in_date.year) * 12 + (effective_end.month - in_date.month)
                     if months_diff >= 1:
-                        renewal_date = date(today.year, today.month, 1)
+                        renewal_date = date(effective_end.year, effective_end.month, 1)
             
             writer.writerow([
                 index,  # 순번

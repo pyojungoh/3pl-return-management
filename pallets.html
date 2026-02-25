@@ -1884,6 +1884,45 @@
       div.textContent = text;
       return div.innerHTML;
     }
+
+    /**
+     * 갱신일 계산 (보관이 1달 이상이면 매월 1일)
+     * @param {Date} inDate - 입고일
+     * @param {string|null} outDateStr - 보관종료일 (YYYY-MM-DD 또는 null)
+     * @param {string|null} asOfMonth - 조회월 (YYYY-MM). 지정 시 해당 월 말일 기준으로 갱신일 계산 (1월 상세보기 시 1월로 표시)
+     * @returns {string} 갱신일 문자열 또는 '-'
+     */
+    function palCalcRenewalDate(inDate, outDateStr, asOfMonth) {
+      if (!inDate || isNaN(inDate.getTime())) return '-';
+      let effectiveEndDate;
+      if (asOfMonth) {
+        const parts = asOfMonth.split('-');
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        if (isNaN(y) || isNaN(m)) return '-';
+        effectiveEndDate = new Date(y, m, 0);
+        if (isNaN(effectiveEndDate.getTime())) return '-';
+      } else {
+        effectiveEndDate = new Date();
+      }
+      if (!outDateStr) {
+        const monthsDiff = (effectiveEndDate.getFullYear() - inDate.getFullYear()) * 12 + (effectiveEndDate.getMonth() - inDate.getMonth());
+        if (monthsDiff >= 1) {
+          const lastRenewal = new Date(effectiveEndDate.getFullYear(), effectiveEndDate.getMonth(), 1);
+          return lastRenewal.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace(/\./g, '');
+        }
+        return '-';
+      }
+      const outDate = new Date(outDateStr + 'T00:00:00+09:00');
+      if (isNaN(outDate.getTime())) return '-';
+      const compareDate = asOfMonth && outDate > effectiveEndDate ? effectiveEndDate : outDate;
+      const monthsDiff = (compareDate.getFullYear() - inDate.getFullYear()) * 12 + (compareDate.getMonth() - inDate.getMonth());
+      if (monthsDiff >= 1) {
+        const lastRenewal = new Date(compareDate.getFullYear(), compareDate.getMonth(), 1);
+        return lastRenewal.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace(/\./g, '');
+      }
+      return '-';
+    }
     
     // 품목 항목 추가
     function palAddProductItem() {
@@ -2635,42 +2674,8 @@
               }
               const canOutbound = statusText === '입고됨';
               
-              // 갱신일 계산 (보관이 1달 이상이면 매월 1일)
-              let renewalDateStr = '-';
-              if (pallet.in_date) {
-                const inDate = new Date(pallet.in_date + 'T00:00:00+09:00');
-                if (!isNaN(inDate.getTime())) {
-                  if (!pallet.out_date) {
-                    // 보관중인 경우
-                    const today = new Date();
-                    const monthsDiff = (today.getFullYear() - inDate.getFullYear()) * 12 + (today.getMonth() - inDate.getMonth());
-                    if (monthsDiff >= 1) {
-                      // 마지막 갱신일 (현재 월의 1일)
-                      const lastRenewal = new Date(today.getFullYear(), today.getMonth(), 1);
-                      renewalDateStr = lastRenewal.toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit'
-                      }).replace(/\. /g, '-').replace(/\./g, '');
-                    }
-                  } else {
-                    // 보관종료된 경우
-                    const outDate = new Date(pallet.out_date + 'T00:00:00+09:00');
-                    if (!isNaN(outDate.getTime())) {
-                      const monthsDiff = (outDate.getFullYear() - inDate.getFullYear()) * 12 + (outDate.getMonth() - inDate.getMonth());
-                      if (monthsDiff >= 1) {
-                        // 마지막 갱신일 (보관종료 월의 1일)
-                        const lastRenewal = new Date(outDate.getFullYear(), outDate.getMonth(), 1);
-                        renewalDateStr = lastRenewal.toLocaleDateString('ko-KR', {
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit'
-                        }).replace(/\. /g, '-').replace(/\./g, '');
-                      }
-                    }
-                  }
-                }
-              }
+              const inDateForRenewal = pallet.in_date ? new Date(pallet.in_date + 'T00:00:00+09:00') : null;
+              const renewalDateStr = palCalcRenewalDate(inDateForRenewal, pallet.out_date || null, month || null);
               
               return `
               <tr>
@@ -4171,37 +4176,7 @@
                         }).replace(/\. /g, '-').replace(/\./g, '');
                       }
                       
-                      // 갱신일 계산 (보관이 1달 이상이면 매월 1일)
-                      let renewalDateStr = '-';
-                      if (inDate && !isNaN(inDate.getTime())) {
-                        if (!p.out_date) {
-                          const today = new Date();
-                          const monthsDiff = (today.getFullYear() - inDate.getFullYear()) * 12 + (today.getMonth() - inDate.getMonth());
-                          if (monthsDiff >= 1) {
-                            // 마지막 갱신일 (현재 월의 1일)
-                            const lastRenewal = new Date(today.getFullYear(), today.getMonth(), 1);
-                            renewalDateStr = lastRenewal.toLocaleDateString('ko-KR', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit'
-                            }).replace(/\. /g, '-').replace(/\./g, '');
-                          }
-                        } else {
-                          const outDate = new Date(p.out_date + 'T00:00:00+09:00');
-                          if (!isNaN(outDate.getTime())) {
-                            const monthsDiff = (outDate.getFullYear() - inDate.getFullYear()) * 12 + (outDate.getMonth() - inDate.getMonth());
-                            if (monthsDiff >= 1) {
-                              // 마지막 갱신일 (보관종료 월의 1일)
-                              const lastRenewal = new Date(outDate.getFullYear(), outDate.getMonth(), 1);
-                              renewalDateStr = lastRenewal.toLocaleDateString('ko-KR', {
-                                year: 'numeric',
-                                month: '2-digit',
-                                day: '2-digit'
-                              }).replace(/\. /g, '-').replace(/\./g, '');
-                            }
-                          }
-                        }
-                      }
+                      const renewalDateStr = palCalcRenewalDate(inDate, p.out_date || null, settlementMonth || null);
                       
                       // 보관종료일 포맷팅
                       let outDateStr = '-';
@@ -4300,38 +4275,8 @@
                         }).replace(/\. /g, '-').replace(/\./g, '');
                       }
                       
-                      // 갱신일 계산 (보관이 1달 이상이면 매월 1일)
-                      let renewalDateStr = '-';
-                      // inDate가 위에서 이미 계산되었으므로 재사용
-                      if (inDate && !isNaN(inDate.getTime())) {
-                        if (!p.out_date) {
-                          const today = new Date();
-                          const monthsDiff = (today.getFullYear() - inDate.getFullYear()) * 12 + (today.getMonth() - inDate.getMonth());
-                          if (monthsDiff >= 1) {
-                            // 마지막 갱신일 (현재 월의 1일)
-                            const lastRenewal = new Date(today.getFullYear(), today.getMonth(), 1);
-                            renewalDateStr = lastRenewal.toLocaleDateString('ko-KR', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit'
-                            }).replace(/\. /g, '-').replace(/\./g, '');
-                          }
-                        } else {
-                          const outDate = new Date(p.out_date + 'T00:00:00+09:00');
-                          if (!isNaN(outDate.getTime())) {
-                            const monthsDiff = (outDate.getFullYear() - inDate.getFullYear()) * 12 + (outDate.getMonth() - inDate.getMonth());
-                            if (monthsDiff >= 1) {
-                              // 마지막 갱신일 (보관종료 월의 1일)
-                              const lastRenewal = new Date(outDate.getFullYear(), outDate.getMonth(), 1);
-                              renewalDateStr = lastRenewal.toLocaleDateString('ko-KR', {
-                                year: 'numeric',
-                                month: '2-digit',
-                                day: '2-digit'
-                              }).replace(/\. /g, '-').replace(/\./g, '');
-                            }
-                          }
-                        }
-                      }
+                      const detailSettlementMonth = settlement.settlement_month || null;
+                      const renewalDateStr = palCalcRenewalDate(inDate, p.out_date || null, detailSettlementMonth);
                       
                       // 보관종료일 포맷팅
                       let outDateStr = '-';
