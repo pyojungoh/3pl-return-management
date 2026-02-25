@@ -1783,10 +1783,16 @@ def export_settlements():
                         # 전체 기간 보관료 계산
                         fee = calculate_fee(pallet.get('company_name', ''), in_date, out_date, is_service)
             
-            # 상태
-            status = pallet.get('status', '입고됨')
+            # 상태 (settlement_month 지정 시 해당 월 말일 기준: 1월 상세에서 2월 종료 파레트는 '입고됨')
             if is_service:
                 status = '서비스'
+            elif settlement_month and start_date and end_date:
+                if out_date and out_date > end_date:
+                    status = '입고됨'
+                else:
+                    status = pallet.get('status', '입고됨')
+            else:
+                status = pallet.get('status', '입고됨')
             
             # 갱신일 계산 (보관이 1달 이상이면 매월 1일)
             # settlement_month 지정 시 해당 월 말일 기준으로 계산 (1월 상세보기 시 1월로 표시)

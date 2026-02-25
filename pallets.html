@@ -1923,7 +1923,27 @@
       }
       return '-';
     }
-    
+
+    /**
+     * 조회월 기준 유효 상태 계산 (1월 상세에서 2월 종료 파레트는 '보관중'으로 표시)
+     * @param {Object} p - 파레트 객체 (out_date, status, is_service)
+     * @param {string|null} asOfMonth - 조회월 (YYYY-MM). 지정 시 해당 월 말일 기준 상태 반환
+     * @returns {string} '입고됨' | '보관종료' | '서비스'
+     */
+    function palCalcEffectiveStatus(p, asOfMonth) {
+      if (p.is_service === 1 || p.is_service === true) return '서비스';
+      if (!asOfMonth) return (p.status || '입고됨');
+      const parts = asOfMonth.split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      if (isNaN(y) || isNaN(m)) return (p.status || '입고됨');
+      const monthEnd = new Date(y, m, 0);
+      if (!p.out_date) return '입고됨';
+      const outDate = new Date(p.out_date + 'T00:00:00+09:00');
+      if (isNaN(outDate.getTime())) return (p.status || '입고됨');
+      return outDate <= monthEnd ? '보관종료' : '입고됨';
+    }
+
     // 품목 항목 추가
     function palAddProductItem() {
       const itemsList = document.getElementById('palProductItemsList');
@@ -2667,12 +2687,13 @@
             tbody.innerHTML = '<tr><td colspan="13" class="no-data">파레트가 없습니다.</td></tr>';
           } else {
             tbody.innerHTML = filteredPallets.map(pallet => {
-              // 서비스 파레트는 상태를 "서비스"로 표시
-              let statusText = pallet.status || '입고됨';
-              if (pallet.is_service === 1 || pallet.is_service === true) {
-                statusText = '서비스';
-              }
-              const canOutbound = statusText === '입고됨';
+              // 상태 표시: 조회월 있으면 해당 월 말일 기준, 없으면 DB 현재값
+              const statusText = palCalcEffectiveStatus(pallet, month || null);
+              // 버튼(보관종료/출고일수정)은 실제 DB 상태 기준 (이미 종료된 파레트에 보관종료 버튼 노출 방지)
+              const realStatus = pallet.status || '입고됨';
+              const isService = pallet.is_service === 1 || pallet.is_service === true;
+              const canOutbound = !isService && realStatus === '입고됨';
+              const showEditOutDate = !isService && realStatus === '보관종료';
               
               const inDateForRenewal = pallet.in_date ? new Date(pallet.in_date + 'T00:00:00+09:00') : null;
               const renewalDateStr = palCalcRenewalDate(inDateForRenewal, pallet.out_date || null, month || null);
@@ -2704,7 +2725,7 @@
                       ? `<button class="pal-btn" onclick="palOutboundFromStatus('${pallet.pallet_id}')" style="padding: 4px 8px; font-size: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;">보관종료</button>`
                       : ''
                     }
-                    ${statusText === '보관종료' 
+                    ${showEditOutDate 
                       ? `<button class="pal-btn" onclick="palEditOutDate('${pallet.pallet_id}', '${pallet.out_date || ''}')" style="padding: 4px 8px; font-size: 10px; background: #ffc107; color: #000; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;" title="출고일 수정">📅</button>`
                       : ''
                     }
@@ -2712,7 +2733,7 @@
                       ? `<button class="pal-btn" onclick="palDeletePalletFromStatus('${pallet.pallet_id}')" style="padding: 4px 8px; font-size: 10px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;">삭제</button>`
                       : ''
                     }
-                    ${!canOutbound && statusText !== '보관종료' && palCurrentRole !== '관리자' 
+                    ${!canOutbound && !showEditOutDate && palCurrentRole !== '관리자' 
                       ? '<span style="color: #999; font-size: 10px;">-</span>'
                       : ''
                     }
@@ -4195,11 +4216,8 @@
                       // 백엔드에서 month 파라미터가 있을 때 해당 월의 보관일수만 계산하여 반환
                       let storageDays = p.storage_days || 0;
                       
-                      // 상태 표시
-                      let statusText = p.status || '입고됨';
-                      if (p.is_service === 1 || p.is_service === true) {
-                        statusText = '서비스';
-                      }
+                      // 상태 표시 (조회월 기준: 1월 상세에서 2월 종료 파레트는 '보관중')
+                      const statusText = palCalcEffectiveStatus(p, settlementMonth || null);
                       const statusColor = statusText === '입고됨' ? '#28a745' : statusText === '보관종료' ? '#6c757d' : '#ffc107';
                       
                       return `
@@ -4294,11 +4312,8 @@
                       // 보관일수 (API에서 제공되는 값 사용 - 정산 상세 API는 이미 해당 월의 보관일수를 계산하여 반환)
                       const storageDays = p.storage_days || 0;
                       
-                      // 상태 표시
-                      let statusText = p.status || '입고됨';
-                      if (p.is_service === 1 || p.is_service === true) {
-                        statusText = '서비스';
-                      }
+                      // 상태 표시 (조회월 기준: 1월 상세에서 2월 종료 파레트는 '보관중')
+                      const statusText = palCalcEffectiveStatus(p, detailSettlementMonth);
                       const statusColor = statusText === '입고됨' ? '#28a745' : statusText === '보관종료' ? '#6c757d' : '#ffc107';
                       
                       return `
