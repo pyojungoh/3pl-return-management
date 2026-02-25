@@ -5,12 +5,7 @@ import os
 import math
 from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict, Tuple
-from api.database.models import (
-    get_db_connection,
-    USE_POSTGRESQL,
-    normalize_company_name,
-    get_company_search_keywords,
-)
+from api.database.models import get_db_connection, USE_POSTGRESQL
 
 # ========================================
 # 파레트 관리 함수
@@ -419,9 +414,6 @@ def get_pallets(company_name: str = None, status: str = None,
     """
     파레트 목록 조회
     
-    화주사 필터 시 get_settlement_detail과 동일하게 정규화·키워드 매칭 적용
-    ("TKS 컴퍼니"와 "TKS컴퍼니" 등 띄어쓰기/대소문자 차이 무시)
-    
     Args:
         company_name: 화주사명 (화주사인 경우 필수)
         status: 상태 필터 (입고됨, 보관종료, 서비스, 전체)
@@ -439,72 +431,22 @@ def get_pallets(company_name: str = None, status: str = None,
         else:
             cursor = conn.cursor()
         
-        # 화주사 필터: 정규화·키워드 매칭으로 매칭되는 company_name 목록 산출
-        matching_companies = None
-        if company_name:
-            try:
-                search_keywords = get_company_search_keywords(company_name)
-                if not search_keywords:
-                    search_keywords = [normalize_company_name(company_name)]
-            except Exception as e:
-                print(f"[경고] get_pallets 화주사 키워드 조회 실패: {e}")
-                search_keywords = [normalize_company_name(company_name)]
-            
-            # 기타 필터만 적용한 distinct company_name 조회
-            distinct_query = "SELECT DISTINCT company_name FROM pallets WHERE 1=1"
-            distinct_params = []
-            
-            if status and status != '전체':
-                distinct_query += " AND status = %s" if USE_POSTGRESQL else " AND status = ?"
-                distinct_params.append(status)
-            if pallet_id and pallet_id.strip():
-                distinct_query += " AND pallet_id LIKE %s" if USE_POSTGRESQL else " AND pallet_id LIKE ?"
-                distinct_params.append(f'%{pallet_id.strip()}%')
-            if product_name and product_name.strip():
-                distinct_query += " AND product_name LIKE %s" if USE_POSTGRESQL else " AND product_name LIKE ?"
-                distinct_params.append(f'%{product_name.strip()}%')
-            if month:
-                year, month_num = map(int, month.split('-'))
-                start_date = date(year, month_num, 1)
-                if month_num == 12:
-                    end_date = date(year + 1, 1, 1) - timedelta(days=1)
-                else:
-                    end_date = date(year, month_num + 1, 1) - timedelta(days=1)
-                distinct_query += " AND in_date <= %s AND (out_date IS NULL OR out_date >= %s)" if USE_POSTGRESQL else " AND in_date <= ? AND (out_date IS NULL OR out_date >= ?)"
-                distinct_params.extend([end_date, start_date])
-            
-            cursor.execute(distinct_query, distinct_params)
-            distinct_rows = cursor.fetchall()
-            
-            matching_companies = []
-            search_keywords_set = set(search_keywords)
-            for row in distinct_rows:
-                pallet_company = row['company_name'] if USE_POSTGRESQL else row[0]
-                if not pallet_company:
-                    continue
-                try:
-                    pallet_keywords = get_company_search_keywords(pallet_company)
-                    if not pallet_keywords:
-                        pallet_keywords = [normalize_company_name(pallet_company)]
-                    pallet_keywords_set = set(pallet_keywords)
-                    if search_keywords_set & pallet_keywords_set:
-                        matching_companies.append(pallet_company)
-                except Exception:
-                    if normalize_company_name(pallet_company) in search_keywords_set:
-                        matching_companies.append(pallet_company)
-            
-            # 정규화 매칭 실패 시 exact match 폴백
-            if not matching_companies:
-                matching_companies = [company_name]
-        
         query = "SELECT * FROM pallets WHERE 1=1"
         params = []
         
-        # 화주사 필터링 (정규화 매칭 결과 또는 기존 완전 일치)
-        if matching_companies is not None:
-            placeholders = ', '.join(['%s'] * len(matching_companies)) if USE_POSTGRESQL else ', '.join(['?'] * len(matching_companies))
-            query += f" AND company_name IN ({placeholders})"
-            params.extend(matching_companies)
+        # 화주사 필터링
+        if role != '관리자' and company_name:
+            if USE_POSTGRESQL:
+                query += " AND company_name = %s"
+            else:
+                query += " AND company_name = ?"
+            params.append(company_name)
+        elif company_name:
+            if USE_POSTGRESQL:
+                query += " AND company_name = %s"
+            else:
+                query += " AND company_name = ?"
+            params.append(company_name)
         
         # 상태 필터링
         if status and status != '전체':
@@ -863,90 +805,48 @@ def get_pallets_for_settlement(company_name: str = None,
         query = "SELECT * FROM pallets WHERE 1=1"
         params = []
         
-        # 화주사 필터링 (get_settlement_detail과 동일하게 정규화·키워드 매칭)
+        # 화주사 필터링 (성능 최적화: DB 레벨에서 필터링)
         if company_name:
-            try:
-                search_keywords = get_company_search_keywords(company_name)
-                if not search_keywords:
-                    search_keywords = [normalize_company_name(company_name)]
-            except Exception as e:
-                print(f"[경고] get_pallets_for_settlement 화주사 키워드 조회 실패: {e}")
-                search_keywords = [normalize_company_name(company_name)]
-            
-            # 기간 필터로 distinct company_name 조회
-            if start_date and end_date:
-                distinct_query = '''
-                    SELECT DISTINCT company_name FROM pallets 
-                    WHERE in_date <= %s AND (out_date IS NULL OR out_date >= %s)
-                ''' if USE_POSTGRESQL else '''
-                    SELECT DISTINCT company_name FROM pallets 
-                    WHERE in_date <= ? AND (out_date IS NULL OR out_date >= ?)
-                '''
-                cursor.execute(distinct_query, (end_date, start_date))
-            else:
-                distinct_query = 'SELECT DISTINCT company_name FROM pallets'
-                cursor.execute(distinct_query)
-            
-            distinct_rows = cursor.fetchall()
-            matching_companies = []
-            search_keywords_set = set(search_keywords)
-            for row in distinct_rows:
-                pallet_company = row['company_name'] if USE_POSTGRESQL else row[0]
-                if not pallet_company:
-                    continue
-                try:
-                    pallet_keywords = get_company_search_keywords(pallet_company)
-                    if not pallet_keywords:
-                        pallet_keywords = [normalize_company_name(pallet_company)]
-                    if search_keywords_set & set(pallet_keywords):
-                        matching_companies.append(pallet_company)
-                except Exception:
-                    if normalize_company_name(pallet_company) in search_keywords_set:
-                        matching_companies.append(pallet_company)
-            
-            # 정규화 매칭 실패 시 exact match 폴백
-            if not matching_companies:
-                matching_companies = [company_name]
-            
-            placeholders = ', '.join(['%s'] * len(matching_companies)) if USE_POSTGRESQL else ', '.join(['?'] * len(matching_companies))
+            # 단순 문자열 매칭으로 변경 (정규화 로직 제거로 성능 향상)
+            # 정산 계산 시에는 정확한 화주사명 매칭만 필요
             if start_date and end_date:
                 if USE_POSTGRESQL:
-                    cursor.execute(f'''
+                    cursor.execute('''
                         SELECT id, pallet_id, company_name, product_name, in_date, out_date, 
                                status, is_service, created_at, updated_at
                         FROM pallets 
-                        WHERE company_name IN ({placeholders})
+                        WHERE company_name = %s 
                           AND in_date <= %s 
                           AND (out_date IS NULL OR out_date >= %s)
                         ORDER BY in_date
-                    ''', (matching_companies + [end_date, start_date]))
+                    ''', (company_name, end_date, start_date))
                 else:
-                    cursor.execute(f'''
+                    cursor.execute('''
                         SELECT id, pallet_id, company_name, product_name, in_date, out_date, 
                                status, is_service, created_at, updated_at
                         FROM pallets 
-                        WHERE company_name IN ({placeholders})
+                        WHERE company_name = ? 
                           AND in_date <= ? 
                           AND (out_date IS NULL OR out_date >= ?)
                         ORDER BY in_date
-                    ''', (matching_companies + [end_date, start_date]))
+                    ''', (company_name, end_date, start_date))
             else:
                 if USE_POSTGRESQL:
-                    cursor.execute(f'''
+                    cursor.execute('''
                         SELECT id, pallet_id, company_name, product_name, in_date, out_date, 
                                status, is_service, created_at, updated_at
                         FROM pallets 
-                        WHERE company_name IN ({placeholders})
+                        WHERE company_name = %s
                         ORDER BY in_date
-                    ''', (matching_companies,))
+                    ''', (company_name,))
                 else:
-                    cursor.execute(f'''
+                    cursor.execute('''
                         SELECT id, pallet_id, company_name, product_name, in_date, out_date, 
                                status, is_service, created_at, updated_at
                         FROM pallets 
-                        WHERE company_name IN ({placeholders})
+                        WHERE company_name = ?
                         ORDER BY in_date
-                    ''', (matching_companies,))
+                    ''', (company_name,))
             
             rows = cursor.fetchall()
             
