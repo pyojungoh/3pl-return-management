@@ -1887,28 +1887,56 @@
 
     /**
      * 갱신일 계산 (보관이 1달 이상이면 매월 1일)
-     * 보관중: 현재 월 1일, 보관종료: 보관종료 월 1일
+     * 보관중: 조회월 1일(또는 현재 월 1일), 보관종료: 보관종료 월 1일
      * @param {Date} inDate - 입고일
      * @param {string|null} outDateStr - 보관종료일 (YYYY-MM-DD 또는 null)
+     * @param {string|null} asOfMonth - 조회월 (YYYY-MM). 지정 시 해당 월 기준 갱신일 (1월 상세→1월 1일)
      * @returns {string} 갱신일 문자열 또는 '-'
      */
-    function palCalcRenewalDate(inDate, outDateStr) {
+    function palCalcRenewalDate(inDate, outDateStr, asOfMonth) {
       if (!inDate || isNaN(inDate.getTime())) return '-';
-      if (!outDateStr) {
-        const today = new Date();
-        const monthsDiff = (today.getFullYear() - inDate.getFullYear()) * 12 + (today.getMonth() - inDate.getMonth());
+      let effectiveDate;
+      let useOutDateForRenewal = false;
+      if (outDateStr) {
+        const outDate = new Date(outDateStr + 'T00:00:00+09:00');
+        if (!isNaN(outDate.getTime())) {
+          if (asOfMonth) {
+            const parts = asOfMonth.split('-');
+            const y = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10);
+            const monthEnd = new Date(y, m, 0);
+            if (outDate <= monthEnd) {
+              useOutDateForRenewal = true;
+            } else {
+              effectiveDate = new Date(y, m - 1, 1);
+            }
+          } else {
+            useOutDateForRenewal = true;
+          }
+        }
+      } else {
+        effectiveDate = asOfMonth ? (function() {
+          const parts = asOfMonth.split('-');
+          const y = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10);
+          return new Date(y, m - 1, 1);
+        })() : new Date();
+      }
+      if (useOutDateForRenewal) {
+        const outDate = new Date(outDateStr + 'T00:00:00+09:00');
+        const monthsDiff = (outDate.getFullYear() - inDate.getFullYear()) * 12 + (outDate.getMonth() - inDate.getMonth());
         if (monthsDiff >= 1) {
-          const lastRenewal = new Date(today.getFullYear(), today.getMonth(), 1);
+          const lastRenewal = new Date(outDate.getFullYear(), outDate.getMonth(), 1);
           return lastRenewal.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace(/\./g, '');
         }
         return '-';
       }
-      const outDate = new Date(outDateStr + 'T00:00:00+09:00');
-      if (isNaN(outDate.getTime())) return '-';
-      const monthsDiff = (outDate.getFullYear() - inDate.getFullYear()) * 12 + (outDate.getMonth() - inDate.getMonth());
-      if (monthsDiff >= 1) {
-        const lastRenewal = new Date(outDate.getFullYear(), outDate.getMonth(), 1);
-        return lastRenewal.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace(/\./g, '');
+      if (effectiveDate) {
+        const monthsDiff = (effectiveDate.getFullYear() - inDate.getFullYear()) * 12 + (effectiveDate.getMonth() - inDate.getMonth());
+        if (monthsDiff >= 1) {
+          const lastRenewal = new Date(effectiveDate.getFullYear(), effectiveDate.getMonth(), 1);
+          return lastRenewal.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace(/\./g, '');
+        }
       }
       return '-';
     }
@@ -4186,18 +4214,26 @@
                         }).replace(/\. /g, '-').replace(/\./g, '');
                       }
                       
-                      const renewalDateStr = palCalcRenewalDate(inDate, p.out_date || null);
+                      const renewalDateStr = palCalcRenewalDate(inDate, p.out_date || null, settlementMonth || null);
                       
-                      // 보관종료일 포맷팅
+                      // 보관종료일 포맷팅 (1월 상세에서 2월 종료 건은 표시 안 함)
                       let outDateStr = '-';
                       if (p.out_date) {
                         const outDate = new Date(p.out_date + 'T00:00:00+09:00');
                         if (!isNaN(outDate.getTime())) {
-                          outDateStr = outDate.toLocaleDateString('ko-KR', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit'
-                          }).replace(/\. /g, '-').replace(/\./g, '');
+                          let showOutDate = true;
+                          if (settlementMonth) {
+                            const parts = settlementMonth.split('-');
+                            const monthEnd = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10), 0);
+                            if (outDate > monthEnd) showOutDate = false;
+                          }
+                          if (showOutDate) {
+                            outDateStr = outDate.toLocaleDateString('ko-KR', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit'
+                            }).replace(/\. /g, '-').replace(/\./g, '');
+                          }
                         }
                       }
                       
@@ -4283,18 +4319,26 @@
                       }
                       
                       const detailSettlementMonth = settlement.settlement_month || null;
-                      const renewalDateStr = palCalcRenewalDate(inDate, p.out_date || null);
+                      const renewalDateStr = palCalcRenewalDate(inDate, p.out_date || null, detailSettlementMonth);
                       
-                      // 보관종료일 포맷팅
+                      // 보관종료일 포맷팅 (1월 상세에서 2월 종료 건은 표시 안 함)
                       let outDateStr = '-';
                       if (p.out_date) {
                         const outDate = new Date(p.out_date + 'T00:00:00+09:00');
                         if (!isNaN(outDate.getTime())) {
-                          outDateStr = outDate.toLocaleDateString('ko-KR', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit'
-                          }).replace(/\. /g, '-').replace(/\./g, '');
+                          let showOutDate = true;
+                          if (detailSettlementMonth) {
+                            const parts = detailSettlementMonth.split('-');
+                            const monthEnd = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10), 0);
+                            if (outDate > monthEnd) showOutDate = false;
+                          }
+                          if (showOutDate) {
+                            outDateStr = outDate.toLocaleDateString('ko-KR', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit'
+                            }).replace(/\. /g, '-').replace(/\./g, '');
+                          }
                         }
                       }
                       
