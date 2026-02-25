@@ -1067,9 +1067,7 @@ def settlements_list():
                 end_date=end_date
             )
             
-            # 화주사 필터링이 있으면 추가 필터링
-            if final_company:
-                pallets = [p for p in pallets if p['company_name'] == final_company]
+            # 화주사 필터는 get_pallets_for_settlement 내부에서 정규화 매칭으로 처리됨 (추가 필터 제거)
             
             if pallets:
                 # 화주사별로 그룹화하여 임시 정산 내역 생성
@@ -1543,8 +1541,7 @@ def export_settlements():
                 end_date=end_date
             )
             
-            if final_company:
-                pallets = [p for p in pallets if p['company_name'] == final_company]
+            # 화주사 필터는 get_pallets_for_settlement 내부에서 정규화 매칭으로 처리됨
             
             if pallets:
                 company_settlements = {}
@@ -1703,8 +1700,7 @@ def export_settlements():
                 end_date=end_date
             )
             
-            if final_company:
-                pallets = [p for p in pallets if p['company_name'] == final_company]
+            # 화주사 필터는 get_pallets_for_settlement 내부에서 정규화 매칭으로 처리됨
         
         # 순번과 함께 파레트별 상세 내역 작성
         for index, pallet in enumerate(pallets, 1):
