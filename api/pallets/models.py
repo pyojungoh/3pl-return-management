@@ -470,21 +470,16 @@ def get_pallets(company_name: str = None, status: str = None,
             q += " ORDER BY in_date DESC, pallet_id DESC"
             return q, p
         
-        # 1) exact match 먼저 시도 (기존 동작 유지)
-        use_company = company_name if (role != '관리자' and company_name) or (company_name) else None
-        query, params = _build_base_query_and_params(use_company)
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        
-        # 2) 0건이고 화주사 필터가 있으면 정규화 매칭으로 재조회
-        if len(rows) == 0 and company_name:
+        # 1) 화주사별: 정규화 매칭 먼저 (변형 모두 포함)
+        use_company = None
+        if company_name:
+            matching = []
             try:
                 from api.database.models import normalize_company_name, get_company_search_keywords
                 kw = get_company_search_keywords(company_name)
                 if not kw:
                     kw = [normalize_company_name(company_name)]
                 kw_set = set(kw)
-                # distinct company_name (동일 필터, 화주사 제외)
                 dq = "SELECT DISTINCT company_name FROM pallets WHERE 1=1"
                 dp = []
                 if status and status != '전체':
@@ -507,7 +502,6 @@ def get_pallets(company_name: str = None, status: str = None,
                     dp.extend([end_date, start_date])
                 cursor.execute(dq, dp)
                 distinct_rows = cursor.fetchall()
-                matching = []
                 for r in distinct_rows:
                     cn = r['company_name'] if USE_POSTGRESQL else r[0]
                     if not cn:
@@ -521,12 +515,13 @@ def get_pallets(company_name: str = None, status: str = None,
                     except Exception:
                         if normalize_company_name(cn) in kw_set:
                             matching.append(cn)
-                if matching:
-                    query2, params2 = _build_base_query_and_params(matching)
-                    cursor.execute(query2, params2)
-                    rows = cursor.fetchall()
             except Exception as e:
-                print(f"[경고] get_pallets 정규화 매칭 실패 (exact 결과 유지): {e}")
+                print(f"[경고] get_pallets 정규화 매칭 실패: {e}")
+            use_company = matching if matching else [company_name]
+        
+        query, params = _build_base_query_and_params(use_company)
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
         
         if USE_POSTGRESQL:
             return [dict(row) for row in rows]
@@ -841,7 +836,7 @@ def get_pallets_for_settlement(company_name: str = None,
         query = "SELECT * FROM pallets WHERE 1=1"
         params = []
         
-        # 화주사 필터링: exact match 먼저, 0건이면 정규화 매칭 (TKS 컴퍼니/TKS컴퍼니)
+        # 화주사 필터링: 정규화 매칭 먼저 (TKS 컴퍼니/TKS컴퍼니/밸런스게임 등 변형 통합)
         if company_name:
             def _run_query(matching_companies):
                 ph = ', '.join(['%s'] * len(matching_companies)) if USE_POSTGRESQL else ', '.join(['?'] * len(matching_companies))
@@ -865,44 +860,42 @@ def get_pallets_for_settlement(company_name: str = None,
                         matching_companies
                     )
             
-            # 1) exact match 먼저
-            _run_query([company_name])
-            rows = cursor.fetchall()
+            # 1) 정규화 매칭 먼저 (변형 모두 포함)
+            matching = []
+            try:
+                kw = get_company_search_keywords(company_name)
+                if not kw:
+                    kw = [normalize_company_name(company_name)]
+                kw_set = set(kw)
+                dq = "SELECT DISTINCT company_name FROM pallets WHERE 1=1"
+                dp = []
+                if start_date and end_date:
+                    dq += " AND in_date <= %s AND (out_date IS NULL OR out_date >= %s)" if USE_POSTGRESQL else " AND in_date <= ? AND (out_date IS NULL OR out_date >= ?)"
+                    dp.extend([end_date, start_date])
+                cursor.execute(dq, dp)
+                distinct_rows = cursor.fetchall()
+                for r in distinct_rows:
+                    cn = r['company_name'] if USE_POSTGRESQL else r[0]
+                    if not cn:
+                        continue
+                    try:
+                        pk = get_company_search_keywords(cn)
+                        if not pk:
+                            pk = [normalize_company_name(cn)]
+                        if kw_set & set(pk):
+                            matching.append(cn)
+                    except Exception:
+                        if normalize_company_name(cn) in kw_set:
+                            matching.append(cn)
+            except Exception as e:
+                print(f"[경고] get_pallets_for_settlement 정규화 매칭 실패: {e}")
             
-            # 2) 0건이면 정규화 매칭
-            if len(rows) == 0:
-                try:
-                    from api.database.models import normalize_company_name, get_company_search_keywords
-                    kw = get_company_search_keywords(company_name)
-                    if not kw:
-                        kw = [normalize_company_name(company_name)]
-                    kw_set = set(kw)
-                    dq = "SELECT DISTINCT company_name FROM pallets WHERE 1=1"
-                    dp = []
-                    if start_date and end_date:
-                        dq += " AND in_date <= %s AND (out_date IS NULL OR out_date >= %s)" if USE_POSTGRESQL else " AND in_date <= ? AND (out_date IS NULL OR out_date >= ?)"
-                        dp.extend([end_date, start_date])
-                    cursor.execute(dq, dp)
-                    distinct_rows = cursor.fetchall()
-                    matching = []
-                    for r in distinct_rows:
-                        cn = r['company_name'] if USE_POSTGRESQL else r[0]
-                        if not cn:
-                            continue
-                        try:
-                            pk = get_company_search_keywords(cn)
-                            if not pk:
-                                pk = [normalize_company_name(cn)]
-                            if kw_set & set(pk):
-                                matching.append(cn)
-                        except Exception:
-                            if normalize_company_name(cn) in kw_set:
-                                matching.append(cn)
-                    if matching:
-                        _run_query(matching)
-                        rows = cursor.fetchall()
-                except Exception as e:
-                    print(f"[경고] get_pallets_for_settlement 정규화 매칭 실패: {e}")
+            # 2) 정규화 결과 없으면 exact match
+            if not matching:
+                matching = [company_name]
+            
+            _run_query(matching)
+            rows = cursor.fetchall()
             
             if USE_POSTGRESQL:
                 return [dict(row) for row in rows]
