@@ -493,8 +493,9 @@ def get_pallets(company_name: str = None, status: str = None,
                     if normalize_company_name(pallet_company) in search_keywords_set:
                         matching_companies.append(pallet_company)
             
+            # 정규화 매칭 실패 시 exact match 폴백
             if not matching_companies:
-                return []
+                matching_companies = [company_name]
         
         query = "SELECT * FROM pallets WHERE 1=1"
         params = []
@@ -903,8 +904,9 @@ def get_pallets_for_settlement(company_name: str = None,
                     if normalize_company_name(pallet_company) in search_keywords_set:
                         matching_companies.append(pallet_company)
             
+            # 정규화 매칭 실패 시 exact match 폴백
             if not matching_companies:
-                return []
+                matching_companies = [company_name]
             
             placeholders = ', '.join(['%s'] * len(matching_companies)) if USE_POSTGRESQL else ', '.join(['?'] * len(matching_companies))
             if start_date and end_date:
