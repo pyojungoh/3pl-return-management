@@ -412,7 +412,10 @@ def get_pallets(company_name: str = None, status: str = None,
                 month: str = None, role: str = '화주사',
                 pallet_id: str = None, product_name: str = None) -> List[Dict]:
     """
-    파레트 목록 조회
+    파레트 목록 조회 (미정산 상세 등 list API용)
+    
+    화주사 필터: exact match 먼저 시도, 0건이면 정규화 매칭으로 재조회
+    (TKS 컴퍼니 / TKS컴퍼니 등 띄어쓰기 차이 무시)
     
     Args:
         company_name: 화주사명 (화주사인 경우 필수)
@@ -431,66 +434,99 @@ def get_pallets(company_name: str = None, status: str = None,
         else:
             cursor = conn.cursor()
         
-        query = "SELECT * FROM pallets WHERE 1=1"
-        params = []
+        def _build_base_query_and_params(company_filter=None):
+            """화주사 제외 공통 WHERE/params 생성"""
+            q = "SELECT * FROM pallets WHERE 1=1"
+            p = []
+            if company_filter is not None:
+                if isinstance(company_filter, list):
+                    ph = ', '.join(['%s'] * len(company_filter)) if USE_POSTGRESQL else ', '.join(['?'] * len(company_filter))
+                    q += f" AND company_name IN ({ph})"
+                    p.extend(company_filter)
+                else:
+                    if USE_POSTGRESQL:
+                        q += " AND company_name = %s"
+                    else:
+                        q += " AND company_name = ?"
+                    p.append(company_filter)
+            if status and status != '전체':
+                q += " AND status = %s" if USE_POSTGRESQL else " AND status = ?"
+                p.append(status)
+            if pallet_id and pallet_id.strip():
+                q += " AND pallet_id LIKE %s" if USE_POSTGRESQL else " AND pallet_id LIKE ?"
+                p.append(f'%{pallet_id.strip()}%')
+            if product_name and product_name.strip():
+                q += " AND product_name LIKE %s" if USE_POSTGRESQL else " AND product_name LIKE ?"
+                p.append(f'%{product_name.strip()}%')
+            if month:
+                year, month_num = map(int, month.split('-'))
+                start_date = date(year, month_num, 1)
+                if month_num == 12:
+                    end_date = date(year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    end_date = date(year, month_num + 1, 1) - timedelta(days=1)
+                q += " AND in_date <= %s AND (out_date IS NULL OR out_date >= %s)" if USE_POSTGRESQL else " AND in_date <= ? AND (out_date IS NULL OR out_date >= ?)"
+                p.extend([end_date, start_date])
+            q += " ORDER BY in_date DESC, pallet_id DESC"
+            return q, p
         
-        # 화주사 필터링
-        if role != '관리자' and company_name:
-            if USE_POSTGRESQL:
-                query += " AND company_name = %s"
-            else:
-                query += " AND company_name = ?"
-            params.append(company_name)
-        elif company_name:
-            if USE_POSTGRESQL:
-                query += " AND company_name = %s"
-            else:
-                query += " AND company_name = ?"
-            params.append(company_name)
-        
-        # 상태 필터링
-        if status and status != '전체':
-            if USE_POSTGRESQL:
-                query += " AND status = %s"
-            else:
-                query += " AND status = ?"
-            params.append(status)
-        
-        # 파레트 ID 부분 일치 검색 (LIKE)
-        if pallet_id and pallet_id.strip():
-            if USE_POSTGRESQL:
-                query += " AND pallet_id LIKE %s"
-            else:
-                query += " AND pallet_id LIKE ?"
-            params.append(f'%{pallet_id.strip()}%')
-        
-        # 품목명 부분 일치 검색 (LIKE)
-        if product_name and product_name.strip():
-            if USE_POSTGRESQL:
-                query += " AND product_name LIKE %s"
-            else:
-                query += " AND product_name LIKE ?"
-            params.append(f'%{product_name.strip()}%')
-        
-        # 월 필터링
-        if month:
-            year, month_num = map(int, month.split('-'))
-            start_date = date(year, month_num, 1)
-            if month_num == 12:
-                end_date = date(year + 1, 1, 1) - timedelta(days=1)
-            else:
-                end_date = date(year, month_num + 1, 1) - timedelta(days=1)
-            
-            if USE_POSTGRESQL:
-                query += " AND in_date <= %s AND (out_date IS NULL OR out_date >= %s)"
-            else:
-                query += " AND in_date <= ? AND (out_date IS NULL OR out_date >= ?)"
-            params.extend([end_date, start_date])
-        
-        query += " ORDER BY in_date DESC, pallet_id DESC"
-        
+        # 1) exact match 먼저 시도 (기존 동작 유지)
+        use_company = company_name if (role != '관리자' and company_name) or (company_name) else None
+        query, params = _build_base_query_and_params(use_company)
         cursor.execute(query, params)
         rows = cursor.fetchall()
+        
+        # 2) 0건이고 화주사 필터가 있으면 정규화 매칭으로 재조회
+        if len(rows) == 0 and company_name:
+            try:
+                from api.database.models import normalize_company_name, get_company_search_keywords
+                kw = get_company_search_keywords(company_name)
+                if not kw:
+                    kw = [normalize_company_name(company_name)]
+                kw_set = set(kw)
+                # distinct company_name (동일 필터, 화주사 제외)
+                dq = "SELECT DISTINCT company_name FROM pallets WHERE 1=1"
+                dp = []
+                if status and status != '전체':
+                    dq += " AND status = %s" if USE_POSTGRESQL else " AND status = ?"
+                    dp.append(status)
+                if pallet_id and pallet_id.strip():
+                    dq += " AND pallet_id LIKE %s" if USE_POSTGRESQL else " AND pallet_id LIKE ?"
+                    dp.append(f'%{pallet_id.strip()}%')
+                if product_name and product_name.strip():
+                    dq += " AND product_name LIKE %s" if USE_POSTGRESQL else " AND product_name LIKE ?"
+                    dp.append(f'%{product_name.strip()}%')
+                if month:
+                    year, month_num = map(int, month.split('-'))
+                    start_date = date(year, month_num, 1)
+                    if month_num == 12:
+                        end_date = date(year + 1, 1, 1) - timedelta(days=1)
+                    else:
+                        end_date = date(year, month_num + 1, 1) - timedelta(days=1)
+                    dq += " AND in_date <= %s AND (out_date IS NULL OR out_date >= %s)" if USE_POSTGRESQL else " AND in_date <= ? AND (out_date IS NULL OR out_date >= ?)"
+                    dp.extend([end_date, start_date])
+                cursor.execute(dq, dp)
+                distinct_rows = cursor.fetchall()
+                matching = []
+                for r in distinct_rows:
+                    cn = r['company_name'] if USE_POSTGRESQL else r[0]
+                    if not cn:
+                        continue
+                    try:
+                        pk = get_company_search_keywords(cn)
+                        if not pk:
+                            pk = [normalize_company_name(cn)]
+                        if kw_set & set(pk):
+                            matching.append(cn)
+                    except Exception:
+                        if normalize_company_name(cn) in kw_set:
+                            matching.append(cn)
+                if matching:
+                    query2, params2 = _build_base_query_and_params(matching)
+                    cursor.execute(query2, params2)
+                    rows = cursor.fetchall()
+            except Exception as e:
+                print(f"[경고] get_pallets 정규화 매칭 실패 (exact 결과 유지): {e}")
         
         if USE_POSTGRESQL:
             return [dict(row) for row in rows]
