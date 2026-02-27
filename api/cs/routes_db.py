@@ -619,6 +619,9 @@ def create_cs():
             result = send_telegram_notification(message)
             print(f"📬 [C/S 등록] 텔레그램 알림 전송 결과: {'성공' if result else '실패'}")
             
+            # 즉시 알림 전송 시 last_notification_at 설정 (반복 알림 기준점, cron이 5분마다 호출되므로)
+            update_cs_last_notification(cs_id, kst_now)
+            
             return jsonify({
                 'success': True,
                 'message': 'C/S 접수가 등록되었습니다.',
@@ -1058,17 +1061,21 @@ def check_notifications():
     """C/S 알림 체크 (Vercel Cron Jobs용)"""
     try:
         # Vercel Cron Jobs에서 호출하는 엔드포인트
-        # 헤더에서 cron secret 확인 (선택사항, 보안 강화용)
+        # 인증: 헤더(Authorization: Bearer xxx) 또는 query param(?secret=xxx) 지원
+        # cron-job.org 등에서 헤더 설정이 어려울 수 있어 query param 대안 제공
         cron_secret = request.headers.get('Authorization')
+        query_secret = request.args.get('secret', '').strip()
         expected_secret = os.environ.get('CRON_SECRET')
         
-        # CRON_SECRET이 설정되어 있으면 검증
-        if expected_secret and cron_secret != f'Bearer {expected_secret}':
-            print("⚠️ [Cron] 인증 실패: CRON_SECRET 불일치")
-            return jsonify({
-                'success': False,
-                'message': 'Unauthorized'
-            }), 401
+        if expected_secret:
+            header_ok = cron_secret == f'Bearer {expected_secret}'
+            query_ok = query_secret == expected_secret
+            if not header_ok and not query_ok:
+                print("⚠️ [Cron] 인증 실패: CRON_SECRET 불일치 (헤더 또는 ?secret= 파라미터 확인)")
+                return jsonify({
+                    'success': False,
+                    'message': 'Unauthorized'
+                }), 401
         
         print("🔄 [Cron] C/S 알림 체크 시작 (Vercel Cron Jobs)")
         
