@@ -414,6 +414,33 @@ def update_customer_name(cs_id: int, customer_name: str) -> bool:
             conn.close()
 
 
+def update_cs_last_notification(cs_id: int, notification_time: datetime) -> bool:
+    """C/S 마지막 알림 시간 업데이트 (반복 알림용, Vercel 서버리스에서 DB에 저장)"""
+    conn = get_db_connection()
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        if USE_POSTGRESQL:
+            cursor.execute('''
+                UPDATE customer_service SET last_notification_at = %s WHERE id = %s
+            ''', (notification_time, cs_id))
+        else:
+            cursor.execute('''
+                UPDATE customer_service SET last_notification_at = ? WHERE id = ?
+            ''', (notification_time, cs_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ C/S last_notification_at 업데이트 오류: {e}")
+        if USE_POSTGRESQL:
+            conn.rollback()
+        return False
+    finally:
+        if cursor:
+            cursor.close()
+        conn.close()
+
+
 def get_pending_cs_requests() -> list:
     """미처리 C/S 접수 목록 조회 (알림용)"""
     conn = get_db_connection()
@@ -439,7 +466,7 @@ def get_pending_cs_requests() -> list:
             cursor.execute('''
                 SELECT id, company_name, username, date, month, issue_type, content, 
                        management_number, generated_management_number, customer_name, status, 
-                       admin_message, processor, processed_at, created_at, updated_at
+                       admin_message, processor, processed_at, created_at, updated_at, last_notification_at
                 FROM customer_service
                 WHERE status = '접수'
                 ORDER BY created_at DESC
@@ -463,7 +490,8 @@ def get_pending_cs_requests() -> list:
                     'processor': row['processor'] or '',
                     'processed_at': str(row['processed_at']) if row['processed_at'] else '',
                     'created_at': str(row['created_at']) if row['created_at'] else '',
-                    'updated_at': str(row['updated_at']) if row['updated_at'] else ''
+                    'updated_at': str(row['updated_at']) if row['updated_at'] else '',
+                    'last_notification_at': str(row['last_notification_at']) if row.get('last_notification_at') else None
                 })
             return result
         finally:
@@ -503,7 +531,7 @@ def get_pending_cs_requests_by_issue_type(issue_type: str = None) -> list:
                 cursor.execute('''
                     SELECT id, company_name, username, date, month, issue_type, content, 
                            management_number, generated_management_number, customer_name, status, 
-                           admin_message, processor, processed_at, created_at, updated_at
+                           admin_message, processor, processed_at, created_at, updated_at, last_notification_at
                     FROM customer_service
                     WHERE status = '접수' AND issue_type = ?
                     ORDER BY created_at DESC
@@ -512,7 +540,7 @@ def get_pending_cs_requests_by_issue_type(issue_type: str = None) -> list:
                 cursor.execute('''
                     SELECT id, company_name, username, date, month, issue_type, content, 
                            management_number, generated_management_number, customer_name, status, 
-                           admin_message, processor, processed_at, created_at, updated_at
+                           admin_message, processor, processed_at, created_at, updated_at, last_notification_at
                     FROM customer_service
                     WHERE status = '접수'
                     ORDER BY created_at DESC
@@ -536,7 +564,8 @@ def get_pending_cs_requests_by_issue_type(issue_type: str = None) -> list:
                     'processor': row['processor'] or '',
                     'processed_at': str(row['processed_at']) if row['processed_at'] else '',
                     'created_at': str(row['created_at']) if row['created_at'] else '',
-                    'updated_at': str(row['updated_at']) if row['updated_at'] else ''
+                    'updated_at': str(row['updated_at']) if row['updated_at'] else '',
+                    'last_notification_at': str(row['last_notification_at']) if row.get('last_notification_at') else None
                 })
             return result
         finally:

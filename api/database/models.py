@@ -531,6 +531,11 @@ def init_db():
                 ''')
             except Exception:
                 pass
+            # last_notification_at: 미처리 C/S 반복 알림용 (Vercel 서버리스에서 메모리 유지 불가)
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN IF NOT EXISTS last_notification_at TIMESTAMP')
+            except Exception:
+                pass
             
             # C/S 인덱스 생성
             cursor.execute('''
@@ -1333,6 +1338,11 @@ def init_db():
                     SET admin_message = admin_response 
                     WHERE admin_message IS NULL AND admin_response IS NOT NULL
                 ''')
+            except OperationalError:
+                pass
+            # last_notification_at: 미처리 C/S 반복 알림용 (Vercel 서버리스에서 메모리 유지 불가)
+            try:
+                cursor.execute('ALTER TABLE customer_service ADD COLUMN last_notification_at TIMESTAMP')
             except OperationalError:
                 pass
             

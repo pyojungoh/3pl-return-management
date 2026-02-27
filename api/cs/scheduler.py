@@ -2,12 +2,45 @@
 C/S 알림 스케줄러
 - 일반 미처리 항목: 5분마다 알림
 - 취소건: 1분마다 알림
+- Vercel 서버리스: last_notification_at을 DB에 저장 (메모리는 요청마다 초기화됨)
 """
 import threading
 import time
 from datetime import datetime, timezone, timedelta
-from api.cs.routes_db import get_pending_cs_requests, get_pending_cs_requests_by_issue_type
+from api.cs.routes_db import (
+    get_pending_cs_requests,
+    get_pending_cs_requests_by_issue_type,
+    update_cs_last_notification,
+)
 from api.notifications.telegram import send_telegram_notification
+
+
+def parse_datetime_for_compare(value) -> datetime:
+    """DB의 last_notification_at 또는 created_at을 datetime으로 파싱 (비교용)"""
+    if not value:
+        return None
+    kst = timezone(timedelta(hours=9))
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=kst)
+        return value.astimezone(kst)
+    s = str(value).strip()
+    if not s:
+        return None
+    # 마이크로초 제거 (예: 2025-02-27 10:30:00.123456)
+    s_clean = s.split('.')[0] if '.' in s else s
+    if len(s_clean) >= 19:
+        try:
+            dt = datetime.strptime(s_clean[:19], '%Y-%m-%d %H:%M:%S')
+            return dt.replace(tzinfo=kst)
+        except ValueError:
+            pass
+        try:
+            dt = datetime.strptime(s_clean[:19], '%Y-%m-%dT%H:%M:%S')
+            return dt.replace(tzinfo=kst)
+        except ValueError:
+            pass
+    return None
 
 
 def convert_to_kst(value) -> str:
@@ -57,9 +90,6 @@ def convert_to_kst(value) -> str:
         value_str = str(value)
         return value_str.split('.')[0] if '.' in value_str else value_str
 
-# 마지막 알림 시간 추적 (중복 알림 방지)
-last_notification_times = {}
-
 def send_cs_notifications():
     """C/S 알림 전송 (스케줄러에서 호출)"""
     try:
@@ -82,10 +112,8 @@ def send_cs_notifications():
             if status not in ['접수']:
                 continue
                 
-            # 마지막 알림 시간 확인 (1분 이내면 스킵)
-            last_time_key = f"cancellation_{cs_id}"
-            last_time = last_notification_times.get(last_time_key)
-            
+            # 마지막 알림 시간 확인 (1분 이내면 스킵) - DB에서 조회 (Vercel 서버리스 대응)
+            last_time = parse_datetime_for_compare(cs.get('last_notification_at'))
             if last_time:
                 time_diff = (current_time - last_time).total_seconds()
                 if time_diff < 60:  # 1분 미만이면 스킵
@@ -112,8 +140,8 @@ def send_cs_notifications():
             print(f"[정보] [스케줄러] 취소건 알림 전송: C/S #{cs_id}")
             send_telegram_notification(message)
             
-            # 마지막 알림 시간 업데이트
-            last_notification_times[last_time_key] = current_time
+            # 마지막 알림 시간 DB 업데이트 (Vercel 서버리스에서 다음 호출 시 유지)
+            update_cs_last_notification(cs_id, current_time)
         
         # 일반 미처리 항목: 5분마다 알림 (취소건 제외)
         all_pending = get_pending_cs_requests()
@@ -121,7 +149,6 @@ def send_cs_notifications():
         print(f"[정보] [스케줄러] 일반 미처리 항목 조회: {len(non_cancellation_requests)}건")
         if len(non_cancellation_requests) > 0:
             print(f"   - C/S ID 목록: {[cs.get('id') for cs in non_cancellation_requests]}")
-            print(f"   - 저장된 알림 시간 키: {list(last_notification_times.keys())}")
         
         for cs in non_cancellation_requests:
             cs_id = cs.get('id')
@@ -133,9 +160,8 @@ def send_cs_notifications():
             if status not in ['접수']:
                 continue
                 
-            # 마지막 알림 시간 확인 (5분 이내면 스킵)
-            last_time_key = f"general_{cs_id}"
-            last_time = last_notification_times.get(last_time_key)
+            # 마지막 알림 시간 확인 (5분 이내면 스킵) - DB에서 조회 (Vercel 서버리스 대응)
+            last_time = parse_datetime_for_compare(cs.get('last_notification_at'))
             
             should_send = False
             
@@ -223,9 +249,9 @@ def send_cs_notifications():
             print(f"[정보] [스케줄러] 일반 미처리 항목 알림 전송: C/S #{cs_id}")
             send_telegram_notification(message)
             
-            # 마지막 알림 시간 업데이트
-            last_notification_times[last_time_key] = current_time
-            print(f"[성공] [스케줄러] C/S #{cs_id}: 마지막 알림 시간 저장 완료: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            # 마지막 알림 시간 DB 업데이트 (Vercel 서버리스에서 다음 호출 시 유지)
+            update_cs_last_notification(cs_id, current_time)
+            print(f"[성공] [스케줄러] C/S #{cs_id}: 마지막 알림 시간 DB 저장 완료: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
             
     except Exception as e:
         print(f"[오류] C/S 알림 전송 오류: {e}")
