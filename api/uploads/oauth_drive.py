@@ -39,23 +39,37 @@ def get_credentials():
     oauth_token_json = os.environ.get('GOOGLE_OAUTH_TOKEN_JSON')
     oauth_credentials_json = os.environ.get('GOOGLE_OAUTH_CREDENTIALS_JSON')
     
-    if oauth_token_json and oauth_credentials_json:
+    # 토큰 JSON만 있어도 동작 (extract_oauth_token.py 출력은 client_id/secret 포함)
+    if oauth_token_json:
         try:
-            # 환경 변수에서 credentials 읽기
-            creds_info = json.loads(oauth_credentials_json)
-            # installed 또는 web 형식 모두 지원
-            if 'installed' in creds_info:
-                client_id = creds_info['installed']['client_id']
-                client_secret = creds_info['installed']['client_secret']
-            elif 'web' in creds_info:
-                client_id = creds_info['web']['client_id']
-                client_secret = creds_info['web']['client_secret']
-            else:
-                client_id = creds_info.get('client_id')
-                client_secret = creds_info.get('client_secret')
-            
-            # 환경 변수에서 토큰 읽기
             token_info = json.loads(oauth_token_json)
+            
+            # client_id, client_secret: 토큰에 있으면 사용, 없으면 credentials에서
+            client_id = token_info.get('client_id')
+            client_secret = token_info.get('client_secret')
+            if not client_id or not client_secret:
+                if oauth_credentials_json:
+                    creds_info = json.loads(oauth_credentials_json)
+                    if 'installed' in creds_info:
+                        client_id = creds_info['installed']['client_id']
+                        client_secret = creds_info['installed']['client_secret']
+                    elif 'web' in creds_info:
+                        client_id = creds_info['web']['client_id']
+                        client_secret = creds_info['web']['client_secret']
+                    else:
+                        client_id = creds_info.get('client_id')
+                        client_secret = creds_info.get('client_secret')
+                else:
+                    raise ValueError("client_id/client_secret이 토큰에 없고 GOOGLE_OAUTH_CREDENTIALS_JSON도 없습니다.")
+            
+            # expiry 파싱 (ISO 형식 또는 None)
+            expiry = None
+            if token_info.get('expiry'):
+                expiry_str = token_info['expiry']
+                if isinstance(expiry_str, str):
+                    expiry = datetime.fromisoformat(expiry_str.replace('Z', '+00:00'))
+                elif hasattr(expiry_str, 'isoformat'):
+                    expiry = expiry_str
             
             # Credentials 객체 생성
             creds = Credentials(
@@ -64,13 +78,14 @@ def get_credentials():
                 token_uri=token_info.get('token_uri', 'https://oauth2.googleapis.com/token'),
                 client_id=client_id,
                 client_secret=client_secret,
-                scopes=token_info.get('scopes', SCOPES)
+                scopes=token_info.get('scopes', SCOPES),
+                expiry=expiry
             )
             
             print("✅ 환경 변수에서 OAuth 토큰 로드 성공 (Vercel 배포 환경)")
             
-            # 토큰이 만료되었으면 갱신
-            if creds.expired and creds.refresh_token:
+            # 토큰이 만료되었거나 만료 정보가 없으면 갱신
+            if creds.refresh_token and (creds.expired or creds.expiry is None):
                 try:
                     print("🔄 토큰 갱신 중...")
                     creds.refresh(Request())
@@ -99,19 +114,19 @@ def get_credentials():
     # 배포 환경에서는 환경 변수를 사용해야 하므로, 환경 변수가 없으면 명확한 오류 메시지
     is_vercel = os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV')
     
-    if not oauth_token_json or not oauth_credentials_json:
+    if not oauth_token_json:
         if is_vercel:
             print(f"❌ Vercel 배포 환경에서 OAuth 2.0 환경 변수가 설정되지 않았습니다.")
             print(f"   GOOGLE_OAUTH_TOKEN_JSON: {'✅' if oauth_token_json else '❌'}")
-            print(f"   GOOGLE_OAUTH_CREDENTIALS_JSON: {'✅' if oauth_credentials_json else '❌'}")
             raise Exception(
                 f"Vercel 배포 환경에서 OAuth 2.0 환경 변수가 설정되지 않았습니다.\n\n"
-                f"필요한 환경 변수:\n"
-                f"1. GOOGLE_OAUTH_CREDENTIALS_JSON: credentials.json 전체 내용\n"
-                f"2. GOOGLE_OAUTH_TOKEN_JSON: 로컬에서 인증 받은 토큰 JSON\n\n"
+                f"필수 환경 변수:\n"
+                f"  GOOGLE_OAUTH_TOKEN_JSON: python extract_oauth_token.py 실행 후 출력 JSON 전체\n\n"
+                f"선택 환경 변수 (토큰에 client_id/secret이 없을 때만):\n"
+                f"  GOOGLE_OAUTH_CREDENTIALS_JSON: credentials.json 전체 내용\n\n"
                 f"설정 방법:\n"
                 f"1. Vercel 대시보드 → Settings → Environment Variables\n"
-                f"2. 두 환경 변수 모두 추가 (Production, Preview, Development 모두 선택)\n"
+                f"2. GOOGLE_OAUTH_TOKEN_JSON 추가 (Production, Preview, Development 모두 선택)\n"
                 f"3. 재배포\n\n"
                 f"자세한 내용은 Vercel_환경변수_설정_단계별_가이드.md 참고"
             )
@@ -718,8 +733,16 @@ def upload_settlement_excel_to_drive(
         main_folder_id = SETTLEMENT_MAIN_FOLDER_ID
         print(f"✅ 메인 폴더 ID 사용: {SETTLEMENT_MAIN_FOLDER_NAME} (ID: {main_folder_id})")
         
-        # 2. 정산파일 폴더 찾기
+        # 2. 정산파일 폴더 찾기 (동시 요청 시 간헐적 실패 방지를 위해 최대 2회 재시도)
         settlement_folder_id = find_folder_in_oauth(service, "정산파일", main_folder_id)
+        if not settlement_folder_id:
+            import time
+            for retry in range(2):
+                time.sleep(1)  # 1초 대기 후 재시도
+                print(f"⚠️ 정산파일 폴더 재조회 시도 {retry + 1}/2")
+                settlement_folder_id = find_folder_in_oauth(service, "정산파일", main_folder_id)
+                if settlement_folder_id:
+                    break
         if not settlement_folder_id:
             raise Exception(
                 f"'정산파일' 폴더를 찾을 수 없습니다.\n"
