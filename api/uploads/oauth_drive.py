@@ -27,12 +27,22 @@ SETTLEMENT_MAIN_FOLDER_ID = os.environ.get('GOOGLE_DRIVE_SETTLEMENT_MAIN_FOLDER_
 TOKEN_FILE = os.path.join(os.path.dirname(__file__), '../../token.pickle')
 CREDENTIALS_FILE = os.path.join(os.path.dirname(__file__), '../../credentials.json')
 
+# 서버리스 환경: 한 번 갱신된 토큰 캐시 (동일 인스턴스 내 순차 요청에서 재사용)
+_oauth_creds_cache = None
+_last_oauth_error = None  # 마지막 OAuth 오류 (사용자 안내용)
+
 
 def get_credentials():
     """
     OAuth 2.0을 사용하여 사용자 계정 인증 정보 가져오기
     Vercel 환경 변수에서 토큰을 읽거나, 로컬 파일에서 읽습니다.
     """
+    global _oauth_creds_cache, _last_oauth_error
+    
+    # 캐시된 유효한 토큰이 있으면 즉시 반환 (서버리스 순차 요청 시 재사용)
+    if _oauth_creds_cache is not None and _oauth_creds_cache.valid:
+        return _oauth_creds_cache
+    
     creds = None
     
     # 1. 환경 변수에서 토큰 읽기 (Vercel 등 서버리스 환경 우선)
@@ -84,19 +94,32 @@ def get_credentials():
             
             print("✅ 환경 변수에서 OAuth 토큰 로드 성공 (Vercel 배포 환경)")
             
-            # 토큰이 만료되었거나 만료 정보가 없으면 갱신
+            # 토큰이 만료되었거나 만료 정보가 없으면 갱신 (최대 3회 재시도)
             if creds.refresh_token and (creds.expired or creds.expiry is None):
-                try:
-                    print("🔄 토큰 갱신 중...")
-                    creds.refresh(Request())
-                    print("✅ 토큰 갱신 성공")
-                except Exception as e:
-                    print(f"❌ 토큰 갱신 실패: {e}")
+                refresh_error = None
+                for attempt in range(3):
+                    try:
+                        print(f"🔄 토큰 갱신 중... (시도 {attempt + 1}/3)")
+                        creds.refresh(Request())
+                        print("✅ 토큰 갱신 성공")
+                        refresh_error = None
+                        break
+                    except Exception as e:
+                        refresh_error = e
+                        print(f"❌ 토큰 갱신 실패 (시도 {attempt + 1}/3): {e}")
+                        if attempt < 2:
+                            import time
+                            time.sleep(1)
+                if refresh_error:
                     creds = None
+                    _last_oauth_error = str(refresh_error)
             
             if creds and creds.valid:
+                _oauth_creds_cache = creds
+                _last_oauth_error = None
                 return creds
         except Exception as e:
+            _last_oauth_error = str(e)
             print(f"⚠️ 환경 변수에서 토큰 로드 실패: {e}")
             print(f"   GOOGLE_OAUTH_TOKEN_JSON 존재: {bool(oauth_token_json)}")
             print(f"   GOOGLE_OAUTH_CREDENTIALS_JSON 존재: {bool(oauth_credentials_json)}")
@@ -165,13 +188,18 @@ def get_credentials():
             if is_vercel:
                 # Vercel 환경에서는 환경 변수만 사용 가능
                 print(f"[디버깅] Vercel 환경에서 토큰 없음 - 예외 발생")
+                err_detail = ""
+                if _last_oauth_error:
+                    err_detail = f"\n\n상세 오류: {_last_oauth_error}"
                 raise Exception(
                     f"Vercel 배포 환경에서 OAuth 2.0 토큰을 가져올 수 없습니다.\n\n"
                     f"환경 변수 확인:\n"
                     f"- GOOGLE_OAUTH_TOKEN_JSON: {'✅ 설정됨' if oauth_token_json else '❌ 없음'}\n"
                     f"- GOOGLE_OAUTH_CREDENTIALS_JSON: {'✅ 설정됨' if oauth_credentials_json else '❌ 없음'}\n\n"
-                    f"환경 변수가 설정되어 있다면 재배포가 필요할 수 있습니다.\n"
-                    f"또는 토큰이 만료되었을 수 있으므로 로컬에서 다시 인증 받아주세요."
+                    f"토큰이 만료되었을 수 있습니다. 로컬에서 다시 인증 후:\n"
+                    f"1. python extract_oauth_token.py 실행\n"
+                    f"2. 출력된 JSON 전체를 Vercel 환경 변수 GOOGLE_OAUTH_TOKEN_JSON에 설정\n"
+                    f"3. 재배포{err_detail}"
                 )
             if not os.path.exists(CREDENTIALS_FILE):
                 raise Exception(
