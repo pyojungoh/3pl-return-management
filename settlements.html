@@ -1871,6 +1871,10 @@
               async function uploadFilesSequentially() {
                 const results = [];
                 for (const [fileType, fileData] of entries) {
+                  // 작업비→입출고비→택배비 순차 업로드: 파일 간 600ms 대기 (Google Drive API 충돌 방지)
+                  if (results.length > 0) {
+                    await new Promise(r => setTimeout(r, 600));
+                  }
                   const file = fileData.file;
                   const fileTypeCapitalized = fileType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
                   const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
