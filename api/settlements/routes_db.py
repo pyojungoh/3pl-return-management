@@ -1008,33 +1008,45 @@ def upload_settlement_file():
             cursor.close()
             conn.close()
         
-        # Google Drive 업로드
+        # 파일 업로드: Google Drive 시도 → 실패 시 Cloudinary 폴백 (작업비/입출고비/택배비 동일)
+        file_url = None
         try:
             from api.uploads.oauth_drive import upload_settlement_excel_to_drive
-            
-            # Google Drive에 업로드
             result = upload_settlement_excel_to_drive(
                 file_data=file_data,
                 filename=file_name,
                 company_name=company_name,
                 settlement_year_month=settlement_year_month
             )
-            
-            if not result.get('success'):
-                return jsonify({
-                    'success': False,
-                    'message': result.get('message', '파일 업로드 실패')
-                }), 500
-            
-            file_url = result.get('web_view_link', result.get('file_url', ''))
-            
+            if result.get('success'):
+                file_url = result.get('web_view_link', result.get('file_url', ''))
             if not file_url:
+                raise Exception(result.get('message', 'Google Drive 업로드 실패'))
+        except Exception as gd_err:
+            print(f"[정보] Google Drive 실패, Cloudinary 폴백 시도: {gd_err}")
+            try:
+                from api.uploads.cloudinary_upload import upload_settlement_file_to_cloudinary
+                file_url = upload_settlement_file_to_cloudinary(
+                    file_data=file_data,
+                    filename=file_name,
+                    company_name=company_name,
+                    settlement_year_month=settlement_year_month,
+                    file_type=file_type
+                )
+            except Exception as cl_err:
+                print(f"[오류] Cloudinary 폴백 실패: {cl_err}")
                 return jsonify({
                     'success': False,
-                    'message': '파일 업로드는 성공했지만 파일 URL을 가져올 수 없습니다.'
+                    'message': f'파일 업로드 실패. (Google Drive: {str(gd_err)[:100]})'
                 }), 500
-            
-            # 파일 정보 DB 저장
+        
+        if not file_url:
+            return jsonify({
+                'success': False,
+                'message': '파일 업로드에 실패했습니다.'
+            }), 500
+        
+        # 파일 정보 DB 저장
             conn = get_db_connection()
             cursor = conn.cursor()
             
@@ -1321,117 +1333,113 @@ def upload_settlement_file_complete():
         
         print(f"[정보] 정산 파일 조립 완료: {len(file_data)} bytes")
         
-        # Google Drive에 업로드
+        settlement_id = session['settlement_id']
+        file_type = session['file_type']
+        filename = session['filename']
+        company_name = session['company_name']
+        settlement_year_month = session['settlement_year_month']
+        del upload_settlement_file_start.upload_sessions[upload_id]
+        
+        # 파일 업로드: Google Drive 시도 → 실패 시 Cloudinary 폴백
+        file_url = None
         try:
             from api.uploads.oauth_drive import upload_settlement_excel_to_drive
-            
-            settlement_id = session['settlement_id']
-            file_type = session['file_type']
-            filename = session['filename']
-            company_name = session['company_name']
-            settlement_year_month = session['settlement_year_month']
-            
             result = upload_settlement_excel_to_drive(
                 file_data=file_data,
                 filename=filename,
                 company_name=company_name,
                 settlement_year_month=settlement_year_month
             )
-            
-            # 세션 삭제
-            del upload_settlement_file_start.upload_sessions[upload_id]
-            
-            if not result.get('success'):
-                return jsonify({
-                    'success': False,
-                    'message': result.get('message', '파일 업로드 실패')
-                }), 500
-            
-            file_url = result.get('web_view_link', result.get('file_url', ''))
-            
+            if result.get('success'):
+                file_url = result.get('web_view_link', result.get('file_url', ''))
             if not file_url:
-                return jsonify({
-                    'success': False,
-                    'message': '파일 업로드는 성공했지만 파일 URL을 가져올 수 없습니다.'
-                }), 500
-            
-            # 파일 정보 DB 저장
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
+                raise Exception(result.get('message', 'Google Drive 업로드 실패'))
+        except Exception as gd_err:
+            print(f"[정보] Google Drive 실패, Cloudinary 폴백 시도: {gd_err}")
             try:
-                file_size = len(file_data)
-                
-                if USE_POSTGRESQL:
-                    cursor.execute('''
-                        INSERT INTO settlement_files (
-                            settlement_id, file_type, file_name, file_url, file_size, uploaded_at
-                        )
-                        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-                        RETURNING id
-                    ''', (settlement_id, file_type, filename, file_url, file_size))
-                    file_id = cursor.fetchone()[0]
-                else:
-                    cursor.execute('''
-                        INSERT INTO settlement_files (
-                            settlement_id, file_type, file_name, file_url, file_size, uploaded_at
-                        )
-                        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                    ''', (settlement_id, file_type, filename, file_url, file_size))
-                    file_id = cursor.lastrowid
-                
-                # 정산 테이블에 파일 URL 업데이트 (file_type에 따라)
-                if file_type == 'work_fee':
-                    if USE_POSTGRESQL:
-                        cursor.execute('UPDATE settlements SET work_fee_file_url = %s WHERE id = %s', (file_url, settlement_id))
-                    else:
-                        cursor.execute('UPDATE settlements SET work_fee_file_url = ? WHERE id = ?', (file_url, settlement_id))
-                elif file_type == 'inout_fee':
-                    if USE_POSTGRESQL:
-                        cursor.execute('UPDATE settlements SET inout_fee_file_url = %s WHERE id = %s', (file_url, settlement_id))
-                    else:
-                        cursor.execute('UPDATE settlements SET inout_fee_file_url = ? WHERE id = ?', (file_url, settlement_id))
-                elif file_type == 'shipping_fee':
-                    if USE_POSTGRESQL:
-                        cursor.execute('UPDATE settlements SET shipping_fee_file_url = %s WHERE id = %s', (file_url, settlement_id))
-                    else:
-                        cursor.execute('UPDATE settlements SET shipping_fee_file_url = ? WHERE id = ?', (file_url, settlement_id))
-                
-                conn.commit()
-                
-                return jsonify({
-                    'success': True,
-                    'file_id': file_id,
-                    'file_url': file_url,
-                    'message': '파일 업로드 성공'
-                })
-            except Exception as e:
-                conn.rollback() if USE_POSTGRESQL else None
-                print(f'[오류] 파일 정보 저장 오류: {e}')
-                import traceback
-                traceback.print_exc()
+                from api.uploads.cloudinary_upload import upload_settlement_file_to_cloudinary
+                file_url = upload_settlement_file_to_cloudinary(
+                    file_data=file_data,
+                    filename=filename,
+                    company_name=company_name,
+                    settlement_year_month=settlement_year_month,
+                    file_type=file_type
+                )
+            except Exception as cl_err:
+                print(f"[오류] Cloudinary 폴백 실패: {cl_err}")
                 return jsonify({
                     'success': False,
-                    'message': f'파일 정보 저장 중 오류: {str(e)}'
+                    'message': f'파일 업로드 실패. (Google Drive: {str(gd_err)[:100]})'
                 }), 500
-            finally:
-                cursor.close()
-                conn.close()
-                
-        except ImportError as import_error:
-            print(f"[오류] 구글 드라이브 모듈 import 실패: {import_error}")
+        
+        if not file_url:
             return jsonify({
                 'success': False,
-                'message': f'구글 드라이브 모듈을 찾을 수 없습니다: {str(import_error)}'
+                'message': '파일 업로드에 실패했습니다.'
             }), 500
-        except Exception as upload_error:
-            print(f"[오류] 구글 드라이브 업로드 오류: {upload_error}")
+        
+        # 파일 정보 DB 저장
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            file_size = len(file_data)
+            
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    INSERT INTO settlement_files (
+                        settlement_id, file_type, file_name, file_url, file_size, uploaded_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    RETURNING id
+                ''', (settlement_id, file_type, filename, file_url, file_size))
+                file_id = cursor.fetchone()[0]
+            else:
+                cursor.execute('''
+                    INSERT INTO settlement_files (
+                        settlement_id, file_type, file_name, file_url, file_size, uploaded_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (settlement_id, file_type, filename, file_url, file_size))
+                file_id = cursor.lastrowid
+            
+            # 정산 테이블에 파일 URL 업데이트 (file_type에 따라)
+            if file_type == 'work_fee':
+                if USE_POSTGRESQL:
+                    cursor.execute('UPDATE settlements SET work_fee_file_url = %s WHERE id = %s', (file_url, settlement_id))
+                else:
+                    cursor.execute('UPDATE settlements SET work_fee_file_url = ? WHERE id = ?', (file_url, settlement_id))
+            elif file_type == 'inout_fee':
+                if USE_POSTGRESQL:
+                    cursor.execute('UPDATE settlements SET inout_fee_file_url = %s WHERE id = %s', (file_url, settlement_id))
+                else:
+                    cursor.execute('UPDATE settlements SET inout_fee_file_url = ? WHERE id = ?', (file_url, settlement_id))
+            elif file_type == 'shipping_fee':
+                if USE_POSTGRESQL:
+                    cursor.execute('UPDATE settlements SET shipping_fee_file_url = %s WHERE id = %s', (file_url, settlement_id))
+                else:
+                    cursor.execute('UPDATE settlements SET shipping_fee_file_url = ? WHERE id = ?', (file_url, settlement_id))
+            
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'file_id': file_id,
+                'file_url': file_url,
+                'message': '파일 업로드 성공'
+            })
+        except Exception as e:
+            conn.rollback() if USE_POSTGRESQL else None
+            print(f'[오류] 파일 정보 저장 오류: {e}')
             import traceback
             traceback.print_exc()
             return jsonify({
                 'success': False,
-                'message': f'파일 업로드 중 오류가 발생했습니다: {str(upload_error)}'
+                'message': f'파일 정보 저장 중 오류: {str(e)}'
             }), 500
+        finally:
+            cursor.close()
+            conn.close()
         
     except Exception as e:
         print(f'[오류] 업로드 완료 처리 오류: {e}')
@@ -1720,68 +1728,73 @@ def upload_tax_invoice(settlement_id):
         file_data = file.read()
         file_name = file.filename
         
-        # Google Drive 업로드
+        # 파일 업로드: Google Drive 시도 → 실패 시 Cloudinary 폴백
+        file_url = None
         try:
             from api.uploads.oauth_drive import upload_settlement_excel_to_drive
-            
             result = upload_settlement_excel_to_drive(
                 file_data=file_data,
                 filename=f'세금계산서_{file_name}',
                 company_name=settlement_company_name,
                 settlement_year_month=settlement_year_month
             )
-            
-            if not result.get('success'):
-                return jsonify({
-                    'success': False,
-                    'message': result.get('message', '파일 업로드 실패')
-                }), 500
-            
-            file_url = result.get('web_view_link', result.get('file_url', ''))
-            
+            if result.get('success'):
+                file_url = result.get('web_view_link', result.get('file_url', ''))
             if not file_url:
-                return jsonify({
-                    'success': False,
-                    'message': '파일 업로드는 성공했지만 파일 URL을 가져올 수 없습니다.'
-                }), 500
-            
-            # DB 업데이트
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
+                raise Exception(result.get('message', 'Google Drive 업로드 실패'))
+        except Exception as gd_err:
+            print(f"[정보] Google Drive 실패, Cloudinary 폴백 시도: {gd_err}")
             try:
-                if USE_POSTGRESQL:
-                    cursor.execute('UPDATE settlements SET tax_invoice_file_url = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s', (file_url, settlement_id))
-                else:
-                    cursor.execute('UPDATE settlements SET tax_invoice_file_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', (file_url, settlement_id))
-                
-                conn.commit()
-                
-                return jsonify({
-                    'success': True,
-                    'message': '세금계산서가 업로드되었습니다.',
-                    'file_url': file_url
-                })
-            except Exception as e:
-                conn.rollback() if USE_POSTGRESQL else None
-                print(f'[오류] 세금계산서 정보 저장 오류: {e}')
-                import traceback
-                traceback.print_exc()
+                from api.uploads.cloudinary_upload import upload_settlement_file_to_cloudinary
+                file_url = upload_settlement_file_to_cloudinary(
+                    file_data=file_data,
+                    filename=f'세금계산서_{file_name}',
+                    company_name=settlement_company_name,
+                    settlement_year_month=settlement_year_month,
+                    file_type='tax_invoice'
+                )
+            except Exception as cl_err:
+                print(f"[오류] Cloudinary 폴백 실패: {cl_err}")
                 return jsonify({
                     'success': False,
-                    'message': f'세금계산서 정보 저장 중 오류: {str(e)}'
+                    'message': f'세금계산서 업로드 실패. (Google Drive: {str(gd_err)[:100]})'
                 }), 500
-            finally:
-                cursor.close()
-                conn.close()
+        
+        if not file_url:
+            return jsonify({
+                'success': False,
+                'message': '파일 업로드에 실패했습니다.'
+            }), 500
+        
+        # DB 업데이트
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute('UPDATE settlements SET tax_invoice_file_url = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s', (file_url, settlement_id))
+            else:
+                cursor.execute('UPDATE settlements SET tax_invoice_file_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', (file_url, settlement_id))
+            
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': '세금계산서가 업로드되었습니다.',
+                'file_url': file_url
+            })
         except Exception as e:
-            print(f'[오류] 세금계산서 업로드 오류: {e}')
+            conn.rollback() if USE_POSTGRESQL else None
+            print(f'[오류] 세금계산서 정보 저장 오류: {e}')
             import traceback
             traceback.print_exc()
             return jsonify({
                 'success': False,
-                'message': f'세금계산서 업로드 중 오류: {str(e)}'
+                'message': f'세금계산서 정보 저장 중 오류: {str(e)}'
             }), 500
+        finally:
+            cursor.close()
+            conn.close()
     except Exception as e:
         print(f'[오류] 세금계산서 업로드 오류: {e}')
         import traceback

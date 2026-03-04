@@ -171,6 +171,40 @@ def upload_images_to_cloudinary(image_data_list: List[str], tracking_number: str
         raise Exception(f"이미지 업로드 실패: {str(e)}")
 
 
+def upload_settlement_file_to_cloudinary(
+    file_data: bytes,
+    filename: str,
+    company_name: str,
+    settlement_year_month: str,
+    file_type: str
+) -> str:
+    """
+    정산 파일을 Cloudinary에 업로드 (Google Drive OAuth 실패 시 폴백)
+    """
+    if not CLOUDINARY_CLOUD_NAME or not CLOUDINARY_API_KEY or not CLOUDINARY_API_SECRET:
+        raise Exception("Cloudinary 환경 변수가 설정되지 않았습니다.")
+    
+    safe_company = "".join(c if c.isalnum() or c in "-_" else "_" for c in (company_name or ""))[:50] or "unknown"
+    folder = f"settlements/{settlement_year_month or 'unknown'}/{safe_company}"
+    
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    name_no_ext = filename.rsplit('.', 1)[0] if '.' in filename else filename
+    public_id = f"{folder}/{file_type}_{name_no_ext}_{timestamp}"
+    
+    result = cloudinary.uploader.upload(
+        file_data,
+        public_id=public_id,
+        folder=folder,
+        resource_type='auto',
+        overwrite=False,
+        use_filename=False,
+        unique_filename=True
+    )
+    url = result.get('secure_url', result.get('url', ''))
+    print(f"[성공] 정산 파일 Cloudinary 업로드: {filename}")
+    return url
+
+
 def upload_single_file_to_cloudinary(base64_data: str, filename: str, folder: str = 'business_certificates') -> str:
     """
     Cloudinary에 단일 파일 업로드 (사업자 등록증 등)
