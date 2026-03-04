@@ -223,51 +223,6 @@ def upload_single_file_to_cloudinary(base64_data: str, filename: str, folder: st
         raise
 
 
-def upload_settlement_file_to_cloudinary(
-    file_data: bytes,
-    filename: str,
-    company_name: str,
-    settlement_year_month: str,
-    file_type: str
-) -> str:
-    """
-    정산 파일을 Cloudinary에 업로드 (작업비/입출고비/택배비 - Google Drive OAuth 실패 시 사용)
-    
-    Args:
-        file_data: 파일 바이너리 데이터
-        filename: 파일명
-        company_name: 화주사명
-        settlement_year_month: 정산년월 (예: 2025-01)
-        file_type: work_fee, inout_fee, shipping_fee
-    
-    Returns:
-        업로드된 파일 URL
-    """
-    if not CLOUDINARY_CLOUD_NAME or not CLOUDINARY_API_KEY or not CLOUDINARY_API_SECRET:
-        raise Exception("Cloudinary 환경 변수가 설정되지 않았습니다.")
-    
-    # 폴더: settlements/년월/화주사명
-    safe_company = "".join(c if c.isalnum() or c in "-_" else "_" for c in company_name)[:50]
-    folder = f"settlements/{settlement_year_month}/{safe_company}"
-    
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    name_no_ext = filename.rsplit('.', 1)[0] if '.' in filename else filename
-    public_id = f"{folder}/{file_type}_{name_no_ext}_{timestamp}"
-    
-    result = cloudinary.uploader.upload(
-        file_data,
-        public_id=public_id,
-        folder=folder,
-        resource_type='auto',
-        overwrite=False,
-        use_filename=False,
-        unique_filename=True
-    )
-    url = result.get('secure_url', result.get('url', ''))
-    print(f"[성공] 정산 파일 Cloudinary 업로드: {filename} -> {url[:80]}...")
-    return url
-
-
 def upload_to_cloudinary(file, folder: str = 'uploads') -> dict:
     """
     Cloudinary에 파일 업로드 (Werkzeug FileStorage 객체 사용)
