@@ -91,6 +91,11 @@
       margin-bottom: 10px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
+    /* 정산확인 미완료(대기/전달) 거래처 - 옅은 빨간색 구분 */
+    .ss-company-card.ss-pending {
+      background: #fff5f5;
+      border-color: #ffcdd2;
+    }
     .ss-company-name { font-weight: 700; font-size: 15px; color: #2d3436; margin-bottom: 4px; }
     .ss-company-amount { font-size: 18px; font-weight: 800; color: #ff6b35; margin-bottom: 8px; }
     .ss-company-actions {
@@ -336,9 +341,11 @@
             if (status === '전달') statusClass = 'ss-status-delivery';
             else if (status === '정산확인') statusClass = 'ss-status-confirm';
             else if (status === '입금완료') statusClass = 'ss-status-done';
+            const isPending = (status === '대기' || status === '전달');
+            const cardClass = 'ss-company-card' + (isPending ? ' ss-pending' : '');
 
             return `
-              <div class="ss-company-card">
+              <div class="${cardClass}">
                 <div class="ss-company-name">${(item.company_name || '').escapeHtml()} · ${(item.settlement_year_month || '').escapeHtml()}</div>
                 <div class="ss-company-amount">${amt.toLocaleString()}원</div>
                 <div style="margin-bottom: 8px;"><span class="ss-status-badge ${statusClass}">${status}</span></div>
