@@ -14,7 +14,8 @@ from api.database.models import (
     update_memo,
     delete_return,
     create_return,
-    update_return
+    update_return,
+    is_company_deactivated
 )
 
 # Blueprint 생성
@@ -123,6 +124,10 @@ def get_returns_data():
         
         # 데이터베이스에서 조회
         returns = get_returns_by_company(company, month, role)
+        
+        # 관리자 모드: 이전(비활성) 화주사 데이터는 목록에서 제외
+        if role == '관리자' and returns:
+            returns = [r for r in returns if not is_company_deactivated(r.get('company_name', '') or '')]
         
         # 디버깅: 조회 결과 확인
         print(f"   조회된 데이터: {len(returns)}건")

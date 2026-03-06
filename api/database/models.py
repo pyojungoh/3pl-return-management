@@ -1826,8 +1826,12 @@ def get_company_by_username(username: str) -> Optional[Dict]:
             conn.close()
 
 
-def get_all_companies() -> List[Dict]:
-    """모든 화주사 계정 조회"""
+def get_all_companies(include_inactive: bool = False) -> List[Dict]:
+    """모든 화주사 계정 조회
+    
+    Args:
+        include_inactive: True면 비활성(이전) 화주사 포함, False면 활성 화주사만 반환
+    """
     conn = get_db_connection()
     
     if USE_POSTGRESQL:
@@ -1842,15 +1846,27 @@ def get_all_companies() -> List[Dict]:
             has_is_active = cursor.fetchone() is not None
             
             if has_is_active:
-                cursor.execute('''
-                    SELECT id, company_name, username, role, 
-                           business_number, business_name, business_address, 
-                           business_tel, business_email, business_certificate_url,
-                           search_keywords, last_login, created_at, updated_at,
-                           COALESCE(is_active, TRUE) as is_active
-                    FROM companies
-                    ORDER BY created_at DESC
-                ''')
+                if include_inactive:
+                    cursor.execute('''
+                        SELECT id, company_name, username, role, 
+                               business_number, business_name, business_address, 
+                               business_tel, business_email, business_certificate_url,
+                               search_keywords, last_login, created_at, updated_at,
+                               COALESCE(is_active, TRUE) as is_active
+                        FROM companies
+                        ORDER BY created_at DESC
+                    ''')
+                else:
+                    cursor.execute('''
+                        SELECT id, company_name, username, role, 
+                               business_number, business_name, business_address, 
+                               business_tel, business_email, business_certificate_url,
+                               search_keywords, last_login, created_at, updated_at,
+                               COALESCE(is_active, TRUE) as is_active
+                        FROM companies
+                        WHERE (is_active IS NULL OR is_active = TRUE)
+                        ORDER BY created_at DESC
+                    ''')
             else:
                 # is_active 컬럼이 없으면 기본값으로 조회
                 cursor.execute('''
@@ -1902,7 +1918,11 @@ def get_all_companies() -> List[Dict]:
                 return []
             
             # 모든 컬럼 조회 (존재하지 않는 컬럼은 NULL로 처리)
-            cursor.execute('SELECT * FROM companies ORDER BY created_at DESC')
+            has_is_active = 'is_active' in available_columns
+            if has_is_active and not include_inactive:
+                cursor.execute('SELECT * FROM companies WHERE (is_active IS NULL OR is_active = 1) ORDER BY created_at DESC')
+            else:
+                cursor.execute('SELECT * FROM companies ORDER BY created_at DESC')
             rows = cursor.fetchall()
             
             # Row 객체를 dict로 변환 (존재하지 않는 컬럼은 None으로 설정)

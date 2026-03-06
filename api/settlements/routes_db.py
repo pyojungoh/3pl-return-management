@@ -131,6 +131,11 @@ def get_settlements_list():
             rows = cursor.fetchall()
             result = [dict(row) for row in rows]
             
+            # 관리자 모드: 이전(비활성) 화주사 정산은 목록에서 제외
+            if role == '관리자' and result:
+                from api.database.models import is_company_deactivated
+                result = [r for r in result if not is_company_deactivated(r.get('company_name', '') or '')]
+            
             # datetime 객체를 문자열로 변환
             for item in result:
                 for key, value in item.items():

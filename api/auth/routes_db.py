@@ -14,7 +14,8 @@ from api.database.models import (
     update_company_password_by_id,
     update_company_certificate,
     update_company_info,
-    update_last_login
+    update_last_login,
+    toggle_company_active_status
 )
 
 # Blueprint 생성
@@ -412,8 +413,11 @@ def update_info():
 @auth_bp.route('/companies', methods=['GET'])
 def get_companies():
     """
-    모든 화주사 목록 조회 API
-    
+    화주사 목록 조회 API
+
+    Query Parameters:
+        - include_inactive: 1이면 비활성(이전) 화주사 포함, 기본값 0(활성만)
+
     Returns:
         {
             "success": bool,
@@ -422,7 +426,8 @@ def get_companies():
         }
     """
     try:
-        companies = get_all_companies()
+        include_inactive = request.args.get('include_inactive', '0') == '1'
+        companies = get_all_companies(include_inactive=include_inactive)
         statistics = get_companies_statistics()
         
         # 비밀번호 필드는 제외하고 datetime 필드 처리
@@ -458,6 +463,55 @@ def get_companies():
                 'company_count': 0,
                 'total_count': 0
             }
+        }), 500
+
+
+@auth_bp.route('/companies/<path:company_name>/transfer', methods=['PUT'])
+def transfer_company(company_name):
+    """
+    화주사 이전 (비활성화) / 복구 API
+
+    Path:
+        - company_name: 화주사명 (URL 디코딩됨)
+
+    Request Body (선택):
+        - is_active: true면 복구, false 또는 생략이면 이전(비활성화)
+
+    Returns:
+        {
+            "success": bool,
+            "message": str
+        }
+    """
+    try:
+        from urllib.parse import unquote
+        company_name = unquote(company_name).strip()
+        if not company_name:
+            return jsonify({
+                'success': False,
+                'message': '화주사명이 필요합니다.'
+            }), 400
+
+        data = request.get_json(silent=True) or {}
+        is_active = data.get('is_active', False)
+        success, message = toggle_company_active_status(company_name, is_active=is_active)
+        if success:
+            msg = f'"{company_name}" 화주사가 복구되었습니다.' if is_active else f'"{company_name}" 화주사가 이전 처리되었습니다. 모든 메뉴에서 숨겨집니다.'
+            return jsonify({
+                'success': True,
+                'message': msg
+            })
+        return jsonify({
+            'success': False,
+            'message': message or '화주사 이전 처리에 실패했습니다.'
+        }), 400
+    except Exception as e:
+        print(f"❌ 화주사 이전 API 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'화주사 이전 처리 중 오류가 발생했습니다: {str(e)}'
         }), 500
 
 

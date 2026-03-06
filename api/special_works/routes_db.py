@@ -390,6 +390,11 @@ def get_works():
             # SQLite Row 객체는 dict()로 변환 가능, PostgreSQL RealDictCursor는 이미 dict
             result = [dict(row) for row in rows]
             
+            # 관리자 모드: 이전(비활성) 화주사 작업은 목록에서 제외
+            from api.database.models import is_company_deactivated
+            if role == '관리자' and result:
+                result = [r for r in result if not is_company_deactivated(r.get('company_name', '') or '')]
+            
             # datetime 객체를 문자열로 변환
             for item in result:
                 for key, value in item.items():

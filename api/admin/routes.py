@@ -438,17 +438,18 @@ def migrate_status():
     마이그레이션 상태 확인 (데이터베이스 통계)
     """
     try:
-        from api.database.models import get_companies_statistics, get_available_months, get_returns_by_company
+        from api.database.models import get_companies_statistics, get_available_months, get_returns_by_company, is_company_deactivated
         
         # 통계 정보
         stats = get_companies_statistics()
         months = get_available_months()
         
-        # 각 월별 데이터 개수
+        # 각 월별 데이터 개수 (이전/비활성 화주사 데이터 제외)
         month_counts = {}
         for month in months:
             try:
                 returns = get_returns_by_company('', month, role='관리자')
+                returns = [r for r in returns if not is_company_deactivated(r.get('company_name', '') or '')]
                 month_counts[month] = len(returns)
             except:
                 month_counts[month] = 0

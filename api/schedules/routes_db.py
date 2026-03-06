@@ -197,7 +197,7 @@ def create_schedule_route():
         
         # "모든 화주사" 선택 시 모든 화주사에게 스케줄 생성 (company_name은 "제이제이"로 저장)
         if company_name == '모든 화주사' or company_name == 'ALL':
-            companies = get_all_companies()
+            companies = get_all_companies(include_inactive=False)
             # 관리자 계정 제외
             companies = [c for c in companies if c.get('role') != '관리자']
             
