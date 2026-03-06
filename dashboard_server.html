@@ -533,6 +533,7 @@
       border: none;
       margin-bottom: 20px;
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
       align-items: center;
     }
@@ -714,6 +715,7 @@
       border: none;
       margin-bottom: 20px;
       display: flex;
+      flex-wrap: wrap;
       gap: 6px;
     }
     .tab-btn {
@@ -1242,6 +1244,76 @@
       background: linear-gradient(135deg, #ff9500 0%, #ffa502 100%) !important;
       background-color: #ff9500 !important;
       color: white !important;
+    }
+
+    /* ========== 모바일 반응형 (768px 이하) ========== */
+    @media (max-width: 768px) {
+      body {
+        padding: 12px;
+      }
+      .header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        padding: 12px 16px;
+      }
+      .header-left {
+        flex: none;
+        justify-content: flex-start;
+        order: 1;
+      }
+      .header-center {
+        position: static;
+        transform: none;
+        order: 3;
+        width: 100%;
+      }
+      .header-right {
+        order: 2;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .header .creator {
+        display: none;
+      }
+      .header h1 {
+        white-space: normal;
+        font-size: 16px;
+      }
+      .header .subtitle {
+        white-space: normal;
+      }
+      .company-info {
+        white-space: normal;
+        max-width: 100%;
+        font-size: 12px;
+        padding: 6px 12px;
+      }
+      #hbBannerContainer {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        height: 40px !important;
+      }
+      .menu-bar {
+        padding: 10px 12px;
+        gap: 6px;
+      }
+      .menu-item {
+        padding: 8px 14px;
+        font-size: 13px;
+      }
+      .tabs {
+        padding: 6px 10px;
+        gap: 6px;
+      }
+      .tab-btn {
+        flex: 1 1 auto;
+        min-width: 80px;
+        padding: 10px 12px;
+        font-size: 12px;
+      }
     }
     
     td {
