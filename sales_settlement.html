@@ -336,7 +336,9 @@
           }
 
           const html = items.map(item => {
-            const amt = item.total_amount || 0;
+            const totalAmount = item.total_amount || 0;
+            const tax = Math.floor(totalAmount * 0.1);
+            const finalAmount = totalAmount + tax;
             const status = item.status || '대기';
             let statusClass = 'ss-status-wait';
             if (status === '전달') statusClass = 'ss-status-delivery';
@@ -348,7 +350,7 @@
             return `
               <div class="${cardClass}">
                 <div class="ss-company-name">${(item.company_name || '').escapeHtml()} · ${(item.settlement_year_month || '').escapeHtml()}</div>
-                <div class="ss-company-amount">${amt.toLocaleString()}원</div>
+                <div class="ss-company-amount">${finalAmount.toLocaleString()}원</div>
                 <div style="margin-bottom: 8px;"><span class="ss-status-badge ${statusClass}">${status}</span></div>
                 <div class="ss-company-actions">
                   <button class="ss-btn ss-btn-small" onclick="ssShowDetail(${item.id})">상세</button>
