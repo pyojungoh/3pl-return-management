@@ -294,10 +294,11 @@
         ssCurrentUsername = window.currentUsername || localStorage.getItem('client_username') || '';
       }
 
-      const today = new Date();
       const monthInput = document.getElementById('ssFilterMonth');
       if (monthInput && !monthInput.value) {
-        monthInput.value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+        const date = new Date();
+        date.setMonth(date.getMonth() - 1);
+        monthInput.value = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
       }
       ssLoadData();
       ssInitialized = true;
