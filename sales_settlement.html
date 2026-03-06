@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>매출정산</title>
+  <style>
+    * { box-sizing: border-box; }
+    #ssContainer {
+      padding: 12px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .ss-section { margin-bottom: 16px; }
+    .ss-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      border: 2px solid #ffeaa7;
+    }
+    .ss-card-title {
+      font-size: 14px;
+      color: #636e72;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .ss-card-value {
+      font-size: 22px;
+      font-weight: 800;
+      color: #ff6b35;
+    }
+    .ss-filters {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin-bottom: 16px;
+    }
+    .ss-filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ss-filter-group label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #2d3436;
+    }
+    .ss-filter-group input, .ss-filter-group select {
+      padding: 10px 14px;
+      border: 2px solid #ffeaa7;
+      border-radius: 8px;
+      font-size: 14px;
+      min-width: 120px;
+    }
+    .ss-btn {
+      padding: 10px 18px;
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .ss-btn:active { transform: scale(0.98); }
+    .ss-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .ss-status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .ss-status-wait { background: #dfe6e9; color: #2d3436; }
+    .ss-status-delivery { background: #74b9ff; color: white; }
+    .ss-status-confirm { background: #00b894; color: white; }
+    .ss-status-done { background: #00a085; color: white; }
+    .ss-company-card {
+      background: #fff;
+      border: 2px solid #ffeaa7;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .ss-company-name { font-weight: 700; font-size: 15px; color: #2d3436; margin-bottom: 4px; }
+    .ss-company-amount { font-size: 18px; font-weight: 800; color: #ff6b35; margin-bottom: 8px; }
+    .ss-company-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .ss-company-actions .ss-btn {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    .ss-btn-small {
+      padding: 6px 12px;
+      font-size: 12px;
+      background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+    }
+    .ss-modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 10000;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .ss-modal {
+      max-width: 400px;
+      margin: 20px auto;
+      background: white;
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .ss-modal h2 { margin: 0 0 20px 0; color: #ff6b35; font-size: 18px; }
+    .ss-modal-close {
+      float: right;
+      background: #e17055;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
+      font-size: 18px;
+    }
+    .ss-detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 14px;
+    }
+    .ss-detail-row .label { font-weight: 600; color: #636e72; }
+    .ss-detail-row .value { color: #2d3436; }
+    .ss-no-data { text-align: center; padding: 40px 20px; color: #636e72; }
+    @media (min-width: 768px) {
+      #ssContainer { padding: 20px; }
+      .ss-company-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 12px;
+      }
+      .ss-company-card { margin-bottom: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="ssContainer">
+    <div class="ss-section">
+      <h2 style="margin: 0 0 12px 0; font-size: 18px; color: #ff6b35;">📊 매출정산</h2>
+      <div class="ss-filters">
+        <div class="ss-filter-group">
+          <label>조회 월</label>
+          <input type="month" id="ssFilterMonth" onchange="ssLoadData()">
+        </div>
+        <div class="ss-filter-group">
+          <label>조회 연도 (선택)</label>
+          <input type="number" id="ssFilterYear" placeholder="전체" min="2020" max="2030" style="width: 100px;" onchange="ssLoadData()">
+        </div>
+        <button class="ss-btn" onclick="ssLoadData()">조회</button>
+      </div>
+    </div>
+
+    <div class="ss-summary-grid">
+      <div class="ss-card">
+        <div class="ss-card-title">총매출</div>
+        <div class="ss-card-value" id="ssTotalSales">0원</div>
+      </div>
+      <div class="ss-card">
+        <div class="ss-card-title">대기</div>
+        <div class="ss-card-value" id="ssCountWait" style="font-size: 18px; color: #636e72;">0건</div>
+      </div>
+      <div class="ss-card">
+        <div class="ss-card-title">전달</div>
+        <div class="ss-card-value" id="ssCountDelivery" style="font-size: 18px; color: #0984e3;">0건</div>
+      </div>
+      <div class="ss-card">
+        <div class="ss-card-title">정산확인</div>
+        <div class="ss-card-value" id="ssCountConfirm" style="font-size: 18px; color: #00b894;">0건</div>
+      </div>
+      <div class="ss-card">
+        <div class="ss-card-title">입금완료</div>
+        <div class="ss-card-value" id="ssCountDone" style="font-size: 18px; color: #00a085;">0건</div>
+      </div>
+    </div>
+
+    <div class="ss-section">
+      <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #2d3436;">화주사별 정산내역</h3>
+      <div id="ssCompanyList" class="ss-company-grid">
+        <div class="ss-no-data">로딩 중...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 상세 모달 -->
+  <div id="ssDetailModal" class="ss-modal-overlay" onclick="if(event.target.id==='ssDetailModal') ssCloseDetailModal()">
+    <div class="ss-modal" onclick="event.stopPropagation()">
+      <button class="ss-modal-close" onclick="ssCloseDetailModal()">×</button>
+      <h2>정산 상세</h2>
+      <div id="ssDetailContent"></div>
+      <div style="margin-top: 20px;">
+        <button class="ss-btn" onclick="ssCloseDetailModal()">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 상태 변경 모달 -->
+  <div id="ssStatusModal" class="ss-modal-overlay" onclick="if(event.target.id==='ssStatusModal') ssCloseStatusModal()">
+    <div class="ss-modal" onclick="event.stopPropagation()">
+      <button class="ss-modal-close" onclick="ssCloseStatusModal()">×</button>
+      <h2>정산표 상태 변경</h2>
+      <div style="margin-bottom: 16px; padding: 12px; background: #fff3cd; border-radius: 8px;">
+        <strong>현재 상태:</strong> <span id="ssCurrentStatus"></span>
+      </div>
+      <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 600;">변경할 상태:</label>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="display: flex; align-items: center; padding: 10px; border: 2px solid #ffeaa7; border-radius: 8px; cursor: pointer;">
+            <input type="radio" name="ssStatus" value="대기" style="margin-right: 10px;"> 대기
+          </label>
+          <label style="display: flex; align-items: center; padding: 10px; border: 2px solid #ffeaa7; border-radius: 8px; cursor: pointer;">
+            <input type="radio" name="ssStatus" value="전달" style="margin-right: 10px;"> 전달
+          </label>
+          <label style="display: flex; align-items: center; padding: 10px; border: 2px solid #ffeaa7; border-radius: 8px; cursor: pointer;">
+            <input type="radio" name="ssStatus" value="정산확인" style="margin-right: 10px;"> 정산확인
+          </label>
+          <label style="display: flex; align-items: center; padding: 10px; border: 2px solid #ffeaa7; border-radius: 8px; cursor: pointer;">
+            <input type="radio" name="ssStatus" value="입금완료" style="margin-right: 10px;"> 입금완료
+          </label>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button class="ss-btn" onclick="ssSaveStatus()">저장</button>
+        <button class="ss-btn ss-btn-small" onclick="ssCloseStatusModal()">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var ssCurrentRole = '관리자';
+    var ssCurrentCompany = '관리자';
+    var ssCurrentUsername = 'jjay';
+    var ssInitialized = false;
+    var ssCurrentStatusModalId = null;
+
+    function ssGetUserHeaders() {
+      const enc = (v) => encodeURIComponent((v || '').toString().trim());
+      return {
+        'X-User-Role': enc(ssCurrentRole),
+        'X-User-Name': enc(ssCurrentUsername),
+        'X-Company-Name': enc(ssCurrentCompany)
+      };
+    }
+
+    function ssCommonInit() {
+      const tab = document.getElementById('salesSettlementTab');
+      const container = document.getElementById('ssContainer');
+      if (!tab || !container) return;
+      if (tab.style.display === 'none' || tab.classList.contains('hidden')) return;
+      if (ssInitialized) return;
+
+      const companyInfo = document.getElementById('companyInfo');
+      if (companyInfo && companyInfo.textContent) {
+        const t = companyInfo.textContent.trim();
+        if (t.includes('[관리자]')) {
+          ssCurrentRole = '관리자';
+          const m = t.match(/\(([^)]+)\)/);
+          if (m) ssCurrentUsername = m[1].trim();
+          const cm = t.match(/^([^[]+)/);
+          if (cm) ssCurrentCompany = cm[1].trim();
+        }
+      } else {
+        ssCurrentRole = window.currentRole || localStorage.getItem('client_role') || '관리자';
+        ssCurrentCompany = window.currentCompany || localStorage.getItem('client_company') || '관리자';
+        ssCurrentUsername = window.currentUsername || localStorage.getItem('client_username') || '';
+      }
+
+      const today = new Date();
+      const monthInput = document.getElementById('ssFilterMonth');
+      if (monthInput && !monthInput.value) {
+        monthInput.value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+      }
+      ssLoadData();
+      ssInitialized = true;
+    }
+    window.ssCommonInit = ssCommonInit;
+
+    function ssLoadData() {
+      const month = document.getElementById('ssFilterMonth')?.value || '';
+      const year = document.getElementById('ssFilterYear')?.value || '';
+      let url = '/api/sales_settlement/summary?';
+      if (month) url += 'year_month=' + encodeURIComponent(month) + '&';
+      if (year) url += 'year=' + encodeURIComponent(year) + '&';
+
+      document.getElementById('ssCompanyList').innerHTML = '<div class="ss-no-data">로딩 중...</div>';
+
+      fetch(url, { credentials: 'include', headers: ssGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success) {
+            document.getElementById('ssCompanyList').innerHTML = '<div class="ss-no-data">' + (data.message || '조회 실패') + '</div>';
+            return;
+          }
+          const d = data.data || {};
+          document.getElementById('ssTotalSales').textContent = (d.total_sales || 0).toLocaleString() + '원';
+          const byStatus = d.by_status || {};
+          document.getElementById('ssCountWait').textContent = (byStatus['대기'] || 0) + '건';
+          document.getElementById('ssCountDelivery').textContent = (byStatus['전달'] || 0) + '건';
+          document.getElementById('ssCountConfirm').textContent = (byStatus['정산확인'] || 0) + '건';
+          document.getElementById('ssCountDone').textContent = (byStatus['입금완료'] || 0) + '건';
+
+          const items = d.items || [];
+          if (items.length === 0) {
+            document.getElementById('ssCompanyList').innerHTML = '<div class="ss-no-data">정산 내역이 없습니다.</div>';
+            return;
+          }
+
+          const html = items.map(item => {
+            const amt = item.total_amount || 0;
+            const status = item.status || '대기';
+            let statusClass = 'ss-status-wait';
+            if (status === '전달') statusClass = 'ss-status-delivery';
+            else if (status === '정산확인') statusClass = 'ss-status-confirm';
+            else if (status === '입금완료') statusClass = 'ss-status-done';
+
+            return `
+              <div class="ss-company-card">
+                <div class="ss-company-name">${(item.company_name || '').escapeHtml()} · ${(item.settlement_year_month || '').escapeHtml()}</div>
+                <div class="ss-company-amount">${amt.toLocaleString()}원</div>
+                <div style="margin-bottom: 8px;"><span class="ss-status-badge ${statusClass}">${status}</span></div>
+                <div class="ss-company-actions">
+                  <button class="ss-btn ss-btn-small" onclick="ssShowDetail(${item.id})">상세</button>
+                  <button class="ss-btn" onclick="ssShowStatusModal(${item.id}, '${status}')" style="padding: 6px 12px; font-size: 12px;">상태변경</button>
+                  ${status === '정산확인' ? '<button class="ss-btn" onclick="ssCompletePayment(' + item.id + ')" style="padding: 6px 12px; font-size: 12px; background: linear-gradient(135deg, #00a085 0%, #008874 100%);">입금확인</button>' : ''}
+                </div>
+              </div>
+            `;
+          }).join('');
+          document.getElementById('ssCompanyList').innerHTML = html;
+        })
+        .catch(err => {
+          console.error('[SS] 로드 오류:', err);
+          document.getElementById('ssCompanyList').innerHTML = '<div class="ss-no-data">목록을 불러오는 중 오류가 발생했습니다.</div>';
+        });
+    }
+
+    String.prototype.escapeHtml = function() {
+      const div = document.createElement('div');
+      div.textContent = this;
+      return div.innerHTML;
+    };
+
+    function ssShowDetail(id) {
+      fetch('/api/settlements/' + id, { credentials: 'include', headers: ssGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success || !data.data) {
+            alert('상세 정보를 불러올 수 없습니다.');
+            return;
+          }
+          const s = data.data;
+          const total = (s.work_fee || 0) + (s.inout_fee || 0) + (s.shipping_fee || 0) + (s.collect_on_delivery_fee || 0) + (s.storage_fee || 0) + (s.special_work_fee || 0) - (s.error_deduction || 0);
+          const tax = Math.floor(total * 0.1);
+          const finalAmt = total + tax;
+
+          let html = '';
+          const rows = [
+            ['화주사', s.company_name],
+            ['정산년월', s.settlement_year_month],
+            ['작업비', (s.work_fee || 0).toLocaleString() + '원'],
+            ['입출고비', (s.inout_fee || 0).toLocaleString() + '원'],
+            ['택배비', (s.shipping_fee || 0).toLocaleString() + '원'],
+            ['착불 택배비', (s.collect_on_delivery_fee || 0).toLocaleString() + '원'],
+            ['보관료', (s.storage_fee || 0).toLocaleString() + '원'],
+            ['특수작업', (s.special_work_fee || 0).toLocaleString() + '원'],
+            ['오배송/누락 차감', '-' + (s.error_deduction || 0).toLocaleString() + '원'],
+            ['총액', total.toLocaleString() + '원'],
+            ['세금(10%)', tax.toLocaleString() + '원'],
+            ['결제금액', finalAmt.toLocaleString() + '원'],
+            ['상태', s.status || '대기']
+          ];
+          rows.forEach(([label, value]) => {
+            html += '<div class="ss-detail-row"><span class="label">' + label + '</span><span class="value">' + (value || '-') + '</span></div>';
+          });
+          document.getElementById('ssDetailContent').innerHTML = html;
+          document.getElementById('ssDetailModal').style.display = 'block';
+        })
+        .catch(err => {
+          console.error(err);
+          alert('상세 정보를 불러오는 중 오류가 발생했습니다.');
+        });
+    }
+
+    function ssCloseDetailModal() {
+      document.getElementById('ssDetailModal').style.display = 'none';
+    }
+
+    function ssShowStatusModal(id, currentStatus) {
+      ssCurrentStatusModalId = id;
+      document.getElementById('ssCurrentStatus').textContent = currentStatus || '대기';
+      document.querySelectorAll('input[name="ssStatus"]').forEach(r => {
+        r.checked = (r.value === currentStatus);
+      });
+      document.getElementById('ssStatusModal').style.display = 'block';
+    }
+
+    function ssCloseStatusModal() {
+      document.getElementById('ssStatusModal').style.display = 'none';
+      ssCurrentStatusModalId = null;
+    }
+
+    function ssSaveStatus() {
+      if (!ssCurrentStatusModalId) return;
+      const radio = document.querySelector('input[name="ssStatus"]:checked');
+      if (!radio) {
+        alert('변경할 상태를 선택해주세요.');
+        return;
+      }
+      const newStatus = radio.value;
+      if (!confirm('정산 상태를 "' + newStatus + '"로 변경하시겠습니까?')) return;
+
+      fetch('/api/settlements/' + ssCurrentStatusModalId + '/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...ssGetUserHeaders() },
+        credentials: 'include',
+        body: JSON.stringify({ status: newStatus })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert('상태가 변경되었습니다.');
+            ssCloseStatusModal();
+            ssLoadData();
+          } else {
+            alert(data.message || '상태 변경에 실패했습니다.');
+          }
+        })
+        .catch(err => {
+          alert('상태 변경 중 오류가 발생했습니다.');
+        });
+    }
+
+    function ssCompletePayment(id) {
+      if (!confirm('입금완료로 변경하시겠습니까?')) return;
+      fetch('/api/settlements/' + id + '/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...ssGetUserHeaders() },
+        credentials: 'include',
+        body: JSON.stringify({ status: '입금완료' })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert('입금완료로 변경되었습니다.');
+            ssLoadData();
+          } else {
+            alert(data.message || '변경에 실패했습니다.');
+          }
+        })
+        .catch(err => alert('오류가 발생했습니다.'));
+    }
+  </script>
+</body>
+</html>

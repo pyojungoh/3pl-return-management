@@ -113,6 +113,7 @@ from api.schedule_notifications.scheduler import start_schedule_notification_sch
 from api.schedule_notifications.routes import schedule_notifications_bp
 from api.pallets.routes import pallets_bp
 from api.settlements.routes_db import settlements_bp
+from api.sales_settlement.routes_db import sales_settlement_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(returns_bp)
@@ -130,7 +131,9 @@ app.register_blueprint(schedule_notifications_bp)
 app.register_blueprint(pallets_bp)
 print("[앱 시작] 파레트 보관료 관리 시스템 Blueprint 등록 완료")
 app.register_blueprint(settlements_bp)
+app.register_blueprint(sales_settlement_bp)
 print("[앱 시작] 정산 관리 시스템 Blueprint 등록 완료")
+print("[앱 시작] 매출정산(jjay 전용) Blueprint 등록 완료")
 
 # C/S 알림 스케줄러 시작
 print("[정보] [앱 시작] C/S 알림 스케줄러 시작 시도...")
@@ -224,6 +227,17 @@ def test_excel_upload():
         return send_file('test_excel_upload.html')
     except FileNotFoundError:
         return '<h1>테스트 페이지 파일을 찾을 수 없습니다.</h1><p>test_excel_upload.html 파일이 필요합니다.</p>', 404
+    except Exception as e:
+        return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
+
+
+@app.route('/sales_settlement.html')
+def sales_settlement():
+    """매출정산 페이지 (jjay 최고관리자 전용)"""
+    try:
+        return send_file('sales_settlement.html')
+    except FileNotFoundError:
+        return '<h1>매출정산 페이지를 찾을 수 없습니다.</h1><p>sales_settlement.html 파일이 필요합니다.</p>', 404
     except Exception as e:
         return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
 
