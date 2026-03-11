@@ -1081,12 +1081,18 @@ def check_notifications():
         
         # 스케줄러 함수 직접 호출
         from api.cs.scheduler import send_cs_notifications
-        send_cs_notifications()
+        stats = send_cs_notifications() or {}
         
-        return jsonify({
+        resp = {
             'success': True,
-            'message': 'C/S 알림 체크 완료'
-        })
+            'message': 'C/S 알림 체크 완료',
+            'cancellation_count': stats.get('cancellation_count', 0),
+            'general_count': stats.get('general_count', 0),
+            'cancellation_sent': stats.get('cancellation_sent', 0),
+            'general_sent': stats.get('general_sent', 0),
+        }
+        print(f"🔄 [Cron] 결과: 취소건 {stats.get('cancellation_sent', 0)}건/일반 {stats.get('general_sent', 0)}건 전송")
+        return jsonify(resp)
         
     except Exception as e:
         print(f'❌ C/S 알림 체크 오류: {e}')

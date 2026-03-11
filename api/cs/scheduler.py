@@ -91,7 +91,11 @@ def convert_to_kst(value) -> str:
         return value_str.split('.')[0] if '.' in value_str else value_str
 
 def send_cs_notifications():
-    """C/S 알림 전송 (스케줄러에서 호출)"""
+    """C/S 알림 전송 (스케줄러에서 호출)
+    Returns:
+        dict: {cancellation_count, general_count, cancellation_sent, general_sent}
+    """
+    stats = {'cancellation_count': 0, 'general_count': 0, 'cancellation_sent': 0, 'general_sent': 0}
     try:
         # KST 시간대 사용
         kst = timezone(timedelta(hours=9))
@@ -100,6 +104,7 @@ def send_cs_notifications():
         
         # 취소건: 1분마다 알림
         cancellation_requests = get_pending_cs_requests_by_issue_type('취소')
+        stats['cancellation_count'] = len(cancellation_requests)
         print(f"[정보] [스케줄러] 취소건 조회: {len(cancellation_requests)}건")
         
         for cs in cancellation_requests:
@@ -138,7 +143,8 @@ def send_cs_notifications():
             message += f"접수일: {created_at_kst}"
             
             print(f"[정보] [스케줄러] 취소건 알림 전송: C/S #{cs_id}")
-            send_telegram_notification(message)
+            if send_telegram_notification(message):
+                stats['cancellation_sent'] += 1
             
             # 마지막 알림 시간 DB 업데이트 (Vercel 서버리스에서 다음 호출 시 유지)
             update_cs_last_notification(cs_id, current_time)
@@ -146,6 +152,7 @@ def send_cs_notifications():
         # 일반 미처리 항목: 5분마다 알림 (취소건 제외)
         all_pending = get_pending_cs_requests()
         non_cancellation_requests = [cs for cs in all_pending if cs.get('issue_type') != '취소' and cs.get('status') == '접수']
+        stats['general_count'] = len(non_cancellation_requests)
         print(f"[정보] [스케줄러] 일반 미처리 항목 조회: {len(non_cancellation_requests)}건")
         if len(non_cancellation_requests) > 0:
             print(f"   - C/S ID 목록: {[cs.get('id') for cs in non_cancellation_requests]}")
@@ -247,16 +254,20 @@ def send_cs_notifications():
             message += f"접수일: {created_at_kst}"
             
             print(f"[정보] [스케줄러] 일반 미처리 항목 알림 전송: C/S #{cs_id}")
-            send_telegram_notification(message)
+            if send_telegram_notification(message):
+                stats['general_sent'] += 1
             
             # 마지막 알림 시간 DB 업데이트 (Vercel 서버리스에서 다음 호출 시 유지)
             update_cs_last_notification(cs_id, current_time)
             print(f"[성공] [스케줄러] C/S #{cs_id}: 마지막 알림 시간 DB 저장 완료: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        return stats
             
     except Exception as e:
         print(f"[오류] C/S 알림 전송 오류: {e}")
         import traceback
         traceback.print_exc()
+        return stats
 
 
 def start_cs_notification_scheduler():
