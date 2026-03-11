@@ -1077,7 +1077,6 @@ def check_notifications():
                     'message': 'Unauthorized'
                 }), 401
         
-        print("🔄 [Cron] C/S 알림 체크 시작 (Vercel Cron Jobs)")
         
         # 스케줄러 함수 직접 호출
         from api.cs.scheduler import send_cs_notifications
@@ -1090,8 +1089,8 @@ def check_notifications():
             'general_count': stats.get('general_count', 0),
             'cancellation_sent': stats.get('cancellation_sent', 0),
             'general_sent': stats.get('general_sent', 0),
+            'logs': stats.get('log_lines', []),
         }
-        print(f"🔄 [Cron] 결과: 취소건 {stats.get('cancellation_sent', 0)}건/일반 {stats.get('general_sent', 0)}건 전송")
         return jsonify(resp)
         
     except Exception as e:
