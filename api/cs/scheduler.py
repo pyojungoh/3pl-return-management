@@ -119,8 +119,13 @@ def convert_to_kst(value) -> str:
         value_str = str(value)
         return value_str.split('.')[0] if '.' in value_str else value_str
 
-def send_cs_notifications():
+def send_cs_notifications(notification_type='all'):
     """C/S 알림 전송 (스케줄러에서 호출)
+    Args:
+        notification_type: 'all' | 'cancellation' | 'general'
+            - all: 취소건 + 일반건 모두
+            - cancellation: 취소건만 (1분용 cron)
+            - general: 일반건만 (5분용 cron)
     Returns:
         dict: {cancellation_count, general_count, cancellation_sent, general_sent, log_lines}
     """
@@ -137,12 +142,19 @@ def send_cs_notifications():
         kst = timezone(timedelta(hours=9))
         current_time_utc = datetime.now(utc)
         current_time_kst = current_time_utc.astimezone(kst)
-        _log(f"[스케줄러] 실행 시작: {current_time_kst.strftime('%Y-%m-%d %H:%M:%S')} KST")
+        _log(f"[스케줄러] 실행 시작: {current_time_kst.strftime('%Y-%m-%d %H:%M:%S')} KST (type={notification_type})")
+        
+        run_cancellation = notification_type in ('all', 'cancellation')
+        run_general = notification_type in ('all', 'general')
         
         # 취소건: 1분마다 알림
-        cancellation_requests = get_pending_cs_requests_by_issue_type('취소')
-        stats['cancellation_count'] = len(cancellation_requests)
-        _log(f"[스케줄러] 취소건 조회: {len(cancellation_requests)}건")
+        if run_cancellation:
+            cancellation_requests = get_pending_cs_requests_by_issue_type('취소')
+            stats['cancellation_count'] = len(cancellation_requests)
+            _log(f"[스케줄러] 취소건 조회: {len(cancellation_requests)}건")
+        else:
+            cancellation_requests = []
+            stats['cancellation_count'] = 0
         
         for cs in cancellation_requests:
             cs_id = cs.get('id')
@@ -191,12 +203,16 @@ def send_cs_notifications():
             update_cs_last_notification(cs.get('id'), None)
         
         # 일반 미처리 항목: 5분마다 알림 (취소건 제외)
-        all_pending = get_pending_cs_requests()
-        non_cancellation_requests = [cs for cs in all_pending if cs.get('issue_type') != '취소' and cs.get('status') == '접수']
-        stats['general_count'] = len(non_cancellation_requests)
-        _log(f"[스케줄러] 일반 미처리 항목 조회: {len(non_cancellation_requests)}건")
-        if len(non_cancellation_requests) > 0:
-            _log(f"   - C/S ID 목록: {[cs.get('id') for cs in non_cancellation_requests]}")
+        if run_general:
+            all_pending = get_pending_cs_requests()
+            non_cancellation_requests = [cs for cs in all_pending if cs.get('issue_type') != '취소' and cs.get('status') == '접수']
+            stats['general_count'] = len(non_cancellation_requests)
+            _log(f"[스케줄러] 일반 미처리 항목 조회: {len(non_cancellation_requests)}건")
+            if len(non_cancellation_requests) > 0:
+                _log(f"   - C/S ID 목록: {[cs.get('id') for cs in non_cancellation_requests]}")
+        else:
+            non_cancellation_requests = []
+            stats['general_count'] = 0
         
         for cs in non_cancellation_requests:
             cs_id = cs.get('id')

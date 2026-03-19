@@ -1064,35 +1064,36 @@ def resend_cs_notification(cs_id):
         }), 500
 
 
+def _check_cron_auth():
+    """Cron 인증 검사. 실패 시 (False, response) 반환, 성공 시 (True, None) 반환"""
+    cron_secret = request.headers.get('Authorization')
+    query_secret = request.args.get('secret', '').strip()
+    expected_secret = os.environ.get('CRON_SECRET')
+    if expected_secret:
+        header_ok = cron_secret == f'Bearer {expected_secret}'
+        query_ok = query_secret == expected_secret
+        if not header_ok and not query_ok:
+            return False, (jsonify({'success': False, 'message': 'Unauthorized'}), 401)
+    return True, None
+
+
 @cs_bp.route('/check-notifications', methods=['GET', 'POST'])
 def check_notifications():
-    """C/S 알림 체크 (Vercel Cron Jobs용)"""
+    """C/S 알림 체크 (Vercel Cron Jobs용) - type 파라미터로 분기"""
     try:
-        # Vercel Cron Jobs에서 호출하는 엔드포인트
-        # 인증: 헤더(Authorization: Bearer xxx) 또는 query param(?secret=xxx) 지원
-        # cron-job.org 등에서 헤더 설정이 어려울 수 있어 query param 대안 제공
-        cron_secret = request.headers.get('Authorization')
-        query_secret = request.args.get('secret', '').strip()
-        expected_secret = os.environ.get('CRON_SECRET')
-        
-        if expected_secret:
-            header_ok = cron_secret == f'Bearer {expected_secret}'
-            query_ok = query_secret == expected_secret
-            if not header_ok and not query_ok:
-                print("⚠️ [Cron] 인증 실패: CRON_SECRET 불일치 (헤더 또는 ?secret= 파라미터 확인)")
-                return jsonify({
-                    'success': False,
-                    'message': 'Unauthorized'
-                }), 401
-        
-        
-        # 스케줄러 함수 직접 호출
+        ok, err = _check_cron_auth()
+        if not ok:
+            return err
+        notif_type = request.args.get('type', 'all').strip().lower()
+        if notif_type not in ('all', 'cancellation', 'general'):
+            notif_type = 'all'
         from api.cs.scheduler import send_cs_notifications
-        stats = send_cs_notifications() or {}
+        stats = send_cs_notifications(notification_type=notif_type) or {}
         
         resp = {
             'success': True,
             'message': 'C/S 알림 체크 완료',
+            'type': notif_type,
             'cancellation_count': stats.get('cancellation_count', 0),
             'general_count': stats.get('general_count', 0),
             'cancellation_sent': stats.get('cancellation_sent', 0),
@@ -1109,6 +1110,48 @@ def check_notifications():
             'success': False,
             'message': f'C/S 알림 체크 중 오류: {str(e)}'
         }), 500
+
+
+@cs_bp.route('/check-notifications-cancellation', methods=['GET', 'POST'])
+def check_notifications_cancellation():
+    """C/S 취소건 알림 전용 (1분용 cron) - URL 분리로 혼동 방지"""
+    try:
+        ok, err = _check_cron_auth()
+        if not ok:
+            return err
+        from api.cs.scheduler import send_cs_notifications
+        stats = send_cs_notifications(notification_type='cancellation') or {}
+        return jsonify({
+            'success': True, 'message': 'C/S 취소건 알림 체크 완료', 'type': 'cancellation',
+            'cancellation_count': stats.get('cancellation_count', 0), 'cancellation_sent': stats.get('cancellation_sent', 0),
+            'logs': stats.get('log_lines', []),
+        })
+    except Exception as e:
+        print(f'❌ C/S 취소건 알림 체크 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@cs_bp.route('/check-notifications-general', methods=['GET', 'POST'])
+def check_notifications_general():
+    """C/S 일반건 알림 전용 (5분용 cron) - URL 분리로 혼동 방지"""
+    try:
+        ok, err = _check_cron_auth()
+        if not ok:
+            return err
+        from api.cs.scheduler import send_cs_notifications
+        stats = send_cs_notifications(notification_type='general') or {}
+        return jsonify({
+            'success': True, 'message': 'C/S 일반건 알림 체크 완료', 'type': 'general',
+            'general_count': stats.get('general_count', 0), 'general_sent': stats.get('general_sent', 0),
+            'logs': stats.get('log_lines', []),
+        })
+    except Exception as e:
+        print(f'❌ C/S 일반건 알림 체크 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @cs_bp.route('/export', methods=['GET'])
