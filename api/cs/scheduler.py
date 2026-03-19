@@ -125,10 +125,13 @@ def send_cs_notifications():
                 continue
                 
             # 마지막 알림 시간 확인 (1분 이내면 스킵) - DB에서 조회 (Vercel 서버리스 대응)
-            last_time = parse_datetime_for_compare(cs.get('last_notification_at'))
+            raw_last = cs.get('last_notification_at')
+            last_time = parse_datetime_for_compare(raw_last)
             if last_time:
                 time_diff = (current_time - last_time).total_seconds()
+                _log(f"[스케줄러] 취소 C/S #{cs_id}: last_notification_at={raw_last} → 파싱={last_time.strftime('%H:%M:%S')} 경과={time_diff:.0f}초")
                 if time_diff < 60:  # 1분 미만이면 스킵
+                    _log(f"[스케줄러] 취소 C/S #{cs_id}: 1분 미만 스킵")
                     continue
             
             # 알림 전송
@@ -154,7 +157,9 @@ def send_cs_notifications():
                 stats['cancellation_sent'] += 1
             
             # 마지막 알림 시간 DB 업데이트 (Vercel 서버리스에서 다음 호출 시 유지)
-            update_cs_last_notification(cs_id, current_time)
+            # 중요: naive datetime(KST)으로 저장 - psycopg2가 UTC 변환하지 않도록
+            naive_time = current_time.replace(tzinfo=None) if current_time.tzinfo else current_time
+            update_cs_last_notification(cs.get('id'), naive_time)
         
         # 일반 미처리 항목: 5분마다 알림 (취소건 제외)
         all_pending = get_pending_cs_requests()
@@ -259,8 +264,10 @@ def send_cs_notifications():
                 stats['general_sent'] += 1
             
             # 마지막 알림 시간 DB 업데이트 (Vercel 서버리스에서 다음 호출 시 유지)
-            update_cs_last_notification(cs_id, current_time)
-            _log(f"[스케줄러] C/S #{cs_id}: DB 저장 완료")
+            # 중요: naive datetime(KST)으로 저장 - psycopg2가 UTC 변환하지 않도록
+            naive_time = current_time.replace(tzinfo=None) if current_time.tzinfo else current_time
+            update_cs_last_notification(cs.get('id'), naive_time)
+            _log(f"[스케줄러] C/S #{cs_id}: DB 저장 완료 (naive {naive_time.strftime('%H:%M:%S')})")
         
         return stats
             
