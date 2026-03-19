@@ -414,20 +414,27 @@ def update_customer_name(cs_id: int, customer_name: str) -> bool:
             conn.close()
 
 
-def update_cs_last_notification(cs_id: int, notification_time: datetime) -> bool:
-    """C/S 마지막 알림 시간 업데이트 (반복 알림용, Vercel 서버리스에서 DB에 저장)"""
+def update_cs_last_notification(cs_id: int, notification_time: datetime = None) -> bool:
+    """C/S 마지막 알림 시간 업데이트 (반복 알림용, Vercel 서버리스에서 DB에 저장)
+    PostgreSQL: DB의 NOW() 사용 (타임존 변환 문제 완전 회피)
+    SQLite: Python datetime 전달
+    """
     conn = get_db_connection()
     cursor = None
     try:
         cursor = conn.cursor()
         if USE_POSTGRESQL:
+            # DB 서버 시간(UTC) 사용 - Python/psycopg2 타임존 변환 회피
+            cursor.execute("SET LOCAL timezone = 'UTC'")
             cursor.execute('''
-                UPDATE customer_service SET last_notification_at = %s WHERE id = %s
-            ''', (notification_time, cs_id))
+                UPDATE customer_service SET last_notification_at = NOW() WHERE id = %s
+            ''', (cs_id,))
         else:
+            # SQLite: Python datetime 필요
+            ts = notification_time if notification_time is not None else datetime.now(timezone.utc)
             cursor.execute('''
                 UPDATE customer_service SET last_notification_at = ? WHERE id = ?
-            ''', (notification_time, cs_id))
+            ''', (ts, cs_id))
         conn.commit()
         return True
     except Exception as e:
@@ -619,8 +626,9 @@ def create_cs():
             result = send_telegram_notification(message)
             print(f"📬 [C/S 등록] 텔레그램 알림 전송 결과: {'성공' if result else '실패'}")
             
-            # 즉시 알림 전송 시 last_notification_at 설정 (반복 알림 기준점, cron이 5분마다 호출되므로)
-            update_cs_last_notification(cs_id, kst_now)
+            # 즉시 알림 전송 시 last_notification_at 설정 (반복 알림 기준점)
+            # None 전달 → PostgreSQL: NOW(), SQLite: Python UTC (타임존 일관성)
+            update_cs_last_notification(cs_id, None)
             
             return jsonify({
                 'success': True,

@@ -44,6 +44,34 @@ def parse_datetime_for_compare(value) -> datetime:
     return None
 
 
+def parse_datetime_for_compare_utc(value) -> datetime:
+    """DB의 last_notification_at을 UTC datetime으로 파싱 (비교용) - psycopg2가 UTC로 저장하므로"""
+    if not value:
+        return None
+    utc = timezone.utc
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            # naive면 UTC로 가정 (PostgreSQL TIMESTAMP는 보통 UTC)
+            return value.replace(tzinfo=utc)
+        return value.astimezone(utc)
+    s = str(value).strip()
+    if not s:
+        return None
+    s_clean = s.split('.')[0] if '.' in s else s
+    if len(s_clean) >= 19:
+        try:
+            dt = datetime.strptime(s_clean[:19], '%Y-%m-%d %H:%M:%S')
+            return dt.replace(tzinfo=utc)
+        except ValueError:
+            pass
+        try:
+            dt = datetime.strptime(s_clean[:19], '%Y-%m-%dT%H:%M:%S')
+            return dt.replace(tzinfo=utc)
+        except ValueError:
+            pass
+    return None
+
+
 def convert_to_kst(value) -> str:
     """
     시간 값을 한국시간(KST) 문자열로 변환.
@@ -104,10 +132,12 @@ def send_cs_notifications():
         sys.stdout.flush()
     
     try:
-        # KST 시간대 사용
+        # UTC로 통일 (DB/서버 타임존 변환 문제 완전 회피)
+        utc = timezone.utc
         kst = timezone(timedelta(hours=9))
-        current_time = datetime.now(kst)
-        _log(f"[스케줄러] 실행 시작: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        current_time_utc = datetime.now(utc)
+        current_time_kst = current_time_utc.astimezone(kst)
+        _log(f"[스케줄러] 실행 시작: {current_time_kst.strftime('%Y-%m-%d %H:%M:%S')} KST")
         
         # 취소건: 1분마다 알림
         cancellation_requests = get_pending_cs_requests_by_issue_type('취소')
@@ -124,12 +154,12 @@ def send_cs_notifications():
             if status not in ['접수']:
                 continue
                 
-            # 마지막 알림 시간 확인 (1분 이내면 스킵) - DB에서 조회 (Vercel 서버리스 대응)
+            # 마지막 알림 시간 확인 (1분 이내면 스킵) - UTC로 비교
             raw_last = cs.get('last_notification_at')
-            last_time = parse_datetime_for_compare(raw_last)
+            last_time = parse_datetime_for_compare_utc(raw_last)
             if last_time:
-                time_diff = (current_time - last_time).total_seconds()
-                _log(f"[스케줄러] 취소 C/S #{cs_id}: last_notification_at={raw_last} → 파싱={last_time.strftime('%H:%M:%S')} 경과={time_diff:.0f}초")
+                time_diff = (current_time_utc - last_time).total_seconds()
+                _log(f"[스케줄러] 취소 C/S #{cs_id}: last={raw_last} → 경과={time_diff:.0f}초")
                 if time_diff < 60:  # 1분 미만이면 스킵
                     _log(f"[스케줄러] 취소 C/S #{cs_id}: 1분 미만 스킵")
                     continue
@@ -157,9 +187,8 @@ def send_cs_notifications():
                 stats['cancellation_sent'] += 1
             
             # 마지막 알림 시간 DB 업데이트 (Vercel 서버리스에서 다음 호출 시 유지)
-            # 중요: naive datetime(KST)으로 저장 - psycopg2가 UTC 변환하지 않도록
-            naive_time = current_time.replace(tzinfo=None) if current_time.tzinfo else current_time
-            update_cs_last_notification(cs.get('id'), naive_time)
+            # None 전달 시 PostgreSQL은 NOW(), SQLite는 Python UTC 사용 → 타임존 일관성
+            update_cs_last_notification(cs.get('id'), None)
         
         # 일반 미처리 항목: 5분마다 알림 (취소건 제외)
         all_pending = get_pending_cs_requests()
@@ -179,15 +208,15 @@ def send_cs_notifications():
             if status not in ['접수']:
                 continue
                 
-            # 마지막 알림 시간 확인 (5분 이내면 스킵) - DB에서 조회 (Vercel 서버리스 대응)
-            last_time = parse_datetime_for_compare(cs.get('last_notification_at'))
+            # 마지막 알림 시간 확인 (5분 이내면 스킵) - UTC로 비교
+            last_time = parse_datetime_for_compare_utc(cs.get('last_notification_at'))
             
             should_send = False
             
             if last_time:
                 # 이전에 알림을 보낸 적이 있으면, 5분 이상 지났는지 확인
-                time_diff = (current_time - last_time).total_seconds()
-                _log(f"[스케줄러] C/S #{cs_id}: 마지막 알림 {last_time.strftime('%H:%M:%S') if hasattr(last_time, 'strftime') else last_time} 경과 {time_diff/60:.1f}분")
+                time_diff = (current_time_utc - last_time).total_seconds()
+                _log(f"[스케줄러] C/S #{cs_id}: 마지막 알림 경과 {time_diff/60:.1f}분")
                 if time_diff >= 300:  # 5분 이상 지났으면 알림 전송
                     should_send = True
                     _log(f"[스케줄러] C/S #{cs_id}: 5분 이상 경과, 알림 전송")
@@ -219,7 +248,8 @@ def send_cs_notifications():
                         
                         if created_at:
                             # 접수일로부터 1분 이상 지났는지 확인 (5분에서 1분으로 완화)
-                            time_since_creation = (current_time - created_at).total_seconds()
+                            created_at_utc = created_at.astimezone(utc) if created_at.tzinfo else created_at.replace(tzinfo=utc)
+                            time_since_creation = (current_time_utc - created_at_utc).total_seconds()
                             if time_since_creation >= 60:  # 1분 이상 지났으면 알림 전송
                                 should_send = True
                                 _log(f"[스케줄러] C/S #{cs_id}: 1분 이상 경과, 알림 전송")
@@ -263,11 +293,9 @@ def send_cs_notifications():
             if send_telegram_notification(message):
                 stats['general_sent'] += 1
             
-            # 마지막 알림 시간 DB 업데이트 (Vercel 서버리스에서 다음 호출 시 유지)
-            # 중요: naive datetime(KST)으로 저장 - psycopg2가 UTC 변환하지 않도록
-            naive_time = current_time.replace(tzinfo=None) if current_time.tzinfo else current_time
-            update_cs_last_notification(cs.get('id'), naive_time)
-            _log(f"[스케줄러] C/S #{cs_id}: DB 저장 완료 (naive {naive_time.strftime('%H:%M:%S')})")
+            # 마지막 알림 시간 DB 업데이트 (PostgreSQL: NOW(), SQLite: Python UTC)
+            update_cs_last_notification(cs.get('id'), None)
+            _log(f"[스케줄러] C/S #{cs_id}: DB 저장 완료")
         
         return stats
             
