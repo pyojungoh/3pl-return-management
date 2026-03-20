@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>거래명세서</title>
+  <style>
+    #invContainer {
+      padding: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .inv-tab-btns {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .inv-tab-btn {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%);
+      color: #ff6b35;
+      border: 2px solid #ffeaa7;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(255, 152, 0, 0.1);
+    }
+    .inv-tab-btn:hover {
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      color: white;
+      border-color: #ff6b35;
+      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
+    }
+    .inv-tab-btn.active {
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      color: white;
+      border-color: #ff6b35;
+    }
+    .inv-tab-content {
+      display: none;
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 14px;
+      border: 2px solid #ffeaa7;
+      box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1);
+    }
+    .inv-tab-content.active {
+      display: block;
+    }
+    .inv-placeholder {
+      text-align: center;
+      padding: 60px 20px;
+      color: #636e72;
+      font-size: 16px;
+    }
+    .inv-form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .inv-form-group label {
+      display: block;
+      font-weight: 600;
+      color: #2d3436;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .inv-form-group input, .inv-form-group textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 2px solid #ffeaa7;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .inv-form-group input:focus, .inv-form-group textarea:focus {
+      outline: none;
+      border-color: #ff6b35;
+    }
+    .inv-btn {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .inv-btn:hover { opacity: 0.9; }
+    .inv-btn-secondary {
+      background: linear-gradient(135deg, #636e72 0%, #b2bec3 100%);
+    }
+    .inv-table { width: 100%; border-collapse: collapse; }
+    .inv-table th, .inv-table td {
+      padding: 10px 12px;
+      text-align: center;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .inv-table th {
+      background: linear-gradient(135deg, #fffef9 0%, #ffffff 100%);
+      color: #ff6b35;
+      font-weight: 600;
+    }
+    .inv-table img { max-width: 50px; max-height: 50px; object-fit: contain; }
+    .inv-no-data { text-align: center; padding: 40px; color: #999; }
+    @media print {
+      @page { size: A4; margin: 20mm; }
+      body { margin: 0; padding: 15mm; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="invContainer">
+    <div class="inv-tab-btns">
+      <button type="button" class="inv-tab-btn active" id="invTabProductsBtn" onclick="invSwitchTab('products')">📦 상품등록</button>
+      <button type="button" class="inv-tab-btn" id="invTabCustomersBtn" onclick="invSwitchTab('customers')">🏢 거래처등록</button>
+      <button type="button" class="inv-tab-btn" id="invTabStatementsBtn" onclick="invSwitchTab('statements')">📄 거래명세서</button>
+      <button type="button" class="inv-tab-btn" id="invTabSettlementsBtn" onclick="invSwitchTab('settlements')">💰 정산</button>
+    </div>
+    <div id="invTabProducts" class="inv-tab-content active">
+      <div class="inv-section">
+        <button type="button" class="inv-btn" onclick="invToggleProductForm()" id="invProductFormToggleBtn">➕ 상품 등록</button>
+        <div id="invProductFormWrap" style="display:none; margin-top:16px; padding:20px; background:#fff9e6; border-radius:12px; border:2px solid #ffeaa7;">
+          <h3 style="margin-bottom:16px; color:#ff6b35;">상품 등록/수정</h3>
+          <div class="inv-form-grid">
+            <div class="inv-form-group">
+              <label>상품고유번호 *</label>
+              <input type="text" id="invProductCode" placeholder="예: P001">
+            </div>
+            <div class="inv-form-group">
+              <label>상품명 *</label>
+              <input type="text" id="invProductName" placeholder="상품명">
+            </div>
+            <div class="inv-form-group">
+              <label>카톤별 수량</label>
+              <input type="number" id="invQtyPerCarton" value="1" min="1">
+            </div>
+            <div class="inv-form-group">
+              <label>입고가(원)</label>
+              <input type="number" id="invPurchasePrice" value="0" min="0">
+            </div>
+            <div class="inv-form-group">
+              <label>도매가(원)</label>
+              <input type="number" id="invWholesalePrice" value="0" min="0">
+            </div>
+            <div class="inv-form-group">
+              <label>공동구매가(원)</label>
+              <input type="number" id="invGroupBuyPrice" value="0" min="0">
+            </div>
+            <div class="inv-form-group">
+              <label>일반판매가(원)</label>
+              <input type="number" id="invRetailPrice" value="0" min="0">
+            </div>
+            <div class="inv-form-group">
+              <label>유통기한(일)</label>
+              <input type="number" id="invExpiryDays" placeholder="365" min="0">
+            </div>
+            <div class="inv-form-group">
+              <label>카테고리</label>
+              <input type="text" id="invCategory" placeholder="선택">
+            </div>
+          </div>
+          <div class="inv-form-group" style="margin-bottom:12px;">
+            <label>메모</label>
+            <textarea id="invProductMemo" rows="2" placeholder="메모"></textarea>
+          </div>
+          <div class="inv-form-group" style="margin-bottom:12px;">
+            <label>상품 사진</label>
+            <input type="file" id="invProductImageInput" accept="image/*" onchange="invPreviewProductImage(event)">
+            <div id="invProductImagePreview" style="margin-top:8px;"></div>
+            <input type="hidden" id="invProductImageUrl">
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="inv-btn" onclick="invSaveProduct()">저장</button>
+            <button type="button" class="inv-btn inv-btn-secondary" onclick="invResetProductForm()">취소</button>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:20px;">
+        <div style="display:flex; gap:10px; margin-bottom:12px; align-items:center;">
+          <input type="text" id="invProductSearch" placeholder="상품코드/이름 검색" style="padding:8px 12px; border:2px solid #ffeaa7; border-radius:8px; width:200px;">
+          <button type="button" class="inv-btn" onclick="invLoadProducts()">🔍 검색</button>
+          <label><input type="checkbox" id="invIncludeInactive"> 비활성 포함</label>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="inv-table">
+            <thead>
+              <tr>
+                <th>순번</th>
+                <th>상품코드</th>
+                <th>상품명</th>
+                <th>카톤수량</th>
+                <th>입고가</th>
+                <th>도매가</th>
+                <th>공동구매가</th>
+                <th>일반판매가</th>
+                <th>유통기한</th>
+                <th>사진</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="invProductTableBody">
+              <tr><td colspan="11" class="inv-no-data">로딩 중...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="invTabCustomers" class="inv-tab-content">
+      <div class="inv-section">
+        <button type="button" class="inv-btn" onclick="invToggleCustomerForm()" id="invCustomerFormToggleBtn">➕ 거래처 등록</button>
+        <div id="invCustomerFormWrap" style="display:none; margin-top:16px; padding:20px; background:#fff9e6; border-radius:12px; border:2px solid #ffeaa7;">
+          <h3 style="margin-bottom:16px; color:#ff6b35;">거래처 등록/수정</h3>
+          <div class="inv-form-grid">
+            <div class="inv-form-group">
+              <label>거래처명 *</label>
+              <input type="text" id="invCustomerName" placeholder="거래처명">
+            </div>
+            <div class="inv-form-group">
+              <label>연락처</label>
+              <input type="text" id="invContactTel" placeholder="전화번호">
+            </div>
+            <div class="inv-form-group">
+              <label>사업자번호</label>
+              <input type="text" id="invBusinessNumber" placeholder="사업자번호">
+            </div>
+            <div class="inv-form-group">
+              <label>대표자명</label>
+              <input type="text" id="invRepresentative" placeholder="대표자">
+            </div>
+            <div class="inv-form-group" style="grid-column: 1 / -1;">
+              <label>주소</label>
+              <input type="text" id="invAddress" placeholder="주소">
+            </div>
+            <div class="inv-form-group">
+              <label>화주사 연결</label>
+              <label style="display:flex; align-items:center; gap:8px; font-weight:normal;">
+                <input type="checkbox" id="invIndependentCustomer" onchange="invToggleCompanySelect()"> 독립 거래처 (화주사 무관)
+              </label>
+              <select id="invCompanySelect" style="margin-top:8px; padding:10px; border:2px solid #ffeaa7; border-radius:8px; width:100%;">
+                <option value="">화주사 선택</option>
+              </select>
+            </div>
+          </div>
+          <div class="inv-form-group" style="margin-bottom:12px;">
+            <label>메모</label>
+            <textarea id="invCustomerMemo" rows="2" placeholder="메모"></textarea>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="inv-btn" onclick="invSaveCustomer()">저장</button>
+            <button type="button" class="inv-btn inv-btn-secondary" onclick="invResetCustomerForm()">취소</button>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:20px;">
+        <div style="display:flex; gap:10px; margin-bottom:12px; align-items:center; flex-wrap:wrap;">
+          <select id="invCustomerFilter" onchange="invLoadCustomers()" style="padding:8px 12px; border:2px solid #ffeaa7; border-radius:8px;">
+            <option value="">전체</option>
+            <option value="null">독립 거래처만</option>
+          </select>
+          <button type="button" class="inv-btn" onclick="invLoadCustomers()">🔍 새로고침</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="inv-table">
+            <thead>
+              <tr>
+                <th>순번</th>
+                <th>거래처명</th>
+                <th>연락처</th>
+                <th>화주사</th>
+                <th>대표자</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="invCustomerTableBody">
+              <tr><td colspan="6" class="inv-no-data">로딩 중...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="invTabStatements" class="inv-tab-content">
+      <div class="inv-section no-print">
+        <button type="button" class="inv-btn" onclick="invToggleStatementForm()" id="invStatementFormToggleBtn">➕ 거래명세서 작성</button>
+        <div id="invStatementFormWrap" style="display:none; margin-top:16px; padding:20px; background:#fff9e6; border-radius:12px; border:2px solid #ffeaa7;">
+          <h3 style="margin-bottom:16px; color:#ff6b35;">거래명세서 작성</h3>
+          <div class="inv-form-grid">
+            <div class="inv-form-group">
+              <label>거래일자 *</label>
+              <input type="date" id="invStatementDate">
+            </div>
+            <div class="inv-form-group" style="grid-column: span 2;">
+              <label>거래처 *</label>
+              <select id="invStatementCustomer" style="padding:10px; border:2px solid #ffeaa7; border-radius:8px; width:100%;">
+                <option value="">거래처 선택</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin:16px 0;">
+            <label style="font-weight:600;">품목</label>
+            <div id="invStatementItems"></div>
+            <button type="button" class="inv-btn" style="margin-top:8px;" onclick="invAddStatementItem()">➕ 품목 추가</button>
+          </div>
+          <div class="inv-form-group">
+            <label>비고</label>
+            <textarea id="invStatementMemo" rows="2" placeholder="비고"></textarea>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="inv-btn" onclick="invSaveStatement()">저장</button>
+            <button type="button" class="inv-btn inv-btn-secondary" onclick="invResetStatementForm()">취소</button>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:20px;" class="no-print">
+        <div style="display:flex; gap:10px; margin-bottom:12px; align-items:center; flex-wrap:wrap;">
+          <input type="date" id="invStatementStartDate" style="padding:8px; border:2px solid #ffeaa7; border-radius:8px;">
+          <input type="date" id="invStatementEndDate" style="padding:8px; border:2px solid #ffeaa7; border-radius:8px;">
+          <select id="invStatementFilterCustomer" style="padding:8px; border:2px solid #ffeaa7; border-radius:8px;">
+            <option value="">전체 거래처</option>
+          </select>
+          <select id="invStatementFilterPaid" style="padding:8px; border:2px solid #ffeaa7; border-radius:8px;">
+            <option value="">전체</option>
+            <option value="0">미입금</option>
+            <option value="1">입금완료</option>
+          </select>
+          <button type="button" class="inv-btn" onclick="invLoadStatements()">🔍 조회</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="inv-table">
+            <thead>
+              <tr>
+                <th>순번</th>
+                <th>명세서번호</th>
+                <th>거래일자</th>
+                <th>거래처</th>
+                <th>공급가액</th>
+                <th>세액</th>
+                <th>합계</th>
+                <th>입금</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="invStatementTableBody">
+              <tr><td colspan="9" class="inv-no-data">조회 버튼을 클릭하세요</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div id="invStatementPrintArea" style="display:none; padding:20px; background:#fff;"></div>
+    </div>
+    <div id="invTabSettlements" class="inv-tab-content">
+      <div class="inv-section">
+        <h3 class="inv-section-title">📊 정산 요약</h3>
+        <div class="inv-filter-row">
+          <label>
+            <input type="radio" name="invSettlementGroup" value="month" checked> 월별
+          </label>
+          <label>
+            <input type="radio" name="invSettlementGroup" value="year"> 연별
+          </label>
+          <button type="button" class="inv-btn" onclick="invLoadSettlementSummary()">조회</button>
+        </div>
+        <div class="inv-table-wrap" style="max-height:200px;">
+          <table class="inv-table">
+            <thead>
+              <tr>
+                <th style="width:50px; text-align:center;">순번</th>
+                <th>기간</th>
+                <th style="text-align:right;">건수</th>
+                <th style="text-align:right;">총액</th>
+                <th style="text-align:right;">입금액</th>
+                <th style="text-align:right;">미입금</th>
+              </tr>
+            </thead>
+            <tbody id="invSettlementSummaryBody">
+              <tr><td colspan="6" class="inv-no-data">조회 버튼을 클릭하세요</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="inv-section">
+        <h3 class="inv-section-title">⚠️ 미정산(미입금) 명세서</h3>
+        <div class="inv-table-wrap">
+          <table class="inv-table">
+            <thead>
+              <tr>
+                <th style="width:50px; text-align:center;">순번</th>
+                <th>명세서번호</th>
+                <th>거래일자</th>
+                <th>거래처</th>
+                <th style="text-align:right;">합계</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="invSettlementUnpaidBody">
+              <tr><td colspan="6" class="inv-no-data">로딩 중...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    var invInitialized = false;
+    var invCurrentTab = 'products';
+
+    function invSwitchTab(tabName) {
+      invCurrentTab = tabName;
+      try { localStorage.setItem('invActiveTab', tabName); } catch (e) {}
+      document.querySelectorAll('.inv-tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.inv-tab-content').forEach(el => el.classList.remove('active'));
+      const btn = document.getElementById('invTab' + tabName.charAt(0).toUpperCase() + tabName.slice(1) + 'Btn');
+      const content = document.getElementById('invTab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+      if (btn) btn.classList.add('active');
+      if (content) content.classList.add('active');
+      if (tabName === 'products' && typeof invLoadProducts === 'function') invLoadProducts();
+      if (tabName === 'customers') {
+        if (typeof invLoadCompaniesForSelect === 'function') invLoadCompaniesForSelect();
+        if (typeof invLoadCustomers === 'function') invLoadCustomers();
+      }
+      if (tabName === 'statements') {
+        if (typeof invLoadStatementData === 'function') invLoadStatementData();
+      }
+      if (tabName === 'settlements') {
+        if (typeof invLoadSettlementData === 'function') invLoadSettlementData();
+      }
+    }
+
+    function invCommonInit() {
+      if (invInitialized) return;
+      const container = document.getElementById('invContainer');
+      const invoiceTab = document.getElementById('invoiceTab');
+      if (!container || !invoiceTab) return;
+      if (invoiceTab.style.display === 'none' || invoiceTab.classList.contains('hidden')) return;
+
+      const role = (window.currentRole || localStorage.getItem('client_role') || '').toString().trim();
+      if (role !== '관리자') {
+        container.innerHTML = '<div class="inv-placeholder" style="color:#e74c3c;">거래명세서는 관리자 전용 메뉴입니다.</div>';
+        invInitialized = true;
+        return;
+      }
+
+      invInitialized = true;
+      var savedSub = '';
+      try { savedSub = (localStorage.getItem('invActiveTab') || '').trim(); } catch (e) {}
+      var validSubs = ['products', 'customers', 'statements', 'settlements'];
+      if (savedSub && validSubs.indexOf(savedSub) >= 0) {
+        invCurrentTab = savedSub;
+        invSwitchTab(savedSub);
+      } else {
+        invLoadProducts();
+      }
+      console.log('[INV] 거래명세서 초기화 완료');
+    }
+    window.invCommonInit = invCommonInit;
+
+    function invGetUserHeaders() {
+      const r = (window.currentRole || localStorage.getItem('client_role') || '').toString().trim();
+      const c = (window.currentCompany || localStorage.getItem('client_company') || '').toString().trim();
+      const u = (window.currentUsername || localStorage.getItem('client_username') || '').toString().trim();
+      return {
+        'Content-Type': 'application/json',
+        'X-User-Role': encodeURIComponent(r),
+        'X-Company-Name': encodeURIComponent(c),
+        'X-User-Name': encodeURIComponent(u)
+      };
+    }
+
+    var invEditingProductId = null;
+
+    function invToggleProductForm() {
+      const wrap = document.getElementById('invProductFormWrap');
+      const btn = document.getElementById('invProductFormToggleBtn');
+      if (wrap.style.display === 'none') {
+        wrap.style.display = 'block';
+        btn.textContent = '▼ 접기';
+      } else {
+        wrap.style.display = 'none';
+        btn.textContent = '➕ 상품 등록';
+        invResetProductForm();
+      }
+    }
+
+    function invResetProductForm() {
+      invEditingProductId = null;
+      document.getElementById('invProductCode').value = '';
+      document.getElementById('invProductName').value = '';
+      document.getElementById('invQtyPerCarton').value = '1';
+      document.getElementById('invPurchasePrice').value = '0';
+      document.getElementById('invWholesalePrice').value = '0';
+      document.getElementById('invGroupBuyPrice').value = '0';
+      document.getElementById('invRetailPrice').value = '0';
+      document.getElementById('invExpiryDays').value = '';
+      document.getElementById('invCategory').value = '';
+      document.getElementById('invProductMemo').value = '';
+      document.getElementById('invProductImageUrl').value = '';
+      document.getElementById('invProductImageInput').value = '';
+      document.getElementById('invProductImagePreview').innerHTML = '';
+    }
+
+    function invPreviewProductImage(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const base64 = ev.target.result;
+        document.getElementById('invProductImageUrl').value = base64;
+        document.getElementById('invProductImagePreview').innerHTML = '<img src="' + base64 + '" style="max-width:100px; max-height:100px; border-radius:8px;">';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function invSaveProduct() {
+      const code = document.getElementById('invProductCode').value.trim();
+      const name = document.getElementById('invProductName').value.trim();
+      if (!code) { alert('상품고유번호를 입력하세요.'); return; }
+      if (!name) { alert('상품명을 입력하세요.'); return; }
+
+      let imageUrl = document.getElementById('invProductImageUrl').value.trim();
+      if (imageUrl && imageUrl.startsWith('data:')) {
+        const uploadPayload = {
+          base64: imageUrl,
+          filename: document.getElementById('invProductImageInput').files[0]?.name || code + '.jpg',
+          product_code: code
+        };
+        fetch('/api/invoice/products/upload-image', {
+          method: 'POST',
+          headers: invGetUserHeaders(),
+          credentials: 'include',
+          body: JSON.stringify(uploadPayload)
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              imageUrl = data.url;
+              invDoSaveProduct(imageUrl);
+            } else {
+              alert(data.message || '이미지 업로드 실패');
+            }
+          })
+          .catch(err => {
+            console.error(err);
+            alert('이미지 업로드 중 오류');
+          });
+      } else {
+        invDoSaveProduct(imageUrl || null);
+      }
+    }
+
+    function invDoSaveProduct(imageUrl) {
+      const payload = {
+        product_code: document.getElementById('invProductCode').value.trim(),
+        product_name: document.getElementById('invProductName').value.trim(),
+        qty_per_carton: parseInt(document.getElementById('invQtyPerCarton').value) || 1,
+        purchase_price: parseInt(document.getElementById('invPurchasePrice').value) || 0,
+        wholesale_price: parseInt(document.getElementById('invWholesalePrice').value) || 0,
+        group_buy_price: parseInt(document.getElementById('invGroupBuyPrice').value) || 0,
+        retail_price: parseInt(document.getElementById('invRetailPrice').value) || 0,
+        expiry_days: document.getElementById('invExpiryDays').value ? parseInt(document.getElementById('invExpiryDays').value) : null,
+        category: document.getElementById('invCategory').value.trim() || null,
+        memo: document.getElementById('invProductMemo').value.trim() || null,
+        image_url: imageUrl
+      };
+
+      const url = invEditingProductId
+        ? '/api/invoice/products/' + invEditingProductId
+        : '/api/invoice/products';
+      const method = invEditingProductId ? 'PUT' : 'POST';
+
+      fetch(url, {
+        method: method,
+        headers: invGetUserHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message);
+            invResetProductForm();
+            invLoadProducts();
+            if (invEditingProductId) invToggleProductForm();
+          } else {
+            alert(data.message || '저장 실패');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          alert('저장 중 오류');
+        });
+    }
+
+    function invLoadProducts() {
+      const search = document.getElementById('invProductSearch').value.trim();
+      const includeInactive = document.getElementById('invIncludeInactive').checked;
+      let url = '/api/invoice/products?include_inactive=' + (includeInactive ? '1' : '0');
+      if (search) url += '&search=' + encodeURIComponent(search);
+
+      const tbody = document.getElementById('invProductTableBody');
+      tbody.innerHTML = '<tr><td colspan="11" class="inv-no-data">로딩 중...</td></tr>';
+
+      fetch(url, { credentials: 'include', headers: invGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.data) {
+            invRenderProductList(data.data);
+          } else {
+            tbody.innerHTML = '<tr><td colspan="11" class="inv-no-data">' + (data.message || '조회 실패') + '</td></tr>';
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          tbody.innerHTML = '<tr><td colspan="11" class="inv-no-data">목록 로드 실패</td></tr>';
+        });
+    }
+
+    function invRenderProductList(items) {
+      const tbody = document.getElementById('invProductTableBody');
+      if (!items || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="inv-no-data">등록된 상품이 없습니다.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map((p, i) => {
+        const img = p.image_url
+          ? '<img src="' + p.image_url + '" alt="">'
+          : '-';
+        const activeBadge = (p.is_active === false || p.is_active === 0) ? ' <span style="color:#e74c3c;font-size:11px;">(비활성)</span>' : '';
+        return '<tr>' +
+          '<td>' + (i + 1) + '</td>' +
+          '<td>' + (p.product_code || '') + '</td>' +
+          '<td>' + (p.product_name || '') + activeBadge + '</td>' +
+          '<td>' + (p.qty_per_carton || 0) + '</td>' +
+          '<td>' + (p.purchase_price || 0).toLocaleString() + '</td>' +
+          '<td>' + (p.wholesale_price || 0).toLocaleString() + '</td>' +
+          '<td>' + (p.group_buy_price || 0).toLocaleString() + '</td>' +
+          '<td>' + (p.retail_price || 0).toLocaleString() + '</td>' +
+          '<td>' + (p.expiry_days || '-') + '</td>' +
+          '<td>' + img + '</td>' +
+          '<td>' +
+            '<button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invEditProduct(' + p.id + ')">수정</button> ' +
+            '<button type="button" class="inv-btn inv-btn-secondary" style="padding:6px 12px; font-size:12px;" onclick="invDeleteProduct(' + p.id + ')">삭제</button>' +
+          '</td></tr>';
+      }).join('');
+    }
+
+    function invEditProduct(id) {
+      fetch('/api/invoice/products/' + id, { credentials: 'include', headers: invGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const p = data.data;
+            invEditingProductId = p.id;
+            document.getElementById('invProductCode').value = p.product_code || '';
+            document.getElementById('invProductName').value = p.product_name || '';
+            document.getElementById('invQtyPerCarton').value = p.qty_per_carton || 1;
+            document.getElementById('invPurchasePrice').value = p.purchase_price || 0;
+            document.getElementById('invWholesalePrice').value = p.wholesale_price || 0;
+            document.getElementById('invGroupBuyPrice').value = p.group_buy_price || 0;
+            document.getElementById('invRetailPrice').value = p.retail_price || 0;
+            document.getElementById('invExpiryDays').value = p.expiry_days || '';
+            document.getElementById('invCategory').value = p.category || '';
+            document.getElementById('invProductMemo').value = p.memo || '';
+            document.getElementById('invProductImageUrl').value = p.image_url || '';
+            document.getElementById('invProductImageInput').value = '';
+            document.getElementById('invProductImagePreview').innerHTML = p.image_url
+              ? '<img src="' + p.image_url + '" style="max-width:100px; max-height:100px; border-radius:8px;">'
+              : '';
+            document.getElementById('invProductFormWrap').style.display = 'block';
+            document.getElementById('invProductFormToggleBtn').textContent = '▼ 접기';
+          }
+        })
+        .catch(err => console.error(err));
+    }
+
+    function invDeleteProduct(id) {
+      if (!confirm('이 상품을 비활성화하시겠습니까?')) return;
+
+      fetch('/api/invoice/products/' + id, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: invGetUserHeaders()
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message);
+            invLoadProducts();
+          } else {
+            alert(data.message || '삭제 실패');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          alert('삭제 중 오류');
+        });
+    }
+
+    var invEditingCustomerId = null;
+    var invCompaniesList = [];
+
+    function invToggleCustomerForm() {
+      const wrap = document.getElementById('invCustomerFormWrap');
+      const btn = document.getElementById('invCustomerFormToggleBtn');
+      if (wrap.style.display === 'none') {
+        wrap.style.display = 'block';
+        btn.textContent = '▼ 접기';
+        invLoadCompaniesForSelect();
+      } else {
+        wrap.style.display = 'none';
+        btn.textContent = '➕ 거래처 등록';
+        invResetCustomerForm();
+      }
+    }
+
+    function invToggleCompanySelect() {
+      const indep = document.getElementById('invIndependentCustomer').checked;
+      document.getElementById('invCompanySelect').disabled = indep;
+      if (indep) document.getElementById('invCompanySelect').value = '';
+    }
+
+    function invLoadCompaniesForSelect() {
+      fetch('/api/invoice/companies', { credentials: 'include', headers: invGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.data) {
+            invCompaniesList = data.data;
+            const sel = document.getElementById('invCompanySelect');
+            sel.innerHTML = '<option value="">화주사 선택</option>' +
+              data.data.map(c => '<option value="' + c.id + '">' + (c.company_name || '') + '</option>').join('');
+            const filterSel = document.getElementById('invCustomerFilter');
+            const optCount = filterSel.options.length;
+            if (optCount <= 2) {
+              data.data.forEach(c => {
+                filterSel.appendChild(new Option(c.company_name, c.id));
+              });
+            }
+          }
+        })
+        .catch(err => console.error('[INV] 화주사 로드 오류:', err));
+    }
+
+    function invResetCustomerForm() {
+      invEditingCustomerId = null;
+      document.getElementById('invCustomerName').value = '';
+      document.getElementById('invContactTel').value = '';
+      document.getElementById('invAddress').value = '';
+      document.getElementById('invBusinessNumber').value = '';
+      document.getElementById('invRepresentative').value = '';
+      document.getElementById('invIndependentCustomer').checked = false;
+      document.getElementById('invCompanySelect').value = '';
+      document.getElementById('invCompanySelect').disabled = false;
+      document.getElementById('invCustomerMemo').value = '';
+    }
+
+    function invSaveCustomer() {
+      const name = document.getElementById('invCustomerName').value.trim();
+      if (!name) { alert('거래처명을 입력하세요.'); return; }
+
+      const isIndependent = document.getElementById('invIndependentCustomer').checked;
+      const companyId = isIndependent ? null : (document.getElementById('invCompanySelect').value || null);
+
+      const payload = {
+        customer_name: name,
+        contact_tel: document.getElementById('invContactTel').value.trim() || null,
+        address: document.getElementById('invAddress').value.trim() || null,
+        business_number: document.getElementById('invBusinessNumber').value.trim() || null,
+        representative: document.getElementById('invRepresentative').value.trim() || null,
+        company_id: companyId,
+        memo: document.getElementById('invCustomerMemo').value.trim() || null
+      };
+
+      const url = invEditingCustomerId ? '/api/invoice/customers/' + invEditingCustomerId : '/api/invoice/customers';
+      const method = invEditingCustomerId ? 'PUT' : 'POST';
+
+      fetch(url, {
+        method: method,
+        headers: invGetUserHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message);
+            invResetCustomerForm();
+            invLoadCustomers();
+            if (invEditingCustomerId) invToggleCustomerForm();
+          } else {
+            alert(data.message || '저장 실패');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          alert('저장 중 오류');
+        });
+    }
+
+    function invLoadCustomers() {
+      const filter = document.getElementById('invCustomerFilter').value;
+      let url = '/api/invoice/customers';
+      if (filter) url += '?company_id=' + encodeURIComponent(filter);
+
+      const tbody = document.getElementById('invCustomerTableBody');
+      tbody.innerHTML = '<tr><td colspan="6" class="inv-no-data">로딩 중...</td></tr>';
+
+      fetch(url, { credentials: 'include', headers: invGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.data) {
+            invRenderCustomerList(data.data);
+          } else {
+            tbody.innerHTML = '<tr><td colspan="6" class="inv-no-data">' + (data.message || '조회 실패') + '</td></tr>';
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          tbody.innerHTML = '<tr><td colspan="6" class="inv-no-data">목록 로드 실패</td></tr>';
+        });
+    }
+
+    function invRenderCustomerList(items) {
+      const tbody = document.getElementById('invCustomerTableBody');
+      if (!items || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="inv-no-data">등록된 거래처가 없습니다.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map((c, i) =>
+        '<tr><td>' + (i + 1) + '</td><td>' + (c.customer_name || '') + '</td><td>' + (c.contact_tel || '-') +
+        '</td><td>' + (c.company_name || '(독립)') + '</td><td>' + (c.representative || '-') +
+        '</td><td><button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invEditCustomer(' + c.id + ')">수정</button> ' +
+        '<button type="button" class="inv-btn inv-btn-secondary" style="padding:6px 12px; font-size:12px;" onclick="invDeleteCustomer(' + c.id + ')">삭제</button></td></tr>'
+      ).join('');
+    }
+
+    function invEditCustomer(id) {
+      fetch('/api/invoice/customers/' + id, { credentials: 'include', headers: invGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const c = data.data;
+            invEditingCustomerId = c.id;
+            document.getElementById('invCustomerName').value = c.customer_name || '';
+            document.getElementById('invContactTel').value = c.contact_tel || '';
+            document.getElementById('invAddress').value = c.address || '';
+            document.getElementById('invBusinessNumber').value = c.business_number || '';
+            document.getElementById('invRepresentative').value = c.representative || '';
+            document.getElementById('invCustomerMemo').value = c.memo || '';
+            const isIndep = !c.company_id;
+            document.getElementById('invIndependentCustomer').checked = isIndep;
+            document.getElementById('invCompanySelect').disabled = isIndep;
+            document.getElementById('invCustomerFormWrap').style.display = 'block';
+            document.getElementById('invCustomerFormToggleBtn').textContent = '▼ 접기';
+            invLoadCompaniesForSelect();
+            setTimeout(function() {
+              document.getElementById('invCompanySelect').value = c.company_id || '';
+            }, 200);
+          }
+        })
+        .catch(err => console.error(err));
+    }
+
+    function invDeleteCustomer(id) {
+      if (!confirm('이 거래처를 비활성화하시겠습니까?')) return;
+      fetch('/api/invoice/customers/' + id, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: invGetUserHeaders()
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message);
+            invLoadCustomers();
+          } else {
+            alert(data.message || '삭제 실패');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          alert('삭제 중 오류');
+        });
+    }
+
+    var invProductsList = [];
+    var invStatementItemIndex = 0;
+    var invEditingStatementId = null;
+
+    function invLoadStatementData() {
+      invLoadCustomersForStatementSelect();
+      invLoadProductsForStatementSelect();
+      const today = new Date().toISOString().slice(0, 10);
+      const start = new Date();
+      start.setMonth(start.getMonth() - 1);
+      const startEl = document.getElementById('invStatementStartDate');
+      const endEl = document.getElementById('invStatementEndDate');
+      if (startEl) startEl.value = start.toISOString().slice(0, 10);
+      if (endEl) endEl.value = today;
+      setTimeout(function() { invLoadStatements(); }, 300);
+    }
+
+    function invLoadCustomersForStatementSelect() {
+      fetch('/api/invoice/customers', { credentials: 'include', headers: invGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const sel = document.getElementById('invStatementCustomer');
+            const filterSel = document.getElementById('invStatementFilterCustomer');
+            if (sel) {
+              sel.innerHTML = '<option value="">거래처 선택</option>' +
+                data.data.map(c => '<option value="' + c.id + '">' + (c.customer_name || '') + '</option>').join('');
+            }
+            if (filterSel && filterSel.options.length <= 1) {
+              data.data.forEach(c => {
+                filterSel.appendChild(new Option(c.customer_name, c.id));
+              });
+            }
+          }
+        })
+        .catch(err => console.error(err));
+    }
+
+    function invLoadProductsForStatementSelect() {
+      fetch('/api/invoice/products?include_inactive=0', { credentials: 'include', headers: invGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.data) {
+            invProductsList = data.data;
+          }
+        })
+        .catch(err => console.error(err));
+    }
+
+    function invEditStatement(id) {
+      fetch('/api/invoice/statements/' + id, { credentials: 'include', headers: invGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const s = data.data;
+            invEditingStatementId = s.id;
+            document.getElementById('invStatementDate').value = s.statement_date || '';
+            document.getElementById('invStatementCustomer').value = s.customer_id || '';
+            document.getElementById('invStatementMemo').value = s.memo || '';
+            document.getElementById('invStatementItems').innerHTML = '';
+            var optsForEdit = invProductsList.slice();
+            (s.items || []).forEach(function(it) {
+              var found = optsForEdit.some(function(p) { return p.id === it.product_id; });
+              if (!found && it.product_id) {
+                optsForEdit.push({ id: it.product_id, product_code: '-', product_name: it.product_name || '-', wholesale_price: it.unit_price || 0, retail_price: it.unit_price || 0 });
+              }
+            });
+            (s.items || []).forEach(function(it) {
+              invStatementItemIndex++;
+              const idx = invStatementItemIndex;
+              const productOpts = optsForEdit.map(function(p) {
+                return '<option value="' + p.id + '" data-wholesale="' + (p.wholesale_price || 0) + '" data-retail="' + (p.retail_price || 0) + '"' +
+                  (p.id === it.product_id ? ' selected' : '') + '>' + (p.product_code === '-' ? p.product_name : (p.product_code + ' - ' + p.product_name)) + '</option>';
+              }).join('');
+              const container = document.getElementById('invStatementItems');
+              const div = document.createElement('div');
+              div.className = 'inv-statement-item';
+              div.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;';
+              div.innerHTML = '<select class="inv-item-product" data-idx="' + idx + '" onchange="invOnProductSelect(this)" style="min-width:200px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;">' +
+                '<option value="">상품 선택</option>' + productOpts + '</select>' +
+                '<input type="number" class="inv-item-qty" placeholder="수량" min="1" value="' + (it.qty || 1) + '" style="width:80px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;" onchange="invCalcItemAmount(this)">' +
+                '<input type="number" class="inv-item-price" placeholder="단가" min="0" value="' + (it.unit_price || 0) + '" style="width:100px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;" onchange="invCalcItemAmount(this)">' +
+                '<span class="inv-item-amount" style="min-width:80px;">' + (it.amount || 0).toLocaleString() + '</span>' +
+                '<button type="button" class="inv-btn inv-btn-secondary" style="padding:6px 10px; font-size:12px;" onclick="this.closest(\'.inv-statement-item\').remove()">삭제</button>';
+              container.appendChild(div);
+            });
+            if (!s.items || s.items.length === 0) invAddStatementItem();
+            document.getElementById('invStatementFormWrap').style.display = 'block';
+            document.getElementById('invStatementFormToggleBtn').textContent = '▼ 접기';
+            invLoadCustomersForStatementSelect();
+          }
+        })
+        .catch(err => console.error(err));
+    }
+
+    function invToggleStatementForm() {
+      const wrap = document.getElementById('invStatementFormWrap');
+      const btn = document.getElementById('invStatementFormToggleBtn');
+      if (wrap.style.display === 'none') {
+        wrap.style.display = 'block';
+        btn.textContent = '▼ 접기';
+        document.getElementById('invStatementDate').value = new Date().toISOString().slice(0, 10);
+        invLoadCustomersForStatementSelect();
+        invResetStatementForm();
+      } else {
+        wrap.style.display = 'none';
+        btn.textContent = '➕ 거래명세서 작성';
+        invEditingStatementId = null;
+      }
+    }
+
+    function invAddStatementItem() {
+      const container = document.getElementById('invStatementItems');
+      const idx = invStatementItemIndex++;
+      const productOpts = invProductsList.map(p =>
+        '<option value="' + p.id + '" data-wholesale="' + (p.wholesale_price || 0) + '" data-retail="' + (p.retail_price || 0) + '">' +
+        (p.product_code || '') + ' - ' + (p.product_name || '') + '</option>'
+      ).join('');
+      const div = document.createElement('div');
+      div.className = 'inv-statement-item';
+      div.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;';
+      div.innerHTML = '<select class="inv-item-product" data-idx="' + idx + '" onchange="invOnProductSelect(this)" style="min-width:200px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;">' +
+        '<option value="">상품 선택</option>' + productOpts + '</select>' +
+        '<input type="number" class="inv-item-qty" placeholder="수량" min="1" value="1" style="width:80px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;" onchange="invCalcItemAmount(this)">' +
+        '<input type="number" class="inv-item-price" placeholder="단가" min="0" value="0" style="width:100px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;" onchange="invCalcItemAmount(this)">' +
+        '<span class="inv-item-amount" style="min-width:80px;">0</span>' +
+        '<button type="button" class="inv-btn inv-btn-secondary" style="padding:6px 10px; font-size:12px;" onclick="this.closest(\'.inv-statement-item\').remove()">삭제</button>';
+      container.appendChild(div);
+    }
+
+    function invOnProductSelect(sel) {
+      const opt = sel.options[sel.selectedIndex];
+      if (opt && opt.value) {
+        const price = parseInt(opt.dataset.wholesale) || parseInt(opt.dataset.retail) || 0;
+        const row = sel.closest('.inv-statement-item');
+        if (row) {
+          row.querySelector('.inv-item-price').value = price;
+          invCalcItemAmount(sel);
+        }
+      }
+    }
+
+    function invCalcItemAmount(el) {
+      const row = el.closest('.inv-statement-item');
+      if (!row) return;
+      const qty = parseInt(row.querySelector('.inv-item-qty').value) || 0;
+      const price = parseInt(row.querySelector('.inv-item-price').value) || 0;
+      row.querySelector('.inv-item-amount').textContent = (qty * price).toLocaleString();
+    }
+
+    function invResetStatementForm() {
+      invEditingStatementId = null;
+      document.getElementById('invStatementItems').innerHTML = '';
+      document.getElementById('invStatementMemo').value = '';
+      invAddStatementItem();
+    }
+
+    function invSaveStatement() {
+      const date = document.getElementById('invStatementDate').value.trim();
+      const customerId = document.getElementById('invStatementCustomer').value;
+      if (!date) { alert('거래일자를 입력하세요.'); return; }
+      if (!customerId) { alert('거래처를 선택하세요.'); return; }
+
+      const items = [];
+      document.querySelectorAll('.inv-statement-item').forEach(row => {
+        const productSel = row.querySelector('.inv-item-product');
+        const productOpt = productSel.options[productSel.selectedIndex];
+        const productId = productSel.value;
+        const productName = productOpt ? productOpt.text : '-';
+        const qty = parseInt(row.querySelector('.inv-item-qty').value) || 0;
+        const price = parseInt(row.querySelector('.inv-item-price').value) || 0;
+        if (productId && qty > 0) {
+          items.push({ product_id: productId, product_name: productName, qty: qty, unit_price: price });
+        }
+      });
+      if (items.length === 0) { alert('품목을 1개 이상 추가하세요.'); return; }
+
+      const payload = {
+        statement_date: date,
+        customer_id: customerId,
+        memo: document.getElementById('invStatementMemo').value.trim() || null,
+        items: items
+      };
+      const url = invEditingStatementId ? '/api/invoice/statements/' + invEditingStatementId : '/api/invoice/statements';
+      const method = invEditingStatementId ? 'PUT' : 'POST';
+
+      fetch(url, {
+        method: method,
+        headers: invGetUserHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message + (data.statement_no ? ' (번호: ' + data.statement_no + ')' : ''));
+            invResetStatementForm();
+            invLoadStatements();
+            invToggleStatementForm();
+            if (typeof invLoadSettlementSummary === 'function') invLoadSettlementSummary();
+            if (typeof invLoadSettlementUnpaid === 'function') invLoadSettlementUnpaid();
+          } else {
+            alert(data.message || '저장 실패');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          alert('저장 중 오류');
+        });
+    }
+
+    function invLoadStatements() {
+      const start = document.getElementById('invStatementStartDate').value;
+      const end = document.getElementById('invStatementEndDate').value;
+      const customerId = document.getElementById('invStatementFilterCustomer').value;
+      const isPaid = document.getElementById('invStatementFilterPaid').value;
+      let url = '/api/invoice/statements?';
+      if (start) url += 'start_date=' + encodeURIComponent(start) + '&';
+      if (end) url += 'end_date=' + encodeURIComponent(end) + '&';
+      if (customerId) url += 'customer_id=' + encodeURIComponent(customerId) + '&';
+      if (isPaid) url += 'is_paid=' + encodeURIComponent(isPaid) + '&';
+
+      const tbody = document.getElementById('invStatementTableBody');
+      tbody.innerHTML = '<tr><td colspan="9" class="inv-no-data">로딩 중...</td></tr>';
+
+      fetch(url, { credentials: 'include', headers: invGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.data) {
+            invRenderStatementList(data.data);
+          } else {
+            tbody.innerHTML = '<tr><td colspan="9" class="inv-no-data">' + (data.message || '조회 실패') + '</td></tr>';
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          tbody.innerHTML = '<tr><td colspan="9" class="inv-no-data">목록 로드 실패</td></tr>';
+        });
+    }
+
+    function invRenderStatementList(items) {
+      const tbody = document.getElementById('invStatementTableBody');
+      if (!items || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="inv-no-data">조회 결과가 없습니다.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map((s, i) => {
+        const paidBtn = (s.is_paid === true || s.is_paid === 1)
+          ? '<span style="color:#27ae60;">입금완료</span>'
+          : '<button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invMarkPaid(' + s.id + ')">입금처리</button>';
+        return '<tr><td>' + (i + 1) + '</td><td>' + (s.statement_no || '') + '</td><td>' + (s.statement_date || '') +
+          '</td><td>' + (s.customer_name || '') + '</td><td>' + (s.total_amount || 0).toLocaleString() +
+          '</td><td>' + (s.vat_amount || 0).toLocaleString() + '</td><td>' + (s.grand_total || 0).toLocaleString() +
+          '</td><td>' + paidBtn + '</td><td>' +
+          '<button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invEditStatement(' + s.id + ')">수정</button> ' +
+          '<button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invPrintStatement(' + s.id + ')">🖨️ 프린트</button></td></tr>';
+      }).join('');
+    }
+
+    function invMarkPaid(id) {
+      if (!confirm('입금 완료 처리하시겠습니까?')) return;
+      fetch('/api/invoice/statements/' + id + '/paid', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: invGetUserHeaders()
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message);
+            if (typeof invLoadStatements === 'function') invLoadStatements();
+            if (typeof invLoadSettlementUnpaid === 'function') invLoadSettlementUnpaid();
+            if (typeof invLoadSettlementSummary === 'function') invLoadSettlementSummary();
+          } else {
+            alert(data.message || '처리 실패');
+          }
+        })
+        .catch(err => { console.error(err); alert('처리 중 오류'); });
+    }
+
+    function invPrintStatement(id) {
+      fetch('/api/invoice/statements/' + id, { credentials: 'include', headers: invGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const s = data.data;
+            const vatRate = s.total_amount ? Math.round((s.vat_amount || 0) / (s.total_amount || 1) * 100) : 10;
+            let itemsHtml = (s.items || []).map((it, i) =>
+              '<tr><td style="text-align:center">' + (i + 1) + '</td><td>' + (it.product_name || '') + '</td><td>-</td>' +
+              '<td style="text-align:right">' + (it.qty || 0).toLocaleString() + '</td>' +
+              '<td style="text-align:right">' + (it.unit_price || 0).toLocaleString() + '</td>' +
+              '<td style="text-align:right">' + (it.amount || 0).toLocaleString() + '</td>' +
+              '<td style="text-align:right">' + Math.round((it.amount || 0) * vatRate / 100).toLocaleString() + '</td>' +
+              '<td style="text-align:right">' + (Math.round((it.amount || 0) * (1 + vatRate / 100))).toLocaleString() + '</td></tr>'
+            ).join('');
+            const html = '<div style="font-family:Malgun Gothic,sans-serif; font-size:12px;">' +
+              '<h2 style="text-align:center; margin-bottom:20px;">거래명세서</h2>' +
+              '<table style="width:100%; margin-bottom:20px; font-size:11px;">' +
+              '<tr><td><strong>명세서번호:</strong> ' + (s.statement_no || '') + '</td><td><strong>거래일자:</strong> ' + (s.statement_date || '') + '</td></tr></table>' +
+              '<table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:11px;">' +
+              '<tr><th style="border:1px solid #333; padding:6px;">공급받는자</th><td style="border:1px solid #333; padding:6px;">' + (s.customer_name || '') + '</td></tr>' +
+              '<tr><th style="border:1px solid #333; padding:6px;">주소</th><td style="border:1px solid #333; padding:6px;">' + (s.address || '-') + '</td></tr>' +
+              '<tr><th style="border:1px solid #333; padding:6px;">사업자번호</th><td style="border:1px solid #333; padding:6px;">' + (s.business_number || '-') + '</td></tr>' +
+              '<tr><th style="border:1px solid #333; padding:6px;">대표자</th><td style="border:1px solid #333; padding:6px;">' + (s.representative || '-') + '</td></tr></table>' +
+              '<table style="width:100%; border-collapse:collapse; font-size:11px;">' +
+              '<thead><tr><th style="border:1px solid #333; padding:6px;">순번</th><th style="border:1px solid #333; padding:6px;">상품명</th><th style="border:1px solid #333; padding:6px;">규격</th>' +
+              '<th style="border:1px solid #333; padding:6px;">수량</th><th style="border:1px solid #333; padding:6px;">단가</th><th style="border:1px solid #333; padding:6px;">공급가액</th>' +
+              '<th style="border:1px solid #333; padding:6px;">세액</th><th style="border:1px solid #333; padding:6px;">합계</th></tr></thead><tbody>' +
+              itemsHtml +
+              '<tr><td colspan="5" style="border:1px solid #333; padding:6px; text-align:right"><strong>합계</strong></td>' +
+              '<td style="border:1px solid #333; padding:6px; text-align:right">' + (s.total_amount || 0).toLocaleString() + '</td>' +
+              '<td style="border:1px solid #333; padding:6px; text-align:right">' + (s.vat_amount || 0).toLocaleString() + '</td>' +
+              '<td style="border:1px solid #333; padding:6px; text-align:right">' + (s.grand_total || 0).toLocaleString() + '</td></tr></tbody></table>' +
+              (s.memo ? '<p><strong>비고:</strong> ' + s.memo + '</p>' : '') + '</div>';
+            const printWin = window.open('', '_blank');
+            printWin.document.write('<html><head><title>거래명세서 ' + (s.statement_no || '') + '</title><style>@page{size:A4;margin:20mm;} body{margin:0;padding:15mm;}</style></head><body>' + html + '</body></html>');
+            printWin.document.close();
+            printWin.focus();
+            setTimeout(function() { printWin.print(); printWin.close(); }, 250);
+          }
+        })
+        .catch(err => { console.error(err); alert('명세서 로드 실패'); });
+    }
+
+    function invLoadSettlementData() {
+      invLoadSettlementSummary();
+      invLoadSettlementUnpaid();
+    }
+
+    function invLoadSettlementSummary() {
+      const radio = document.querySelector('input[name="invSettlementGroup"]:checked');
+      const group = (radio && radio.value) ? radio.value : 'month';
+      fetch('/api/invoice/settlements/summary?group=' + group, {
+        credentials: 'include',
+        headers: invGetUserHeaders()
+      })
+        .then(r => r.json())
+        .then(data => {
+          const tbody = document.getElementById('invSettlementSummaryBody');
+          if (!tbody) return;
+          if (!data.success || !data.data || data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="inv-no-data">조회 결과가 없습니다.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = data.data.map((row, i) =>
+            '<tr><td style="text-align:center">' + (i + 1) + '</td><td>' + (row.period || '') + '</td>' +
+            '<td style="text-align:right">' + (row.cnt || 0).toLocaleString() + '</td>' +
+            '<td style="text-align:right">' + (row.total_amount || 0).toLocaleString() + '</td>' +
+            '<td style="text-align:right">' + (row.paid_amount || 0).toLocaleString() + '</td>' +
+            '<td style="text-align:right; color:' + ((row.unpaid_amount || 0) > 0 ? '#e74c3c' : '#27ae60') + ';">' + (row.unpaid_amount || 0).toLocaleString() + '</td></tr>'
+          ).join('');
+        })
+        .catch(err => {
+          console.error(err);
+          const tbody = document.getElementById('invSettlementSummaryBody');
+          if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="inv-no-data">조회 실패</td></tr>';
+        });
+    }
+
+    function invLoadSettlementUnpaid() {
+      const tbody = document.getElementById('invSettlementUnpaidBody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="inv-no-data">로딩 중...</td></tr>';
+      fetch('/api/invoice/settlements/unpaid', {
+        credentials: 'include',
+        headers: invGetUserHeaders()
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (!tbody) return;
+          if (!data.success || !data.data || data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="inv-no-data">미입금 명세서가 없습니다.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = data.data.map((s, i) =>
+            '<tr><td style="text-align:center">' + (i + 1) + '</td><td>' + (s.statement_no || '') + '</td><td>' + (s.statement_date || '') +
+            '</td><td>' + (s.customer_name || '') + '</td><td style="text-align:right">' + (s.grand_total || 0).toLocaleString() +
+            '</td><td><button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invMarkPaid(' + s.id + ')">입금처리</button> ' +
+            '<button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invPrintStatement(' + s.id + ')">🖨️ 프린트</button></td></tr>'
+          ).join('');
+        })
+        .catch(err => {
+          console.error(err);
+          if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="inv-no-data">조회 실패</td></tr>';
+        });
+    }
+  </script>
+</body>
+</html>
