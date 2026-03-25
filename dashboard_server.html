@@ -731,29 +731,56 @@
       box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
     }
     
-    /* 탭 스타일 */
+    /* 탭 스타일 (관리자 상단) — 한 줄, 공간 부족 시 글자·패딩 축소 */
     .tabs {
       background: #ffffff;
-      padding: 6px;
+      padding: 6px clamp(8px, 1.2vw + 4px, 10px);
       border-radius: 14px;
       box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
       border: none;
       margin-bottom: 20px;
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: clamp(4px, 0.35vw + 2px, 6px);
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      container-type: inline-size;
+      container-name: admin-tabs;
     }
+
+    .tabs::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .tabs::-webkit-scrollbar-thumb {
+      background: rgba(255, 152, 0, 0.35);
+      border-radius: 3px;
+    }
+
     .tab-btn {
-      flex: 1;
-      padding: 12px 20px;
+      flex: 0 1 auto;
+      min-width: 0;
+      padding: clamp(6px, 0.45vw + 4px, 12px) clamp(4px, 0.65vw + 3px, 18px);
       border: none;
       background: transparent;
       border-radius: 10px;
       color: #636e72;
       font-weight: 600;
-      font-size: 14px;
+      font-size: clamp(8px, 0.72vw + 5px, 14px);
+      line-height: 1.25;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+      white-space: nowrap;
+    }
+
+    @supports (container-type: inline-size) {
+      .tab-btn {
+        padding: clamp(6px, 0.45cqw + 3px, 12px) clamp(4px, 0.95cqw + 2px, 18px);
+        font-size: clamp(8px, calc(100cqw / 92), 14px);
+      }
     }
     
     .tab-btn:hover {
@@ -1327,14 +1354,7 @@
         padding: 8px 10px;
       }
       .tabs {
-        padding: 6px 10px;
-        gap: 6px;
-      }
-      .tab-btn {
-        flex: 1 1 auto;
-        min-width: 80px;
-        padding: 10px 12px;
-        font-size: 12px;
+        padding: 5px 8px;
       }
     }
     
