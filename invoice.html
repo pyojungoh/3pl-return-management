@@ -405,8 +405,8 @@
       </div>
     </div>
   </div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" crossorigin="anonymous"></script>
   <script>
     var invInitialized = false;
     var invCurrentTab = 'products';
@@ -1175,6 +1175,16 @@
       return n || '거래명세서';
     }
 
+    /** jsPDF UMD: global 형태가 빌드·CDN마다 달라서 모두 시도 */
+    function invGetJsPDFConstructor() {
+      var g = window.jspdf;
+      if (!g) return null;
+      if (typeof g.jsPDF === 'function') return g.jsPDF;
+      if (typeof g.default === 'function') return g.default;
+      if (typeof g === 'function') return g;
+      return null;
+    }
+
     function invBuildStatementPrintContent(s) {
       const vatRate = s.total_amount ? Math.round((s.vat_amount || 0) / (s.total_amount || 1) * 100) : 10;
       const items = s.items || [];
@@ -1291,7 +1301,8 @@
         alert('화면 캡처 라이브러리를 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도하세요.');
         return;
       }
-      if (format === 'pdf' && (!window.jspdf || typeof window.jspdf.jsPDF !== 'function')) {
+      var JsPDF = invGetJsPDFConstructor();
+      if (format === 'pdf' && !JsPDF) {
         alert('PDF 라이브러리를 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도하세요.');
         return;
       }
@@ -1307,15 +1318,19 @@
           if (prevSt) prevSt.remove();
           var st = document.createElement('style');
           st.id = 'inv-cap-style-temp';
-          st.textContent = doc.printStyles + 'html,body{height:auto!important;overflow:visible!important;}.inv-print-root{min-height:auto!important;width:794px!important;max-width:794px!important;margin:0;background:#fff;}';
+          /* 인쇄 @page margin(6mm 7mm)과 동일: A4 용지 안쪽 여백 + 본문 */
+          st.textContent = doc.printStyles +
+            'html,body{height:auto!important;overflow:visible!important;margin:0;background:#fff;}' +
+            '.inv-capture-page{width:210mm;min-height:297mm;box-sizing:border-box;padding:6mm 7mm;background:#fff;}' +
+            '.inv-capture-page .inv-print-root{min-height:auto!important;width:100%!important;max-width:100%!important;margin:0!important;}';
           document.head.appendChild(st);
           var wrap = document.createElement('div');
           wrap.id = 'inv-cap-wrap-temp';
-          wrap.style.cssText = 'position:fixed;left:-12000px;top:0;width:794px;background:#fff;';
-          wrap.innerHTML = doc.html;
+          wrap.style.cssText = 'position:fixed;left:-12000px;top:0;background:#fff;';
+          wrap.innerHTML = '<div class="inv-capture-page">' + doc.html + '</div>';
           document.body.appendChild(wrap);
-          var root = wrap.querySelector('.inv-print-root');
-          if (!root) {
+          var pageEl = wrap.querySelector('.inv-capture-page');
+          if (!pageEl) {
             wrap.remove();
             st.remove();
             alert('명세서 영역을 찾을 수 없습니다.');
@@ -1323,10 +1338,21 @@
           }
           requestAnimationFrame(function() {
             requestAnimationFrame(function() {
-              html2canvas(root, { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true })
+              html2canvas(pageEl, {
+                scale: 2,
+                backgroundColor: '#ffffff',
+                logging: false,
+                useCORS: true,
+                allowTaint: false,
+                imageTimeout: 15000
+              })
                 .then(function(canvas) {
                   wrap.remove();
                   st.remove();
+                  if (!canvas.width || !canvas.height) {
+                    alert('캔버스가 비어 있습니다. 다시 시도해 주세요.');
+                    return;
+                  }
                   try {
                     if (format === 'jpg') {
                       var a = document.createElement('a');
@@ -1336,24 +1362,27 @@
                       a.click();
                       document.body.removeChild(a);
                     } else {
-                      var imgData = canvas.toDataURL('image/jpeg', 0.92);
-                      var PDF = window.jspdf.jsPDF;
-                      var pdf = new PDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                      var imgData = canvas.toDataURL('image/png');
+                      var pdf = new JsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
                       var pageW = pdf.internal.pageSize.getWidth();
                       var pageH = pdf.internal.pageSize.getHeight();
+                      var cw = canvas.width;
+                      var ch = canvas.height;
+                      var ratio = cw / ch;
                       var imgW = pageW;
-                      var imgH = (canvas.height * imgW) / canvas.width;
+                      var imgH = pageW / ratio;
                       if (imgH > pageH) {
-                        var rr = pageH / imgH;
-                        pdf.addImage(imgData, 'JPEG', 0, 0, imgW * rr, pageH);
-                      } else {
-                        pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
+                        imgH = pageH;
+                        imgW = pageH * ratio;
                       }
+                      var x = (pageW - imgW) / 2;
+                      var y = (pageH - imgH) / 2;
+                      pdf.addImage(imgData, 'PNG', x, y, imgW, imgH);
                       pdf.save(doc.fileBase + '.pdf');
                     }
                   } catch (e) {
                     console.error(e);
-                    alert('파일 저장 중 오류가 발생했습니다.');
+                    alert('파일 저장 중 오류가 발생했습니다: ' + (e.message || String(e)));
                   }
                 })
                 .catch(function(err) {
