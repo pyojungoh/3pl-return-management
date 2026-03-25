@@ -855,6 +855,54 @@ def update_statement(statement_id):
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
+@invoice_bp.route('/statements/<int:statement_id>', methods=['DELETE'])
+def delete_statement(statement_id):
+    """거래명세서 삭제 (미입금·미정산만 허용)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute(
+                    'SELECT is_paid FROM invoice_statements WHERE id = %s',
+                    (statement_id,),
+                )
+            else:
+                cursor.execute(
+                    'SELECT is_paid FROM invoice_statements WHERE id = ?',
+                    (statement_id,),
+                )
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'success': False, 'message': '명세서를 찾을 수 없습니다.'}), 404
+            paid = row[0]
+            if paid is True or paid == 1:
+                return jsonify({
+                    'success': False,
+                    'message': '입금 완료된 명세서는 삭제할 수 없습니다.',
+                }), 400
+
+            if USE_POSTGRESQL:
+                cursor.execute('DELETE FROM invoice_statements WHERE id = %s', (statement_id,))
+            else:
+                cursor.execute('DELETE FROM invoice_statements WHERE id = ?', (statement_id,))
+            conn.commit()
+            if cursor.rowcount == 0:
+                return jsonify({'success': False, 'message': '명세서를 찾을 수 없습니다.'}), 404
+            return jsonify({'success': True, 'message': '거래명세서가 삭제되었습니다.'})
+        except Exception as db_err:
+            conn.rollback()
+            raise
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f"[오류] 명세서 삭제: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @invoice_bp.route('/statements', methods=['POST'])
 def create_statement():
     """거래명세서 작성"""

@@ -906,7 +906,7 @@
     }
 
     function invLoadCustomersForStatementSelect() {
-      fetch('/api/invoice/customers', { credentials: 'include', headers: invGetUserHeaders() })
+      return fetch('/api/invoice/customers', { credentials: 'include', headers: invGetUserHeaders() })
         .then(r => r.json())
         .then(data => {
           if (data.success && data.data) {
@@ -916,14 +916,57 @@
               sel.innerHTML = '<option value="">거래처 선택</option>' +
                 data.data.map(c => '<option value="' + c.id + '">' + (c.customer_name || '') + '</option>').join('');
             }
-            if (filterSel && filterSel.options.length <= 1) {
+            if (filterSel) {
+              while (filterSel.options.length > 1) filterSel.remove(1);
               data.data.forEach(c => {
                 filterSel.appendChild(new Option(c.customer_name, c.id));
               });
             }
           }
         })
-        .catch(err => console.error(err));
+        .catch(err => { console.error(err); });
+    }
+
+    function invEnsureInvoiceProductsLoaded() {
+      if (invProductsList && invProductsList.length > 0) return Promise.resolve();
+      return fetch('/api/invoice/products?include_inactive=0', { credentials: 'include', headers: invGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.data) invProductsList = data.data;
+        });
+    }
+
+    /** 정산 탭 미정산 목록에서 호출: 명세서 탭으로 이동 후 수정 폼 오픈 */
+    function invEditStatementFromSettlement(id) {
+      invSwitchTab('statements');
+      Promise.all([invEnsureInvoiceProductsLoaded(), invLoadCustomersForStatementSelect()])
+        .then(function() {
+          setTimeout(function() { invEditStatement(id); }, 80);
+        });
+    }
+
+    function invDeleteUnpaidStatement(id) {
+      if (!confirm('이 미정산 명세서를 삭제할까요? 삭제 후에는 복구할 수 없습니다.')) return;
+      fetch('/api/invoice/statements/' + id, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: invGetUserHeaders()
+      })
+        .then(r => r.json().then(function(body) { return { ok: r.ok, body: body }; }))
+        .then(function(res) {
+          if (res.body.success) {
+            alert(res.body.message || '삭제되었습니다.');
+            if (typeof invLoadSettlementUnpaid === 'function') invLoadSettlementUnpaid();
+            if (typeof invLoadSettlementSummary === 'function') invLoadSettlementSummary();
+            if (typeof invLoadStatements === 'function') invLoadStatements();
+          } else {
+            alert(res.body.message || '삭제 실패');
+          }
+        })
+        .catch(function(err) {
+          console.error(err);
+          alert('삭제 중 오류');
+        });
     }
 
     function invLoadProductsForStatementSelect() {
@@ -1452,10 +1495,12 @@
           tbody.innerHTML = data.data.map((s, i) =>
             '<tr><td style="text-align:center">' + (i + 1) + '</td><td>' + (s.statement_no || '') + '</td><td>' + (s.statement_date || '') +
             '</td><td>' + (s.customer_name || '') + '</td><td style="text-align:right">' + (s.grand_total || 0).toLocaleString() +
-            '</td><td><button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invMarkPaid(' + s.id + ')">입금처리</button> ' +
-            '<button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invPrintStatement(' + s.id + ')">🖨️ 프린트</button> ' +
-            '<button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invDownloadStatement(' + s.id + ', \'pdf\')">PDF</button> ' +
-            '<button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invDownloadStatement(' + s.id + ', \'jpg\')">JPG</button></td></tr>'
+            '</td><td style="white-space:normal;max-width:320px;"><button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invEditStatementFromSettlement(' + s.id + ')">수정</button> ' +
+            '<button type="button" class="inv-btn inv-btn-secondary" style="padding:6px 10px; font-size:12px;" onclick="invDeleteUnpaidStatement(' + s.id + ')">삭제</button> ' +
+            '<button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invMarkPaid(' + s.id + ')">입금처리</button> ' +
+            '<button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invPrintStatement(' + s.id + ')">🖨️ 프린트</button> ' +
+            '<button type="button" class="inv-btn" style="padding:6px 8px; font-size:11px;" onclick="invDownloadStatement(' + s.id + ', \'pdf\')">PDF</button> ' +
+            '<button type="button" class="inv-btn" style="padding:6px 8px; font-size:11px;" onclick="invDownloadStatement(' + s.id + ', \'jpg\')">JPG</button></td></tr>'
           ).join('');
         })
         .catch(err => {
