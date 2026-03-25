@@ -300,9 +300,27 @@
                 <option value="">거래처 선택</option>
               </select>
             </div>
+            <div class="inv-form-group" style="grid-column: span 2;">
+              <label style="font-weight:600;">단가 기준 (부가세 10%)</label>
+              <div style="display:flex; flex-wrap:wrap; gap:16px; margin-top:6px;">
+                <label style="font-weight:500; cursor:pointer;">
+                  <input type="radio" name="invStatementVatIncluded" value="0" checked> 부가세 미포함 (공급가 단가)
+                </label>
+                <label style="font-weight:500; cursor:pointer;">
+                  <input type="radio" name="invStatementVatIncluded" value="1"> 부가세 포함 단가
+                </label>
+              </div>
+            </div>
           </div>
           <div style="margin:16px 0;">
             <label style="font-weight:600;">품목</label>
+            <div id="invStatementItemsHead" style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding:6px 4px; font-size:12px; font-weight:600; color:#555; border-bottom:2px solid #ffeaa7; flex-wrap:wrap;">
+              <span style="min-width:200px;">상품</span>
+              <span style="width:80px; text-align:center;">수량</span>
+              <span id="invStatementHeadPrice" style="width:100px; text-align:center;">단가</span>
+              <span id="invStatementHeadAmount" style="min-width:100px;">공급가액</span>
+              <span style="width:72px;"></span>
+            </div>
             <div id="invStatementItems"></div>
             <button type="button" class="inv-btn" style="margin-top:8px;" onclick="invAddStatementItem()">➕ 품목 추가</button>
           </div>
@@ -457,6 +475,19 @@
       } else {
         invLoadProducts();
       }
+      var invStmtRoot = document.getElementById('invTabStatements');
+      if (invStmtRoot) {
+        invStmtRoot.addEventListener('change', function(e) {
+          if (e.target && e.target.name === 'invStatementVatIncluded') {
+            invUpdateStatementItemHeaderLabels();
+            document.querySelectorAll('#invStatementItems .inv-statement-item').forEach(function(row) {
+              var q = row.querySelector('.inv-item-qty');
+              if (q) invCalcItemAmount(q);
+            });
+          }
+        });
+      }
+      invUpdateStatementItemHeaderLabels();
       console.log('[INV] 거래명세서 초기화 완료');
     }
     window.invCommonInit = invCommonInit;
@@ -892,6 +923,24 @@
     var invStatementItemIndex = 0;
     var invEditingStatementId = null;
 
+    function invIsStatementVatIncluded() {
+      var el = document.querySelector('input[name="invStatementVatIncluded"]:checked');
+      return el && el.value === '1';
+    }
+
+    function invUpdateStatementItemHeaderLabels() {
+      var hp = document.getElementById('invStatementHeadPrice');
+      var ha = document.getElementById('invStatementHeadAmount');
+      if (!hp || !ha) return;
+      if (invIsStatementVatIncluded()) {
+        hp.textContent = '단가(포함)';
+        ha.textContent = '금액(포함합계)';
+      } else {
+        hp.textContent = '단가(공급가)';
+        ha.textContent = '공급가액';
+      }
+    }
+
     function invLoadStatementData() {
       invLoadCustomersForStatementSelect();
       invLoadProductsForStatementSelect();
@@ -990,6 +1039,14 @@
             document.getElementById('invStatementDate').value = s.statement_date || '';
             document.getElementById('invStatementCustomer').value = s.customer_id || '';
             document.getElementById('invStatementMemo').value = s.memo || '';
+            var rInc = document.querySelector('input[name="invStatementVatIncluded"][value="1"]');
+            var rExc = document.querySelector('input[name="invStatementVatIncluded"][value="0"]');
+            if (s.vat_included === true || s.vat_included === 1) {
+              if (rInc) rInc.checked = true;
+            } else {
+              if (rExc) rExc.checked = true;
+            }
+            invUpdateStatementItemHeaderLabels();
             document.getElementById('invStatementItems').innerHTML = '';
             var optsForEdit = invProductsList.slice();
             (s.items || []).forEach(function(it) {
@@ -1011,8 +1068,8 @@
               div.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;';
               div.innerHTML = '<select class="inv-item-product" data-idx="' + idx + '" onchange="invOnProductSelect(this)" style="min-width:200px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;">' +
                 '<option value="">상품 선택</option>' + productOpts + '</select>' +
-                '<input type="number" class="inv-item-qty" placeholder="수량" min="1" value="' + (it.qty || 1) + '" style="width:80px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;" onchange="invCalcItemAmount(this)">' +
-                '<input type="number" class="inv-item-price" placeholder="단가" min="0" value="' + (it.unit_price || 0) + '" style="width:100px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;" onchange="invCalcItemAmount(this)">' +
+                '<input type="number" class="inv-item-qty" placeholder="수량" min="1" value="' + (it.qty || 1) + '" style="width:80px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;" onchange="invCalcItemAmount(this)" oninput="invCalcItemAmount(this)">' +
+                '<input type="number" class="inv-item-price" placeholder="단가" min="0" value="' + (it.unit_price || 0) + '" style="width:100px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;" onchange="invCalcItemAmount(this)" oninput="invCalcItemAmount(this)">' +
                 '<span class="inv-item-amount" style="min-width:80px;">' + (it.amount || 0).toLocaleString() + '</span>' +
                 '<button type="button" class="inv-btn inv-btn-secondary" style="padding:6px 10px; font-size:12px;" onclick="this.closest(\'.inv-statement-item\').remove()">삭제</button>';
               container.appendChild(div);
@@ -1054,8 +1111,8 @@
       div.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;';
       div.innerHTML = '<select class="inv-item-product" data-idx="' + idx + '" onchange="invOnProductSelect(this)" style="min-width:200px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;">' +
         '<option value="">상품 선택</option>' + productOpts + '</select>' +
-        '<input type="number" class="inv-item-qty" placeholder="수량" min="1" value="1" style="width:80px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;" onchange="invCalcItemAmount(this)">' +
-        '<input type="number" class="inv-item-price" placeholder="단가" min="0" value="0" style="width:100px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;" onchange="invCalcItemAmount(this)">' +
+        '<input type="number" class="inv-item-qty" placeholder="수량" min="1" value="1" style="width:80px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;" onchange="invCalcItemAmount(this)" oninput="invCalcItemAmount(this)">' +
+        '<input type="number" class="inv-item-price" placeholder="단가" min="0" value="0" style="width:100px; padding:8px; border:2px solid #ffeaa7; border-radius:8px;" onchange="invCalcItemAmount(this)" oninput="invCalcItemAmount(this)">' +
         '<span class="inv-item-amount" style="min-width:80px;">0</span>' +
         '<button type="button" class="inv-btn inv-btn-secondary" style="padding:6px 10px; font-size:12px;" onclick="this.closest(\'.inv-statement-item\').remove()">삭제</button>';
       container.appendChild(div);
@@ -1078,11 +1135,21 @@
       if (!row) return;
       const qty = parseInt(row.querySelector('.inv-item-qty').value) || 0;
       const price = parseInt(row.querySelector('.inv-item-price').value) || 0;
-      row.querySelector('.inv-item-amount').textContent = (qty * price).toLocaleString();
+      const span = row.querySelector('.inv-item-amount');
+      if (invIsStatementVatIncluded()) {
+        const gross = qty * price;
+        const supply = Math.round(gross / 1.1);
+        span.textContent = gross.toLocaleString() + ' (공급 ' + supply.toLocaleString() + ')';
+      } else {
+        span.textContent = (qty * price).toLocaleString();
+      }
     }
 
     function invResetStatementForm() {
       invEditingStatementId = null;
+      var rExc = document.querySelector('input[name="invStatementVatIncluded"][value="0"]');
+      if (rExc) rExc.checked = true;
+      invUpdateStatementItemHeaderLabels();
       document.getElementById('invStatementItems').innerHTML = '';
       document.getElementById('invStatementMemo').value = '';
       invAddStatementItem();
@@ -1112,6 +1179,7 @@
         statement_date: date,
         customer_id: customerId,
         memo: document.getElementById('invStatementMemo').value.trim() || null,
+        vat_included: invIsStatementVatIncluded() ? 1 : 0,
         items: items
       };
       const url = invEditingStatementId ? '/api/invoice/statements/' + invEditingStatementId : '/api/invoice/statements';
@@ -1187,8 +1255,7 @@
           '</td><td>' + paidBtn + '</td><td>' +
           '<button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invEditStatement(' + s.id + ')">수정</button> ' +
           '<button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invPrintStatement(' + s.id + ')">🖨️ 프린트</button> ' +
-          '<button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invDownloadStatement(' + s.id + ', \'pdf\')">PDF</button> ' +
-          '<button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invDownloadStatement(' + s.id + ', \'jpg\')">JPG</button></td></tr>';
+          '<button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invDownloadStatement(' + s.id + ')">PDF</button></td></tr>';
       }).join('');
     }
 
@@ -1229,6 +1296,7 @@
     }
 
     function invBuildStatementPrintContent(s) {
+      const vatIncluded = s.vat_included === true || s.vat_included === 1;
       const vatRate = s.total_amount ? Math.round((s.vat_amount || 0) / (s.total_amount || 1) * 100) : 10;
       const items = s.items || [];
       const MIN_ITEM_ROWS = 16;
@@ -1250,17 +1318,31 @@
       const dAmt = cell + 'text-align:right;width:10%;';
       const dVat = cell + 'text-align:right;width:9%;';
       const dSum = cell + 'text-align:right;width:12%;';
-      let itemsHtml = items.map((it, i) =>
-        '<tr class="inv-p-row">' +
-        '<td style="' + dNo + '">' + (i + 1) + '</td>' +
-        '<td style="' + dName + '">' + (it.product_name || '') + '</td>' +
-        '<td style="' + dSpec + '">-</td>' +
-        '<td style="' + dQty + '">' + (it.qty || 0).toLocaleString() + '</td>' +
-        '<td style="' + dPrice + '">' + (it.unit_price || 0).toLocaleString() + '</td>' +
-        '<td style="' + dAmt + '">' + (it.amount || 0).toLocaleString() + '</td>' +
-        '<td style="' + dVat + '">' + Math.round((it.amount || 0) * vatRate / 100).toLocaleString() + '</td>' +
-        '<td style="' + dSum + '">' + (Math.round((it.amount || 0) * (1 + vatRate / 100))).toLocaleString() + '</td></tr>'
-      ).join('');
+      const priceThLabel = vatIncluded ? '단가(포함)' : '단가';
+      let itemsHtml = items.map((it, i) => {
+        const qty = it.qty || 0;
+        const up = it.unit_price || 0;
+        const supply = it.amount || 0;
+        let vatCell, sumCell;
+        if (vatIncluded) {
+          const gross = qty * up;
+          const vat = gross - supply;
+          vatCell = vat.toLocaleString();
+          sumCell = gross.toLocaleString();
+        } else {
+          vatCell = Math.round(supply * vatRate / 100).toLocaleString();
+          sumCell = (Math.round(supply * (1 + vatRate / 100))).toLocaleString();
+        }
+        return '<tr class="inv-p-row">' +
+          '<td style="' + dNo + '">' + (i + 1) + '</td>' +
+          '<td style="' + dName + '">' + (it.product_name || '') + '</td>' +
+          '<td style="' + dSpec + '">-</td>' +
+          '<td style="' + dQty + '">' + qty.toLocaleString() + '</td>' +
+          '<td style="' + dPrice + '">' + up.toLocaleString() + '</td>' +
+          '<td style="' + dAmt + '">' + supply.toLocaleString() + '</td>' +
+          '<td style="' + dVat + '">' + vatCell + '</td>' +
+          '<td style="' + dSum + '">' + sumCell + '</td></tr>';
+      }).join('');
       for (let r = items.length; r < MIN_ITEM_ROWS; r++) {
         itemsHtml += '<tr class="inv-p-row inv-p-empty"><td style="' + dNo + '">' + (r + 1) + '</td>' +
           '<td style="' + cell + 'width:50%;">&nbsp;</td><td style="' + cell + 'width:3%;">&nbsp;</td><td style="' + cell + 'width:5%;">&nbsp;</td>' +
@@ -1285,7 +1367,8 @@
         '<h1 class="inv-print-title">거 래 명 세 서</h1>' +
         '<table class="inv-print-meta" style="width:100%;border-collapse:collapse;margin-bottom:10px;">' +
         '<tr><td style="' + cell + 'width:50%;"><strong>명세서번호</strong> ' + (s.statement_no || '') + '</td>' +
-        '<td style="' + cell + 'width:50%;"><strong>거래일자</strong> ' + (s.statement_date || '') + '</td></tr></table>' +
+        '<td style="' + cell + 'width:50%;"><strong>거래일자</strong> ' + (s.statement_date || '') + '</td></tr>' +
+        '<tr><td colspan="2" style="' + cell + '"><strong>입금계좌</strong> 국민은행 910601-01-494700 이정민(제이제이)</td></tr></table>' +
         '<table class="inv-print-parties" style="width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:10px;">' +
         '<tr><td style="width:50%;vertical-align:top;padding:0 4px 0 0;">' +
         '<div class="inv-print-party-cap" style="' + cell + 'background:#222;color:#fff;text-align:center;font-weight:bold;padding:4px 2px;font-size:9px;">공 급 자</div>' +
@@ -1296,7 +1379,7 @@
         '<table class="inv-print-items" style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:8.5px;">' +
         '<thead><tr>' +
         '<th style="' + wNo + '">순번</th><th style="' + wName + '">상품명</th><th style="' + wSpec + '">규격</th>' +
-        '<th style="' + wQty + '">수량</th><th style="' + wPrice + '">단가</th><th style="' + wAmt + '">공급가액</th>' +
+        '<th style="' + wQty + '">수량</th><th style="' + wPrice + '">' + priceThLabel + '</th><th style="' + wAmt + '">공급가액</th>' +
         '<th style="' + wVat + '">세액</th><th style="' + wSum + '">합계</th></tr></thead><tbody>' +
         itemsHtml +
         '<tr><td colspan="5" style="' + cell + 'text-align:right;font-weight:bold;">합 계</td>' +
@@ -1337,15 +1420,13 @@
         .catch(err => { console.error(err); alert('명세서 로드 실패'); });
     }
 
-    function invDownloadStatement(id, format) {
-      format = (format || 'pdf').toLowerCase();
-      if (format !== 'pdf' && format !== 'jpg') format = 'pdf';
+    function invDownloadStatement(id) {
       if (typeof html2canvas === 'undefined') {
         alert('화면 캡처 라이브러리를 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도하세요.');
         return;
       }
       var JsPDF = invGetJsPDFConstructor();
-      if (format === 'pdf' && !JsPDF) {
+      if (!JsPDF) {
         alert('PDF 라이브러리를 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도하세요.');
         return;
       }
@@ -1397,32 +1478,23 @@
                     return;
                   }
                   try {
-                    if (format === 'jpg') {
-                      var a = document.createElement('a');
-                      a.href = canvas.toDataURL('image/jpeg', 0.92);
-                      a.download = doc.fileBase + '.jpg';
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                    } else {
-                      var imgData = canvas.toDataURL('image/png');
-                      var pdf = new JsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-                      var pageW = pdf.internal.pageSize.getWidth();
-                      var pageH = pdf.internal.pageSize.getHeight();
-                      var cw = canvas.width;
-                      var ch = canvas.height;
-                      var ratio = cw / ch;
-                      var imgW = pageW;
-                      var imgH = pageW / ratio;
-                      if (imgH > pageH) {
-                        imgH = pageH;
-                        imgW = pageH * ratio;
-                      }
-                      var x = (pageW - imgW) / 2;
-                      var y = (pageH - imgH) / 2;
-                      pdf.addImage(imgData, 'PNG', x, y, imgW, imgH);
-                      pdf.save(doc.fileBase + '.pdf');
+                    var imgData = canvas.toDataURL('image/png');
+                    var pdf = new JsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                    var pageW = pdf.internal.pageSize.getWidth();
+                    var pageH = pdf.internal.pageSize.getHeight();
+                    var cw = canvas.width;
+                    var ch = canvas.height;
+                    var ratio = cw / ch;
+                    var imgW = pageW;
+                    var imgH = pageW / ratio;
+                    if (imgH > pageH) {
+                      imgH = pageH;
+                      imgW = pageH * ratio;
                     }
+                    var x = (pageW - imgW) / 2;
+                    var y = (pageH - imgH) / 2;
+                    pdf.addImage(imgData, 'PNG', x, y, imgW, imgH);
+                    pdf.save(doc.fileBase + '.pdf');
                   } catch (e) {
                     console.error(e);
                     alert('파일 저장 중 오류가 발생했습니다: ' + (e.message || String(e)));
@@ -1499,8 +1571,7 @@
             '<button type="button" class="inv-btn inv-btn-secondary" style="padding:6px 10px; font-size:12px;" onclick="invDeleteUnpaidStatement(' + s.id + ')">삭제</button> ' +
             '<button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invMarkPaid(' + s.id + ')">입금처리</button> ' +
             '<button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invPrintStatement(' + s.id + ')">🖨️ 프린트</button> ' +
-            '<button type="button" class="inv-btn" style="padding:6px 8px; font-size:11px;" onclick="invDownloadStatement(' + s.id + ', \'pdf\')">PDF</button> ' +
-            '<button type="button" class="inv-btn" style="padding:6px 8px; font-size:11px;" onclick="invDownloadStatement(' + s.id + ', \'jpg\')">JPG</button></td></tr>'
+            '<button type="button" class="inv-btn" style="padding:6px 8px; font-size:11px;" onclick="invDownloadStatement(' + s.id + ')">PDF</button></td></tr>'
           ).join('');
         })
         .catch(err => {

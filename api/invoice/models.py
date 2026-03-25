@@ -7,6 +7,30 @@ from api.database.models import get_db_connection, USE_POSTGRESQL
 _invoice_tables_initialized = False
 
 
+def _ensure_invoice_statements_vat_included(cursor):
+    """기존 DB에 vat_included 컬럼 추가 (부가세 단가 포함 여부)"""
+    try:
+        if USE_POSTGRESQL:
+            cursor.execute('''
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'invoice_statements'
+                  AND column_name = 'vat_included'
+            ''')
+            if not cursor.fetchone():
+                cursor.execute(
+                    'ALTER TABLE invoice_statements ADD COLUMN vat_included BOOLEAN DEFAULT FALSE'
+                )
+        else:
+            cursor.execute('PRAGMA table_info(invoice_statements)')
+            cols = [r[1] for r in cursor.fetchall()]
+            if cols and 'vat_included' not in cols:
+                cursor.execute(
+                    'ALTER TABLE invoice_statements ADD COLUMN vat_included INTEGER DEFAULT 0'
+                )
+    except Exception as e:
+        print(f'[경고] invoice_statements.vat_included 마이그레이션: {e}')
+
+
 def init_invoice_tables():
     """거래명세서 관련 테이블 생성 (PostgreSQL/SQLite 호환)"""
     global _invoice_tables_initialized
@@ -21,6 +45,7 @@ def init_invoice_tables():
             _create_invoice_tables_postgresql(cursor)
         else:
             _create_invoice_tables_sqlite(cursor)
+        _ensure_invoice_statements_vat_included(cursor)
         conn.commit()
         _invoice_tables_initialized = True
         print("[성공] 거래명세서 테이블 초기화 완료")
@@ -86,6 +111,7 @@ def _create_invoice_tables_postgresql(cursor):
             vat_amount INTEGER DEFAULT 0,
             grand_total INTEGER NOT NULL DEFAULT 0,
             memo TEXT,
+            vat_included BOOLEAN DEFAULT FALSE,
             is_paid BOOLEAN DEFAULT FALSE,
             paid_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -168,6 +194,7 @@ def _create_invoice_tables_sqlite(cursor):
             vat_amount INTEGER DEFAULT 0,
             grand_total INTEGER NOT NULL DEFAULT 0,
             memo TEXT,
+            vat_included INTEGER DEFAULT 0,
             is_paid INTEGER DEFAULT 0,
             paid_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

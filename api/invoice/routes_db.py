@@ -39,6 +39,49 @@ def _get_user_role():
     return role or ''
 
 
+def _parse_vat_included(data):
+    """요청 JSON에서 부가세 포함 단가 여부"""
+    v = data.get('vat_included')
+    return v is True or v == 1 or v == '1'
+
+
+def _prepare_statement_lines(items, vat_included):
+    """
+    품목별 공급가액(amount) 및 명세서 합계 계산.
+    vat_included=True: 단가·금액은 부가세 포함, amount는 공급가액(역산).
+    """
+    vat_included = bool(vat_included)
+    prepared = []
+    total_supply = 0
+    grand = 0
+    for it in items:
+        qty = int(it.get('qty', 0) or 0)
+        unit_price = int(it.get('unit_price', 0) or 0)
+        if qty <= 0:
+            continue
+        if vat_included:
+            gross = qty * unit_price
+            supply = int(round(gross / 1.1))
+            prepared.append((it, qty, unit_price, supply))
+            total_supply += supply
+            grand += gross
+        else:
+            supply = qty * unit_price
+            prepared.append((it, qty, unit_price, supply))
+            total_supply += supply
+    if not prepared:
+        return None
+    if vat_included:
+        total_amount = total_supply
+        grand_total = grand
+        vat_amount = grand_total - total_amount
+    else:
+        total_amount = total_supply
+        vat_amount = int(total_amount * 0.1)
+        grand_total = total_amount + vat_amount
+    return prepared, total_amount, vat_amount, grand_total
+
+
 def _require_invoice_admin():
     """관리자 권한 확인, 실패 시 (False, response_tuple) 반환"""
     role = _get_user_role()
@@ -675,7 +718,7 @@ def get_statements():
         try:
             sql = '''
                 SELECT s.id, s.statement_no, s.statement_date, s.customer_id, s.total_amount,
-                       s.vat_amount, s.grand_total, s.memo, s.is_paid, s.paid_at, s.created_at,
+                       s.vat_amount, s.grand_total, s.memo, s.vat_included, s.is_paid, s.paid_at, s.created_at,
                        c.customer_name
                 FROM invoice_statements s
                 JOIN invoice_customers c ON s.customer_id = c.id
@@ -779,6 +822,7 @@ def update_statement(statement_id):
         customer_id = data.get('customer_id')
         memo = (data.get('memo') or '').strip() or None
         items = data.get('items') or []
+        vat_included = _parse_vat_included(data)
 
         if not statement_date:
             return jsonify({'success': False, 'message': '거래일자를 입력하세요.'}), 400
@@ -791,28 +835,26 @@ def update_statement(statement_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         try:
-            total_amount = 0
-            for it in items:
-                qty = int(it.get('qty', 0) or 0)
-                unit_price = int(it.get('unit_price', 0) or 0)
-                total_amount += qty * unit_price
-            vat_amount = int(total_amount * 0.1)
-            grand_total = total_amount + vat_amount
+            prep = _prepare_statement_lines(items, vat_included)
+            if prep is None:
+                return jsonify({'success': False, 'message': '수량·단가가 올바른 품목을 1개 이상 넣어주세요.'}), 400
+            prepared, total_amount, vat_amount, grand_total = prep
+            vif_db = vat_included if USE_POSTGRESQL else (1 if vat_included else 0)
 
             if USE_POSTGRESQL:
                 cursor.execute('''
                     UPDATE invoice_statements SET
                     statement_date=%s, customer_id=%s, total_amount=%s, vat_amount=%s,
-                    grand_total=%s, memo=%s, updated_at=CURRENT_TIMESTAMP
+                    grand_total=%s, memo=%s, vat_included=%s, updated_at=CURRENT_TIMESTAMP
                     WHERE id=%s
-                ''', (statement_date, customer_id, total_amount, vat_amount, grand_total, memo, statement_id))
+                ''', (statement_date, customer_id, total_amount, vat_amount, grand_total, memo, vif_db, statement_id))
             else:
                 cursor.execute('''
                     UPDATE invoice_statements SET
                     statement_date=?, customer_id=?, total_amount=?, vat_amount=?,
-                    grand_total=?, memo=?, updated_at=CURRENT_TIMESTAMP
+                    grand_total=?, memo=?, vat_included=?, updated_at=CURRENT_TIMESTAMP
                     WHERE id=?
-                ''', (statement_date, customer_id, total_amount, vat_amount, grand_total, memo, statement_id))
+                ''', (statement_date, customer_id, total_amount, vat_amount, grand_total, memo, vif_db, statement_id))
             if cursor.rowcount == 0:
                 return jsonify({'success': False, 'message': '명세서를 찾을 수 없습니다.'}), 404
 
@@ -821,12 +863,9 @@ def update_statement(statement_id):
             else:
                 cursor.execute('DELETE FROM invoice_statement_items WHERE statement_id = ?', (statement_id,))
 
-            for i, it in enumerate(items):
+            for i, (it, qty, unit_price, amount) in enumerate(prepared):
                 product_id = int(it.get('product_id', 0) or 0)
                 product_name = (it.get('product_name') or '').strip() or '-'
-                qty = int(it.get('qty', 0) or 0)
-                unit_price = int(it.get('unit_price', 0) or 0)
-                amount = qty * unit_price
                 if USE_POSTGRESQL:
                     cursor.execute('''
                         INSERT INTO invoice_statement_items
@@ -912,6 +951,7 @@ def create_statement():
         customer_id = data.get('customer_id')
         memo = (data.get('memo') or '').strip() or None
         items = data.get('items') or []
+        vat_included = _parse_vat_included(data)
 
         if not statement_date:
             return jsonify({'success': False, 'message': '거래일자를 입력하세요.'}), 400
@@ -925,37 +965,32 @@ def create_statement():
         cursor = conn.cursor()
         try:
             statement_no = _generate_statement_no(conn, cursor)
-            total_amount = 0
-            for it in items:
-                qty = int(it.get('qty', 0) or 0)
-                unit_price = int(it.get('unit_price', 0) or 0)
-                total_amount += qty * unit_price
-            vat_amount = int(total_amount * 0.1)
-            grand_total = total_amount + vat_amount
+            prep = _prepare_statement_lines(items, vat_included)
+            if prep is None:
+                return jsonify({'success': False, 'message': '수량·단가가 올바른 품목을 1개 이상 넣어주세요.'}), 400
+            prepared, total_amount, vat_amount, grand_total = prep
+            vif_db = vat_included if USE_POSTGRESQL else (1 if vat_included else 0)
 
             if USE_POSTGRESQL:
                 cursor.execute('''
                     INSERT INTO invoice_statements
-                    (statement_no, statement_date, customer_id, total_amount, vat_amount, grand_total, memo)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    (statement_no, statement_date, customer_id, total_amount, vat_amount, grand_total, memo, vat_included)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
-                ''', (statement_no, statement_date, customer_id, total_amount, vat_amount, grand_total, memo))
+                ''', (statement_no, statement_date, customer_id, total_amount, vat_amount, grand_total, memo, vif_db))
                 row = cursor.fetchone()
                 stmt_id = row[0] if row else None
             else:
                 cursor.execute('''
                     INSERT INTO invoice_statements
-                    (statement_no, statement_date, customer_id, total_amount, vat_amount, grand_total, memo)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (statement_no, statement_date, customer_id, total_amount, vat_amount, grand_total, memo))
+                    (statement_no, statement_date, customer_id, total_amount, vat_amount, grand_total, memo, vat_included)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (statement_no, statement_date, customer_id, total_amount, vat_amount, grand_total, memo, vif_db))
                 stmt_id = cursor.lastrowid
 
-            for i, it in enumerate(items):
+            for i, (it, qty, unit_price, amount) in enumerate(prepared):
                 product_id = int(it.get('product_id', 0) or 0)
                 product_name = (it.get('product_name') or '').strip() or '-'
-                qty = int(it.get('qty', 0) or 0)
-                unit_price = int(it.get('unit_price', 0) or 0)
-                amount = qty * unit_price
                 if USE_POSTGRESQL:
                     cursor.execute('''
                         INSERT INTO invoice_statement_items
