@@ -6,7 +6,8 @@ from api.database.models import (
     get_db_connection,
     USE_POSTGRESQL,
     normalize_company_name,
-    get_company_search_keywords
+    get_company_search_keywords,
+    ensure_settlement_return_fee_column,
 )
 from datetime import datetime, date
 from urllib.parse import unquote
@@ -61,6 +62,7 @@ def get_settlements_list():
         filter_company_name = request.args.get('company_name', '').strip()
         
         conn = get_db_connection()
+        ensure_settlement_return_fee_column(conn)
         if USE_POSTGRESQL:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
         else:
@@ -176,6 +178,7 @@ def get_settlement_detail(settlement_id):
         company_name = user_context['company_name']
         
         conn = get_db_connection()
+        ensure_settlement_return_fee_column(conn)
         if USE_POSTGRESQL:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
         else:
@@ -271,6 +274,7 @@ def create_settlement():
             }), 400
         
         conn = get_db_connection()
+        ensure_settlement_return_fee_column(conn)
         cursor = conn.cursor()
         
         try:
@@ -408,6 +412,7 @@ def update_settlement(settlement_id):
         data = request.get_json()
         
         conn = get_db_connection()
+        ensure_settlement_return_fee_column(conn)
         cursor = conn.cursor()
         
         try:

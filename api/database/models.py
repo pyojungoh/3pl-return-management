@@ -79,6 +79,38 @@ def get_db_connection():
         return conn
 
 
+# 배포 DB가 수동 마이그레이션 없이 올라간 경우 대비 (settlements.return_fee)
+_SETTLEMENT_RETURN_FEE_COLUMN_OK = False
+
+
+def ensure_settlement_return_fee_column(conn):
+    """settlements.return_fee 컬럼이 없으면 추가. 프로세스당 최초 1회만 ALTER 시도."""
+    global _SETTLEMENT_RETURN_FEE_COLUMN_OK
+    if _SETTLEMENT_RETURN_FEE_COLUMN_OK:
+        return
+    cursor = conn.cursor()
+    try:
+        if USE_POSTGRESQL:
+            cursor.execute(
+                'ALTER TABLE settlements ADD COLUMN IF NOT EXISTS return_fee INTEGER DEFAULT 0'
+            )
+        else:
+            try:
+                cursor.execute(
+                    'ALTER TABLE settlements ADD COLUMN return_fee INTEGER DEFAULT 0'
+                )
+            except OperationalError as e:
+                if 'duplicate' not in str(e).lower():
+                    raise
+        conn.commit()
+        _SETTLEMENT_RETURN_FEE_COLUMN_OK = True
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+
+
 def init_db():
     """데이터베이스 초기화 (테이블 생성)"""
     conn = get_db_connection()

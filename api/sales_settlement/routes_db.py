@@ -4,7 +4,7 @@
 - 기존 settlements API 재사용 (목록, 상세, 상태변경)
 """
 from flask import Blueprint, request, jsonify
-from api.database.models import get_db_connection, USE_POSTGRESQL
+from api.database.models import get_db_connection, USE_POSTGRESQL, ensure_settlement_return_fee_column
 from datetime import datetime, date
 from urllib.parse import unquote
 
@@ -69,6 +69,7 @@ def get_summary():
         year = request.args.get('year', '').strip()
 
         conn = get_db_connection()
+        ensure_settlement_return_fee_column(conn)
         if USE_POSTGRESQL:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
         else:
