@@ -1173,38 +1173,80 @@
           if (data.success && data.data) {
             const s = data.data;
             const vatRate = s.total_amount ? Math.round((s.vat_amount || 0) / (s.total_amount || 1) * 100) : 10;
-            let itemsHtml = (s.items || []).map((it, i) =>
-              '<tr><td style="text-align:center">' + (i + 1) + '</td><td>' + (it.product_name || '') + '</td><td>-</td>' +
-              '<td style="text-align:right">' + (it.qty || 0).toLocaleString() + '</td>' +
-              '<td style="text-align:right">' + (it.unit_price || 0).toLocaleString() + '</td>' +
-              '<td style="text-align:right">' + (it.amount || 0).toLocaleString() + '</td>' +
-              '<td style="text-align:right">' + Math.round((it.amount || 0) * vatRate / 100).toLocaleString() + '</td>' +
-              '<td style="text-align:right">' + (Math.round((it.amount || 0) * (1 + vatRate / 100))).toLocaleString() + '</td></tr>'
+            const items = s.items || [];
+            const MIN_ITEM_ROWS = 16;
+            const cell = 'border:1px solid #222;padding:7px 6px;';
+            const thCell = cell + 'background:#f0f0f0;font-weight:600;';
+            let itemsHtml = items.map((it, i) =>
+              '<tr class="inv-p-row">' +
+              '<td style="' + cell + 'text-align:center;width:4%;">' + (i + 1) + '</td>' +
+              '<td style="' + cell + 'text-align:left;">' + (it.product_name || '') + '</td>' +
+              '<td style="' + cell + 'text-align:center;width:8%;">-</td>' +
+              '<td style="' + cell + 'text-align:right;width:8%;">' + (it.qty || 0).toLocaleString() + '</td>' +
+              '<td style="' + cell + 'text-align:right;width:10%;">' + (it.unit_price || 0).toLocaleString() + '</td>' +
+              '<td style="' + cell + 'text-align:right;width:11%;">' + (it.amount || 0).toLocaleString() + '</td>' +
+              '<td style="' + cell + 'text-align:right;width:10%;">' + Math.round((it.amount || 0) * vatRate / 100).toLocaleString() + '</td>' +
+              '<td style="' + cell + 'text-align:right;width:11%;">' + (Math.round((it.amount || 0) * (1 + vatRate / 100))).toLocaleString() + '</td></tr>'
             ).join('');
-            const html = '<div style="font-family:Malgun Gothic,sans-serif; font-size:12px;">' +
-              '<h2 style="text-align:center; margin-bottom:20px;">거래명세서</h2>' +
-              '<table style="width:100%; margin-bottom:20px; font-size:11px;">' +
-              '<tr><td><strong>명세서번호:</strong> ' + (s.statement_no || '') + '</td><td><strong>거래일자:</strong> ' + (s.statement_date || '') + '</td></tr></table>' +
-              '<table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:11px;">' +
-              '<tr><th style="border:1px solid #333; padding:6px;">공급받는자</th><td style="border:1px solid #333; padding:6px;">' + (s.customer_name || '') + '</td></tr>' +
-              '<tr><th style="border:1px solid #333; padding:6px;">주소</th><td style="border:1px solid #333; padding:6px;">' + (s.address || '-') + '</td></tr>' +
-              '<tr><th style="border:1px solid #333; padding:6px;">사업자번호</th><td style="border:1px solid #333; padding:6px;">' + (s.business_number || '-') + '</td></tr>' +
-              '<tr><th style="border:1px solid #333; padding:6px;">대표자</th><td style="border:1px solid #333; padding:6px;">' + (s.representative || '-') + '</td></tr></table>' +
-              '<table style="width:100%; border-collapse:collapse; font-size:11px;">' +
-              '<thead><tr><th style="border:1px solid #333; padding:6px;">순번</th><th style="border:1px solid #333; padding:6px;">상품명</th><th style="border:1px solid #333; padding:6px;">규격</th>' +
-              '<th style="border:1px solid #333; padding:6px;">수량</th><th style="border:1px solid #333; padding:6px;">단가</th><th style="border:1px solid #333; padding:6px;">공급가액</th>' +
-              '<th style="border:1px solid #333; padding:6px;">세액</th><th style="border:1px solid #333; padding:6px;">합계</th></tr></thead><tbody>' +
+            for (let r = items.length; r < MIN_ITEM_ROWS; r++) {
+              itemsHtml += '<tr class="inv-p-row inv-p-empty"><td style="' + cell + 'text-align:center;">' + (r + 1) + '</td>' +
+                '<td style="' + cell + '">&nbsp;</td><td style="' + cell + '">&nbsp;</td><td style="' + cell + '">&nbsp;</td>' +
+                '<td style="' + cell + '">&nbsp;</td><td style="' + cell + '">&nbsp;</td><td style="' + cell + '">&nbsp;</td><td style="' + cell + '">&nbsp;</td></tr>';
+            }
+            const supplierRows =
+              '<tr><th style="' + thCell + 'width:22%;">상호</th><td style="' + cell + '">제이제이</td></tr>' +
+              '<tr><th style="' + thCell + '">사업자번호</th><td style="' + cell + '">803-15-01907</td></tr>' +
+              '<tr><th style="' + thCell + '">대표자</th><td style="' + cell + '">이정민</td></tr>' +
+              '<tr><th style="' + thCell + '">업태</th><td style="' + cell + '">도매및 소매업</td></tr>' +
+              '<tr><th style="' + thCell + '">종목</th><td style="' + cell + '">상품 종합 도매업</td></tr>' +
+              '<tr><th style="' + thCell + '">전화번호</th><td style="' + cell + '">010-9813-1905</td></tr>';
+            const buyerRows =
+              '<tr><th style="' + thCell + 'width:22%;">상호(거래처)</th><td style="' + cell + '">' + (s.customer_name || '') + '</td></tr>' +
+              '<tr><th style="' + thCell + '">주소</th><td style="' + cell + '">' + (s.address || '-') + '</td></tr>' +
+              '<tr><th style="' + thCell + '">사업자번호</th><td style="' + cell + '">' + (s.business_number || '-') + '</td></tr>' +
+              '<tr><th style="' + thCell + '">대표자</th><td style="' + cell + '">' + (s.representative || '-') + '</td></tr>' +
+              '<tr><th style="' + thCell + '">&nbsp;</th><td style="' + cell + '">&nbsp;</td></tr>' +
+              '<tr><th style="' + thCell + '">&nbsp;</th><td style="' + cell + '">&nbsp;</td></tr>';
+            const html =
+              '<div class="inv-print-root">' +
+              '<h1 class="inv-print-title">거 래 명 세 서</h1>' +
+              '<table class="inv-print-meta" style="width:100%;border-collapse:collapse;margin-bottom:10px;">' +
+              '<tr><td style="' + cell + 'width:50%;"><strong>명세서번호</strong> ' + (s.statement_no || '') + '</td>' +
+              '<td style="' + cell + 'width:50%;"><strong>거래일자</strong> ' + (s.statement_date || '') + '</td></tr></table>' +
+              '<table class="inv-print-parties" style="width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:14px;">' +
+              '<tr><td style="width:50%;vertical-align:top;padding:0 8px 0 0;">' +
+              '<div class="inv-print-party-cap" style="' + cell + 'background:#222;color:#fff;text-align:center;font-weight:bold;padding:8px;">공 급 자</div>' +
+              '<table style="width:100%;border-collapse:collapse;border:1px solid #222;border-top:none;">' + supplierRows + '</table></td>' +
+              '<td style="width:50%;vertical-align:top;padding:0 0 0 8px;">' +
+              '<div class="inv-print-party-cap" style="' + cell + 'background:#222;color:#fff;text-align:center;font-weight:bold;padding:8px;">공 급 받 는 자</div>' +
+              '<table style="width:100%;border-collapse:collapse;border:1px solid #222;border-top:none;">' + buyerRows + '</table></td></tr></table>' +
+              '<table class="inv-print-items" style="width:100%;border-collapse:collapse;font-size:10.5px;">' +
+              '<thead><tr>' +
+              '<th style="' + thCell + '">순번</th><th style="' + thCell + '">상품명</th><th style="' + thCell + '">규격</th>' +
+              '<th style="' + thCell + '">수량</th><th style="' + thCell + '">단가</th><th style="' + thCell + '">공급가액</th>' +
+              '<th style="' + thCell + '">세액</th><th style="' + thCell + '">합계</th></tr></thead><tbody>' +
               itemsHtml +
-              '<tr><td colspan="5" style="border:1px solid #333; padding:6px; text-align:right"><strong>합계</strong></td>' +
-              '<td style="border:1px solid #333; padding:6px; text-align:right">' + (s.total_amount || 0).toLocaleString() + '</td>' +
-              '<td style="border:1px solid #333; padding:6px; text-align:right">' + (s.vat_amount || 0).toLocaleString() + '</td>' +
-              '<td style="border:1px solid #333; padding:6px; text-align:right">' + (s.grand_total || 0).toLocaleString() + '</td></tr></tbody></table>' +
-              (s.memo ? '<p><strong>비고:</strong> ' + s.memo + '</p>' : '') + '</div>';
+              '<tr><td colspan="5" style="' + cell + 'text-align:right;font-weight:bold;">합 계</td>' +
+              '<td style="' + cell + 'text-align:right;font-weight:bold;">' + (s.total_amount || 0).toLocaleString() + '</td>' +
+              '<td style="' + cell + 'text-align:right;font-weight:bold;">' + (s.vat_amount || 0).toLocaleString() + '</td>' +
+              '<td style="' + cell + 'text-align:right;font-weight:bold;">' + (s.grand_total || 0).toLocaleString() + '</td></tr></tbody></table>' +
+              (s.memo ? '<div class="inv-print-memo" style="margin-top:12px;padding:10px;border:1px solid #222;min-height:48px;"><strong>비고</strong> ' + s.memo + '</div>' : '<div class="inv-print-memo" style="margin-top:12px;padding:10px;border:1px solid #222;min-height:48px;color:#999;">비고</div>') +
+              '</div>';
+            const printStyles =
+              '@page{size:A4 portrait;margin:10mm 12mm;}' +
+              '*{box-sizing:border-box;}' +
+              'html,body{height:100%;margin:0;padding:0;}' +
+              'body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+              '.inv-print-root{min-height:265mm;display:flex;flex-direction:column;padding:0;}' +
+              '.inv-print-title{margin:0 0 14px;font-size:22px;font-weight:700;letter-spacing:0.35em;text-align:center;}' +
+              '.inv-p-row td{min-height:26px;vertical-align:middle;}' +
+              '.inv-print-items{flex:1 1 auto;}' +
+              '.inv-print-memo{flex-shrink:0;}';
             const printWin = window.open('', '_blank');
-            printWin.document.write('<html><head><title>거래명세서 ' + (s.statement_no || '') + '</title><style>@page{size:A4;margin:20mm;} body{margin:0;padding:15mm;}</style></head><body>' + html + '</body></html>');
+            printWin.document.write('<html><head><meta charset="UTF-8"><title>거래명세서 ' + (s.statement_no || '') + '</title><style>' + printStyles + '</style></head><body>' + html + '</body></html>');
             printWin.document.close();
             printWin.focus();
-            setTimeout(function() { printWin.print(); printWin.close(); }, 250);
+            setTimeout(function() { printWin.print(); printWin.close(); }, 300);
           }
         })
         .catch(err => { console.error(err); alert('명세서 로드 실패'); });
