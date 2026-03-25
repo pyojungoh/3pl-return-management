@@ -1295,6 +1295,11 @@
       return null;
     }
 
+    /** 명세서 워터마크 — Cloudinary (서버 /static 없이 동작, 인쇄·html2canvas 공통) */
+    function invInvoiceWatermarkAbsUrl() {
+      return 'https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png';
+    }
+
     function invBuildStatementPrintContent(s) {
       const vatIncluded = s.vat_included === true || s.vat_included === 1;
       const vatRate = s.total_amount ? Math.round((s.vat_amount || 0) / (s.total_amount || 1) * 100) : 10;
@@ -1362,10 +1367,13 @@
         '<tr><th style="' + thCell + '">대표자</th><td style="' + cell + 'word-break:break-word;">' + (s.representative || '-') + '</td></tr>' +
         '<tr><th style="' + thCell + '">&nbsp;</th><td style="' + cell + '">&nbsp;</td></tr>' +
         '<tr><th style="' + thCell + '">&nbsp;</th><td style="' + cell + '">&nbsp;</td></tr>';
-      var invPrintWatermarkUrl = '/static/invoice-jayjay-watermark.png';
+      var wmAbs = invInvoiceWatermarkAbsUrl();
+      var wmTag = wmAbs
+        ? '<img class="inv-print-watermark" src="' + wmAbs.replace(/"/g, '') + '" alt="" crossorigin="anonymous">'
+        : '';
       const html =
         '<div class="inv-print-root">' +
-        '<div class="inv-print-watermark" style="background-image:url(\'' + invPrintWatermarkUrl + '\')"></div>' +
+        wmTag +
         '<div class="inv-print-foreground">' +
         '<h1 class="inv-print-title">거 래 명 세 서</h1>' +
         '<table class="inv-print-meta" style="width:100%;border-collapse:collapse;margin-bottom:10px;">' +
@@ -1397,7 +1405,7 @@
         'html,body{height:100%;margin:0;padding:0;max-width:100%;overflow-x:hidden;}' +
         'body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;font-size:9px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
         '.inv-print-root{position:relative;min-height:265mm;padding:0;width:100%;max-width:100%;}' +
-        '.inv-print-watermark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78mm;height:78mm;max-width:42%;background-size:contain;background-repeat:no-repeat;background-position:center;opacity:0.1;pointer-events:none;z-index:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+        '.inv-print-watermark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78mm;max-width:42%;height:auto;opacity:0.12;pointer-events:none;z-index:0;object-fit:contain;display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
         '.inv-print-foreground{position:relative;z-index:1;display:flex;flex-direction:column;min-height:265mm;width:100%;}' +
         '.inv-print-title{margin:0 0 8px;font-size:17px;font-weight:700;letter-spacing:0.12em;text-align:center;}' +
         '.inv-p-row td{min-height:20px;vertical-align:middle;}' +
@@ -1419,8 +1427,24 @@
           const printWin = window.open('', '_blank');
           printWin.document.write('<html><head><meta charset="UTF-8"><title>거래명세서 ' + (data.data.statement_no || '') + '</title><style>' + doc.printStyles + '</style></head><body>' + doc.html + '</body></html>');
           printWin.document.close();
-          printWin.focus();
-          setTimeout(function() { printWin.print(); printWin.close(); }, 300);
+          var invPrintOnce = false;
+          function invDoPrintWinPrint() {
+            if (invPrintOnce) return;
+            invPrintOnce = true;
+            try {
+              printWin.focus();
+              printWin.print();
+              printWin.close();
+            } catch (e) { console.error(e); }
+          }
+          var wmImg = printWin.document.querySelector('img.inv-print-watermark');
+          if (wmImg && !wmImg.complete) {
+            wmImg.onload = function() { setTimeout(invDoPrintWinPrint, 150); };
+            wmImg.onerror = function() { setTimeout(invDoPrintWinPrint, 150); };
+            setTimeout(invDoPrintWinPrint, 2500);
+          } else {
+            setTimeout(invDoPrintWinPrint, 400);
+          }
         })
         .catch(err => { console.error(err); alert('명세서 로드 실패'); });
     }
@@ -1466,52 +1490,65 @@
             alert('명세서 영역을 찾을 수 없습니다.');
             return;
           }
+          var invPdfCaptureOnce = false;
+          function invRunHtml2CanvasPdf() {
+            if (invPdfCaptureOnce) return;
+            invPdfCaptureOnce = true;
+            html2canvas(pageEl, {
+              scale: 2,
+              backgroundColor: '#ffffff',
+              logging: false,
+              useCORS: true,
+              allowTaint: false,
+              imageTimeout: 20000
+            })
+              .then(function(canvas) {
+                wrap.remove();
+                st.remove();
+                if (!canvas.width || !canvas.height) {
+                  alert('캔버스가 비어 있습니다. 다시 시도해 주세요.');
+                  return;
+                }
+                try {
+                  var imgData = canvas.toDataURL('image/png');
+                  var pdf = new JsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                  var pageW = pdf.internal.pageSize.getWidth();
+                  var pageH = pdf.internal.pageSize.getHeight();
+                  var cw = canvas.width;
+                  var ch = canvas.height;
+                  var ratio = cw / ch;
+                  var imgW = pageW;
+                  var imgH = pageW / ratio;
+                  if (imgH > pageH) {
+                    imgH = pageH;
+                    imgW = pageH * ratio;
+                  }
+                  var x = (pageW - imgW) / 2;
+                  var y = (pageH - imgH) / 2;
+                  pdf.addImage(imgData, 'PNG', x, y, imgW, imgH);
+                  pdf.save(doc.fileBase + '.pdf');
+                } catch (e) {
+                  console.error(e);
+                  alert('파일 저장 중 오류가 발생했습니다: ' + (e.message || String(e)));
+                }
+              })
+              .catch(function(err) {
+                wrap.remove();
+                st.remove();
+                console.error(err);
+                alert('이미지 변환에 실패했습니다.');
+              });
+          }
+          var wmCap = pageEl.querySelector('img.inv-print-watermark');
           requestAnimationFrame(function() {
             requestAnimationFrame(function() {
-              html2canvas(pageEl, {
-                scale: 2,
-                backgroundColor: '#ffffff',
-                logging: false,
-                useCORS: true,
-                allowTaint: false,
-                imageTimeout: 15000
-              })
-                .then(function(canvas) {
-                  wrap.remove();
-                  st.remove();
-                  if (!canvas.width || !canvas.height) {
-                    alert('캔버스가 비어 있습니다. 다시 시도해 주세요.');
-                    return;
-                  }
-                  try {
-                    var imgData = canvas.toDataURL('image/png');
-                    var pdf = new JsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-                    var pageW = pdf.internal.pageSize.getWidth();
-                    var pageH = pdf.internal.pageSize.getHeight();
-                    var cw = canvas.width;
-                    var ch = canvas.height;
-                    var ratio = cw / ch;
-                    var imgW = pageW;
-                    var imgH = pageW / ratio;
-                    if (imgH > pageH) {
-                      imgH = pageH;
-                      imgW = pageH * ratio;
-                    }
-                    var x = (pageW - imgW) / 2;
-                    var y = (pageH - imgH) / 2;
-                    pdf.addImage(imgData, 'PNG', x, y, imgW, imgH);
-                    pdf.save(doc.fileBase + '.pdf');
-                  } catch (e) {
-                    console.error(e);
-                    alert('파일 저장 중 오류가 발생했습니다: ' + (e.message || String(e)));
-                  }
-                })
-                .catch(function(err) {
-                  wrap.remove();
-                  st.remove();
-                  console.error(err);
-                  alert('이미지 변환에 실패했습니다.');
-                });
+              if (wmCap && !wmCap.complete) {
+                wmCap.onload = function() { setTimeout(invRunHtml2CanvasPdf, 120); };
+                wmCap.onerror = function() { invRunHtml2CanvasPdf(); };
+                setTimeout(invRunHtml2CanvasPdf, 3000);
+              } else {
+                setTimeout(invRunHtml2CanvasPdf, 200);
+              }
             });
           });
         })
