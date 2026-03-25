@@ -1300,6 +1300,23 @@
       return 'https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png';
     }
 
+    /** html2canvas는 외부 URL img를 CORS로 못 그리는 경우가 많아, PDF 전용으로 Data URL로 넣음 */
+    function invPrefetchImageAsDataUrl(url) {
+      return fetch(url, { mode: 'cors', credentials: 'omit', cache: 'force-cache' })
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.blob();
+        })
+        .then(function(blob) {
+          return new Promise(function(resolve, reject) {
+            var fr = new FileReader();
+            fr.onload = function() { resolve(fr.result); };
+            fr.onerror = function() { reject(new Error('FileReader')); };
+            fr.readAsDataURL(blob);
+          });
+        });
+    }
+
     function invBuildStatementPrintContent(s) {
       const vatIncluded = s.vat_included === true || s.vat_included === 1;
       const vatRate = s.total_amount ? Math.round((s.vat_amount || 0) / (s.total_amount || 1) * 100) : 10;
@@ -1539,18 +1556,39 @@
                 alert('이미지 변환에 실패했습니다.');
               });
           }
-          var wmCap = pageEl.querySelector('img.inv-print-watermark');
-          requestAnimationFrame(function() {
+          function invSchedulePdfCapture() {
             requestAnimationFrame(function() {
-              if (wmCap && !wmCap.complete) {
-                wmCap.onload = function() { setTimeout(invRunHtml2CanvasPdf, 120); };
-                wmCap.onerror = function() { invRunHtml2CanvasPdf(); };
-                setTimeout(invRunHtml2CanvasPdf, 3000);
-              } else {
-                setTimeout(invRunHtml2CanvasPdf, 200);
-              }
+              requestAnimationFrame(function() {
+                setTimeout(invRunHtml2CanvasPdf, 100);
+              });
             });
-          });
+          }
+          var wmCap = pageEl.querySelector('img.inv-print-watermark');
+          var wmRemoteUrl = invInvoiceWatermarkAbsUrl();
+          if (wmCap && wmRemoteUrl) {
+            invPrefetchImageAsDataUrl(wmRemoteUrl)
+              .then(function(dataUrl) {
+                wmCap.removeAttribute('crossorigin');
+                wmCap.src = dataUrl;
+                return new Promise(function(resolve) {
+                  function done() { setTimeout(resolve, 100); }
+                  if (wmCap.complete && wmCap.naturalWidth) done();
+                  else {
+                    wmCap.onload = done;
+                    wmCap.onerror = done;
+                    setTimeout(done, 2500);
+                  }
+                });
+              })
+              .catch(function(e) {
+                console.warn('[INV] 워터마크 prefetch 실패(PDF는 진행):', e);
+              })
+              .then(function() {
+                invSchedulePdfCapture();
+              });
+          } else {
+            invSchedulePdfCapture();
+          }
         })
         .catch(function(err) {
           console.error(err);
