@@ -13687,7 +13687,8 @@
       let totalFinalAmount = 0;
       settlements.forEach(settlement => {
         const totalAmount = (settlement.work_fee || 0) + (settlement.inout_fee || 0) + 
-                          (settlement.shipping_fee || 0) + (settlement.storage_fee || 0) + 
+                          (settlement.shipping_fee || 0) + (settlement.collect_on_delivery_fee || 0) +
+                          (settlement.return_fee || 0) + (settlement.storage_fee || 0) + 
                           (settlement.special_work_fee || 0) - (settlement.error_deduction || 0);
         const tax = Math.floor(totalAmount * 0.1);
         const finalAmount = totalAmount + tax;
@@ -13714,7 +13715,8 @@
       settlements.forEach((settlement, index) => {
         const yearMonth = settlement.settlement_year_month || '';
         const totalAmount = (settlement.work_fee || 0) + (settlement.inout_fee || 0) + 
-                          (settlement.shipping_fee || 0) + (settlement.storage_fee || 0) + 
+                          (settlement.shipping_fee || 0) + (settlement.collect_on_delivery_fee || 0) +
+                          (settlement.return_fee || 0) + (settlement.storage_fee || 0) + 
                           (settlement.special_work_fee || 0) - (settlement.error_deduction || 0);
         const tax = Math.floor(totalAmount * 0.1);
         const finalAmount = totalAmount + tax;
@@ -13892,7 +13894,8 @@
         if (result.success && result.data) {
           const settlementDetail = result.data;
           const totalAmount = (settlementDetail.work_fee || 0) + (settlementDetail.inout_fee || 0) + 
-                            (settlementDetail.shipping_fee || 0) + (settlementDetail.storage_fee || 0) + 
+                            (settlementDetail.shipping_fee || 0) + (settlementDetail.collect_on_delivery_fee || 0) +
+                            (settlementDetail.return_fee || 0) + (settlementDetail.storage_fee || 0) + 
                             (settlementDetail.special_work_fee || 0) - (settlementDetail.error_deduction || 0);
           const tax = Math.floor(totalAmount * 0.1);
           const finalAmount = totalAmount + tax;
@@ -13945,6 +13948,14 @@
           }
           detailHtml += '</div>';
           detailHtml += '</div>';
+          detailHtml += '</div>';
+          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '<span>착불 택배비</span>';
+          detailHtml += `<span style="font-weight: 600;">${(settlementDetail.collect_on_delivery_fee || 0).toLocaleString()}원</span>`;
+          detailHtml += '</div>';
+          detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+          detailHtml += '<span>반품비</span>';
+          detailHtml += `<span style="font-weight: 600;">${(settlementDetail.return_fee || 0).toLocaleString()}원</span>`;
           detailHtml += '</div>';
           detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
           detailHtml += '<span>보관료</span>';

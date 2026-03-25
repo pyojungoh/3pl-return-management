@@ -383,7 +383,7 @@
             return;
           }
           const s = data.data;
-          const total = (s.work_fee || 0) + (s.inout_fee || 0) + (s.shipping_fee || 0) + (s.collect_on_delivery_fee || 0) + (s.storage_fee || 0) + (s.special_work_fee || 0) - (s.error_deduction || 0);
+          const total = (s.work_fee || 0) + (s.inout_fee || 0) + (s.shipping_fee || 0) + (s.collect_on_delivery_fee || 0) + (s.return_fee || 0) + (s.storage_fee || 0) + (s.special_work_fee || 0) - (s.error_deduction || 0);
           const tax = Math.floor(total * 0.1);
           const finalAmt = total + tax;
 
@@ -395,6 +395,7 @@
             ['입출고비', (s.inout_fee || 0).toLocaleString() + '원'],
             ['택배비', (s.shipping_fee || 0).toLocaleString() + '원'],
             ['착불 택배비', (s.collect_on_delivery_fee || 0).toLocaleString() + '원'],
+            ['반품비', (s.return_fee || 0).toLocaleString() + '원'],
             ['보관료', (s.storage_fee || 0).toLocaleString() + '원'],
             ['특수작업', (s.special_work_fee || 0).toLocaleString() + '원'],
             ['오배송/누락 차감', '-' + (s.error_deduction || 0).toLocaleString() + '원'],

@@ -95,7 +95,7 @@ def get_summary():
                     total_amount,
                     status,
                     work_fee, inout_fee, shipping_fee, storage_fee,
-                    special_work_fee, error_deduction, collect_on_delivery_fee
+                    special_work_fee, error_deduction, collect_on_delivery_fee, return_fee
                 FROM settlements
                 WHERE {where_sql}
                 ORDER BY settlement_year_month DESC, company_name

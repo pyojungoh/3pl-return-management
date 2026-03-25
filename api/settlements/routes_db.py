@@ -20,6 +20,9 @@ if USE_POSTGRESQL:
 # Blueprint 생성
 settlements_bp = Blueprint('settlements', __name__, url_prefix='/api/settlements')
 
+# 정산에 반영하는 반품 처리 비용 (건당 원)
+RETURN_SETTLEMENT_FEE_PER_CASE = 500
+
 
 def get_user_context():
     """사용자 컨텍스트 가져오기 (헤더 또는 세션)"""
@@ -116,6 +119,7 @@ def get_settlements_list():
                     s.special_work_fee,
                     s.error_deduction,
                     s.collect_on_delivery_fee,
+                    s.return_fee,
                     s.total_amount,
                     s.status,
                     s.tax_invoice_file_url,
@@ -289,7 +293,7 @@ def create_settlement():
                             work_fee = %s, inout_fee = %s, 
                             shipping_fee = %s, storage_fee = %s,
                             special_work_fee = %s, error_deduction = %s,
-                            collect_on_delivery_fee = %s,
+                            collect_on_delivery_fee = %s, return_fee = %s,
                             total_amount = %s, status = %s, memo = %s,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s
@@ -297,7 +301,7 @@ def create_settlement():
                         data.get('work_fee', 0), data.get('inout_fee', 0),
                         data.get('shipping_fee', 0), data.get('storage_fee', 0),
                         data.get('special_work_fee', 0), data.get('error_deduction', 0),
-                        data.get('collect_on_delivery_fee', 0),
+                        data.get('collect_on_delivery_fee', 0), data.get('return_fee', 0),
                         data.get('total_amount', 0), data.get('status', '대기'),
                         data.get('memo', ''), settlement_id
                     ))
@@ -307,7 +311,7 @@ def create_settlement():
                             work_fee = ?, inout_fee = ?, 
                             shipping_fee = ?, storage_fee = ?,
                             special_work_fee = ?, error_deduction = ?,
-                            collect_on_delivery_fee = ?,
+                            collect_on_delivery_fee = ?, return_fee = ?,
                             total_amount = ?, status = ?, memo = ?,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
@@ -315,7 +319,7 @@ def create_settlement():
                         data.get('work_fee', 0), data.get('inout_fee', 0),
                         data.get('shipping_fee', 0), data.get('storage_fee', 0),
                         data.get('special_work_fee', 0), data.get('error_deduction', 0),
-                        data.get('collect_on_delivery_fee', 0),
+                        data.get('collect_on_delivery_fee', 0), data.get('return_fee', 0),
                         data.get('total_amount', 0), data.get('status', '대기'),
                         data.get('memo', ''), settlement_id
                     ))
@@ -326,16 +330,16 @@ def create_settlement():
                         INSERT INTO settlements (
                             company_name, settlement_year_month, work_fee, inout_fee, 
                             shipping_fee, storage_fee, special_work_fee, error_deduction,
-                            collect_on_delivery_fee, total_amount, status, memo, created_at, updated_at
+                            collect_on_delivery_fee, return_fee, total_amount, status, memo, created_at, updated_at
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         RETURNING id
                     ''', (
                         settlement_company_name, settlement_year_month,
                         data.get('work_fee', 0), data.get('inout_fee', 0),
                         data.get('shipping_fee', 0), data.get('storage_fee', 0),
                         data.get('special_work_fee', 0), data.get('error_deduction', 0),
-                        data.get('collect_on_delivery_fee', 0),
+                        data.get('collect_on_delivery_fee', 0), data.get('return_fee', 0),
                         data.get('total_amount', 0), data.get('status', '대기'),
                         data.get('memo', '')
                     ))
@@ -345,15 +349,15 @@ def create_settlement():
                         INSERT INTO settlements (
                             company_name, settlement_year_month, work_fee, inout_fee, 
                             shipping_fee, storage_fee, special_work_fee, error_deduction,
-                            collect_on_delivery_fee, total_amount, status, memo, created_at, updated_at
+                            collect_on_delivery_fee, return_fee, total_amount, status, memo, created_at, updated_at
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     ''', (
                         settlement_company_name, settlement_year_month,
                         data.get('work_fee', 0), data.get('inout_fee', 0),
                         data.get('shipping_fee', 0), data.get('storage_fee', 0),
                         data.get('special_work_fee', 0), data.get('error_deduction', 0),
-                        data.get('collect_on_delivery_fee', 0),
+                        data.get('collect_on_delivery_fee', 0), data.get('return_fee', 0),
                         data.get('total_amount', 0), data.get('status', '대기'),
                         data.get('memo', '')
                     ))
@@ -438,6 +442,10 @@ def update_settlement(settlement_id):
             if 'collect_on_delivery_fee' in data:
                 updates.append('collect_on_delivery_fee = %s' if USE_POSTGRESQL else 'collect_on_delivery_fee = ?')
                 params.append(data['collect_on_delivery_fee'])
+            
+            if 'return_fee' in data:
+                updates.append('return_fee = %s' if USE_POSTGRESQL else 'return_fee = ?')
+                params.append(data['return_fee'])
             
             if 'storage_fee' in data:
                 updates.append('storage_fee = %s' if USE_POSTGRESQL else 'storage_fee = ?')
@@ -618,7 +626,9 @@ def get_data_sources():
             'error_wrong_delivery_count': 0,  # 오배송 건수
             'error_missing_count': 0,  # 누락 건수
             'error_details': [],  # 오배송/누락 상세
-            'collect_on_delivery_fee': 0  # 착불 택배비
+            'collect_on_delivery_fee': 0,  # 착불 택배비
+            'return_count': 0,  # 해당 월 반품 건수 (화주사 매칭)
+            'return_fee': 0  # 반품비 (건당 RETURN_SETTLEMENT_FEE_PER_CASE)
         }
         
         # 1. 파레트 보관료 조회
@@ -886,6 +896,56 @@ def get_data_sources():
             traceback.print_exc()
             # 에러가 발생해도 기본값 0으로 계속 진행
             result['collect_on_delivery_fee'] = 0
+        
+        # 5. 반품 비용 (반품관리 — 해당 정산월 반품 건수 × 건당 단가)
+        try:
+            conn = get_db_connection()
+            if USE_POSTGRESQL:
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+            else:
+                cursor = conn.cursor()
+            try:
+                year, month = map(int, settlement_year_month.split('-'))
+                month_variants = list(dict.fromkeys([f'{year}년{month}월', f'{year}년{month:02d}월']))
+                try:
+                    company_keywords = get_company_search_keywords(filter_company_name)
+                    if not company_keywords:
+                        company_keywords = [normalize_company_name(filter_company_name)]
+                except Exception:
+                    company_keywords = [normalize_company_name(filter_company_name)]
+                if USE_POSTGRESQL:
+                    placeholders = ','.join(['%s'] * len(month_variants))
+                    cursor.execute(f'''
+                        SELECT company_name FROM returns
+                        WHERE month IN ({placeholders})
+                    ''', tuple(month_variants))
+                else:
+                    placeholders = ','.join(['?'] * len(month_variants))
+                    cursor.execute(f'''
+                        SELECT company_name FROM returns
+                        WHERE month IN ({placeholders})
+                    ''', tuple(month_variants))
+                rows = cursor.fetchall()
+                return_count = 0
+                for row in rows:
+                    if isinstance(row, dict):
+                        cn = (row.get('company_name') or '').strip()
+                    else:
+                        cn = (row[0] or '').strip() if row else ''
+                    if normalize_company_name(cn) in company_keywords:
+                        return_count += 1
+                result['return_count'] = return_count
+                result['return_fee'] = return_count * RETURN_SETTLEMENT_FEE_PER_CASE
+                print(f'[정보] 반품비 집계: {filter_company_name}, {settlement_year_month}, {return_count}건 → {result["return_fee"]}원')
+            finally:
+                cursor.close()
+                conn.close()
+        except Exception as e:
+            print(f'[경고] 반품비 집계 오류: {e}')
+            import traceback
+            traceback.print_exc()
+            result['return_count'] = 0
+            result['return_fee'] = 0
         
         return jsonify({
             'success': True,
