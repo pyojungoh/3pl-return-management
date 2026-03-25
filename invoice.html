@@ -405,6 +405,8 @@
       </div>
     </div>
   </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script>
     var invInitialized = false;
     var invCurrentTab = 'products';
@@ -1141,7 +1143,9 @@
           '</td><td>' + (s.vat_amount || 0).toLocaleString() + '</td><td>' + (s.grand_total || 0).toLocaleString() +
           '</td><td>' + paidBtn + '</td><td>' +
           '<button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invEditStatement(' + s.id + ')">수정</button> ' +
-          '<button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invPrintStatement(' + s.id + ')">🖨️ 프린트</button></td></tr>';
+          '<button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invPrintStatement(' + s.id + ')">🖨️ 프린트</button> ' +
+          '<button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invDownloadStatement(' + s.id + ', \'pdf\')">PDF</button> ' +
+          '<button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invDownloadStatement(' + s.id + ', \'jpg\')">JPG</button></td></tr>';
       }).join('');
     }
 
@@ -1166,91 +1170,205 @@
         .catch(err => { console.error(err); alert('처리 중 오류'); });
     }
 
+    function invSanitizeFileName(name) {
+      var n = String(name || '거래명세서').replace(/[/\\?%*:|"<>]/g, '-').trim();
+      return n || '거래명세서';
+    }
+
+    function invBuildStatementPrintContent(s) {
+      const vatRate = s.total_amount ? Math.round((s.vat_amount || 0) / (s.total_amount || 1) * 100) : 10;
+      const items = s.items || [];
+      const MIN_ITEM_ROWS = 16;
+      const cell = 'border:1px solid #222;padding:3px 2px;font-size:8.5px;';
+      const thCell = cell + 'background:#f0f0f0;font-weight:600;';
+      const wNo = thCell + 'width:2%;max-width:2.2em;padding:3px 1px;';
+      const wName = thCell + 'width:50%;';
+      const wSpec = thCell + 'width:3%;padding:3px 1px;';
+      const wQty = thCell + 'width:5%;padding:3px 1px;';
+      const wPrice = thCell + 'width:9%;';
+      const wAmt = thCell + 'width:10%;';
+      const wVat = thCell + 'width:9%;';
+      const wSum = thCell + 'width:12%;';
+      const dNo = cell + 'text-align:center;width:2%;max-width:2.2em;padding:3px 1px;';
+      const dName = cell + 'text-align:left;word-break:break-word;width:50%;';
+      const dSpec = cell + 'text-align:center;width:3%;padding:3px 1px;';
+      const dQty = cell + 'text-align:right;width:5%;padding:3px 1px;';
+      const dPrice = cell + 'text-align:right;width:9%;';
+      const dAmt = cell + 'text-align:right;width:10%;';
+      const dVat = cell + 'text-align:right;width:9%;';
+      const dSum = cell + 'text-align:right;width:12%;';
+      let itemsHtml = items.map((it, i) =>
+        '<tr class="inv-p-row">' +
+        '<td style="' + dNo + '">' + (i + 1) + '</td>' +
+        '<td style="' + dName + '">' + (it.product_name || '') + '</td>' +
+        '<td style="' + dSpec + '">-</td>' +
+        '<td style="' + dQty + '">' + (it.qty || 0).toLocaleString() + '</td>' +
+        '<td style="' + dPrice + '">' + (it.unit_price || 0).toLocaleString() + '</td>' +
+        '<td style="' + dAmt + '">' + (it.amount || 0).toLocaleString() + '</td>' +
+        '<td style="' + dVat + '">' + Math.round((it.amount || 0) * vatRate / 100).toLocaleString() + '</td>' +
+        '<td style="' + dSum + '">' + (Math.round((it.amount || 0) * (1 + vatRate / 100))).toLocaleString() + '</td></tr>'
+      ).join('');
+      for (let r = items.length; r < MIN_ITEM_ROWS; r++) {
+        itemsHtml += '<tr class="inv-p-row inv-p-empty"><td style="' + dNo + '">' + (r + 1) + '</td>' +
+          '<td style="' + cell + 'width:50%;">&nbsp;</td><td style="' + cell + 'width:3%;">&nbsp;</td><td style="' + cell + 'width:5%;">&nbsp;</td>' +
+          '<td style="' + cell + '">&nbsp;</td><td style="' + cell + '">&nbsp;</td><td style="' + cell + '">&nbsp;</td><td style="' + cell + '">&nbsp;</td></tr>';
+      }
+      const supplierRows =
+        '<tr><th style="' + thCell + 'width:18%;">상호</th><td style="' + cell + 'word-break:break-word;">제이제이</td></tr>' +
+        '<tr><th style="' + thCell + '">사업자번호</th><td style="' + cell + '">803-15-01907</td></tr>' +
+        '<tr><th style="' + thCell + '">대표자</th><td style="' + cell + '">이정민</td></tr>' +
+        '<tr><th style="' + thCell + '">업태</th><td style="' + cell + '">도매및 소매업</td></tr>' +
+        '<tr><th style="' + thCell + '">종목</th><td style="' + cell + '">상품 종합 도매업</td></tr>' +
+        '<tr><th style="' + thCell + '">전화번호</th><td style="' + cell + 'word-break:break-word;">010-9813-1905</td></tr>';
+      const buyerRows =
+        '<tr><th style="' + thCell + 'width:18%;">상호(거래처)</th><td style="' + cell + 'word-break:break-word;">' + (s.customer_name || '') + '</td></tr>' +
+        '<tr><th style="' + thCell + '">주소</th><td style="' + cell + 'word-break:break-word;">' + (s.address || '-') + '</td></tr>' +
+        '<tr><th style="' + thCell + '">사업자번호</th><td style="' + cell + 'word-break:break-word;">' + (s.business_number || '-') + '</td></tr>' +
+        '<tr><th style="' + thCell + '">대표자</th><td style="' + cell + 'word-break:break-word;">' + (s.representative || '-') + '</td></tr>' +
+        '<tr><th style="' + thCell + '">&nbsp;</th><td style="' + cell + '">&nbsp;</td></tr>' +
+        '<tr><th style="' + thCell + '">&nbsp;</th><td style="' + cell + '">&nbsp;</td></tr>';
+      const html =
+        '<div class="inv-print-root">' +
+        '<h1 class="inv-print-title">거 래 명 세 서</h1>' +
+        '<table class="inv-print-meta" style="width:100%;border-collapse:collapse;margin-bottom:10px;">' +
+        '<tr><td style="' + cell + 'width:50%;"><strong>명세서번호</strong> ' + (s.statement_no || '') + '</td>' +
+        '<td style="' + cell + 'width:50%;"><strong>거래일자</strong> ' + (s.statement_date || '') + '</td></tr></table>' +
+        '<table class="inv-print-parties" style="width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:10px;">' +
+        '<tr><td style="width:50%;vertical-align:top;padding:0 4px 0 0;">' +
+        '<div class="inv-print-party-cap" style="' + cell + 'background:#222;color:#fff;text-align:center;font-weight:bold;padding:4px 2px;font-size:9px;">공 급 자</div>' +
+        '<table style="width:100%;border-collapse:collapse;border:1px solid #222;border-top:none;table-layout:fixed;">' + supplierRows + '</table></td>' +
+        '<td style="width:50%;vertical-align:top;padding:0 0 0 4px;">' +
+        '<div class="inv-print-party-cap" style="' + cell + 'background:#222;color:#fff;text-align:center;font-weight:bold;padding:4px 2px;font-size:9px;">공 급 받 는 자</div>' +
+        '<table style="width:100%;border-collapse:collapse;border:1px solid #222;border-top:none;table-layout:fixed;">' + buyerRows + '</table></td></tr></table>' +
+        '<table class="inv-print-items" style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:8.5px;">' +
+        '<thead><tr>' +
+        '<th style="' + wNo + '">순번</th><th style="' + wName + '">상품명</th><th style="' + wSpec + '">규격</th>' +
+        '<th style="' + wQty + '">수량</th><th style="' + wPrice + '">단가</th><th style="' + wAmt + '">공급가액</th>' +
+        '<th style="' + wVat + '">세액</th><th style="' + wSum + '">합계</th></tr></thead><tbody>' +
+        itemsHtml +
+        '<tr><td colspan="5" style="' + cell + 'text-align:right;font-weight:bold;">합 계</td>' +
+        '<td style="' + cell + 'text-align:right;font-weight:bold;">' + (s.total_amount || 0).toLocaleString() + '</td>' +
+        '<td style="' + cell + 'text-align:right;font-weight:bold;">' + (s.vat_amount || 0).toLocaleString() + '</td>' +
+        '<td style="' + cell + 'text-align:right;font-weight:bold;">' + (s.grand_total || 0).toLocaleString() + '</td></tr></tbody></table>' +
+        (s.memo ? '<div class="inv-print-memo" style="margin-top:8px;padding:6px;border:1px solid #222;min-height:36px;font-size:8.5px;word-break:break-word;"><strong>비고</strong> ' + s.memo + '</div>' : '<div class="inv-print-memo" style="margin-top:8px;padding:6px;border:1px solid #222;min-height:36px;color:#999;font-size:8.5px;">비고</div>') +
+        '</div>';
+      const printStyles =
+        '@page{size:A4 portrait;margin:6mm 7mm;}' +
+        '*{box-sizing:border-box;}' +
+        'html,body{height:100%;margin:0;padding:0;max-width:100%;overflow-x:hidden;}' +
+        'body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;font-size:9px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+        '.inv-print-root{min-height:265mm;display:flex;flex-direction:column;padding:0;width:100%;max-width:100%;}' +
+        '.inv-print-title{margin:0 0 8px;font-size:17px;font-weight:700;letter-spacing:0.12em;text-align:center;}' +
+        '.inv-p-row td{min-height:20px;vertical-align:middle;}' +
+        '.inv-print-items{flex:1 1 auto;table-layout:fixed;}' +
+        '.inv-print-memo{flex-shrink:0;}' +
+        'table{max-width:100%;}';
+      return { html: html, printStyles: printStyles, fileBase: invSanitizeFileName(s.statement_no || '거래명세서') };
+    }
+
     function invPrintStatement(id) {
       fetch('/api/invoice/statements/' + id, { credentials: 'include', headers: invGetUserHeaders() })
         .then(r => r.json())
         .then(data => {
-          if (data.success && data.data) {
-            const s = data.data;
-            const vatRate = s.total_amount ? Math.round((s.vat_amount || 0) / (s.total_amount || 1) * 100) : 10;
-            const items = s.items || [];
-            const MIN_ITEM_ROWS = 16;
-            const cell = 'border:1px solid #222;padding:3px 2px;font-size:8.5px;';
-            const thCell = cell + 'background:#f0f0f0;font-weight:600;';
-            let itemsHtml = items.map((it, i) =>
-              '<tr class="inv-p-row">' +
-              '<td style="' + cell + 'text-align:center;width:3%;">' + (i + 1) + '</td>' +
-              '<td style="' + cell + 'text-align:left;word-break:break-word;">' + (it.product_name || '') + '</td>' +
-              '<td style="' + cell + 'text-align:center;width:6%;">-</td>' +
-              '<td style="' + cell + 'text-align:right;width:7%;">' + (it.qty || 0).toLocaleString() + '</td>' +
-              '<td style="' + cell + 'text-align:right;width:8%;">' + (it.unit_price || 0).toLocaleString() + '</td>' +
-              '<td style="' + cell + 'text-align:right;width:9%;">' + (it.amount || 0).toLocaleString() + '</td>' +
-              '<td style="' + cell + 'text-align:right;width:8%;">' + Math.round((it.amount || 0) * vatRate / 100).toLocaleString() + '</td>' +
-              '<td style="' + cell + 'text-align:right;width:9%;">' + (Math.round((it.amount || 0) * (1 + vatRate / 100))).toLocaleString() + '</td></tr>'
-            ).join('');
-            for (let r = items.length; r < MIN_ITEM_ROWS; r++) {
-              itemsHtml += '<tr class="inv-p-row inv-p-empty"><td style="' + cell + 'text-align:center;">' + (r + 1) + '</td>' +
-                '<td style="' + cell + '">&nbsp;</td><td style="' + cell + '">&nbsp;</td><td style="' + cell + '">&nbsp;</td>' +
-                '<td style="' + cell + '">&nbsp;</td><td style="' + cell + '">&nbsp;</td><td style="' + cell + '">&nbsp;</td><td style="' + cell + '">&nbsp;</td></tr>';
-            }
-            const supplierRows =
-              '<tr><th style="' + thCell + 'width:18%;">상호</th><td style="' + cell + 'word-break:break-word;">제이제이</td></tr>' +
-              '<tr><th style="' + thCell + '">사업자번호</th><td style="' + cell + '">803-15-01907</td></tr>' +
-              '<tr><th style="' + thCell + '">대표자</th><td style="' + cell + '">이정민</td></tr>' +
-              '<tr><th style="' + thCell + '">업태</th><td style="' + cell + '">도매및 소매업</td></tr>' +
-              '<tr><th style="' + thCell + '">종목</th><td style="' + cell + '">상품 종합 도매업</td></tr>' +
-              '<tr><th style="' + thCell + '">전화번호</th><td style="' + cell + 'word-break:break-word;">010-9813-1905</td></tr>';
-            const buyerRows =
-              '<tr><th style="' + thCell + 'width:18%;">상호(거래처)</th><td style="' + cell + 'word-break:break-word;">' + (s.customer_name || '') + '</td></tr>' +
-              '<tr><th style="' + thCell + '">주소</th><td style="' + cell + 'word-break:break-word;">' + (s.address || '-') + '</td></tr>' +
-              '<tr><th style="' + thCell + '">사업자번호</th><td style="' + cell + 'word-break:break-word;">' + (s.business_number || '-') + '</td></tr>' +
-              '<tr><th style="' + thCell + '">대표자</th><td style="' + cell + 'word-break:break-word;">' + (s.representative || '-') + '</td></tr>' +
-              '<tr><th style="' + thCell + '">&nbsp;</th><td style="' + cell + '">&nbsp;</td></tr>' +
-              '<tr><th style="' + thCell + '">&nbsp;</th><td style="' + cell + '">&nbsp;</td></tr>';
-            const html =
-              '<div class="inv-print-root">' +
-              '<h1 class="inv-print-title">거 래 명 세 서</h1>' +
-              '<table class="inv-print-meta" style="width:100%;border-collapse:collapse;margin-bottom:10px;">' +
-              '<tr><td style="' + cell + 'width:50%;"><strong>명세서번호</strong> ' + (s.statement_no || '') + '</td>' +
-              '<td style="' + cell + 'width:50%;"><strong>거래일자</strong> ' + (s.statement_date || '') + '</td></tr></table>' +
-              '<table class="inv-print-parties" style="width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:10px;">' +
-              '<tr><td style="width:50%;vertical-align:top;padding:0 4px 0 0;">' +
-              '<div class="inv-print-party-cap" style="' + cell + 'background:#222;color:#fff;text-align:center;font-weight:bold;padding:4px 2px;font-size:9px;">공 급 자</div>' +
-              '<table style="width:100%;border-collapse:collapse;border:1px solid #222;border-top:none;table-layout:fixed;">' + supplierRows + '</table></td>' +
-              '<td style="width:50%;vertical-align:top;padding:0 0 0 4px;">' +
-              '<div class="inv-print-party-cap" style="' + cell + 'background:#222;color:#fff;text-align:center;font-weight:bold;padding:4px 2px;font-size:9px;">공 급 받 는 자</div>' +
-              '<table style="width:100%;border-collapse:collapse;border:1px solid #222;border-top:none;table-layout:fixed;">' + buyerRows + '</table></td></tr></table>' +
-              '<table class="inv-print-items" style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:8.5px;">' +
-              '<thead><tr>' +
-              '<th style="' + thCell + '">순번</th><th style="' + thCell + '">상품명</th><th style="' + thCell + '">규격</th>' +
-              '<th style="' + thCell + '">수량</th><th style="' + thCell + '">단가</th><th style="' + thCell + '">공급가액</th>' +
-              '<th style="' + thCell + '">세액</th><th style="' + thCell + '">합계</th></tr></thead><tbody>' +
-              itemsHtml +
-              '<tr><td colspan="5" style="' + cell + 'text-align:right;font-weight:bold;">합 계</td>' +
-              '<td style="' + cell + 'text-align:right;font-weight:bold;">' + (s.total_amount || 0).toLocaleString() + '</td>' +
-              '<td style="' + cell + 'text-align:right;font-weight:bold;">' + (s.vat_amount || 0).toLocaleString() + '</td>' +
-              '<td style="' + cell + 'text-align:right;font-weight:bold;">' + (s.grand_total || 0).toLocaleString() + '</td></tr></tbody></table>' +
-              (s.memo ? '<div class="inv-print-memo" style="margin-top:8px;padding:6px;border:1px solid #222;min-height:36px;font-size:8.5px;word-break:break-word;"><strong>비고</strong> ' + s.memo + '</div>' : '<div class="inv-print-memo" style="margin-top:8px;padding:6px;border:1px solid #222;min-height:36px;color:#999;font-size:8.5px;">비고</div>') +
-              '</div>';
-            const printStyles =
-              '@page{size:A4 portrait;margin:6mm 7mm;}' +
-              '*{box-sizing:border-box;}' +
-              'html,body{height:100%;margin:0;padding:0;max-width:100%;overflow-x:hidden;}' +
-              'body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;font-size:9px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
-              '.inv-print-root{min-height:265mm;display:flex;flex-direction:column;padding:0;width:100%;max-width:100%;}' +
-              '.inv-print-title{margin:0 0 8px;font-size:17px;font-weight:700;letter-spacing:0.12em;text-align:center;}' +
-              '.inv-p-row td{min-height:20px;vertical-align:middle;}' +
-              '.inv-print-items{flex:1 1 auto;table-layout:fixed;}' +
-              '.inv-print-memo{flex-shrink:0;}' +
-              'table{max-width:100%;}';
-            const printWin = window.open('', '_blank');
-            printWin.document.write('<html><head><meta charset="UTF-8"><title>거래명세서 ' + (s.statement_no || '') + '</title><style>' + printStyles + '</style></head><body>' + html + '</body></html>');
-            printWin.document.close();
-            printWin.focus();
-            setTimeout(function() { printWin.print(); printWin.close(); }, 300);
+          if (!data.success || !data.data) {
+            alert(data.message || '명세서를 불러올 수 없습니다.');
+            return;
           }
+          const doc = invBuildStatementPrintContent(data.data);
+          const printWin = window.open('', '_blank');
+          printWin.document.write('<html><head><meta charset="UTF-8"><title>거래명세서 ' + (data.data.statement_no || '') + '</title><style>' + doc.printStyles + '</style></head><body>' + doc.html + '</body></html>');
+          printWin.document.close();
+          printWin.focus();
+          setTimeout(function() { printWin.print(); printWin.close(); }, 300);
         })
         .catch(err => { console.error(err); alert('명세서 로드 실패'); });
+    }
+
+    function invDownloadStatement(id, format) {
+      format = (format || 'pdf').toLowerCase();
+      if (format !== 'pdf' && format !== 'jpg') format = 'pdf';
+      if (typeof html2canvas === 'undefined') {
+        alert('화면 캡처 라이브러리를 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도하세요.');
+        return;
+      }
+      if (format === 'pdf' && (!window.jspdf || typeof window.jspdf.jsPDF !== 'function')) {
+        alert('PDF 라이브러리를 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도하세요.');
+        return;
+      }
+      fetch('/api/invoice/statements/' + id, { credentials: 'include', headers: invGetUserHeaders() })
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success || !data.data) {
+            alert(data.message || '명세서를 불러올 수 없습니다.');
+            return;
+          }
+          const doc = invBuildStatementPrintContent(data.data);
+          var prevSt = document.getElementById('inv-cap-style-temp');
+          if (prevSt) prevSt.remove();
+          var st = document.createElement('style');
+          st.id = 'inv-cap-style-temp';
+          st.textContent = doc.printStyles + 'html,body{height:auto!important;overflow:visible!important;}.inv-print-root{min-height:auto!important;width:794px!important;max-width:794px!important;margin:0;background:#fff;}';
+          document.head.appendChild(st);
+          var wrap = document.createElement('div');
+          wrap.id = 'inv-cap-wrap-temp';
+          wrap.style.cssText = 'position:fixed;left:-12000px;top:0;width:794px;background:#fff;';
+          wrap.innerHTML = doc.html;
+          document.body.appendChild(wrap);
+          var root = wrap.querySelector('.inv-print-root');
+          if (!root) {
+            wrap.remove();
+            st.remove();
+            alert('명세서 영역을 찾을 수 없습니다.');
+            return;
+          }
+          requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+              html2canvas(root, { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true })
+                .then(function(canvas) {
+                  wrap.remove();
+                  st.remove();
+                  try {
+                    if (format === 'jpg') {
+                      var a = document.createElement('a');
+                      a.href = canvas.toDataURL('image/jpeg', 0.92);
+                      a.download = doc.fileBase + '.jpg';
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                    } else {
+                      var imgData = canvas.toDataURL('image/jpeg', 0.92);
+                      var PDF = window.jspdf.jsPDF;
+                      var pdf = new PDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                      var pageW = pdf.internal.pageSize.getWidth();
+                      var pageH = pdf.internal.pageSize.getHeight();
+                      var imgW = pageW;
+                      var imgH = (canvas.height * imgW) / canvas.width;
+                      if (imgH > pageH) {
+                        var rr = pageH / imgH;
+                        pdf.addImage(imgData, 'JPEG', 0, 0, imgW * rr, pageH);
+                      } else {
+                        pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
+                      }
+                      pdf.save(doc.fileBase + '.pdf');
+                    }
+                  } catch (e) {
+                    console.error(e);
+                    alert('파일 저장 중 오류가 발생했습니다.');
+                  }
+                })
+                .catch(function(err) {
+                  wrap.remove();
+                  st.remove();
+                  console.error(err);
+                  alert('이미지 변환에 실패했습니다.');
+                });
+            });
+          });
+        })
+        .catch(function(err) {
+          console.error(err);
+          alert('명세서 로드 실패');
+        });
     }
 
     function invLoadSettlementData() {
@@ -1306,7 +1424,9 @@
             '<tr><td style="text-align:center">' + (i + 1) + '</td><td>' + (s.statement_no || '') + '</td><td>' + (s.statement_date || '') +
             '</td><td>' + (s.customer_name || '') + '</td><td style="text-align:right">' + (s.grand_total || 0).toLocaleString() +
             '</td><td><button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invMarkPaid(' + s.id + ')">입금처리</button> ' +
-            '<button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invPrintStatement(' + s.id + ')">🖨️ 프린트</button></td></tr>'
+            '<button type="button" class="inv-btn" style="padding:6px 12px; font-size:12px;" onclick="invPrintStatement(' + s.id + ')">🖨️ 프린트</button> ' +
+            '<button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invDownloadStatement(' + s.id + ', \'pdf\')">PDF</button> ' +
+            '<button type="button" class="inv-btn" style="padding:6px 10px; font-size:12px;" onclick="invDownloadStatement(' + s.id + ', \'jpg\')">JPG</button></td></tr>'
           ).join('');
         })
         .catch(err => {
