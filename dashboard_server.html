@@ -524,31 +524,56 @@
       background: linear-gradient(135deg, #ff5722 0%, #ffb74d 100%);
     }
     
-    /* 메뉴바 스타일 */
+    /* 메뉴바 스타일 — 한 줄 유지, 공간 부족 시 글자·패딩 축소 (이모지 동일 비율) */
     .menu-bar {
       background: #ffffff;
-      padding: 12px 20px;
+      padding: 10px clamp(12px, 1.5vw + 8px, 20px);
       border-radius: 14px;
       box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
       border: none;
       margin-bottom: 20px;
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+      flex-wrap: nowrap;
+      gap: clamp(4px, 0.4vw + 3px, 8px);
       align-items: center;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      container-type: inline-size;
+      container-name: menubar;
+    }
+    
+    .menu-bar::-webkit-scrollbar {
+      height: 6px;
+    }
+    
+    .menu-bar::-webkit-scrollbar-thumb {
+      background: rgba(255, 152, 0, 0.35);
+      border-radius: 3px;
     }
     
     .menu-item {
-      padding: 10px 20px;
+      flex: 0 1 auto;
+      min-width: 0;
+      padding: clamp(6px, 0.5vw + 4px, 10px) clamp(5px, 0.75vw + 3px, 18px);
       border: none;
       background: transparent;
       border-radius: 10px;
       color: #636e72;
       font-weight: 600;
-      font-size: 14px;
+      font-size: clamp(9px, 0.85vw + 6px, 14px);
+      line-height: 1.25;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
       white-space: nowrap;
+    }
+
+    @supports (container-type: inline-size) {
+      .menu-item {
+        padding: clamp(6px, 0.55cqw + 4px, 10px) clamp(5px, 1.1cqw + 3px, 18px);
+        font-size: clamp(9px, calc(100cqw / 68), 14px);
+      }
     }
 
     /* 스케쥴 - 검색형 드롭다운 */
@@ -1299,12 +1324,7 @@
         height: 40px !important;
       }
       .menu-bar {
-        padding: 10px 12px;
-        gap: 6px;
-      }
-      .menu-item {
-        padding: 8px 14px;
-        font-size: 13px;
+        padding: 8px 10px;
       }
       .tabs {
         padding: 6px 10px;
