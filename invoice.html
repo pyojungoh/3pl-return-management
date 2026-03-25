@@ -1362,8 +1362,11 @@
         '<tr><th style="' + thCell + '">대표자</th><td style="' + cell + 'word-break:break-word;">' + (s.representative || '-') + '</td></tr>' +
         '<tr><th style="' + thCell + '">&nbsp;</th><td style="' + cell + '">&nbsp;</td></tr>' +
         '<tr><th style="' + thCell + '">&nbsp;</th><td style="' + cell + '">&nbsp;</td></tr>';
+      var invPrintWatermarkUrl = '/static/invoice-jayjay-watermark.png';
       const html =
         '<div class="inv-print-root">' +
+        '<div class="inv-print-watermark" style="background-image:url(\'' + invPrintWatermarkUrl + '\')"></div>' +
+        '<div class="inv-print-foreground">' +
         '<h1 class="inv-print-title">거 래 명 세 서</h1>' +
         '<table class="inv-print-meta" style="width:100%;border-collapse:collapse;margin-bottom:10px;">' +
         '<tr><td style="' + cell + 'width:50%;"><strong>명세서번호</strong> ' + (s.statement_no || '') + '</td>' +
@@ -1387,13 +1390,15 @@
         '<td style="' + cell + 'text-align:right;font-weight:bold;">' + (s.vat_amount || 0).toLocaleString() + '</td>' +
         '<td style="' + cell + 'text-align:right;font-weight:bold;">' + (s.grand_total || 0).toLocaleString() + '</td></tr></tbody></table>' +
         (s.memo ? '<div class="inv-print-memo" style="margin-top:8px;padding:6px;border:1px solid #222;min-height:36px;font-size:8.5px;word-break:break-word;"><strong>비고</strong> ' + s.memo + '</div>' : '<div class="inv-print-memo" style="margin-top:8px;padding:6px;border:1px solid #222;min-height:36px;color:#999;font-size:8.5px;">비고</div>') +
-        '</div>';
+        '</div></div>';
       const printStyles =
         '@page{size:A4 portrait;margin:6mm 7mm;}' +
         '*{box-sizing:border-box;}' +
         'html,body{height:100%;margin:0;padding:0;max-width:100%;overflow-x:hidden;}' +
         'body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;font-size:9px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
-        '.inv-print-root{min-height:265mm;display:flex;flex-direction:column;padding:0;width:100%;max-width:100%;}' +
+        '.inv-print-root{position:relative;min-height:265mm;padding:0;width:100%;max-width:100%;}' +
+        '.inv-print-watermark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78mm;height:78mm;max-width:42%;background-size:contain;background-repeat:no-repeat;background-position:center;opacity:0.1;pointer-events:none;z-index:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+        '.inv-print-foreground{position:relative;z-index:1;display:flex;flex-direction:column;min-height:265mm;width:100%;}' +
         '.inv-print-title{margin:0 0 8px;font-size:17px;font-weight:700;letter-spacing:0.12em;text-align:center;}' +
         '.inv-p-row td{min-height:20px;vertical-align:middle;}' +
         '.inv-print-items{flex:1 1 auto;table-layout:fixed;}' +
@@ -1446,7 +1451,8 @@
           st.textContent = doc.printStyles +
             'html,body{height:auto!important;overflow:visible!important;margin:0;background:#fff;}' +
             '.inv-capture-page{width:210mm;min-height:297mm;box-sizing:border-box;padding:6mm 7mm;background:#fff;}' +
-            '.inv-capture-page .inv-print-root{min-height:auto!important;width:100%!important;max-width:100%!important;margin:0!important;}';
+            '.inv-capture-page .inv-print-root{min-height:auto!important;width:100%!important;max-width:100%!important;margin:0!important;}' +
+            '.inv-capture-page .inv-print-foreground{min-height:auto!important;}';
           document.head.appendChild(st);
           var wrap = document.createElement('div');
           wrap.id = 'inv-cap-wrap-temp';
