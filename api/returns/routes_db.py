@@ -126,8 +126,14 @@ def get_returns_data():
         returns = get_returns_by_company(company, month, role)
         
         # 관리자 모드: 이전(비활성) 화주사 데이터는 목록에서 제외
+        # 화주사명마다 DB를 여는 N+1 방지: 고유 화주사명에 대해 1회만 is_company_deactivated 호출
         if role == '관리자' and returns:
-            returns = [r for r in returns if not is_company_deactivated(r.get('company_name', '') or '')]
+            deactivated_cache = {}
+            for r in returns:
+                cname = (r.get('company_name', '') or '')
+                if cname not in deactivated_cache:
+                    deactivated_cache[cname] = is_company_deactivated(cname)
+            returns = [r for r in returns if not deactivated_cache[(r.get('company_name', '') or '')]]
         
         # 디버깅: 조회 결과 확인
         print(f"   조회된 데이터: {len(returns)}건")
@@ -221,7 +227,8 @@ def get_returns_data():
                 '다른외부택배사': ret.get('other_courier', ''),
                 '배송비': ret.get('shipping_fee', ''),
                 '화주사요청': ret.get('client_request', ''),
-                '화주사확인완료': ret.get('client_confirmed', '')
+                '화주사확인완료': ret.get('client_confirmed', ''),
+                '관리번호': ret.get('management_number') or ''
             })
         
         # 최신 날짜부터 정렬 (서버에서 이미 정렬되었지만 클라이언트 측에서도 정렬 보장)
@@ -470,6 +477,8 @@ def update_return_route():
             update_data['return_type'] = data.get('return_type', '').strip()
         if 'stock_status' in data:
             update_data['stock_status'] = data.get('stock_status', '').strip()
+        if 'management_number' in data:
+            update_data['management_number'] = data.get('management_number', '').strip()
         
         if not update_data:
             return jsonify({
@@ -713,6 +722,9 @@ def upload_csv_route():
             elif '송장번호' in header or ('송장' in header and '번호' in header):
                 if 'tracking_number' not in column_indices:
                     column_indices['tracking_number'] = idx
+            elif '관리번호' in header or header_clean == '관리번호':
+                if 'management_number' not in column_indices:
+                    column_indices['management_number'] = idx
             elif '반품/교환/오배송' in header or '반품/교환' in header:
                 if 'return_type' not in column_indices:
                     column_indices['return_type'] = idx
@@ -811,6 +823,7 @@ def upload_csv_route():
                     'photo_links': get_col(column_indices.get('photo_links')) or None,
                     'other_courier': None,
                     'shipping_fee': get_col(column_indices.get('shipping_fee')) or None,
+                    'management_number': get_col(column_indices.get('management_number')) or None,
                     'client_request': get_col(column_indices.get('client_request')) or None,
                     'client_confirmed': get_col(column_indices.get('client_confirmed')) or None,
                     'month': month
@@ -867,13 +880,13 @@ def download_csv_template():
     try:
         # CSV 데이터 생성
         csv_data = [
-            ['반품 접수일', '화주명', '제품', '고객명', '송장번호', '반품/교환/오배송', 
-             '재고상태 (불량/정상)', '검품유무', '처리완료', '비고', '사진', 'QR코드', 
+            ['반품 접수일', '화주명', '제품', '고객명', '송장번호', '관리번호', '반품/교환/오배송',
+             '재고상태 (불량/정상)', '검품유무', '처리완료', '비고', '사진', 'QR코드',
              '금액', '화주사요청', '화주사확인완료'],
-            ['2025-01-15', '제이제이', '상품A', '홍길동', '123456789', '반품', '정상', 
-             '강', '강', '테스트 메모', '', '', '', '', ''],
-            ['2025-01-16', '보딩패스', '상품B', '이기석', '987654321', '교환', '불량', 
-             '표', '표', '', '', '', '', '', '']
+            ['2025-01-15', '제이제이', '상품A', '홍길동', '123456789', 'M-001', '반품', '정상',
+             '강', '강', '테스트 메모', '', '', '', '', '', ''],
+            ['2025-01-16', '보딩패스', '상품B', '이기석', '987654321', '', '교환', '불량',
+             '표', '표', '', '', '', '', '', '', '']
         ]
         
         # CSV 문자열 생성

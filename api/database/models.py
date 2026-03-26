@@ -194,6 +194,14 @@ def init_db():
                 ON returns(return_date)
             ''')
             
+            try:
+                cursor.execute(
+                    'ALTER TABLE returns ADD COLUMN IF NOT EXISTS management_number TEXT'
+                )
+            except Exception as e:
+                if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
+                    print(f"[경고] returns.management_number 추가 중 오류 (무시 가능): {e}")
+            
             # 판매 스케쥴 테이블
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS schedules (
@@ -1043,6 +1051,13 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_returns_date 
                 ON returns(return_date)
             ''')
+            
+            try:
+                cursor.execute('ALTER TABLE returns ADD COLUMN management_number TEXT')
+            except OperationalError as e:
+                err = str(e).lower()
+                if 'duplicate column' not in err and 'already exists' not in err:
+                    print(f"[경고] returns.management_number 추가 중 오류 (무시 가능): {e}")
             
             # SQLite - 스케쥴 테이블
             cursor.execute('''
@@ -2735,6 +2750,71 @@ def get_company_search_keywords(company_name: str) -> List[str]:
         conn.close()
 
 
+def _sql_company_normalized_equals_keywords_pg() -> str:
+    """PostgreSQL: Python normalize_company_name 과 동일하게 공백류 제거 후 소문자."""
+    return (
+        "lower(regexp_replace(coalesce(company_name, ''), "
+        r"'\\s', '', 'g'))"
+    )
+
+
+def _sql_company_normalized_equals_keywords_sqlite() -> str:
+    """SQLite: 공란/탭/CR/LF 제거 후 소문자 (일반 데이터에 한함)."""
+    return (
+        "lower("
+        "replace(replace(replace(replace(ifnull(company_name,''), ' ', ''), "
+        "char(9), ''), char(10), ''), char(13), ''))"
+    )
+
+
+def _assign_missing_return_ids(cursor, rows: List[Dict], use_pg: bool) -> None:
+    """id 누락 행에 ID 부여. MAX(id)는 1회만 조회."""
+    missing = [item for item in rows if not item.get('id') or item.get('id') is None]
+    if not missing:
+        return
+    if use_pg:
+        cursor.execute('SELECT COALESCE(MAX(id), 0) FROM returns')
+        row_max = cursor.fetchone()
+        max_id = row_max[0] if row_max else 0
+    else:
+        cursor.execute('SELECT COALESCE(MAX(id), 0) FROM returns')
+        max_id = cursor.fetchone()[0]
+    next_id = int(max_id or 0)
+    for item in missing:
+        next_id += 1
+        new_id = next_id
+        customer_name = item.get('customer_name')
+        tracking_number = item.get('tracking_number')
+        item_month = item.get('month')
+        if customer_name and tracking_number and item_month:
+            if use_pg:
+                cursor.execute(
+                    '''
+                    UPDATE returns
+                    SET id = %s
+                    WHERE customer_name = %s
+                    AND tracking_number = %s
+                    AND month = %s
+                    AND (id IS NULL OR id = 0)
+                    ''',
+                    (new_id, customer_name, tracking_number, item_month),
+                )
+            else:
+                cursor.execute(
+                    '''
+                    UPDATE returns
+                    SET id = ?
+                    WHERE customer_name = ?
+                    AND tracking_number = ?
+                    AND month = ?
+                    AND (id IS NULL OR id = 0)
+                    ''',
+                    (new_id, customer_name, tracking_number, item_month),
+                )
+            item['id'] = new_id
+            print(f"   [성공] ID 생성: {new_id} - {customer_name}, {tracking_number}")
+
+
 def get_returns_by_company(company: str, month: str, role: str = '화주사') -> List[Dict]:
     """화주사별 반품 데이터 조회 (최신 날짜부터 정렬)
     
@@ -2762,51 +2842,24 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
                 # 검색 가능한 키워드 목록 가져오기
                 search_keywords = get_company_search_keywords(company.strip())
                 print(f"   검색 키워드: {search_keywords}")
-                
-                # 모든 반품 데이터를 가져온 후 필터링 (대소문자 무시, 공백 무시)
-                cursor.execute('SELECT * FROM returns WHERE month = %s', (month,))
-                all_rows = cursor.fetchall()
-                all_returns = [dict(row) for row in all_rows]
-                
-                # 정규화된 키워드로 필터링
-                result = []
-                for ret in all_returns:
-                    ret_company_name = normalize_company_name(ret.get('company_name', ''))
-                    if ret_company_name in search_keywords:
-                        result.append(ret)
-                
-                print(f"   화주사 모드: '{company.strip()}' 데이터만 조회 (month: {month}, {len(result)}건)")
-                rows = result
+                if not search_keywords:
+                    rows = []
+                else:
+                    kw_list = list(search_keywords)
+                    cn_expr = _sql_company_normalized_equals_keywords_pg()
+                    placeholders = ','.join(['%s'] * len(kw_list))
+                    cursor.execute(
+                        f'SELECT * FROM returns WHERE month = %s AND {cn_expr} IN ({placeholders})',
+                        [month] + kw_list,
+                    )
+                    rows = [dict(row) for row in cursor.fetchall()]
+                print(f"   화주사 모드: '{company.strip()}' 데이터만 조회 (month: {month}, {len(rows)}건)")
             
             print(f"   조회된 데이터: {len(rows)}건")
             if rows and len(rows) > 0:
-                # ID가 없는 데이터에 ID 생성
                 cursor_update = conn.cursor()
                 try:
-                    for item in rows:
-                        if not item.get('id') or item.get('id') is None:
-                            # 최대 ID 조회
-                            cursor_update.execute('SELECT COALESCE(MAX(id), 0) FROM returns')
-                            max_id = cursor_update.fetchone()[0]
-                            new_id = max_id + 1
-                            
-                            # ID 업데이트
-                            customer_name = item.get('customer_name')
-                            tracking_number = item.get('tracking_number')
-                            month = item.get('month')
-                            
-                            if customer_name and tracking_number and month:
-                                cursor_update.execute('''
-                                    UPDATE returns 
-                                    SET id = %s 
-                                    WHERE customer_name = %s 
-                                    AND tracking_number = %s 
-                                    AND month = %s 
-                                    AND (id IS NULL OR id = 0)
-                                ''', (new_id, customer_name, tracking_number, month))
-                                item['id'] = new_id
-                                print(f"   [성공] ID 생성: {new_id} - {customer_name}, {tracking_number}")
-                    
+                    _assign_missing_return_ids(cursor_update, rows, True)
                     conn.commit()
                 finally:
                     cursor_update.close()
@@ -2845,50 +2898,25 @@ def get_returns_by_company(company: str, month: str, role: str = '화주사') ->
                 # 검색 가능한 키워드 목록 가져오기
                 search_keywords = get_company_search_keywords(company.strip())
                 print(f"   검색 키워드: {search_keywords}")
-                
-                # 모든 반품 데이터를 가져온 후 필터링 (대소문자 무시, 공백 무시)
-                cursor.execute('SELECT * FROM returns WHERE month = ?', (month,))
-                all_rows = cursor.fetchall()
-                all_returns = [dict(row) for row in all_rows]
-                
-                # 정규화된 키워드로 필터링
-                result = []
-                for ret in all_returns:
-                    ret_company_name = normalize_company_name(ret.get('company_name', ''))
-                    if ret_company_name in search_keywords:
-                        result.append(ret)
-                
+                if not search_keywords:
+                    result = []
+                else:
+                    kw_list = list(search_keywords)
+                    cn_expr = _sql_company_normalized_equals_keywords_sqlite()
+                    placeholders = ','.join(['?'] * len(kw_list))
+                    cursor.execute(
+                        f'SELECT * FROM returns WHERE month = ? AND {cn_expr} IN ({placeholders})',
+                        [month] + kw_list,
+                    )
+                    rows_sql = cursor.fetchall()
+                    result = [dict(row) for row in rows_sql]
                 print(f"   화주사 모드: '{company.strip()}' 데이터만 조회 (month: {month}, {len(result)}건)")
             
             print(f"   조회된 데이터: {len(result)}건")
             if result and len(result) > 0:
-                # ID가 없는 데이터에 ID 생성
                 cursor_update = conn.cursor()
                 try:
-                    for item in result:
-                        if not item.get('id') or item.get('id') is None:
-                            # 최대 ID 조회
-                            cursor_update.execute('SELECT COALESCE(MAX(id), 0) FROM returns')
-                            max_id = cursor_update.fetchone()[0]
-                            new_id = max_id + 1
-                            
-                            # ID 업데이트
-                            customer_name = item.get('customer_name')
-                            tracking_number = item.get('tracking_number')
-                            month = item.get('month')
-                            
-                            if customer_name and tracking_number and month:
-                                cursor_update.execute('''
-                                    UPDATE returns 
-                                    SET id = ? 
-                                    WHERE customer_name = ? 
-                                    AND tracking_number = ? 
-                                    AND month = ? 
-                                    AND (id IS NULL OR id = 0)
-                                ''', (new_id, customer_name, tracking_number, month))
-                                item['id'] = new_id
-                                print(f"   [성공] ID 생성: {new_id} - {customer_name}, {tracking_number}")
-                    
+                    _assign_missing_return_ids(cursor_update, result, False)
                     conn.commit()
                 finally:
                     cursor_update.close()
@@ -3078,6 +3106,7 @@ def create_return(return_data: Dict) -> int:
         'photo_links': empty_to_none(return_data.get('photo_links')),
         'other_courier': empty_to_none(return_data.get('other_courier')),
         'shipping_fee': empty_to_none(return_data.get('shipping_fee')),
+        'management_number': empty_to_none(return_data.get('management_number')),
         'client_request': empty_to_none(return_data.get('client_request')),
         'client_confirmed': empty_to_none(return_data.get('client_confirmed')),
         'month': return_data.get('month')
@@ -3092,9 +3121,9 @@ def create_return(return_data: Dict) -> int:
                 INSERT INTO returns (
                     return_date, company_name, product, customer_name, tracking_number,
                     return_type, stock_status, inspection, completed, memo,
-                    photo_links, other_courier, shipping_fee, client_request,
+                    photo_links, other_courier, shipping_fee, management_number, client_request,
                     client_confirmed, month
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             ''', (
                 return_data.get('return_date'),
@@ -3110,6 +3139,7 @@ def create_return(return_data: Dict) -> int:
                 return_data.get('photo_links'),
                 return_data.get('other_courier'),
                 return_data.get('shipping_fee'),
+                return_data.get('management_number'),
                 return_data.get('client_request'),
                 return_data.get('client_confirmed'),
                 return_data.get('month')
@@ -3150,6 +3180,7 @@ def create_return(return_data: Dict) -> int:
                     photo_links = COALESCE(%s, photo_links),
                     other_courier = COALESCE(%s, other_courier),
                     shipping_fee = COALESCE(%s, shipping_fee),
+                    management_number = COALESCE(%s, management_number),
                     updated_at = CURRENT_TIMESTAMP
                 WHERE customer_name = %s AND tracking_number = %s AND month = %s
                 RETURNING id
@@ -3165,6 +3196,7 @@ def create_return(return_data: Dict) -> int:
                 return_data.get('photo_links'),
                 return_data.get('other_courier'),
                 return_data.get('shipping_fee'),
+                return_data.get('management_number'),
                 return_data.get('customer_name'),
                 return_data.get('tracking_number'),
                 return_data.get('month')
@@ -3186,9 +3218,9 @@ def create_return(return_data: Dict) -> int:
                 INSERT INTO returns (
                     return_date, company_name, product, customer_name, tracking_number,
                     return_type, stock_status, inspection, completed, memo,
-                    photo_links, other_courier, shipping_fee, client_request,
+                    photo_links, other_courier, shipping_fee, management_number, client_request,
                     client_confirmed, month
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 return_data.get('return_date'),
                 return_data.get('company_name'),
@@ -3203,6 +3235,7 @@ def create_return(return_data: Dict) -> int:
                 return_data.get('photo_links'),
                 return_data.get('other_courier'),
                 return_data.get('shipping_fee'),
+                return_data.get('management_number'),
                 return_data.get('client_request'),
                 return_data.get('client_confirmed'),
                 return_data.get('month')
@@ -3258,6 +3291,7 @@ def create_return(return_data: Dict) -> int:
                     photo_links = COALESCE(?, photo_links),
                     other_courier = COALESCE(?, other_courier),
                     shipping_fee = COALESCE(?, shipping_fee),
+                    management_number = COALESCE(?, management_number),
                     updated_at = CURRENT_TIMESTAMP
                 WHERE customer_name = ? AND tracking_number = ? AND month = ?
             ''', (
@@ -3272,6 +3306,7 @@ def create_return(return_data: Dict) -> int:
                 return_data.get('photo_links'),
                 return_data.get('other_courier'),
                 return_data.get('shipping_fee'),
+                return_data.get('management_number'),
                 return_data.get('customer_name'),
                 return_data.get('tracking_number'),
                 return_data.get('month')
@@ -3501,6 +3536,9 @@ def update_return(return_id: int, return_data: Dict) -> bool:
             if 'stock_status' in return_data:
                 updates.append('stock_status = %s')
                 values.append(return_data.get('stock_status'))
+            if 'management_number' in return_data:
+                updates.append('management_number = %s')
+                values.append(return_data.get('management_number') or None)
             
             if not updates:
                 return False
@@ -3541,6 +3579,9 @@ def update_return(return_id: int, return_data: Dict) -> bool:
             if 'stock_status' in return_data:
                 updates.append('stock_status = ?')
                 values.append(return_data.get('stock_status'))
+            if 'management_number' in return_data:
+                updates.append('management_number = ?')
+                values.append(return_data.get('management_number') or None)
             
             if not updates:
                 return False
