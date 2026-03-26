@@ -5123,7 +5123,22 @@
       }
       
       // 해당 행의 모든 편집 가능한 셀에서 변경사항 수집
-      const row = document.querySelector(`tr:has([data-id="${returnId}"])`);
+      // :has() 미지원 브라우저·특수문자 ID 대비: data-id 속성으로 직접 탐색
+      const tbody = document.getElementById('tableBody');
+      let row = null;
+      const idStr = String(returnId);
+      if (tbody) {
+        const withId = tbody.querySelectorAll('[data-id]');
+        for (let i = 0; i < withId.length; i++) {
+          if (withId[i].getAttribute('data-id') === idStr) {
+            row = withId[i].closest('tr');
+            break;
+          }
+        }
+      }
+      if (!row) {
+        row = document.querySelector(`tr:has([data-id="${returnId}"])`);
+      }
       if (!row) {
         showMessage('❌ 행을 찾을 수 없습니다.', 'error');
         return;

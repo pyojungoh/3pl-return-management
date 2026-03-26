@@ -3074,6 +3074,37 @@ def mark_as_completed(return_id: int, manager_name: str) -> bool:
             conn.close()
 
 
+def ensure_returns_management_number_column(conn) -> None:
+    """returns에 management_number 컬럼이 없으면 추가 (init_db 누락·구 DB 대비)."""
+    try:
+        if USE_POSTGRESQL:
+            c = conn.cursor()
+            try:
+                c.execute(
+                    'ALTER TABLE returns ADD COLUMN IF NOT EXISTS management_number TEXT'
+                )
+                conn.commit()
+            finally:
+                c.close()
+        else:
+            c = conn.cursor()
+            try:
+                c.execute('ALTER TABLE returns ADD COLUMN management_number TEXT')
+                conn.commit()
+            except OperationalError as e:
+                err = str(e).lower()
+                if 'duplicate' not in err and 'already exists' not in err:
+                    print(f"[경고] ensure_returns_management_number_column: {e}")
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            finally:
+                c.close()
+    except Exception as e:
+        print(f"[경고] ensure_returns_management_number_column 실패: {e}")
+
+
 def create_return(return_data: Dict) -> int:
     """반품 데이터 생성"""
     print(f"💾 create_return 함수 호출:")
@@ -3113,6 +3144,7 @@ def create_return(return_data: Dict) -> int:
     }
     
     conn = get_db_connection()
+    ensure_returns_management_number_column(conn)
     
     if USE_POSTGRESQL:
         cursor = conn.cursor()
@@ -3144,8 +3176,8 @@ def create_return(return_data: Dict) -> int:
                 return_data.get('client_confirmed'),
                 return_data.get('month')
             ))
-            conn.commit()
             row = cursor.fetchone()
+            conn.commit()
             return row[0] if row else 0
         except IntegrityError:
             # 중복 데이터인 경우 업데이트 (기존 값 유지)
@@ -3201,8 +3233,8 @@ def create_return(return_data: Dict) -> int:
                 return_data.get('tracking_number'),
                 return_data.get('month')
             ))
-            conn.commit()
             row = cursor.fetchone()
+            conn.commit()
             return row[0] if row else 0
         except Exception as e:
             print(f"반품 데이터 생성 오류: {e}")
@@ -3516,6 +3548,7 @@ def update_memo(return_id: int, memo: str) -> bool:
 def update_return(return_id: int, return_data: Dict) -> bool:
     """반품 데이터 업데이트"""
     conn = get_db_connection()
+    ensure_returns_management_number_column(conn)
     
     if USE_POSTGRESQL:
         cursor = conn.cursor()
