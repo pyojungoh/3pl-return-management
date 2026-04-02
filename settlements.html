@@ -239,6 +239,12 @@
       background: #ffffff;
     }
     
+    .st-file-upload-area.st-file-upload-dragover {
+      border-color: #ff6b35;
+      background: #fff3e0;
+      border-style: solid;
+    }
+    
     .st-file-link {
       color: #74b9ff;
       text-decoration: underline;
@@ -497,7 +503,7 @@
               <div class="st-form-group" style="margin-bottom: 0;">
                 <label class="st-form-label">작업비 파일</label>
                 <div class="st-file-upload-area" id="stWorkFeeFileUploadArea" onclick="document.getElementById('stWorkFeeFileInput').click()">
-                  <p id="stWorkFeeFileUploadText">📄 클릭하여 파일 업로드</p>
+                  <p id="stWorkFeeFileUploadText">📄 클릭 또는 드래그하여 업로드</p>
                   <input type="file" id="stWorkFeeFileInput" accept=".pdf,.xlsx,.xls,.csv" style="display: none;" onchange="stHandleFileSelect('work_fee', event)">
                 </div>
                 <div id="stWorkFeeFileDisplay"></div>
@@ -507,7 +513,7 @@
               <div class="st-form-group" style="margin-bottom: 0;">
                 <label class="st-form-label">입출고비 파일</label>
                 <div class="st-file-upload-area" id="stInoutFeeFileUploadArea" onclick="document.getElementById('stInoutFeeFileInput').click()">
-                  <p id="stInoutFeeFileUploadText">📄 클릭하여 파일 업로드</p>
+                  <p id="stInoutFeeFileUploadText">📄 클릭 또는 드래그하여 업로드</p>
                   <input type="file" id="stInoutFeeFileInput" accept=".pdf,.xlsx,.xls,.csv" style="display: none;" onchange="stHandleFileSelect('inout_fee', event)">
                 </div>
                 <div id="stInoutFeeFileDisplay"></div>
@@ -517,7 +523,7 @@
               <div class="st-form-group" style="margin-bottom: 0;">
                 <label class="st-form-label">택배비 파일</label>
                 <div class="st-file-upload-area" id="stShippingFeeFileUploadArea" onclick="document.getElementById('stShippingFeeFileInput').click()">
-                  <p id="stShippingFeeFileUploadText">📄 클릭하여 파일 업로드</p>
+                  <p id="stShippingFeeFileUploadText">📄 클릭 또는 드래그하여 업로드</p>
                   <input type="file" id="stShippingFeeFileInput" accept=".pdf,.xlsx,.xls,.csv" style="display: none;" onchange="stHandleFileSelect('shipping_fee', event)">
                 </div>
                 <div id="stShippingFeeFileDisplay"></div>
@@ -779,6 +785,8 @@
         stApplyVisibility();
       }, 50);
       
+      stInitFileDropZones();
+
       stInitialized = true;
       console.log('[ST] 초기화 완료');
     }
@@ -1240,32 +1248,155 @@
       document.getElementById('stTotalAmount').textContent = total.toLocaleString();
     }
 
-    // 파일 선택 처리
-    async function stHandleFileSelect(fileType, event) {
-      const file = event.target.files[0];
+    const ST_FILE_UPLOAD_LABEL = '📄 클릭 또는 드래그하여 업로드';
+
+    /** 정산 폼 내용으로 DB에 행 생성/갱신 (파일 즉시 업로드 전에 필요) */
+    async function stEnsureSettlementRecord() {
+      const companyName = document.getElementById('stSettlementCompanyName')?.value;
+      const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
+      if (!companyName || !yearMonth) {
+        return { success: false, message: '화주사와 정산년월을 먼저 선택해주세요.' };
+      }
+      const workFee = parseInt(document.getElementById('stWorkFee')?.value || 0);
+      const inoutFee = parseInt(document.getElementById('stInoutFee')?.value || 0);
+      const shippingFee = parseInt(document.getElementById('stShippingFee')?.value || 0);
+      const collectOnDeliveryFee = parseInt(document.getElementById('stCollectOnDeliveryFee')?.value || 0);
+      const returnFee = parseInt(document.getElementById('stReturnFee')?.value || 0);
+      const storageFee = parseInt(document.getElementById('stStorageFee')?.value || 0);
+      const specialWorkFee = parseInt(document.getElementById('stSpecialWorkFee')?.value || 0);
+      const errorDeduction = parseInt(document.getElementById('stErrorDeduction')?.value || 0);
+      const memo = document.getElementById('stSettlementMemo')?.value || '';
+      const totalAmount = workFee + inoutFee + shippingFee + collectOnDeliveryFee + returnFee + storageFee + specialWorkFee - errorDeduction;
+      const settlementIdEl = document.getElementById('stSettlementId');
+      const settlementId = settlementIdEl?.value;
+
+      const data = {
+        company_name: companyName,
+        settlement_year_month: yearMonth,
+        work_fee: workFee,
+        inout_fee: inoutFee,
+        shipping_fee: shippingFee,
+        collect_on_delivery_fee: collectOnDeliveryFee,
+        return_fee: returnFee,
+        storage_fee: storageFee,
+        special_work_fee: specialWorkFee,
+        error_deduction: errorDeduction,
+        total_amount: totalAmount,
+        memo: memo
+      };
+
+      const url = settlementId ? `/api/settlements/${settlementId}` : '/api/settlements/';
+      const method = settlementId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...stGetUserHeaders()
+        },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+      const result = await response.json();
+      if (!result.success) {
+        return { success: false, message: result.message || '정산 저장에 실패했습니다.' };
+      }
+      let id;
+      if (settlementId) {
+        id = parseInt(settlementId, 10);
+      } else if (result.id) {
+        id = result.id;
+        if (settlementIdEl) settlementIdEl.value = String(result.id);
+      } else {
+        return { success: false, message: '정산 ID를 받지 못했습니다.' };
+      }
+      return { success: true, id: id };
+    }
+
+    /** 클릭/드롭 공통: 정산 자동 저장 후 즉시 Drive 업로드 */
+    async function stProcessPickedFile(fileType, file) {
       if (!file) return;
-      
-      // fileType을 올바르게 변환: 'work_fee' -> 'WorkFee' (언더스코어 제거, 각 단어 첫 글자 대문자)
       const fileTypeCapitalized = fileType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
       const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
       const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
       const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-      
-      // 파일 선택 시 파일만 저장하고 표시만 함 (저장 버튼 클릭 시 업로드)
-      stSelectedFiles[fileType] = { file: file };
-      
-      // 박스 밑 표시 영역에 파일명(용량) 및 저장 후 업로드 예정 표시
+      delete stSelectedFiles[fileType];
+
       if (displayDiv) {
-        displayDiv.innerHTML = `<div style="margin-top: 4px; padding: 4px 8px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 3px; display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
-          <span style="color: #856404; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; margin-right: 8px;">📄 ${file.name} (${fileSizeMB}MB) - 저장 후 업로드 예정</span>
-          <button type="button" onclick="stRemoveFile('${fileType}', event)" style="padding: 2px 6px; background: #95a5a6; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 10px; white-space: nowrap;">❌ 취소</button>
+        displayDiv.innerHTML = `<div style="margin-top: 4px; padding: 4px 8px; background: #e3f2fd; border: 1px solid #0984e3; border-radius: 3px; font-size: 11px; color: #0d47a1;">
+          ⏳ 정산 저장 후 클라우드 업로드 중… (${file.name}, ${fileSizeMB}MB)
         </div>`;
       }
-      
-      // 박스 안 텍스트는 원래대로 유지
-      if (uploadTextEl) {
-        uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+      if (uploadTextEl) uploadTextEl.textContent = '⏳ 처리 중…';
+
+      try {
+        const ensured = await stEnsureSettlementRecord();
+        if (!ensured.success) {
+          if (displayDiv) {
+            displayDiv.innerHTML = `<div style="margin-top: 4px; padding: 4px 8px; background: #f8d7da; border: 1px solid #dc3545; border-radius: 3px; color: #721c24; font-size: 11px;">❌ ${ensured.message || '정산 저장 실패'}</div>`;
+          }
+          if (uploadTextEl) uploadTextEl.textContent = ST_FILE_UPLOAD_LABEL;
+          alert(ensured.message || '정산을 먼저 저장할 수 없습니다.');
+          return;
+        }
+        await stUploadFileImmediately(fileType, ensured.id, file);
+        if (uploadTextEl) uploadTextEl.textContent = ST_FILE_UPLOAD_LABEL;
+        if (typeof stAdminLoadSettlements === 'function') {
+          stAdminLoadSettlements();
+        }
+      } catch (err) {
+        console.error('[ST] stProcessPickedFile:', err);
+        const uploadFailed = uploadTextEl && String(uploadTextEl.textContent || '').indexOf('❌ 업로드 실패') === 0;
+        if (uploadTextEl && !uploadFailed) {
+          uploadTextEl.textContent = ST_FILE_UPLOAD_LABEL;
+        }
+        if (displayDiv && !uploadFailed) {
+          displayDiv.innerHTML = `<div style="margin-top: 4px; padding: 4px 8px; background: #f8d7da; border: 1px solid #dc3545; border-radius: 3px; color: #721c24; font-size: 11px;">❌ ${err.message || '오류'}</div>`;
+        }
       }
+    }
+
+    function stInitFileDropZones() {
+      [
+        ['stWorkFeeFileUploadArea', 'work_fee'],
+        ['stInoutFeeFileUploadArea', 'inout_fee'],
+        ['stShippingFeeFileUploadArea', 'shipping_fee']
+      ].forEach(([areaId, fileType]) => {
+        const area = document.getElementById(areaId);
+        if (!area || area.dataset.stDropBound === '1') return;
+        area.dataset.stDropBound = '1';
+        ['dragenter', 'dragover'].forEach(evName => {
+          area.addEventListener(evName, function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            area.classList.add('st-file-upload-dragover');
+          });
+        });
+        area.addEventListener('dragleave', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const rel = e.relatedTarget;
+          if (!rel || !area.contains(rel)) {
+            area.classList.remove('st-file-upload-dragover');
+          }
+        });
+        area.addEventListener('drop', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          area.classList.remove('st-file-upload-dragover');
+          const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+          if (!f) return;
+          stProcessPickedFile(fileType, f);
+        });
+      });
+    }
+
+    // 파일 선택 처리 → 즉시 정산 저장 + Drive 업로드
+    async function stHandleFileSelect(fileType, event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      await stProcessPickedFile(fileType, file);
+      event.target.value = '';
     }
     
     // 파일을 Base64로 변환 (테스트 파일과 동일)
@@ -1400,11 +1531,11 @@
       const yearMonth = document.getElementById('stSettlementYearMonth')?.value;
       
       if (!companyName || !yearMonth) {
-        // 박스 안 텍스트 변경: 오류
+        const msg = '화주사와 정산년월을 먼저 선택해주세요.';
         if (uploadTextEl) {
-          uploadTextEl.textContent = '❌ 화주사와 정산년월을 먼저 선택해주세요.';
+          uploadTextEl.textContent = '❌ ' + msg;
         }
-        return;
+        throw new Error(msg);
       }
       
       try {
@@ -1470,10 +1601,10 @@
         }
       } catch (error) {
         console.error('[ST] 파일 업로드 오류:', error);
-        // 박스 안 텍스트 변경: 업로드 실패
         if (uploadTextEl) {
           uploadTextEl.textContent = `❌ 업로드 실패: ${error.message || '알 수 없는 오류'}`;
         }
+        throw error;
       }
     }
     
@@ -1521,7 +1652,7 @@
           if (displayDiv) {
             displayDiv.innerHTML = '';
           }
-          // 박스 안 텍스트는 그대로 유지 (이미 "📄 클릭하여 파일 업로드" 상태)
+          // 박스 안 텍스트는 ST_FILE_UPLOAD_LABEL 유지
         } else {
           throw new Error(result.message || '파일 삭제 실패');
         }
@@ -1550,7 +1681,7 @@
       
       // 박스 안 텍스트 원래대로 복원
       if (uploadTextEl) {
-        uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+        uploadTextEl.textContent = ST_FILE_UPLOAD_LABEL;
       }
       
       if (displayDiv) {
@@ -1929,86 +2060,8 @@
         .then(result => {
           if (result.success) {
             alert(result.message || '정산이 저장되었습니다.');
-            
-            // 파일 업로드 처리 (4MB 이상은 청크 업로드, 미만은 FormData)
-            // ※ 순차 업로드: 동시 업로드 시 Google Drive API(정산파일 폴더 조회)가 3번째 요청에서 실패하는 문제 방지
-            const finalSettlementId = result.id || settlementId;
-            if (finalSettlementId && Object.keys(stSelectedFiles).length > 0) {
-              const FILE_SIZE_LIMIT = 4 * 1024 * 1024; // 4MB
-              const entries = Object.entries(stSelectedFiles).filter(([, d]) => d && d.file);
-              
-              async function uploadFilesSequentially() {
-                const results = [];
-                for (const [fileType, fileData] of entries) {
-                  // 작업비→입출고비→택배비 순차 업로드: 파일 간 600ms 대기 (Google Drive API 충돌 방지)
-                  if (results.length > 0) {
-                    await new Promise(r => setTimeout(r, 600));
-                  }
-                  const file = fileData.file;
-                  const fileTypeCapitalized = fileType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
-                  const uploadTextEl = document.getElementById(`st${fileTypeCapitalized}FileUploadText`);
-                  const displayDiv = document.getElementById(`st${fileTypeCapitalized}FileDisplay`);
-                  
-                  if (uploadTextEl) {
-                    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-                    uploadTextEl.textContent = `⏳ 업로드 중... (${fileSizeMB} MB)`;
-                  }
-                  
-                  let uploadResult;
-                  try {
-                    if (file.size >= FILE_SIZE_LIMIT) {
-                      uploadResult = await stUploadInChunks(file, fileType, finalSettlementId, uploadTextEl, displayDiv);
-                    } else {
-                      const formData = new FormData();
-                      formData.append('file', file);
-                      formData.append('settlement_id', finalSettlementId);
-                      formData.append('file_type', fileType);
-                      const response = await fetch('/api/settlements/upload-file', {
-                        method: 'POST',
-                        headers: stGetUserHeaders(),
-                        credentials: 'include',
-                        body: formData
-                      });
-                      uploadResult = await response.json();
-                    }
-                  } catch (err) {
-                    uploadResult = { success: false, message: err.message || '알 수 없는 오류' };
-                  }
-                  
-                  if (uploadTextEl) uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
-                  if (displayDiv) {
-                    if (uploadResult && uploadResult.success) {
-                      const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-                      displayDiv.innerHTML = `<div style="margin-top: 8px; padding: 8px; background: #d4edda; border: 1px solid #28a745; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
-                        <span style="color: #155724; font-weight: 600;">✅ ${file.name} (${fileSizeMB} MB) - 업로드 완료</span>
-                        <button type="button" onclick="stDeleteUploadedFile('${fileType}', event)" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">❌ 삭제</button>
-                      </div>`;
-                    } else {
-                      displayDiv.innerHTML = `<div style="margin-top: 4px; padding: 4px 8px; background: #f8d7da; border: 1px solid #dc3545; border-radius: 3px; color: #721c24; font-size: 11px;">
-                        ❌ 업로드 실패: ${(uploadResult && uploadResult.message) || '알 수 없는 오류'}
-                      </div>`;
-                    }
-                  }
-                  results.push(uploadResult);
-                }
-                return results;
-              }
-              
-              uploadFilesSequentially().then(results => {
-                const failed = results.filter(r => !r || !r.success);
-                if (failed.length > 0) {
-                  console.error('[ST] 일부 파일 업로드 실패:', failed);
-                }
-                stAdminLoadSettlements();
-              }).catch(error => {
-                console.error('[ST] 파일 업로드 오류:', error);
-                alert('정산은 저장되었지만 파일 업로드 중 오류가 발생했습니다.');
-                stAdminLoadSettlements();
-              });
-            } else {
-              stAdminResetSettlementForm();
-              stAdminLoadSettlements();
-            }
+            stAdminResetSettlementForm();
+            stAdminLoadSettlements();
           } else {
             alert(result.message || '정산 저장에 실패했습니다.');
           }
@@ -2031,15 +2084,15 @@
       // 파일 업로드 박스 텍스트 원래대로 복원
       const workFeeUploadText = document.getElementById('stWorkFeeFileUploadText');
       if (workFeeUploadText) {
-        workFeeUploadText.textContent = '📄 클릭하여 파일 업로드';
+        workFeeUploadText.textContent = ST_FILE_UPLOAD_LABEL;
       }
       const inoutFeeUploadText = document.getElementById('stInoutFeeFileUploadText');
       if (inoutFeeUploadText) {
-        inoutFeeUploadText.textContent = '📄 클릭하여 파일 업로드';
+        inoutFeeUploadText.textContent = ST_FILE_UPLOAD_LABEL;
       }
       const shippingFeeUploadText = document.getElementById('stShippingFeeFileUploadText');
       if (shippingFeeUploadText) {
-        shippingFeeUploadText.textContent = '📄 클릭하여 파일 업로드';
+        shippingFeeUploadText.textContent = ST_FILE_UPLOAD_LABEL;
       }
       
       // 파일 입력 필드 초기화
@@ -2256,7 +2309,7 @@
               const uploadTextEl = document.getElementById('stWorkFeeFileUploadText');
               const displayDiv = document.getElementById('stWorkFeeFileDisplay');
               if (uploadTextEl) {
-                uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+                uploadTextEl.textContent = ST_FILE_UPLOAD_LABEL;
               }
               if (displayDiv) {
                 const fileName = settlement.work_fee_file_url.split('/').pop() || '파일';
@@ -2270,7 +2323,7 @@
               const uploadTextEl = document.getElementById('stWorkFeeFileUploadText');
               const displayDiv = document.getElementById('stWorkFeeFileDisplay');
               if (uploadTextEl) {
-                uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+                uploadTextEl.textContent = ST_FILE_UPLOAD_LABEL;
               }
               if (displayDiv) {
                 displayDiv.innerHTML = '';
@@ -2281,7 +2334,7 @@
               const uploadTextEl = document.getElementById('stInoutFeeFileUploadText');
               const displayDiv = document.getElementById('stInoutFeeFileDisplay');
               if (uploadTextEl) {
-                uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+                uploadTextEl.textContent = ST_FILE_UPLOAD_LABEL;
               }
               if (displayDiv) {
                 const fileName = settlement.inout_fee_file_url.split('/').pop() || '파일';
@@ -2294,7 +2347,7 @@
               const uploadTextEl = document.getElementById('stInoutFeeFileUploadText');
               const displayDiv = document.getElementById('stInoutFeeFileDisplay');
               if (uploadTextEl) {
-                uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+                uploadTextEl.textContent = ST_FILE_UPLOAD_LABEL;
               }
               if (displayDiv) {
                 displayDiv.innerHTML = '';
@@ -2305,7 +2358,7 @@
               const uploadTextEl = document.getElementById('stShippingFeeFileUploadText');
               const displayDiv = document.getElementById('stShippingFeeFileDisplay');
               if (uploadTextEl) {
-                uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+                uploadTextEl.textContent = ST_FILE_UPLOAD_LABEL;
               }
               if (displayDiv) {
                 const fileName = settlement.shipping_fee_file_url.split('/').pop() || '파일';
@@ -2318,7 +2371,7 @@
               const uploadTextEl = document.getElementById('stShippingFeeFileUploadText');
               const displayDiv = document.getElementById('stShippingFeeFileDisplay');
               if (uploadTextEl) {
-                uploadTextEl.textContent = '📄 클릭하여 파일 업로드';
+                uploadTextEl.textContent = ST_FILE_UPLOAD_LABEL;
               }
               if (displayDiv) {
                 displayDiv.innerHTML = '';
