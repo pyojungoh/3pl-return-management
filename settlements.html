@@ -835,6 +835,7 @@
       
       if (isAdmin) {
         stAdminInit();
+        stSwitchSubnav('main');
       } else {
         stConsignorInit();
       }
@@ -842,6 +843,7 @@
       // 4. 가시성 제어 재실행
       setTimeout(() => {
         stApplyVisibility();
+        if (isAdmin) stSwitchSubnav('main');
       }, 50);
       
       stInitFileDropZones();
@@ -850,6 +852,140 @@
       console.log('[ST] 초기화 완료');
     }
     window.stCommonInit = stCommonInit;
+
+    /** 대시보드 settlementDeliveryPopupCopy_v1 과 동일 키·필드 (dashboard_server.html 모듈과 동기화) */
+    function stGetDefaultPopupCopyLocal() {
+      return {
+        popupTitle: '💰 정산 전달 알림',
+        summaryLineTemplate: '전달 상태인 정산이 <strong style="color: #ff6b35;">{count}건</strong> 있습니다.',
+        totalLineTemplate: '총 결제금액: <strong style="color: #ff6b35;">{amount}원</strong>',
+        listHeading: '정산 내역 (클릭하여 상세 보기):',
+        agreeLabel: '정산내역을 확인했고 이에 동의합니다.',
+        confirmButtonText: '✅ 정산확인',
+        backButtonText: '목록으로 돌아가기',
+        confirmedBadgeText: '✅ 정산확인 완료'
+      };
+    }
+
+    function stFillPopupCopyForm() {
+      var copy = {};
+      if (typeof window.getSettlementDeliveryPopupCopy === 'function') {
+        copy = window.getSettlementDeliveryPopupCopy();
+      } else {
+        try {
+          var raw = localStorage.getItem('settlementDeliveryPopupCopy_v1');
+          copy = raw ? JSON.parse(raw) : {};
+        } catch (e) {
+          copy = {};
+        }
+        copy = Object.assign({}, stGetDefaultPopupCopyLocal(), copy);
+      }
+      var setVal = function (id, v) {
+        var el = document.getElementById(id);
+        if (el) el.value = v != null ? String(v) : '';
+      };
+      setVal('stPopupTitle', copy.popupTitle);
+      setVal('stPopupSummaryTemplate', copy.summaryLineTemplate);
+      setVal('stPopupTotalTemplate', copy.totalLineTemplate);
+      setVal('stPopupListHeading', copy.listHeading);
+      setVal('stPopupAgreeLabel', copy.agreeLabel);
+      setVal('stPopupConfirmBtn', copy.confirmButtonText);
+      setVal('stPopupBackBtn', copy.backButtonText);
+      setVal('stPopupConfirmedBadge', copy.confirmedBadgeText);
+    }
+
+    function stSavePopupCopySettings() {
+      var obj = {
+        popupTitle: (document.getElementById('stPopupTitle') && document.getElementById('stPopupTitle').value) ? document.getElementById('stPopupTitle').value.trim() : '',
+        summaryLineTemplate: (document.getElementById('stPopupSummaryTemplate') && document.getElementById('stPopupSummaryTemplate').value) ? document.getElementById('stPopupSummaryTemplate').value : '',
+        totalLineTemplate: (document.getElementById('stPopupTotalTemplate') && document.getElementById('stPopupTotalTemplate').value) ? document.getElementById('stPopupTotalTemplate').value : '',
+        listHeading: (document.getElementById('stPopupListHeading') && document.getElementById('stPopupListHeading').value) ? document.getElementById('stPopupListHeading').value.trim() : '',
+        agreeLabel: (document.getElementById('stPopupAgreeLabel') && document.getElementById('stPopupAgreeLabel').value) ? document.getElementById('stPopupAgreeLabel').value.trim() : '',
+        confirmButtonText: (document.getElementById('stPopupConfirmBtn') && document.getElementById('stPopupConfirmBtn').value) ? document.getElementById('stPopupConfirmBtn').value.trim() : '',
+        backButtonText: (document.getElementById('stPopupBackBtn') && document.getElementById('stPopupBackBtn').value) ? document.getElementById('stPopupBackBtn').value.trim() : '',
+        confirmedBadgeText: (document.getElementById('stPopupConfirmedBadge') && document.getElementById('stPopupConfirmedBadge').value) ? document.getElementById('stPopupConfirmedBadge').value.trim() : ''
+      };
+      if (typeof window.setSettlementDeliveryPopupCopy === 'function') {
+        window.setSettlementDeliveryPopupCopy(obj);
+      } else {
+        try {
+          var merged = Object.assign({}, stGetDefaultPopupCopyLocal(), obj);
+          localStorage.setItem('settlementDeliveryPopupCopy_v1', JSON.stringify(merged));
+        } catch (e) {
+          alert('저장에 실패했습니다.');
+          return;
+        }
+      }
+      alert('저장되었습니다. 이 브라우저에서 화주사 전달 알림 팝업 문구에 반영됩니다.');
+    }
+
+    function stResetPopupCopyDefaults() {
+      try {
+        localStorage.removeItem('settlementDeliveryPopupCopy_v1');
+      } catch (e) {}
+      if (typeof window.setSettlementDeliveryPopupCopy === 'function') {
+        window.setSettlementDeliveryPopupCopy({});
+      }
+      stFillPopupCopyForm();
+      alert('기본 문구로 되돌렸습니다.');
+    }
+
+    function stSwitchSubnav(mode) {
+      var mainWrap = document.getElementById('stPanelMainWrap');
+      var popupPanel = document.getElementById('stPanelDeliveryPopup');
+      var btnMain = document.getElementById('stSubnavMain');
+      var btnPopup = document.getElementById('stSubnavPopup');
+      if (!mainWrap || !popupPanel) return;
+      if (mode === 'popup') {
+        mainWrap.style.display = 'none';
+        popupPanel.style.display = 'block';
+        if (btnMain) btnMain.classList.remove('st-subnav-active');
+        if (btnPopup) btnPopup.classList.add('st-subnav-active');
+        stFillPopupCopyForm();
+      } else {
+        mainWrap.style.display = 'block';
+        popupPanel.style.display = 'none';
+        if (btnMain) btnMain.classList.add('st-subnav-active');
+        if (btnPopup) btnPopup.classList.remove('st-subnav-active');
+      }
+    }
+
+    function stPreviewSettlementDeliveryPopup() {
+      if (typeof window.showSettlementDeliveryPopup !== 'function') {
+        alert('미리보기는 대시보드(통합 화면)에서만 동작합니다. settlements.html 단독 열람 시에는 팝업 모듈이 없습니다.');
+        return;
+      }
+      var copyOverride = {
+        popupTitle: document.getElementById('stPopupTitle') && document.getElementById('stPopupTitle').value,
+        summaryLineTemplate: document.getElementById('stPopupSummaryTemplate') && document.getElementById('stPopupSummaryTemplate').value,
+        totalLineTemplate: document.getElementById('stPopupTotalTemplate') && document.getElementById('stPopupTotalTemplate').value,
+        listHeading: document.getElementById('stPopupListHeading') && document.getElementById('stPopupListHeading').value,
+        agreeLabel: document.getElementById('stPopupAgreeLabel') && document.getElementById('stPopupAgreeLabel').value,
+        confirmButtonText: document.getElementById('stPopupConfirmBtn') && document.getElementById('stPopupConfirmBtn').value,
+        backButtonText: document.getElementById('stPopupBackBtn') && document.getElementById('stPopupBackBtn').value,
+        confirmedBadgeText: document.getElementById('stPopupConfirmedBadge') && document.getElementById('stPopupConfirmedBadge').value
+      };
+      var dummy = [{
+        id: 0,
+        settlement_year_month: '2025-01',
+        status: '전달',
+        company_name: '(미리보기)',
+        work_fee: 1000000,
+        inout_fee: 0,
+        shipping_fee: 0,
+        collect_on_delivery_fee: 0,
+        return_fee: 0,
+        storage_fee: 0,
+        special_work_fee: 0,
+        error_deduction: 0
+      }];
+      window.showSettlementDeliveryPopup(dummy, { preview: true, copyOverride: copyOverride });
+    }
+
+    window.stSwitchSubnav = stSwitchSubnav;
+    window.stSavePopupCopySettings = stSavePopupCopySettings;
+    window.stResetPopupCopyDefaults = stResetPopupCopyDefaults;
+    window.stPreviewSettlementDeliveryPopup = stPreviewSettlementDeliveryPopup;
 
     // 가시성 제어 함수
     function stApplyVisibility() {
@@ -860,6 +996,8 @@
       const isAdmin = (roleNormalized === '관리자');
       
       container.querySelectorAll('.st-admin-only').forEach(el => {
+        // 전달 알림 팝업 설정 패널은 stSwitchSubnav()가 표시 여부 전담 (여기서 block 하면 본문과 겹침)
+        if (el.id === 'stPanelDeliveryPopup') return;
         // 테이블 셀(<th>, <td>)인 경우 table-cell/none 사용, 그 외는 block/none 사용
         const isTableCell = el.tagName === 'TH' || el.tagName === 'TD';
         el.style.display = isAdmin ? (isTableCell ? 'table-cell' : 'block') : 'none';
