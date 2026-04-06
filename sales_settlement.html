@@ -152,6 +152,79 @@
     .ss-detail-row .label { font-weight: 600; color: #636e72; }
     .ss-detail-row .value { color: #2d3436; }
     .ss-no-data { text-align: center; padding: 40px 20px; color: #636e72; }
+    .ss-subnav {
+      display: flex;
+      gap: 0;
+      margin-bottom: 16px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px solid #ffeaa7;
+      background: linear-gradient(135deg, #ffffff 0%, #fffef9 100%);
+    }
+    .ss-subnav-btn {
+      flex: 1;
+      padding: 14px 16px;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      font-weight: 600;
+      color: #636e72;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ss-subnav-btn:hover { background: #fff9e6; color: #ff6b35; }
+    .ss-subnav-btn.active {
+      background: linear-gradient(135deg, #fff9e6 0%, #ffeaa7 100%);
+      color: #ff6b35;
+      font-weight: 700;
+    }
+    .ss-view-stats { display: none; }
+    .ss-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .ss-kpi-card .ss-card-value { font-size: 18px; }
+    .ss-chart-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media (min-width: 900px) {
+      .ss-chart-grid { grid-template-columns: 1fr 1fr; }
+    }
+    .ss-chart-wrap {
+      background: #fff;
+      border: 2px solid #ffeaa7;
+      border-radius: 12px;
+      padding: 12px;
+      min-height: 300px;
+      position: relative;
+    }
+    .ss-chart-wrap canvas { max-height: 320px; }
+    .ss-chart-full { grid-column: 1 / -1; }
+    .ss-rank-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .ss-rank-table th, .ss-rank-table td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+    }
+    .ss-rank-table th { background: #fff9e6; color: #2d3436; }
+    .ss-rank-table tr:nth-child(even) { background: #fafafa; }
+    .ss-insight {
+      font-size: 13px;
+      color: #636e72;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
     @media (min-width: 768px) {
       #ssContainer { padding: 20px; }
       .ss-company-grid {
@@ -167,6 +240,14 @@
   <div id="ssContainer">
     <div class="ss-section">
       <h2 style="margin: 0 0 12px 0; font-size: 18px; color: #ff6b35;">📊 매출정산</h2>
+      <div class="ss-subnav" role="tablist">
+        <button type="button" class="ss-subnav-btn active" data-view="list" onclick="ssSwitchSalesView('list')">월별 정산 목록</button>
+        <button type="button" class="ss-subnav-btn" data-view="stats" onclick="ssSwitchSalesView('stats')">연별 정산 통계</button>
+      </div>
+    </div>
+
+    <div id="ssViewList">
+    <div class="ss-section">
       <div class="ss-filters">
         <div class="ss-filter-group">
           <label>조회 월</label>
@@ -207,6 +288,57 @@
       <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #2d3436;">화주사별 정산내역</h3>
       <div id="ssCompanyList" class="ss-company-grid">
         <div class="ss-no-data">로딩 중...</div>
+      </div>
+    </div>
+    </div>
+
+    <div id="ssViewStats" style="display:none;">
+      <div class="ss-section">
+        <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #2d3436;">연별 정산 통계</h3>
+        <p style="margin: 0 0 12px 0; font-size: 13px; color: #636e72;">정산표 기준 월·연 매출, 화주사 순위, 상태 분포입니다.</p>
+        <div class="ss-filters">
+          <div class="ss-filter-group">
+            <label>연도 시작</label>
+            <input type="number" id="ssAnYearFrom" placeholder="전체" min="2020" max="2035" style="width: 100px;">
+          </div>
+          <div class="ss-filter-group">
+            <label>연도 끝</label>
+            <input type="number" id="ssAnYearTo" placeholder="전체" min="2020" max="2035" style="width: 100px;">
+          </div>
+          <div class="ss-filter-group">
+            <label>차트 월 개수</label>
+            <select id="ssAnMonthsBack">
+              <option value="12">최근 12개월</option>
+              <option value="24" selected>최근 24개월</option>
+              <option value="36">최근 36개월</option>
+            </select>
+          </div>
+          <button type="button" class="ss-btn" onclick="ssLoadAnalytics()">적용</button>
+        </div>
+      </div>
+      <p id="ssAnInsight" class="ss-insight"></p>
+      <div id="ssAnKpi" class="ss-kpi-grid"></div>
+      <div class="ss-chart-grid">
+        <div class="ss-chart-wrap">
+          <canvas id="ssChartMonthly"></canvas>
+        </div>
+        <div class="ss-chart-wrap">
+          <canvas id="ssChartYearly"></canvas>
+        </div>
+        <div class="ss-chart-wrap ss-chart-full">
+          <canvas id="ssChartStatus"></canvas>
+        </div>
+      </div>
+      <div class="ss-section">
+        <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #2d3436;">화주사 매출 순위 (상위 20)</h3>
+        <div style="overflow-x: auto;">
+          <table class="ss-rank-table">
+            <thead>
+              <tr><th>#</th><th>화주사</th><th style="text-align:right">합계</th><th style="text-align:right">비중</th></tr>
+            </thead>
+            <tbody id="ssAnRankBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -354,7 +486,7 @@
                 <div style="margin-bottom: 8px;"><span class="ss-status-badge ${statusClass}">${status}</span></div>
                 <div class="ss-company-actions">
                   <button class="ss-btn ss-btn-small" onclick="ssShowDetail(${item.id})">상세</button>
-                  <button class="ss-btn" onclick="ssShowStatusModal(${item.id}, '${status}')" style="padding: 6px 12px; font-size: 12px;">상태변경</button>
+                  <button class="ss-btn" onclick="ssShowStatusModal(${item.id}, ${JSON.stringify(status)})" style="padding: 6px 12px; font-size: 12px;">상태변경</button>
                   ${status === '정산확인' ? '<button class="ss-btn" onclick="ssCompletePayment(' + item.id + ')" style="padding: 6px 12px; font-size: 12px; background: linear-gradient(135deg, #00a085 0%, #008874 100%);">입금확인</button>' : ''}
                 </div>
               </div>
@@ -485,5 +617,6 @@
         .catch(err => alert('오류가 발생했습니다.'));
     }
   </script>
+  <script src="/static/js/sales_settlement_analytics.js"></script>
 </body>
 </html>

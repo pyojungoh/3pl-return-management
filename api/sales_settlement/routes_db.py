@@ -5,6 +5,7 @@
 """
 from flask import Blueprint, request, jsonify
 from api.database.models import get_db_connection, USE_POSTGRESQL, ensure_settlement_return_fee_column
+from api.sales_settlement.analytics_db import build_settlement_analytics
 from datetime import datetime, date
 from urllib.parse import unquote
 
@@ -155,6 +156,68 @@ def get_summary():
             'success': False,
             'message': str(e)
         }), 500
+
+
+@sales_settlement_bp.route('/analytics', methods=['GET'])
+def get_analytics():
+    """
+    연별 매출 통계 (월별·연별 시계열, 화주사 순위, KPI)
+    Query: months_back (기본 24), year_from, year_to (연도 필터, 선택)
+    """
+    ctx, err = _check_jjay()
+    if err:
+        return err[0], err[1]
+    try:
+        months_back = int(request.args.get('months_back', 24))
+        if months_back < 1:
+            months_back = 24
+        if months_back > 120:
+            months_back = 120
+        year_from = request.args.get('year_from', '').strip() or None
+        year_to = request.args.get('year_to', '').strip() or None
+
+        conn = get_db_connection()
+        ensure_settlement_return_fee_column(conn)
+        if USE_POSTGRESQL:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
+
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute('''
+                    SELECT settlement_year_month, company_name, total_amount, status
+                    FROM settlements
+                    WHERE settlement_year_month IS NOT NULL AND TRIM(settlement_year_month) <> ''
+                ''')
+            else:
+                cursor.execute('''
+                    SELECT settlement_year_month, company_name, total_amount, status
+                    FROM settlements
+                    WHERE settlement_year_month IS NOT NULL AND settlement_year_month != ''
+                ''')
+            rows = cursor.fetchall()
+            if USE_POSTGRESQL:
+                list_rows = [dict(r) for r in rows]
+            else:
+                cols = [d[0] for d in cursor.description]
+                list_rows = [dict(zip(cols, r)) for r in rows]
+        finally:
+            cursor.close()
+            conn.close()
+
+        payload = build_settlement_analytics(
+            list_rows,
+            months_back=months_back,
+            year_from=year_from,
+            year_to=year_to,
+        )
+        return jsonify({'success': True, 'data': payload})
+    except Exception as e:
+        print(f'[매출정산] analytics 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @sales_settlement_bp.route('/available-months', methods=['GET'])
