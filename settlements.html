@@ -371,10 +371,38 @@
     .st-settlement-detail-value {
       color: #636e72;
     }
+    
+    .st-subnav-btn {
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      border: 2px solid #ffeaa7;
+      border-radius: 10px;
+      background: #fffef9;
+      color: #636e72;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .st-subnav-btn:hover {
+      border-color: #ff6b35;
+      color: #2d3436;
+    }
+    .st-subnav-btn.st-subnav-active {
+      background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
+      color: #fff;
+      border-color: transparent;
+    }
   </style>
 </head>
 <body>
   <div id="stContainer">
+    <div id="stSettlementSubnav" class="st-admin-only st-section" style="display:none; margin-bottom: 12px;">
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-bottom: 2px solid #ffeaa7; padding-bottom: 10px;">
+        <button type="button" class="st-subnav-btn st-subnav-active" id="stSubnavMain" onclick="stSwitchSubnav('main')">정산 업무</button>
+        <button type="button" class="st-subnav-btn" id="stSubnavPopup" onclick="stSwitchSubnav('popup')">전달 알림 팝업</button>
+      </div>
+    </div>
+    <div id="stPanelMainWrap">
     <!-- 정산 등록/수정 섹션 (관리자만) -->
     <div id="stAdminSettlementSection" class="st-admin-only st-section">
       <button class="st-toggle-btn" onclick="stAdminToggleSettlementForm()">
@@ -610,6 +638,37 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <div id="stPanelDeliveryPopup" class="st-admin-only st-section" style="display: none;">
+      <div style="background: #ffffff; border: 2px solid #ffeaa7; border-radius: 14px; padding: 20px; max-width: 900px; margin: 0 auto;">
+        <h3 style="margin: 0 0 8px 0; color: #ff6b35; font-size: 18px;">화주사 전달 알림 팝업 문구</h3>
+        <p style="margin: 0 0 16px 0; font-size: 12px; color: #636e72; line-height: 1.5;">저장한 설정은 <strong>이 브라우저</strong>의 localStorage에만 저장됩니다. 화주사 로그인 시 표시되는 팝업에 동일하게 적용됩니다. 요약 첫 줄에는 <code>{count}</code>, 총 결제금액 줄에는 숫자만 치환되는 <code>{amount}</code> 를 사용할 수 있습니다.</p>
+        <div style="display: grid; gap: 12px;">
+          <label class="st-form-label">팝업 제목</label>
+          <input type="text" id="stPopupTitle" class="st-form-input" maxlength="200">
+          <label class="st-form-label">요약 첫 줄 (HTML 가능, {count})</label>
+          <textarea id="stPopupSummaryTemplate" class="st-form-textarea" rows="2" style="min-height: 52px;"></textarea>
+          <label class="st-form-label">총 결제금액 줄 (HTML 가능, {amount})</label>
+          <textarea id="stPopupTotalTemplate" class="st-form-textarea" rows="2" style="min-height: 52px;"></textarea>
+          <label class="st-form-label">목록 위 안내 문구</label>
+          <input type="text" id="stPopupListHeading" class="st-form-input" maxlength="300">
+          <label class="st-form-label">동의 체크박스 라벨</label>
+          <input type="text" id="stPopupAgreeLabel" class="st-form-input" maxlength="300">
+          <label class="st-form-label">정산확인 버튼 텍스트</label>
+          <input type="text" id="stPopupConfirmBtn" class="st-form-input" maxlength="80">
+          <label class="st-form-label">목록으로 돌아가기 버튼</label>
+          <input type="text" id="stPopupBackBtn" class="st-form-input" maxlength="80">
+          <label class="st-form-label">정산확인 완료 뱃지</label>
+          <input type="text" id="stPopupConfirmedBadge" class="st-form-input" maxlength="120">
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px;">
+          <button type="button" class="st-btn" onclick="stSavePopupCopySettings()">저장</button>
+          <button type="button" class="st-btn-secondary" onclick="stResetPopupCopyDefaults()">기본값으로 되돌리기</button>
+          <button type="button" class="st-btn" onclick="stPreviewSettlementDeliveryPopup()" style="background: linear-gradient(135deg, #0984e3 0%, #74b9ff 100%);">👁 미리보기</button>
         </div>
       </div>
     </div>
