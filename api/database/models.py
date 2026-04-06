@@ -2138,6 +2138,67 @@ def toggle_company_active_status(company_name: str, is_active: bool) -> Tuple[bo
         conn.close()
 
 
+def _company_deactivated_normalized_match(company_name: str, cursor) -> bool:
+    """
+    exact 매칭 실패 시 정규화(공백 제거·소문자) 비교로 비활성 여부 판별.
+    pallets 등에만 있는 표기와 companies/deactivated_companies 표기 불일치 대응.
+    """
+    n = normalize_company_name(company_name)
+    if not n:
+        return False
+    if USE_POSTGRESQL:
+        cursor.execute('SELECT company_name FROM deactivated_companies')
+        drows = cursor.fetchall()
+    else:
+        cursor.execute('SELECT company_name FROM deactivated_companies')
+        drows = cursor.fetchall()
+    for row in drows:
+        cn = row['company_name'] if USE_POSTGRESQL else row[0]
+        if normalize_company_name(cn) == n:
+            return True
+    if USE_POSTGRESQL:
+        cursor.execute('SELECT company_name, is_active FROM companies')
+        crows = cursor.fetchall()
+    else:
+        cursor.execute('SELECT company_name, is_active FROM companies')
+        crows = cursor.fetchall()
+    has_active = False
+    has_inactive = False
+    unknown_exact_names = []
+    for row in crows:
+        if USE_POSTGRESQL:
+            cn = row['company_name']
+            is_active = row['is_active']
+        else:
+            cn, is_active = row[0], row[1]
+        if normalize_company_name(cn) != n:
+            continue
+        if is_active is None:
+            unknown_exact_names.append(cn)
+        elif isinstance(is_active, int):
+            if is_active == 0:
+                has_inactive = True
+            else:
+                has_active = True
+        else:
+            if bool(is_active):
+                has_active = True
+            else:
+                has_inactive = True
+    if has_active:
+        return False
+    if has_inactive:
+        return True
+    for cn in unknown_exact_names:
+        if USE_POSTGRESQL:
+            cursor.execute('SELECT id FROM deactivated_companies WHERE company_name = %s', (cn,))
+        else:
+            cursor.execute('SELECT id FROM deactivated_companies WHERE company_name = ?', (cn,))
+        if cursor.fetchone():
+            return True
+    return False
+
+
 def is_company_deactivated(company_name: str) -> bool:
     """
     화주사가 비활성화되었는지 확인
@@ -2204,7 +2265,9 @@ def is_company_deactivated(company_name: str) -> bool:
         else:
             # companies 테이블에 없는 경우: deactivated_companies 테이블만 확인
             print(f"[비활성화확인] companies 테이블에 없음, deactivated_companies 테이블 결과: {is_in_deactivated_table}")
-            return is_in_deactivated_table
+            if is_in_deactivated_table:
+                return True
+            return _company_deactivated_normalized_match(company_name, cursor)
         
     except Exception as e:
         print(f"[오류] is_company_deactivated 실패: {e}")

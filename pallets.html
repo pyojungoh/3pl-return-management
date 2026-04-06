@@ -4065,6 +4065,10 @@
         if (palCurrentRole !== '관리자' && !palCurrentCompany) {
           return;
         }
+        // 관리자는 화주사 미선택 시 여기서 종료 (아래 fetch는 company 없이 전체 조회로 이어질 수 있음)
+        if (palCurrentRole === '관리자') {
+          return;
+        }
       }
       
       listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #636e72;">데이터를 불러오는 중...</div>';

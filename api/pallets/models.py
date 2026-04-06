@@ -5,7 +5,7 @@ import os
 import math
 from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict, Tuple
-from api.database.models import get_db_connection, USE_POSTGRESQL
+from api.database.models import get_db_connection, USE_POSTGRESQL, is_company_deactivated
 
 # ========================================
 # 파레트 관리 함수
@@ -2083,6 +2083,8 @@ def get_monthly_revenue(start_month: str = None, end_month: str = None) -> Dict:
     """
     월별 보관료 수입 현황 조회
     
+    비활성화된 화주사(is_company_deactivated) 정산 행은 집계에서 제외한다.
+    
     Args:
         start_month: 시작 월 (YYYY-MM 형식, 선택)
         end_month: 종료 월 (YYYY-MM 형식, 선택)
@@ -2115,6 +2117,8 @@ def get_monthly_revenue(start_month: str = None, end_month: str = None) -> Dict:
             ]
         }
     """
+    from collections import defaultdict
+    
     conn = get_db_connection()
     
     try:
@@ -2124,11 +2128,9 @@ def get_monthly_revenue(start_month: str = None, end_month: str = None) -> Dict:
         else:
             cursor = conn.cursor()
         
-        # 기본 쿼리
-        query = "SELECT settlement_month, SUM(total_fee) as total_fee, COUNT(DISTINCT company_name) as company_count FROM pallet_monthly_settlements WHERE 1=1"
+        query = "SELECT settlement_month, company_name, total_fee FROM pallet_monthly_settlements WHERE 1=1"
         params = []
         
-        # 기간 필터링
         if start_month:
             query += " AND settlement_month >= %s" if USE_POSTGRESQL else " AND settlement_month >= ?"
             params.append(start_month)
@@ -2137,39 +2139,54 @@ def get_monthly_revenue(start_month: str = None, end_month: str = None) -> Dict:
             query += " AND settlement_month <= %s" if USE_POSTGRESQL else " AND settlement_month <= ?"
             params.append(end_month)
         
-        query += " GROUP BY settlement_month ORDER BY settlement_month DESC"
+        query += " ORDER BY settlement_month DESC"
         
         cursor.execute(query, params)
         rows = cursor.fetchall()
         
-        # 월별 데이터 처리
+        deact_cache = {}
+        
+        def _include_company(cn: str) -> bool:
+            if not cn:
+                return False
+            if cn not in deact_cache:
+                deact_cache[cn] = is_company_deactivated(cn)
+            return not deact_cache[cn]
+        
+        month_fee = defaultdict(int)
+        month_companies = defaultdict(set)
+        company_fee = defaultdict(int)
+        
+        for row in rows:
+            if USE_POSTGRESQL:
+                sm = row['settlement_month']
+                cn = row['company_name']
+                fee = int(row['total_fee'] or 0)
+            else:
+                sm, cn, fee = row[0], row[1], int(row[2] or 0)
+            if not _include_company(cn):
+                continue
+            month_fee[sm] += fee
+            month_companies[sm].add(cn)
+            company_fee[cn] += fee
+        
         monthly_data = []
         total_revenue = 0
         revenue_list = []
         
-        for row in rows:
-            if USE_POSTGRESQL:
-                month = row['settlement_month']
-                total_fee = int(row['total_fee'] or 0)
-                company_count = int(row['company_count'] or 0)
-            else:
-                month = row[0]
-                total_fee = int(row[1] or 0)
-                company_count = int(row[2] or 0)
-            
+        for month in sorted(month_fee.keys(), reverse=True):
+            total_fee = month_fee[month]
+            company_count = len(month_companies[month])
             average_fee = total_fee / company_count if company_count > 0 else 0
-            
             monthly_data.append({
                 'month': month,
                 'total_fee': total_fee,
                 'company_count': company_count,
                 'average_fee': round(average_fee, 2)
             })
-            
             total_revenue += total_fee
             revenue_list.append(total_fee)
         
-        # 통계 계산
         total_months = len(monthly_data)
         average_revenue = total_revenue / total_months if total_months > 0 else 0
         max_revenue = max(revenue_list) if revenue_list else 0
@@ -2183,34 +2200,10 @@ def get_monthly_revenue(start_month: str = None, end_month: str = None) -> Dict:
             'total_months': total_months
         }
         
-        # 화주사별 수입 분포 조회
-        company_query = "SELECT company_name, SUM(total_fee) as total_fee FROM pallet_monthly_settlements WHERE 1=1"
-        company_params = []
-        
-        if start_month:
-            company_query += " AND settlement_month >= %s" if USE_POSTGRESQL else " AND settlement_month >= ?"
-            company_params.append(start_month)
-        
-        if end_month:
-            company_query += " AND settlement_month <= %s" if USE_POSTGRESQL else " AND settlement_month <= ?"
-            company_params.append(end_month)
-        
-        company_query += " GROUP BY company_name ORDER BY total_fee DESC"
-        
-        cursor.execute(company_query, company_params)
-        company_rows = cursor.fetchall()
-        
         company_distribution = []
-        for row in company_rows:
-            if USE_POSTGRESQL:
-                company_name = row['company_name']
-                company_total_fee = int(row['total_fee'] or 0)
-            else:
-                company_name = row[0]
-                company_total_fee = int(row[1] or 0)
-            
+        sorted_companies = sorted(company_fee.items(), key=lambda x: -x[1])
+        for company_name, company_total_fee in sorted_companies:
             percentage = (company_total_fee / total_revenue * 100) if total_revenue > 0 else 0
-            
             company_distribution.append({
                 'company_name': company_name,
                 'total_fee': company_total_fee,
