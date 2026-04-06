@@ -408,6 +408,31 @@ def delete_pallet(pallet_id: str) -> Tuple[bool, str]:
         conn.close()
 
 
+def _pallet_id_search_token_list(pallet_id_param) -> List[str]:
+    """콤마(,)가 있으면 토큰별 부분일치 OR 검색, 없으면 기존과 동일 단일 문자열."""
+    if not pallet_id_param or not str(pallet_id_param).strip():
+        return []
+    s = str(pallet_id_param).strip()
+    if ',' in s:
+        return [p.strip() for p in s.split(',') if p.strip()]
+    return [s]
+
+
+def _append_pallet_id_like_clause(q: str, p: list, terms: List[str]) -> Tuple[str, list]:
+    if not terms:
+        return q, p
+    p = list(p)
+    if len(terms) == 1:
+        q += " AND pallet_id LIKE %s" if USE_POSTGRESQL else " AND pallet_id LIKE ?"
+        p.append(f'%{terms[0]}%')
+    else:
+        sym = '%s' if USE_POSTGRESQL else '?'
+        ph = ' OR '.join([f'pallet_id LIKE {sym}'] * len(terms))
+        q += f" AND ({ph})"
+        p.extend([f'%{t}%' for t in terms])
+    return q, p
+
+
 def get_pallets(company_name: str = None, status: str = None,
                 month: str = None, role: str = '화주사',
                 pallet_id: str = None, product_name: str = None) -> List[Dict]:
@@ -422,7 +447,7 @@ def get_pallets(company_name: str = None, status: str = None,
         status: 상태 필터 (입고됨, 보관종료, 서비스, 전체)
         month: 월 필터 (YYYY-MM 형식)
         role: 권한 (관리자, 화주사)
-        pallet_id: 파레트 ID 부분 일치 검색 (LIKE 검색)
+        pallet_id: 파레트 ID 부분 일치(LIKE). 콤마로 구분 시 각 토큰을 OR로 검색
         product_name: 품목명 부분 일치 검색 (LIKE 검색)
     """
     conn = get_db_connection()
@@ -452,9 +477,9 @@ def get_pallets(company_name: str = None, status: str = None,
             if status and status != '전체':
                 q += " AND status = %s" if USE_POSTGRESQL else " AND status = ?"
                 p.append(status)
-            if pallet_id and pallet_id.strip():
-                q += " AND pallet_id LIKE %s" if USE_POSTGRESQL else " AND pallet_id LIKE ?"
-                p.append(f'%{pallet_id.strip()}%')
+            pid_terms = _pallet_id_search_token_list(pallet_id)
+            if pid_terms:
+                q, p = _append_pallet_id_like_clause(q, p, pid_terms)
             if product_name and product_name.strip():
                 q += " AND product_name LIKE %s" if USE_POSTGRESQL else " AND product_name LIKE ?"
                 p.append(f'%{product_name.strip()}%')
@@ -485,9 +510,9 @@ def get_pallets(company_name: str = None, status: str = None,
                 if status and status != '전체':
                     dq += " AND status = %s" if USE_POSTGRESQL else " AND status = ?"
                     dp.append(status)
-                if pallet_id and pallet_id.strip():
-                    dq += " AND pallet_id LIKE %s" if USE_POSTGRESQL else " AND pallet_id LIKE ?"
-                    dp.append(f'%{pallet_id.strip()}%')
+                pid_terms_dq = _pallet_id_search_token_list(pallet_id)
+                if pid_terms_dq:
+                    dq, dp = _append_pallet_id_like_clause(dq, dp, pid_terms_dq)
                 if product_name and product_name.strip():
                     dq += " AND product_name LIKE %s" if USE_POSTGRESQL else " AND product_name LIKE ?"
                     dp.append(f'%{product_name.strip()}%')

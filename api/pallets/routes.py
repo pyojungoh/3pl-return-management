@@ -311,7 +311,7 @@ def pallet_list():
         - company: 화주사명 (관리자 모드에서 필터링용)
         - status: 상태 필터 (입고됨, 보관종료, 서비스, 전체)
         - month: 월 필터 (YYYY-MM 형식)
-        - pallet_id: 파레트 ID 부분 일치 검색
+        - pallet_id: 파레트 ID 부분 일치 검색. 콤마(,)로 구분 시 각각 OR 조건
         - product_name: 품목명 부분 일치 검색
     """
     try:

@@ -781,7 +781,7 @@
                   <thead>
                     <tr>
                       <th style="width: 50px;">
-                        <input type="checkbox" id="palOutboundSelectAll" onclick="palToggleSelectAllPallets()" title="전체 선택/해제">
+                        <input type="checkbox" id="palOutboundSelectAll" onclick="palToggleOutboundSelectAll()" title="전체 선택/해제">
                       </th>
                       <th>파레트 ID</th>
                       <th>화주사</th>
@@ -957,6 +957,32 @@
         </div>
       </div>
 
+      <!-- 선택 일괄 보관종료 모달 -->
+      <div id="palBulkOutboundModal" class="pal-modal" style="display: none;">
+        <div class="pal-modal-content" style="max-width: 480px;">
+          <div class="pal-modal-header">
+            <h2>📤 선택 일괄 보관종료</h2>
+            <button type="button" class="pal-modal-close" onclick="palCloseBulkOutboundModal()">&times;</button>
+          </div>
+          <div class="pal-modal-body" style="padding: 20px;">
+            <p id="palBulkOutboundSummary" style="margin: 0 0 16px 0; color: #2d3436; font-size: 14px;"></p>
+            <div class="pal-form-group" style="margin-bottom: 15px;">
+              <label class="pal-form-label">보관종료일 *</label>
+              <input type="date" id="palBulkOutboundDate" class="pal-form-input" required>
+            </div>
+            <div class="pal-form-group" style="margin-bottom: 15px;">
+              <label class="pal-form-label">비고</label>
+              <textarea id="palBulkOutboundNotes" class="pal-form-input" style="min-height: 72px;" placeholder="선택 사항"></textarea>
+            </div>
+            <div id="palBulkOutboundMessage" style="margin-bottom: 12px; font-size: 13px;"></div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+              <button type="button" class="pal-btn pal-btn-secondary" onclick="palCloseBulkOutboundModal()">취소</button>
+              <button type="button" class="pal-btn" onclick="palConfirmBulkOutbound()">확인</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 파레트 현황 페이지 -->
       <div id="palPageStatus" class="pal-content-page">
         <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 20px;">📊 파레트 현황</h2>
@@ -1001,7 +1027,7 @@
           </div>
           <div class="pal-filter-group">
             <label>파레트 ID 검색</label>
-            <input type="text" id="palFilterPalletId" class="pal-form-input" placeholder="파레트 ID 입력">
+            <input type="text" id="palFilterPalletId" class="pal-form-input" placeholder="여러 개는 콤마(,)로 구분">
           </div>
           <div class="pal-filter-group">
             <label>월 필터</label>
@@ -1012,6 +1038,9 @@
           </div>
           <div class="pal-filter-group">
             <button class="pal-btn pal-btn-secondary" onclick="palLoadPallets()" style="height: 40px;">🔄 새로고침</button>
+          </div>
+          <div class="pal-filter-group pal-admin-only">
+            <button type="button" class="pal-btn" onclick="palOpenBulkOutboundModal()" style="height: 40px; background: #c0392b; color: white;">📤 선택 일괄 보관종료</button>
           </div>
           <div class="pal-filter-group pal-admin-only">
             <button class="pal-btn" onclick="palDeleteSelectedPallets()" style="height: 40px; background: #dc3545; color: white;">🗑️ 선택삭제</button>
@@ -2423,8 +2452,8 @@
       palUpdateOutboundSelectionInfo();
     }
     
-    // 전체 선택/해제
-    function palToggleSelectAllPallets() {
+    // 출고 목록 전체 선택/해제 (파레트 현황의 palToggleSelectAllPallets와 이름 분리)
+    function palToggleOutboundSelectAll() {
       const selectAllCheckbox = document.getElementById('palOutboundSelectAll');
       const checkboxes = document.querySelectorAll('.palOutboundCheckbox');
       
@@ -2718,7 +2747,7 @@
               return `
               <tr>
                 ${palCurrentRole === '관리자' 
-                  ? `<td style="text-align: center;"><input type="checkbox" class="pal-pallet-checkbox" data-pallet-id="${palEscapeHtml(pallet.pallet_id)}" onchange="palUpdatePalletSelection()" style="width: 16px; height: 16px;"></td>`
+                  ? `<td style="text-align: center;"><input type="checkbox" class="pal-pallet-checkbox" data-pallet-id="${palEscapeHtml(pallet.pallet_id)}" data-eligible-outbound="${canOutbound ? '1' : '0'}" onchange="palUpdatePalletSelection()" style="width: 16px; height: 16px;"></td>`
                   : ''
                 }
                 <td style="font-size: 11px; width: 90px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${palEscapeHtml(pallet.pallet_id)}">${palEscapeHtml(pallet.pallet_id)}</td>
@@ -3206,6 +3235,104 @@
         cb.checked = checked;
       });
       palUpdatePalletSelection();
+    }
+    
+    function palCloseBulkOutboundModal() {
+      const modal = document.getElementById('palBulkOutboundModal');
+      if (modal) modal.style.display = 'none';
+      const msg = document.getElementById('palBulkOutboundMessage');
+      if (msg) msg.innerHTML = '';
+    }
+    
+    function palOpenBulkOutboundModal() {
+      if (palCurrentRole !== '관리자') {
+        alert('관리자만 사용할 수 있습니다.');
+        return;
+      }
+      const selected = Array.from(document.querySelectorAll('.pal-pallet-checkbox:checked'));
+      const eligible = selected.filter(cb => cb.getAttribute('data-eligible-outbound') === '1');
+      const skipped = selected.length - eligible.length;
+      if (eligible.length === 0) {
+        alert('보관종료 가능한(보관중·비서비스) 파레트를 선택해 주세요.');
+        return;
+      }
+      const summary = document.getElementById('palBulkOutboundSummary');
+      if (summary) {
+        let t = `<strong>${eligible.length}건</strong>을 보관종료 처리합니다.`;
+        if (skipped > 0) t += ` <span style="color:#636e72;">(서비스·이미 종료 등 ${skipped}건은 제외)</span>`;
+        summary.innerHTML = t;
+      }
+      const dateEl = document.getElementById('palBulkOutboundDate');
+      if (dateEl) {
+        dateEl.value = new Date().toISOString().split('T')[0];
+      }
+      const notesEl = document.getElementById('palBulkOutboundNotes');
+      if (notesEl) notesEl.value = '';
+      const msg = document.getElementById('palBulkOutboundMessage');
+      if (msg) msg.innerHTML = '';
+      const modal = document.getElementById('palBulkOutboundModal');
+      if (modal) modal.style.display = 'block';
+    }
+    
+    async function palConfirmBulkOutbound() {
+      const dateEl = document.getElementById('palBulkOutboundDate');
+      const outDate = dateEl ? dateEl.value : '';
+      if (!outDate) {
+        alert('보관종료일을 선택하세요.');
+        return;
+      }
+      const eligible = Array.from(document.querySelectorAll('.pal-pallet-checkbox:checked'))
+        .filter(cb => cb.getAttribute('data-eligible-outbound') === '1');
+      const palletIds = eligible.map(cb => cb.getAttribute('data-pallet-id')).filter(Boolean);
+      if (palletIds.length === 0) {
+        alert('처리할 파레트가 없습니다.');
+        return;
+      }
+      const notesVal = (document.getElementById('palBulkOutboundNotes') && document.getElementById('palBulkOutboundNotes').value) || '';
+      const notes = notesVal.trim() ? notesVal.trim() : '파레트 현황 선택 일괄 보관종료';
+      const msg = document.getElementById('palBulkOutboundMessage');
+      if (msg) msg.innerHTML = '<span style="color:#636e72;">처리 중...</span>';
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/outbound`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...palGetUserHeaders()
+          },
+          body: JSON.stringify({
+            pallet_ids: palletIds,
+            out_date: outDate,
+            notes: notes
+          })
+        });
+        let result = {};
+        try {
+          result = await response.json();
+        } catch (e) {
+          if (msg) msg.innerHTML = '<span style="color:#e74c3c;">응답을 해석할 수 없습니다.</span>';
+          else alert('응답 오류');
+          return;
+        }
+        if (result.success) {
+          let m = result.message || '처리 완료';
+          if (result.errors && result.errors.length) {
+            m += '\n\n' + result.errors.slice(0, 15).join('\n');
+            if (result.errors.length > 15) m += '\n…';
+          }
+          alert('✅ ' + m);
+          palCloseBulkOutboundModal();
+          palLoadPallets();
+        } else {
+          let m = result.message || '처리 실패';
+          if (result.errors && result.errors.length) m += '\n' + result.errors.slice(0, 10).join('\n');
+          if (msg) msg.innerHTML = '<span style="color:#e74c3c;">' + palEscapeHtml(m).replace(/\n/g, '<br>') + '</span>';
+          else alert('❌ ' + m);
+        }
+      } catch (error) {
+        console.error('일괄 보관종료 오류:', error);
+        if (msg) msg.innerHTML = '<span style="color:#e74c3c;">' + palEscapeHtml(error.message) + '</span>';
+        else alert('❌ ' + error.message);
+      }
     }
     
     // 선택된 파레트 삭제
