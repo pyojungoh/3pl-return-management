@@ -1,0 +1,37 @@
+---
+description: Pallet QR roll label size and specs (pallets.html)
+globs: pallets.html
+alwaysApply: false
+---
+
+# 파레트 QR · 라벨 규격 (pallets.html)
+
+`pallets.html`에서 QR · 인쇄 관련 코드를 바꿀 때 아래를 지킨다.
+
+## 라벨 용지
+
+- **크기:** 63.5mm × 70mm (롤 라벨)
+- `palExecuteRollQrPrint` 등의 인쇄 스타일, `@page`, `.pal-qr-label-page`는 이 규격에 맞춥니다.
+
+## QR 비트맵 크기 (`palQrTextToDataUrl` 두 번째 인자)
+
+|용도|`palQrTextToDataUrl` 두 번째 인자|비고|
+|------|-----------------------------------|------|
+|**라벨 인쇄** (단건 · 일괄)|**150**|구 quickchart `size=150`과 동일|
+|**모달 미리보기**|**300**|구 quickchart `size=300`과 동일|
+
+- 인쇄 시 모달에서 만든 큰 이미지를 그대로 쓰지 말고, **라벨용은 항상 150으로 생성**한다.
+
+## 인쇄 CSS (중요)
+
+- `.pal-qr-label-page img`에는 **`width: 150px !important; height: 150px !important;`**를 유지한다.
+- `width: auto !important; height: auto !important;`처럼 인라인 `150px`를 무시하면 Data URL 원본(300 등) 그대로 출력되어 **입고일 등이 다음으로 넘어갈 수 있다.**
+
+## 라벨 HTML (`palBuildSingleLabelHtml`)
+
+- QR `<img>` 인라인 스타일: `width:150px;height:150px;object-fit:contain;` (인쇄 CSS와 함께 맞춥니다)
+- 표시 항목: 파레트 ID, 품목명, QR, 화주사, 입고일 — 레이아웃 · 글자 크기 변경 시 70mm 높이 안에 들어가는지 확인한다.
+
+## QR 데이터 (Google Forms URL)
+
+- 엔트리 필드는 `PAL_GOOGLE_FORM_BASE` / `palBuildPalletQrText`에 정의된 값을 따른다. 스캔 · 연동 동작을 바꿀 때만 수정한다.

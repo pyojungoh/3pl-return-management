@@ -4138,6 +4138,15 @@
       }
     }
     
+    function palSettlementStatusStyle(status) {
+      const s = (status == null || status === '') ? '미생성' : String(status).trim();
+      if (s === '대기') return { badgeBg: '#fd7e14', badgeFg: '#fff', chevronColor: '#fd7e14' };
+      if (s === '확정') return { badgeBg: '#198754', badgeFg: '#fff', chevronColor: '#198754' };
+      if (s === '완료') return { badgeBg: '#495057', badgeFg: '#fff', chevronColor: '#6c757d' };
+      if (s === '미생성') return { badgeBg: '#17a2b8', badgeFg: '#fff', chevronColor: '#17a2b8' };
+      return { badgeBg: '#6c757d', badgeFg: '#fff', chevronColor: '#6c757d' };
+    }
+
     // 정산 내역 로드 (전체 합계 + 월별 최신순)
     async function palLoadSettlements(companyName = null) {
       const listContainer = document.getElementById('palSettlementsList');
@@ -4267,6 +4276,7 @@
             const settlementId = settlement.id || `temp_${index}`;
             const isTotal = !settlement.settlement_month; // 전체 합계인지 확인
             const settlementMonth = settlement.settlement_month || null;
+            const stStyle = palSettlementStatusStyle(settlement.status);
             
             return `
               <div class="pal-settlement-item" style="margin-bottom: 15px; border: 2px solid #ffeaa7; border-radius: 12px; overflow: hidden; background: #ffffff;">
@@ -4277,10 +4287,10 @@
                   <div style="text-align: center;">${settlement.total_pallets}개</div>
                   <div style="font-weight: ${isTotal ? '700' : '600'}; color: #ff6b35; font-size: ${isTotal ? '15px' : '14px'}; text-align: right;">${settlement.total_fee.toLocaleString()}원</div>
                   <div>
-                    <span style="padding: 4px 8px; border-radius: 4px; background: ${settlement.status === '확정' ? '#28a745' : settlement.status === '완료' ? '#6c757d' : '#ffc107'}; color: white; font-size: 11px; font-weight: 600;">${palEscapeHtml(settlement.status || '미생성')}</span>
+                    <span style="padding: 4px 8px; border-radius: 4px; background: ${stStyle.badgeBg}; color: ${stStyle.badgeFg}; font-size: 11px; font-weight: 600;">${palEscapeHtml(settlement.status || '미생성')}</span>
                   </div>
                   <div>
-                    <span id="palSettlementIcon_${settlementId}" style="font-size: 12px;">▼</span>
+                    <span id="palSettlementIcon_${settlementId}" style="font-size: 14px; font-weight: 700; color: ${stStyle.chevronColor}; line-height: 1;" title="펼치기">▼</span>
                   </div>
                   <div onclick="event.stopPropagation();" style="display: flex; gap: 5px; flex-wrap: wrap;">
                     ${!isTotal ? `
