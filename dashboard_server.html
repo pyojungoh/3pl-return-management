@@ -3501,6 +3501,35 @@
       div.textContent = text;
       return div.innerHTML;
     }
+
+    function buildCourierTrackingUrl(courierName, trackingNumber) {
+      const tn = (trackingNumber || '').toString().trim();
+      if (!tn) return '';
+
+      const raw = (courierName || '').toString().trim();
+      const normalized = raw.replace(/\s+/g, '').toLowerCase();
+
+      // 기본값은 한진
+      if (!normalized || normalized.includes('한진')) {
+        return `https://www.hanjin.com/kor/CMS/DeliveryMgr/WaybillResult.do?mCode=MN038&schLang=KR&wbl_num=${encodeURIComponent(tn)}`;
+      }
+      if (normalized.includes('cj') || normalized.includes('대한통운')) {
+        return `https://www.cjlogistics.com/ko/tool/parcel/tracking?gnbInvcNo=${encodeURIComponent(tn)}`;
+      }
+      if (normalized.includes('롯데')) {
+        return `https://www.lotteglogis.com/home/reservation/tracking/linkView?InvNo=${encodeURIComponent(tn)}`;
+      }
+      if (normalized.includes('로젠')) {
+        return `https://www.ilogen.com/web/personal/trace/${encodeURIComponent(tn)}`;
+      }
+      if (normalized.includes('우체국')) {
+        return `https://service.epost.go.kr/trace.RetrieveDomRigiTraceList.comm?sid1=${encodeURIComponent(tn)}`;
+      }
+
+      // 미매핑 택배사는 검색 결과로 폴백
+      return `https://search.naver.com/search.naver?query=${encodeURIComponent(`${raw} ${tn} 배송조회`)}`;
+    }
+    window.buildCourierTrackingUrl = buildCourierTrackingUrl;
     
     // 메시지 표시
     function showMessage(text, type) {
@@ -4332,6 +4361,8 @@
         const shippingFee = row['배송비'] || '';
         const hasCourierInfo = otherCourier && otherCourier.trim() !== '';
         const hasShippingInfo = shippingFee && shippingFee.trim() !== '' && shippingFee.trim() !== '없음';
+        const trackingCourier = hasCourierInfo ? otherCourier : '한진택배';
+        const trackingUrl = trackingNumber ? buildCourierTrackingUrl(trackingCourier, trackingNumber) : '';
         
         // 착불 아이콘 및 툴팁 생성
         let courierIcon = '';
@@ -4454,7 +4485,9 @@
           ${productCell}
           <td>${row['고객명'] || ''}</td>
           <td style="position: relative;">
-            ${row['송장번호'] || ''}
+            ${trackingNumber
+              ? `<a href="${trackingUrl}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(`${trackingCourier || '한진택배'} 배송조회 열기`)}" style="color: #0d6efd; text-decoration: underline; font-weight: 600;">${escapeHtml(trackingNumber)}</a>`
+              : ''}
             ${courierIcon}
           </td>
           ${managementNumberCell}
