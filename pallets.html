@@ -2041,8 +2041,8 @@
         '  }\n' +
         '  .pal-qr-label-page:last-of-type { page-break-after: auto !important; }\n' +
         '  .pal-qr-label-page img {\n' +
-        '    max-width: 100% !important; max-height: 100% !important; width: auto !important; height: auto !important;\n' +
-        '    object-fit: contain !important;\n' +
+        '    width: 150px !important; height: 150px !important;\n' +
+        '    max-width: 100% !important; object-fit: contain !important;\n' +
         '  }\n' +
         '}\n';
 
@@ -2125,7 +2125,7 @@
           if (!json.success || !json.data) continue;
           var row = json.data;
           var qrText = palBuildPalletQrText(row.pallet_id, row.company_name || '', row.product_name || '');
-          var dataUrl = await palQrTextToDataUrl(qrText, 200);
+          var dataUrl = await palQrTextToDataUrl(qrText, 150);
           var inStr = palFormatPalletInDateForLabel(row.in_date || '');
           parts.push(palBuildSingleLabelHtml(row.pallet_id, row.product_name, row.company_name, inStr, dataUrl));
         }
@@ -3077,7 +3077,7 @@
           const vendor = palletInfo?.company_name || '';
           const product = palletInfo?.product_name || '';
           const qrText = palBuildPalletQrText(palletId, vendor, product);
-          const dataUrl = await palQrTextToDataUrl(qrText, 280);
+          const dataUrl = await palQrTextToDataUrl(qrText, 300);
           palCurrentQRDataUrl = dataUrl;
           palCurrentQRMeta = { vendor: vendor, product: product };
           
@@ -3113,8 +3113,7 @@
           vendor = palCurrentQRMeta.vendor || '';
           product = palCurrentQRMeta.product || '';
         }
-        var dataUrl = palCurrentQRDataUrl;
-        if (!dataUrl) {
+        if (!vendor && !product) {
           const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/${palletId}`, {
             headers: palGetUserHeaders()
           });
@@ -3122,11 +3121,10 @@
           const palletInfo = result.success && result.data ? result.data : null;
           vendor = palletInfo?.company_name || '';
           product = palletInfo?.product_name || '';
-          var qrText = palBuildPalletQrText(palletId, vendor, product);
-          dataUrl = await palQrTextToDataUrl(qrText, 200);
-          palCurrentQRDataUrl = dataUrl;
           palCurrentQRMeta = { vendor: vendor, product: product };
         }
+        var qrText = palBuildPalletQrText(palletId, vendor, product);
+        var dataUrl = await palQrTextToDataUrl(qrText, 150);
         var html = palBuildSingleLabelHtml(palletId, product, vendor, inDateStr, dataUrl);
         await palExecuteRollQrPrint(html);
       } catch (error) {
