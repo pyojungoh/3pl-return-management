@@ -3511,8 +3511,8 @@
 
       // 기본값은 한진
       if (!normalized || normalized.includes('한진')) {
-        // WaybillResult 직링크는 비정상 접근으로 차단되는 경우가 있어 조회 화면으로 진입
-        return `https://www.hanjin.com/kor/CMS/DeliveryMgr/WaybillSch.do?mCode=MN038&wbl_num=${encodeURIComponent(tn)}`;
+        // 한진 배송조회: 결과 페이지 + wblnumText2 파라미터 형식
+        return `https://www.hanjin.com/kor/CMS/DeliveryMgr/WaybillResult.do?mCode=MN038&schLang=KR&wblnumText2=${encodeURIComponent(tn)}`;
       }
       if (normalized.includes('cj') || normalized.includes('대한통운')) {
         return `https://www.cjlogistics.com/ko/tool/parcel/tracking?gnbInvcNo=${encodeURIComponent(tn)}`;
