@@ -1,9 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>파레트 보관료 관리</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     /* body 스타일 제거 (dashboard_server.html에 통합되므로) */
     body {
@@ -1045,6 +1046,9 @@
           <div class="pal-filter-group pal-admin-only">
             <button class="pal-btn" onclick="palDeleteSelectedPallets()" style="height: 40px; background: #dc3545; color: white;">🗑️ 선택삭제</button>
           </div>
+          <div class="pal-filter-group pal-admin-only">
+            <button type="button" class="pal-btn" onclick="palPrintSelectedQrLabels()" style="height: 40px; background: #17a2b8; color: white;">🖨️ 선택 QR 인쇄</button>
+          </div>
         </div>
         
         <div class="pal-table-container">
@@ -1913,6 +1917,229 @@
       div.textContent = text;
       return div.innerHTML;
     }
+
+    var PAL_GOOGLE_FORM_BASE = 'https://docs.google.com/forms/d/e/1FAIpQLSdDmnWcW27tfDptUvuSjEgN8K7nNNQWecdpeMMhwftTtbiyIQ/viewform';
+
+    function palBuildPalletQrText(palletId, vendor, product) {
+      var v = vendor || '';
+      var p = product || '';
+      return PAL_GOOGLE_FORM_BASE + '?usp=pp_url&entry.419411235=' + encodeURIComponent(palletId) +
+        '&entry.427884801=' + encodeURIComponent('\ubcf4\uad00\uc885\ub8cc') +
+        '&entry.2110345042=' + encodeURIComponent(v) +
+        '&entry.306824944=' + encodeURIComponent(p);
+    }
+
+    async function palQrTextToDataUrl(qrText, pixelSize) {
+      var size = pixelSize || 200;
+      if (typeof QRCode !== 'undefined') {
+        return new Promise(function (resolve, reject) {
+          var wrap = document.createElement('div');
+          wrap.style.position = 'fixed';
+          wrap.style.left = '-9999px';
+          wrap.style.top = '0';
+          document.body.appendChild(wrap);
+          try {
+            var CL = QRCode.CorrectLevel || { M: 0 };
+            new QRCode(wrap, {
+              text: qrText,
+              width: size,
+              height: size,
+              colorDark: '#000000',
+              colorLight: '#ffffff',
+              correctLevel: CL.M
+            });
+            requestAnimationFrame(function () {
+              requestAnimationFrame(function () {
+                try {
+                  var canvas = wrap.querySelector('canvas');
+                  if (canvas) {
+                    var url = canvas.toDataURL('image/png');
+                    document.body.removeChild(wrap);
+                    resolve(url);
+                  } else {
+                    document.body.removeChild(wrap);
+                    reject(new Error('QR canvas missing'));
+                  }
+                } catch (e) {
+                  try { document.body.removeChild(wrap); } catch (e2) {}
+                  reject(e);
+                }
+              });
+            });
+          } catch (e) {
+            try { document.body.removeChild(wrap); } catch (e2) {}
+            reject(e);
+          }
+        });
+      }
+      var chartUrl = 'https://quickchart.io/qr?text=' + encodeURIComponent(qrText) + '&size=' + size + '&margin=1';
+      var res = await fetch(chartUrl);
+      if (!res.ok) throw new Error('QR image fetch failed');
+      var blob = await res.blob();
+      return await new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onloadend = function () { resolve(reader.result); };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    async function palWaitPrintImages(root) {
+      var imgs = root.querySelectorAll('img');
+      await Promise.all(Array.from(imgs).map(function (img) {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        if (img.decode) {
+          return img.decode().catch(function () {
+            return new Promise(function (res) {
+              img.onload = function () { res(); };
+              img.onerror = function () { res(); };
+            });
+          });
+        }
+        return new Promise(function (res) {
+          img.onload = img.onerror = function () { res(); };
+        });
+      }));
+      await new Promise(function (r) { setTimeout(r, 80); });
+    }
+
+    function palFormatPalletInDateForLabel(inDateRaw) {
+      if (!inDateRaw) return '-';
+      try {
+        var d = new Date(inDateRaw);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace(/\./g, '');
+        }
+      } catch (e) {}
+      return String(inDateRaw);
+    }
+
+    async function palExecuteRollQrPrint(innerHtml) {
+      var printArea = document.getElementById('palQRPrintArea');
+      if (!printArea) return;
+      printArea.innerHTML = innerHtml;
+
+      var printStyle = document.createElement('style');
+      printStyle.id = 'palQRPrintStyle';
+      printStyle.textContent =
+        '@media print {\n' +
+        '  @page { size: 63.5mm 70mm; margin: 0; }\n' +
+        '  * { margin: 0; padding: 0; }\n' +
+        '  html, body { margin: 0 !important; padding: 0 !important; overflow: visible !important; }\n' +
+        '  body > *:not(#palQRPrintArea) { display: none !important; }\n' +
+        '  #palQRPrintArea {\n' +
+        '    display: block !important; position: absolute !important; left: 0 !important; top: 0 !important;\n' +
+        '    width: 63.5mm !important; height: auto !important; margin: 0 !important; padding: 0 !important;\n' +
+        '    background: white !important;\n' +
+        '  }\n' +
+        '  .pal-qr-label-page {\n' +
+        '    width: 63.5mm !important; height: 70mm !important; box-sizing: border-box !important;\n' +
+        '    padding: 3mm !important; display: flex !important; flex-direction: column !important;\n' +
+        '    align-items: center !important; justify-content: flex-start !important;\n' +
+        '    background: white !important; page-break-inside: avoid !important;\n' +
+        '    page-break-after: always !important;\n' +
+        '  }\n' +
+        '  .pal-qr-label-page:last-of-type { page-break-after: auto !important; }\n' +
+        '  .pal-qr-label-page img {\n' +
+        '    max-width: 100% !important; max-height: 100% !important; width: auto !important; height: auto !important;\n' +
+        '    object-fit: contain !important;\n' +
+        '  }\n' +
+        '}\n';
+
+      var existingStyle = document.getElementById('palQRPrintStyle');
+      if (existingStyle) document.head.removeChild(existingStyle);
+      document.head.appendChild(printStyle);
+
+      var bodyChildren = Array.from(document.body.children);
+      var hiddenElements = [];
+      bodyChildren.forEach(function (child) {
+        if (child.id !== 'palQRPrintArea') {
+          child.setAttribute('data-pal-original-display', window.getComputedStyle(child).display);
+          child.style.display = 'none';
+          hiddenElements.push(child);
+        }
+      });
+
+      printArea.style.display = 'block';
+      printArea.style.position = 'absolute';
+      printArea.style.left = '0';
+      printArea.style.top = '0';
+      printArea.style.width = '63.5mm';
+      document.body.insertBefore(printArea, document.body.firstChild);
+
+      try {
+        await palWaitPrintImages(printArea);
+        window.print();
+      } finally {
+        setTimeout(function () {
+          hiddenElements.forEach(function (child) {
+            var od = child.getAttribute('data-pal-original-display');
+            child.style.display = od || '';
+            child.removeAttribute('data-pal-original-display');
+          });
+          printArea.innerHTML = '';
+          printArea.style.display = 'none';
+          var st = document.getElementById('palQRPrintStyle');
+          if (st) document.head.removeChild(st);
+        }, 200);
+      }
+    }
+
+    function palBuildSingleLabelHtml(palletId, product, vendor, inDateStr, qrDataUrl) {
+      return (
+        '<div class="pal-qr-label-page">' +
+        '<div style="width:100%;text-align:center;flex-shrink:0;margin-bottom:3px;">' +
+        '<div style="font-size:11px;font-weight:600;margin-bottom:2px;line-height:1.2;">\ud30c\ub808\ud2b8 ID: ' + palEscapeHtml(palletId) + '</div>' +
+        '<div style="font-size:11px;font-weight:600;margin-bottom:3px;line-height:1.2;">' + palEscapeHtml(product || '-') + '</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;justify-content:center;margin-bottom:3px;width:100%;flex-shrink:0;">' +
+        '<img src="' + qrDataUrl + '" alt="QR" style="width:150px;height:150px;object-fit:contain;">' +
+        '</div>' +
+        '<div style="width:100%;text-align:center;flex-shrink:0;">' +
+        '<div style="font-size:11px;font-weight:600;margin-bottom:2px;line-height:1.2;">\ud654\uc8fc\uc0ac: ' + palEscapeHtml(vendor || '') + '</div>' +
+        '<div style="font-size:11px;font-weight:600;line-height:1.2;">\uc785\uace0\uc77c: ' + palEscapeHtml(inDateStr) + '</div>' +
+        '</div></div>'
+      );
+    }
+
+    async function palPrintSelectedQrLabels() {
+      if (palCurrentRole !== '\uad00\ub9ac\uc790') {
+        alert('\uad00\ub9ac\uc790\ub9cc \uc0ac\uc6a9\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4.');
+        return;
+      }
+      var checked = Array.from(document.querySelectorAll('.pal-pallet-checkbox:checked'));
+      var ids = checked.map(function (cb) { return cb.getAttribute('data-pallet-id'); }).filter(Boolean);
+      if (ids.length === 0) {
+        alert('QR\uc744 \ucd9c\ub825\ud560 \ud30c\ub808\ud2b8\ub97c \uccb4\ud06c\ud558\uc138\uc694.');
+        return;
+      }
+      if (ids.length > 80) {
+        if (!confirm(ids.length + '\uac74 \uc785\ub2c8\ub2e4. \uacc4\uc18d\ud558\uc2dc\uaca0\uc2b5\ub2c8\uae4c?')) return;
+      }
+      var parts = [];
+      try {
+        for (var i = 0; i < ids.length; i++) {
+          var pid = ids[i];
+          var res = await fetch(PAL_API_BASE_URL + '/api/pallets/' + encodeURIComponent(pid), { headers: palGetUserHeaders() });
+          var json = await res.json();
+          if (!json.success || !json.data) continue;
+          var row = json.data;
+          var qrText = palBuildPalletQrText(row.pallet_id, row.company_name || '', row.product_name || '');
+          var dataUrl = await palQrTextToDataUrl(qrText, 200);
+          var inStr = palFormatPalletInDateForLabel(row.in_date || '');
+          parts.push(palBuildSingleLabelHtml(row.pallet_id, row.product_name, row.company_name, inStr, dataUrl));
+        }
+        if (parts.length === 0) {
+          alert('\ub370\uc774\ud130\ub97c \ubd88\ub7ec\uc62c \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.');
+          return;
+        }
+        await palExecuteRollQrPrint(parts.join(''));
+      } catch (e) {
+        console.error('palPrintSelectedQrLabels', e);
+        alert('\uc77c\uad04 \uc778\uc1c4 \uc911 \uc624\ub958: ' + (e.message || e));
+      }
+    }
+    window.palPrintSelectedQrLabels = palPrintSelectedQrLabels;
 
     /**
      * 갱신일 계산 (보관이 1달 이상이면 매월 1일)
@@ -2814,10 +3041,16 @@
       var palCurrentQRInDate = null;
     }
     
+    if (typeof palCurrentQRDataUrl === 'undefined') {
+      var palCurrentQRDataUrl = null;
+    }
+    if (typeof palCurrentQRMeta === 'undefined') {
+      var palCurrentQRMeta = null;
+    }
+    
     // QR 코드 보기 모달 열기
     async function palViewQRCode(palletId, inDate) {
       try {
-        // 파레트 상세 정보 가져오기 (화주사, 품목명 포함)
         const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/${palletId}`, {
           headers: palGetUserHeaders()
         });
@@ -2827,6 +3060,8 @@
         
         palCurrentQRPalletId = palletId;
         palCurrentQRInDate = palletInfo?.in_date || inDate || '';
+        palCurrentQRDataUrl = null;
+        palCurrentQRMeta = null;
         
         const modal = document.getElementById('palQRModal');
         const titleEl = document.getElementById('palQRTitle');
@@ -2834,31 +3069,25 @@
         const qrContainer = document.getElementById('palQRCodeContainer');
         
         if (modal && titleEl && inDateEl && qrContainer) {
-          titleEl.textContent = `파레트 ID: ${palletId}`;
-          inDateEl.textContent = `입고일: ${palCurrentQRInDate || '-'}`;
+          titleEl.textContent = `\ud30c\ub808\ud2b8 ID: ${palletId}`;
+          inDateEl.textContent = `\uc785\uace0\uc77c: ${palCurrentQRInDate || '-'}`;
+          qrContainer.innerHTML = '<div style="padding:24px;color:#636e72;">QR \uc0dd\uc131 \uc911...</div>';
+          modal.style.display = 'block';
           
-          // QR 코드 생성 (quickchart.io 사용)
-          // Google Apps Script와 동일한 형식: 파레트ID, 작업유형(보관종료), 화주사, 품목명 포함
-          const formUrl = "https://docs.google.com/forms/d/e/1FAIpQLSdDmnWcW27tfDptUvuSjEgN8K7nNNQWecdpeMMhwftTtbiyIQ/viewform";
           const vendor = palletInfo?.company_name || '';
           const product = palletInfo?.product_name || '';
-          // entry.419411235 = 파레트 ID
-          // entry.427884801 = 작업 유형 (보관종료)
-          // entry.2110345042 = 화주사
-          // entry.306824944 = 품목명
-          const qrText = `${formUrl}?usp=pp_url&entry.419411235=${encodeURIComponent(palletId)}&entry.427884801=보관종료&entry.2110345042=${encodeURIComponent(vendor)}&entry.306824944=${encodeURIComponent(product)}`;
-          const qrImageUrl = `https://quickchart.io/qr?text=${encodeURIComponent(qrText)}&size=300`;
+          const qrText = palBuildPalletQrText(palletId, vendor, product);
+          const dataUrl = await palQrTextToDataUrl(qrText, 280);
+          palCurrentQRDataUrl = dataUrl;
+          palCurrentQRMeta = { vendor: vendor, product: product };
           
-          qrContainer.innerHTML = `<img src="${qrImageUrl}" alt="QR Code" style="max-width: 300px; width: 100%; height: auto;">`;
-          
-          modal.style.display = 'block';
+          qrContainer.innerHTML = `<img src="${dataUrl}" alt="QR Code" style="max-width: 300px; width: 100%; height: auto;">`;
         }
       } catch (error) {
-        console.error('QR 코드 모달 열기 오류:', error);
-        alert('QR 코드를 불러오는 중 오류가 발생했습니다.');
+        console.error('QR \ucf54\ub4dc \ubaa8\ub2ec \uc5f4\uae30 \uc624\ub958:', error);
+        alert('QR \ucf54\ub4dc\ub97c \ubd88\ub7ec\uc624\ub294 \uc911 \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\ub2c8\ub2e4.');
       }
     }
-    
     // QR 코드 모달 닫기
     function palCloseQRModal() {
       const modal = document.getElementById('palQRModal');
@@ -2867,6 +3096,8 @@
       }
       palCurrentQRPalletId = null;
       palCurrentQRInDate = null;
+      palCurrentQRDataUrl = null;
+      palCurrentQRMeta = null;
     }
     
     // QR 코드 인쇄 (63.5mm * 70mm 라벨)
@@ -2874,168 +3105,35 @@
       if (!palCurrentQRPalletId) return;
       
       try {
-        // 파레트 상세 정보 가져오기
-        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/${palCurrentQRPalletId}`, {
-          headers: palGetUserHeaders()
-        });
-        
-        const result = await response.json();
-        const palletInfo = result.success && result.data ? result.data : null;
-        
-        const printArea = document.getElementById('palQRPrintArea');
-        if (!printArea) return;
-        
-        // 입고일 포맷팅
-        let inDateStr = '-';
-        if (palCurrentQRInDate) {
-          try {
-            const inDate = new Date(palCurrentQRInDate);
-            if (!isNaN(inDate.getTime())) {
-              inDateStr = inDate.toLocaleDateString('ko-KR', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
-              }).replace(/\. /g, '-').replace(/\./g, '');
-            }
-          } catch (e) {
-            inDateStr = palCurrentQRInDate;
-          }
+        var palletId = palCurrentQRPalletId;
+        var inDateStr = palFormatPalletInDateForLabel(palCurrentQRInDate);
+        var vendor = '';
+        var product = '';
+        if (palCurrentQRMeta) {
+          vendor = palCurrentQRMeta.vendor || '';
+          product = palCurrentQRMeta.product || '';
         }
-        
-        // QR 코드 이미지 생성 (인쇄용 크기, 화주사, 품목명 포함)
-        const formUrl = "https://docs.google.com/forms/d/e/1FAIpQLSdDmnWcW27tfDptUvuSjEgN8K7nNNQWecdpeMMhwftTtbiyIQ/viewform";
-        const vendor = palletInfo?.company_name || '';
-        const product = palletInfo?.product_name || '';
-        const qrText = `${formUrl}?usp=pp_url&entry.419411235=${encodeURIComponent(palCurrentQRPalletId)}&entry.427884801=보관종료&entry.2110345042=${encodeURIComponent(vendor)}&entry.306824944=${encodeURIComponent(product)}`;
-        const qrImageUrl = `https://quickchart.io/qr?text=${encodeURIComponent(qrText)}&size=150`;
-        
-        // 인쇄용 HTML 생성 (border 제거, QR 크기 조정)
-        printArea.innerHTML = `
-          <div id="palQRPrintContent" style="width: 63.5mm; height: 70mm; padding: 3mm; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; background: white;">
-            <div style="width: 100%; text-align: center; flex-shrink: 0; margin-bottom: 3px;">
-              <div style="font-size: 11px; font-weight: 600; margin-bottom: 2px; line-height: 1.2;">파레트 ID: ${palEscapeHtml(palCurrentQRPalletId)}</div>
-              <div style="font-size: 11px; font-weight: 600; margin-bottom: 3px; line-height: 1.2;">${palEscapeHtml(product || '-')}</div>
-            </div>
-            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 3px; width: 100%; flex-shrink: 0;">
-              <img src="${qrImageUrl}" alt="QR Code" style="width: 150px; height: 150px; max-width: 100%; max-height: 100%; object-fit: contain;">
-            </div>
-            <div style="width: 100%; text-align: center; flex-shrink: 0;">
-              <div style="font-size: 11px; font-weight: 600; margin-bottom: 2px; line-height: 1.2;">화주사: ${palEscapeHtml(vendor)}</div>
-              <div style="font-size: 11px; font-weight: 600; line-height: 1.2;">입고일: ${inDateStr}</div>
-            </div>
-          </div>
-        `;
-        
-        // 인쇄 스타일 추가
-        const printStyle = document.createElement('style');
-        printStyle.id = 'palQRPrintStyle';
-        printStyle.textContent = `
-          @media print {
-            @page {
-              size: 63.5mm 70mm;
-              margin: 0;
-            }
-            * {
-              margin: 0;
-              padding: 0;
-            }
-            html, body {
-              width: 63.5mm !important;
-              height: 70mm !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              overflow: hidden !important;
-            }
-            body > *:not(#palQRPrintArea) {
-              display: none !important;
-            }
-            #palQRPrintArea {
-              display: block !important;
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
-              width: 63.5mm !important;
-              height: 70mm !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              page-break-after: avoid !important;
-              page-break-inside: avoid !important;
-            }
-            #palQRPrintContent {
-              display: flex !important;
-              width: 63.5mm !important;
-              height: 70mm !important;
-              margin: 0 !important;
-              padding: 3mm !important;
-              box-sizing: border-box !important;
-              page-break-inside: avoid !important;
-              overflow: hidden !important;
-            }
-            #palQRPrintContent img {
-              max-width: 100% !important;
-              max-height: 100% !important;
-              width: auto !important;
-              height: auto !important;
-              object-fit: contain !important;
-            }
-          }
-        `;
-        
-        // 기존 스타일 제거
-        const existingStyle = document.getElementById('palQRPrintStyle');
-        if (existingStyle) {
-          document.head.removeChild(existingStyle);
+        var dataUrl = palCurrentQRDataUrl;
+        if (!dataUrl) {
+          const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/${palletId}`, {
+            headers: palGetUserHeaders()
+          });
+          const result = await response.json();
+          const palletInfo = result.success && result.data ? result.data : null;
+          vendor = palletInfo?.company_name || '';
+          product = palletInfo?.product_name || '';
+          var qrText = palBuildPalletQrText(palletId, vendor, product);
+          dataUrl = await palQrTextToDataUrl(qrText, 200);
+          palCurrentQRDataUrl = dataUrl;
+          palCurrentQRMeta = { vendor: vendor, product: product };
         }
-        
-        document.head.appendChild(printStyle);
-        
-        // body의 다른 모든 요소 숨기기 (임시)
-        const bodyChildren = Array.from(document.body.children);
-        const hiddenElements = [];
-        bodyChildren.forEach(child => {
-          if (child.id !== 'palQRPrintArea') {
-            const originalDisplay = window.getComputedStyle(child).display;
-            child.setAttribute('data-pal-original-display', originalDisplay);
-            child.style.display = 'none';
-            hiddenElements.push(child);
-          }
-        });
-        
-        // 인쇄 영역을 body의 맨 앞으로 이동
-        printArea.style.display = 'block';
-        printArea.style.position = 'absolute';
-        printArea.style.left = '0';
-        printArea.style.top = '0';
-        printArea.style.width = '63.5mm';
-        printArea.style.height = '70mm';
-        document.body.insertBefore(printArea, document.body.firstChild);
-        
-        // 약간의 지연 후 인쇄 (이미지 로드 대기)
-        setTimeout(() => {
-          window.print();
-          // 인쇄 후 정리
-          setTimeout(() => {
-            // 숨긴 요소들 복원
-            hiddenElements.forEach(child => {
-              const originalDisplay = child.getAttribute('data-pal-original-display');
-              child.style.display = originalDisplay || '';
-              child.removeAttribute('data-pal-original-display');
-            });
-            
-            printArea.innerHTML = '';
-            printArea.style.display = 'none';
-            const styleToRemove = document.getElementById('palQRPrintStyle');
-            if (styleToRemove) {
-              document.head.removeChild(styleToRemove);
-            }
-          }, 100);
-        }, 500);
+        var html = palBuildSingleLabelHtml(palletId, product, vendor, inDateStr, dataUrl);
+        await palExecuteRollQrPrint(html);
       } catch (error) {
-        console.error('QR 코드 인쇄 오류:', error);
-        alert('QR 코드 인쇄 중 오류가 발생했습니다.');
+        console.error('QR \ucf54\ub4dc \uc778\uc1c4 \uc624\ub958:', error);
+        alert('QR \ucf54\ub4dc \uc778\uc1c4 \uc911 \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\ub2c8\ub2e4.');
       }
     }
-    
     // 모달 외부 클릭 시 닫기
     window.addEventListener('click', function(event) {
       const modal = document.getElementById('palQRModal');
