@@ -703,6 +703,7 @@ let currentReturnData = null;
 let availableMonths = [];
 let isUploading = false;
 let currentPhotoSessionId = '';
+let qrFrameSkip = 0;
 
 function decodeQrBinaryPayload(binaryData) {
     if (!binaryData || !binaryData.length) return '';
@@ -735,6 +736,17 @@ function extractQrValue(code) {
         return String(code.data || code.text || '');
     } catch (e) {
         return '';
+    }
+}
+
+function tryDecodeQrFromCanvas(ctx, sx, sy, sw, sh) {
+    try {
+        const imageData = ctx.getImageData(sx, sy, sw, sh);
+        return jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'attemptBoth'
+        });
+    } catch (e) {
+        return null;
     }
 }
 
@@ -798,12 +810,12 @@ async function startAutoQRScan() {
     try {
         showQRStatus('카메라 권한을 요청하는 중...', '');
         
-        // QR 스캔용 카메라 설정 (낮은 해상도, 빠른 스캔)
+        // QR 스캔용 카메라 설정 (인식 우선)
         const constraints = {
             video: {
                 facingMode: 'environment',
-                width: { ideal: 640, max: 1280 },
-                height: { ideal: 480, max: 720 }
+                width: { ideal: 1280, max: 1920 },
+                height: { ideal: 720, max: 1080 }
             }
         };
         
@@ -815,6 +827,22 @@ async function startAutoQRScan() {
         qrVideo.setAttribute('webkit-playsinline', 'true');
         
         await qrVideo.play();
+
+        // 지원 단말에서는 연속 초점/확대 적용 (인식률 개선)
+        try {
+            const track = qrStream.getVideoTracks && qrStream.getVideoTracks()[0];
+            if (track && track.getCapabilities) {
+                const caps = track.getCapabilities();
+                const adv = {};
+                if (caps.focusMode && caps.focusMode.indexOf('continuous') >= 0) adv.focusMode = 'continuous';
+                if (typeof caps.zoom === 'object' && caps.zoom.max >= 1.5) adv.zoom = Math.min(2.0, caps.zoom.max);
+                if (Object.keys(adv).length > 0 && track.applyConstraints) {
+                    await track.applyConstraints({ advanced: [adv] });
+                }
+            }
+        } catch (focusErr) {
+            console.log('ℹ️ 포커스/줌 제어 미지원:', focusErr && focusErr.message ? focusErr.message : focusErr);
+        }
         
         qrScanMode.classList.remove('hidden');
         showQRStatus('QR 코드를 카메라에 비춰주세요.', '');
@@ -824,8 +852,13 @@ async function startAutoQRScan() {
         const context = canvas.getContext('2d');
         
         qrVideo.addEventListener('loadedmetadata', function() {
-            canvas.width = qrVideo.videoWidth;
-            canvas.height = qrVideo.videoHeight;
+            // 디코딩 성능/정확도 균형을 위해 내부 캔버스 크기 제한
+            const vw = qrVideo.videoWidth || 1280;
+            const vh = qrVideo.videoHeight || 720;
+            const maxW = 960;
+            const scale = Math.min(1, maxW / vw);
+            canvas.width = Math.max(320, Math.floor(vw * scale));
+            canvas.height = Math.max(240, Math.floor(vh * scale));
             console.log('📹 비디오 크기:', canvas.width, 'x', canvas.height);
         }, { once: true });
         
@@ -834,12 +867,21 @@ async function startAutoQRScan() {
         qrScanInterval = setInterval(function() {
             if (qrVideo.readyState === qrVideo.HAVE_ENOUGH_DATA && canvas.width > 0 && canvas.height > 0) {
                 try {
+                    // 너무 자주 디코딩하면 일부 단말에서 오히려 인식률/프레임 저하
+                    qrFrameSkip = (qrFrameSkip + 1) % 2;
+                    if (qrFrameSkip !== 0) return;
+
                     context.drawImage(qrVideo, 0, 0, canvas.width, canvas.height);
-                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                    
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                        inversionAttempts: 'attemptBoth',
-                    });
+                    // 중앙 가이드 영역 우선 스캔 -> 실패 시 전체 스캔
+                    const roiW = Math.floor(canvas.width * 0.62);
+                    const roiH = Math.floor(canvas.height * 0.62);
+                    const roiX = Math.floor((canvas.width - roiW) / 2);
+                    const roiY = Math.floor((canvas.height - roiH) / 2);
+
+                    let code = tryDecodeQrFromCanvas(context, roiX, roiY, roiW, roiH);
+                    if (!code) {
+                        code = tryDecodeQrFromCanvas(context, 0, 0, canvas.width, canvas.height);
+                    }
                     
                     if (code) {
                         const qrValueRaw = extractQrValue(code);
