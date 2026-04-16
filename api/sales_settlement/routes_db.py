@@ -18,6 +18,40 @@ sales_settlement_bp = Blueprint('sales_settlement', __name__, url_prefix='/api/s
 JJAY_USERNAME = 'jjay'
 
 
+def _settlement_statement_ready(item: dict) -> bool:
+    """정산 명세서(엑셀) 생성에 쓸 금액·첨부가 갖춰졌는지 여부 (전달 건 표시·정렬용)."""
+    for key in (
+        'work_fee_file_url',
+        'inout_fee_file_url',
+        'shipping_fee_file_url',
+        'tax_invoice_file_url',
+    ):
+        v = item.get(key)
+        if v and str(v).strip():
+            return True
+    try:
+        fc = int(item.get('settlement_file_count') or 0)
+    except (TypeError, ValueError):
+        fc = 0
+    if fc > 0:
+        return True
+    line = (
+        int(item.get('work_fee') or 0)
+        + int(item.get('inout_fee') or 0)
+        + int(item.get('shipping_fee') or 0)
+        + int(item.get('collect_on_delivery_fee') or 0)
+        + int(item.get('return_fee') or 0)
+        + int(item.get('storage_fee') or 0)
+        + int(item.get('special_work_fee') or 0)
+        - int(item.get('error_deduction') or 0)
+    )
+    if line != 0:
+        return True
+    if int(item.get('total_amount') or 0) != 0:
+        return True
+    return False
+
+
 def get_user_context():
     """사용자 컨텍스트 가져오기"""
     role = request.headers.get('X-User-Role', '').strip()
@@ -68,6 +102,8 @@ def get_summary():
     try:
         year_month = request.args.get('year_month', '').strip()
         year = request.args.get('year', '').strip()
+        if year_month and year and len(year_month) >= 7 and not year_month.startswith(f'{year}-'):
+            year = ''
 
         conn = get_db_connection()
         ensure_settlement_return_fee_column(conn)
@@ -91,20 +127,52 @@ def get_summary():
 
             query = f'''
                 SELECT 
-                    id,
-                    settlement_year_month,
-                    company_name,
-                    total_amount,
-                    status,
-                    work_fee, inout_fee, shipping_fee, storage_fee,
-                    special_work_fee, error_deduction, collect_on_delivery_fee, return_fee
-                FROM settlements
-                WHERE {where_sql}
-                ORDER BY settlement_year_month DESC, company_name
+                    s.id,
+                    s.settlement_year_month,
+                    s.company_name,
+                    s.total_amount,
+                    s.status,
+                    s.work_fee, s.inout_fee, s.shipping_fee, s.storage_fee,
+                    s.special_work_fee, s.error_deduction, s.collect_on_delivery_fee, s.return_fee,
+                    s.work_fee_file_url,
+                    s.inout_fee_file_url,
+                    s.shipping_fee_file_url,
+                    s.tax_invoice_file_url,
+                    (SELECT COUNT(*) FROM settlement_files f WHERE f.settlement_id = s.id) AS settlement_file_count
+                FROM settlements s
+                WHERE {where_sql.replace("settlement_year_month", "s.settlement_year_month")}
+                ORDER BY s.settlement_year_month DESC, s.company_name
             '''
             cursor.execute(query, params)
             rows = cursor.fetchall()
             result = [dict(row) for row in rows]
+
+            for item in result:
+                item['statement_ready'] = _settlement_statement_ready(item)
+                for k in (
+                    'work_fee_file_url',
+                    'inout_fee_file_url',
+                    'shipping_fee_file_url',
+                    'tax_invoice_file_url',
+                    'settlement_file_count',
+                ):
+                    item.pop(k, None)
+
+            def _ss_sort_key(row):
+                st = (row.get('status') or '대기').strip()
+                name = (row.get('company_name') or '').strip()
+                sr = bool(row.get('statement_ready'))
+                if st in ('정산확인', '입금완료'):
+                    return (0, 0, name)
+                if st == '전달' and sr:
+                    return (0, 1, name)
+                if st == '대기':
+                    return (1, 0, name)
+                if st == '전달':
+                    return (1, 1, name)
+                return (2, 0, name)
+
+            result.sort(key=_ss_sort_key)
 
             # 집계
             total_sales = 0

@@ -286,6 +286,9 @@
 
     <div class="ss-section">
       <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #2d3436;">화주사별 정산내역</h3>
+      <p style="margin: 0 0 10px 0; font-size: 12px; color: #636e72; line-height: 1.45;">
+        전달 상태도 정산 금액·항목 또는 증빙·첨부가 있으면 명세서 작성이 가능한 건으로 표시되며, 해당 건은 목록 상단에 모읍니다.
+      </p>
       <div id="ssCompanyList" class="ss-company-grid">
         <div class="ss-no-data">로딩 중...</div>
       </div>
@@ -478,12 +481,20 @@
             else if (status === '입금완료') statusClass = 'ss-status-done';
             const isPending = (status === '대기' || status === '전달');
             const cardClass = 'ss-company-card' + (isPending ? ' ss-pending' : '');
+            let deliveryNote = '';
+            if (status === '전달') {
+              if (item.statement_ready) {
+                deliveryNote = '<span class="ss-status-badge" style="background:#e8f5e9;color:#2e7d32;margin-left:6px;">명세·정산자료 있음</span>';
+              } else {
+                deliveryNote = '<span class="ss-status-badge" style="background:#fff3e0;color:#e65100;margin-left:6px;">명세 발행 전</span>';
+              }
+            }
 
             return `
               <div class="${cardClass}">
                 <div class="ss-company-name">${(item.company_name || '').escapeHtml()} · ${(item.settlement_year_month || '').escapeHtml()}</div>
                 <div class="ss-company-amount">${finalAmount.toLocaleString()}원</div>
-                <div style="margin-bottom: 8px;"><span class="ss-status-badge ${statusClass}">${status}</span></div>
+                <div style="margin-bottom: 8px;"><span class="ss-status-badge ${statusClass}">${status}</span>${deliveryNote}</div>
                 <div class="ss-company-actions">
                   <button class="ss-btn ss-btn-small" onclick="ssShowDetail(${item.id})">상세</button>
                   <button class="ss-btn" onclick="ssShowStatusModal(${item.id}, ${JSON.stringify(status)})" style="padding: 6px 12px; font-size: 12px;">상태변경</button>
