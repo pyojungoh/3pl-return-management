@@ -826,6 +826,8 @@
         username: stCurrentUsername
       });
       
+      stEnsureSettlementClickDelegates();
+      
       // 2. 가시성 제어
       stApplyVisibility();
       
@@ -1009,6 +1011,31 @@
         el.style.display = isAdmin ? 'none' : (isTableCell ? 'table-cell' : 'block');
       });
     }
+    window.stApplyVisibility = stApplyVisibility;
+
+    /** 상태 열 버튼: onclick 대신 위임(따옴표/특수문자 이슈 방지) */
+    function stEnsureSettlementClickDelegates() {
+      const root = document.getElementById('stContainer');
+      if (!root || root.dataset.stClickDelegates === '1') return;
+      root.dataset.stClickDelegates = '1';
+      root.addEventListener('click', function (e) {
+        const btn = e.target.closest('.st-status-modal-btn');
+        if (!btn || !root.contains(btn)) return;
+        e.preventDefault();
+        const sid = parseInt(String(btn.getAttribute('data-st-id') || ''), 10);
+        const enc = btn.getAttribute('data-st-status');
+        let st = '대기';
+        try {
+          st = enc != null && enc !== '' ? decodeURIComponent(enc) : '대기';
+        } catch (err) {
+          st = '대기';
+        }
+        if (sid && typeof window.stShowStatusChangeModal === 'function') {
+          window.stShowStatusChangeModal(sid, st);
+        }
+      });
+    }
+    window.stEnsureSettlementClickDelegates = stEnsureSettlementClickDelegates;
 
     // 사용자 헤더 생성 함수
     function stGetUserHeaders() {
@@ -1319,8 +1346,9 @@
         
         // 상태 버튼 (관리자만 - 클릭 시 모달 표시)
         const statusButton = `
-          <button type="button" class="st-btn" 
-                  onclick='stShowStatusChangeModal(${item.id}, ${JSON.stringify(status)})'
+          <button type="button" class="st-btn st-status-modal-btn" 
+                  data-st-id="${item.id}"
+                  data-st-status="${encodeURIComponent(status)}"
                   style="padding: 4px 8px; font-size: 11px; background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">
             ${status}
           </button>
@@ -1352,9 +1380,9 @@
         `;
       }).join('');
       
-      // 렌더링 후 관리자 전용 요소 표시 업데이트
+      // 렌더링 후 관리자/화주 전용 열 표시 재적용
       setTimeout(() => {
-        stToggleAdminOnlyVisibility();
+        stApplyVisibility();
       }, 0);
     }
 
