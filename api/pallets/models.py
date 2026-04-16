@@ -11,6 +11,21 @@ from api.database.models import get_db_connection, USE_POSTGRESQL, is_company_de
 # 파레트 관리 함수
 # ========================================
 
+VALID_PALLET_KINDS = ('일반', '아주', 'kpp', '기타')
+
+
+def normalize_pallet_kind(value) -> str:
+    """입고 시 파레트 종류 (일반/아주/kpp/기타). 알 수 없으면 일반."""
+    if value is None:
+        return '일반'
+    s = str(value).strip()
+    if s in VALID_PALLET_KINDS:
+        return s
+    if s.lower() == 'kpp':
+        return 'kpp'
+    return '일반'
+
+
 def generate_pallet_id(in_date: date = None) -> str:
     """
     파레트 ID 자동 생성 (년월일_001 형식)
@@ -62,7 +77,7 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
                  product_name: str = None, in_date: date = None,
                  storage_location: str = None, quantity: int = 1,
                  is_service: bool = False, notes: str = None,
-                 created_by: str = None) -> Tuple[bool, str, Optional[Dict]]:
+                 created_by: str = None, pallet_kind: str = None) -> Tuple[bool, str, Optional[Dict]]:
     """
     파레트 입고 처리
     
@@ -81,8 +96,10 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
     if pallet_id is None:
         pallet_id = generate_pallet_id(in_date)
     
+    pallet_kind_norm = normalize_pallet_kind(pallet_kind)
+    
     # 디버깅: 요청받은 pallet_id 로깅
-    print(f"[DEBUG] create_pallet 호출 - pallet_id: {pallet_id}, company_name: {company_name}")
+    print(f"[DEBUG] create_pallet 호출 - pallet_id: {pallet_id}, company_name: {company_name}, pallet_kind: {pallet_kind_norm}")
     
     # 중복 체크 (INSERT 전에 미리 확인)
     existing_pallet = get_pallet_by_id(pallet_id)
@@ -99,12 +116,12 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
             cursor.execute('''
                 INSERT INTO pallets (
                     pallet_id, company_name, product_name, status,
-                    in_date, storage_location, quantity, is_service,
+                    in_date, storage_location, quantity, is_service, pallet_kind,
                     notes, created_by, created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ''', (pallet_id, company_name, product_name, '입고됨',
                   in_date, storage_location, quantity, 1 if is_service else 0,
-                  notes, created_by))
+                  pallet_kind_norm, notes, created_by))
             
             # 트랜잭션 이력 저장
             cursor.execute('''
@@ -117,12 +134,12 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
             cursor.execute('''
                 INSERT INTO pallets (
                     pallet_id, company_name, product_name, status,
-                    in_date, storage_location, quantity, is_service,
+                    in_date, storage_location, quantity, is_service, pallet_kind,
                     notes, created_by, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ''', (pallet_id, company_name, product_name, '입고됨',
                   in_date, storage_location, quantity, 1 if is_service else 0,
-                  notes, created_by))
+                  pallet_kind_norm, notes, created_by))
             
             # 트랜잭션 이력 저장
             cursor.execute('''

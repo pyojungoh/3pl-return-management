@@ -689,6 +689,7 @@ def init_db():
                     storage_location TEXT,
                     quantity INTEGER DEFAULT 1,
                     is_service INTEGER DEFAULT 0,
+                    pallet_kind TEXT NOT NULL DEFAULT '일반',
                     notes TEXT,
                     created_by TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -726,6 +727,13 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_pallets_in_date_pallet_id 
                 ON pallets(in_date DESC, pallet_id DESC)
             ''')
+            
+            try:
+                cursor.execute(
+                    "ALTER TABLE pallets ADD COLUMN IF NOT EXISTS pallet_kind TEXT NOT NULL DEFAULT '일반'"
+                )
+            except Exception as e:
+                print(f"[경고] pallets.pallet_kind 마이그레이션(PostgreSQL): {e}")
             
             # pallet_fees 테이블 (화주사별 보관료 설정)
             cursor.execute('''
@@ -1513,6 +1521,7 @@ def init_db():
                     storage_location TEXT,
                     quantity INTEGER DEFAULT 1,
                     is_service INTEGER DEFAULT 0,
+                    pallet_kind TEXT NOT NULL DEFAULT '일반',
                     notes TEXT,
                     created_by TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1550,6 +1559,14 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_pallets_in_date_pallet_id 
                 ON pallets(in_date DESC, pallet_id DESC)
             ''')
+            
+            try:
+                cursor.execute(
+                    "ALTER TABLE pallets ADD COLUMN pallet_kind TEXT NOT NULL DEFAULT '일반'"
+                )
+            except Exception as e:
+                if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
+                    print(f"[경고] pallets.pallet_kind 마이그레이션(SQLite): {e}")
             
             # pallet_fees 테이블 (화주사별 보관료 설정)
             cursor.execute('''

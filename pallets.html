@@ -849,6 +849,28 @@
                 <input type="date" id="palInboundDate" class="pal-form-input" required>
               </div>
               
+              <div class="pal-form-group">
+                <label class="pal-form-label">파레트 종류</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: center;">
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; color: #2d3436;">
+                    <input type="checkbox" id="palInboundKindGeneral" name="palPalletKind" value="일반" checked onchange="palOnInboundKindCheckboxChange(this)">
+                    <span>일반</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; color: #2d3436;">
+                    <input type="checkbox" id="palInboundKindAju" name="palPalletKind" value="아주" onchange="palOnInboundKindCheckboxChange(this)">
+                    <span>아주</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; color: #2d3436;">
+                    <input type="checkbox" id="palInboundKindKpp" name="palPalletKind" value="kpp" onchange="palOnInboundKindCheckboxChange(this)">
+                    <span>kpp</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; color: #2d3436;">
+                    <input type="checkbox" id="palInboundKindEtc" name="palPalletKind" value="기타" onchange="palOnInboundKindCheckboxChange(this)">
+                    <span>기타</span>
+                  </label>
+                </div>
+              </div>
+              
               <!-- 품목 리스트 -->
               <div class="pal-form-group">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -888,7 +910,7 @@
               <p style="margin: 0; font-size: 13px; color: #636e72; line-height: 1.6;">
                 CSV 또는 Excel 파일을 업로드하세요.<br>
                 필수 컬럼: 화주사, 품목명, 입고일 (YYYY-MM-DD)<br>
-                선택 컬럼: 파레트 ID, 보관 위치, 수량, 서비스 여부, 비고
+                선택 컬럼: 파레트 ID, 보관 위치, 수량, 서비스 여부, 비고, 파레트종류 (일반·아주·kpp·기타, 생략 시 일반)
               </p>
             </div>
             <div class="pal-form-group">
@@ -1065,6 +1087,7 @@
                   <th style="font-size: 11px; width: 90px; max-width: 90px;">파레트 ID</th>
                   <th style="font-size: 11px; width: 110px; max-width: 110px;">화주사</th>
                   <th style="font-size: 11px;">품목명</th>
+                  <th style="font-size: 11px; width: 48px;">종류</th>
                   <th style="font-size: 11px;">상태</th>
                   <th style="font-size: 11px;">입고일</th>
                   <th style="font-size: 11px;">갱신일</th>
@@ -1078,7 +1101,7 @@
               </thead>
               <tbody id="palPalletsTableBody">
                 <tr>
-                  <td colspan="13" class="no-data">데이터를 불러오는 중...</td>
+                  <td colspan="14" class="no-data">데이터를 불러오는 중...</td>
                 </tr>
               </tbody>
             </table>
@@ -2324,6 +2347,42 @@
       }
     }
     
+    function palOnInboundKindCheckboxChange(changed) {
+      const form = document.getElementById('palInboundForm');
+      if (!form || !changed) return;
+      const all = form.querySelectorAll('input[name="palPalletKind"]');
+      if (changed.checked) {
+        all.forEach(function (cb) {
+          if (cb !== changed) cb.checked = false;
+        });
+      } else {
+        var anyChecked = false;
+        all.forEach(function (cb) {
+          if (cb.checked) anyChecked = true;
+        });
+        if (!anyChecked) {
+          var g = document.getElementById('palInboundKindGeneral');
+          if (g) g.checked = true;
+        }
+      }
+    }
+    window.palOnInboundKindCheckboxChange = palOnInboundKindCheckboxChange;
+
+    function palGetSelectedPalletKind() {
+      const form = document.getElementById('palInboundForm');
+      if (!form) return '일반';
+      const c = form.querySelector('input[name="palPalletKind"]:checked');
+      return c && c.value ? c.value : '일반';
+    }
+
+    function palResetInboundPalletKinds() {
+      var ids = ['palInboundKindGeneral', 'palInboundKindAju', 'palInboundKindKpp', 'palInboundKindEtc'];
+      ids.forEach(function (id, i) {
+        var el = document.getElementById(id);
+        if (el) el.checked = (i === 0);
+      });
+    }
+
     // 파레트 입고 처리
     async function palInbound() {
       const messageDiv = document.getElementById('palInboundMessage');
@@ -2383,6 +2442,7 @@
             return;
           }
           
+          const palletKind = palGetSelectedPalletKind();
           for (let i = 0; i < quantity; i++) {
             pallets.push({
               pallet_id: null, // 자동 생성
@@ -2392,6 +2452,7 @@
               storage_location: document.getElementById('palInboundLocation').value || null,
               quantity: 1, // 각 파레트는 수량 1
               is_service: document.getElementById('palInboundIsService').checked,
+              pallet_kind: palletKind,
               notes: document.getElementById('palInboundNotes').value || null
             });
           }
@@ -2420,6 +2481,7 @@
           // 폼 초기화
           document.getElementById('palInboundForm').reset();
           document.getElementById('palInboundDate').value = new Date().toISOString().split('T')[0];
+          palResetInboundPalletKinds();
           // 품목 리스트 초기화 (1개만 남기기)
           const itemsList = document.getElementById('palProductItemsList');
           if (itemsList) {
@@ -2477,6 +2539,7 @@
               storage_location: pallet['보관 위치'] || pallet['storage_location'] || null,
               quantity: parseInt(pallet['수량'] || pallet['quantity'] || 1),
               is_service: pallet['서비스 여부'] === 'Y' || pallet['is_service'] === true,
+              pallet_kind: pallet['파레트종류'] || pallet['pallet_kind'] || '일반',
               notes: pallet['비고'] || pallet['notes'] || null
             });
           }
@@ -2892,7 +2955,7 @@
       
       if (!tbody) return;
       
-      tbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="14" class="no-data">데이터를 불러오는 중...</td></tr>';
       
       try {
         const company = palCurrentRole === '관리자' 
@@ -2957,7 +3020,7 @@
           let filteredPallets = pallets;
           
           if (filteredPallets.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="13" class="no-data">파레트가 없습니다.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="14" class="no-data">파레트가 없습니다.</td></tr>';
           } else {
             tbody.innerHTML = filteredPallets.map(pallet => {
               // 상태 표시: 조회월 있으면 해당 월 말일 기준, 없으면 DB 현재값
@@ -2980,6 +3043,7 @@
                 <td style="font-size: 11px; width: 90px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${palEscapeHtml(pallet.pallet_id)}">${palEscapeHtml(pallet.pallet_id)}</td>
                 <td style="font-size: 11px; width: 110px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${palEscapeHtml(pallet.company_name || '')}">${palEscapeHtml(pallet.company_name || '')}</td>
                 <td style="font-size: 11px; white-space: normal; word-break: break-word; max-width: 150px;">${palEscapeHtml(pallet.product_name || '')}</td>
+                <td style="font-size: 11px; white-space: nowrap;">${palEscapeHtml(pallet.pallet_kind || '일반')}</td>
                 <td style="font-size: 11px; font-weight: 600;">${palEscapeHtml(statusText)}</td>
                 <td style="font-size: 11px;">${pallet.in_date || ''}</td>
                 <td style="font-size: 11px;">${renewalDateStr}</td>
@@ -3017,7 +3081,7 @@
             }).join('');
           }
         } else {
-          tbody.innerHTML = '<tr><td colspan="13" class="no-data">❌ ' + result.message + '</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="14" class="no-data">❌ ' + result.message + '</td></tr>';
         }
       } catch (error) {
         console.error('●▶ 파레트 목록 로드 오류:', error);
@@ -3027,7 +3091,7 @@
         } else if (error.message) {
           errorMessage = error.message;
         }
-        tbody.innerHTML = '<tr><td colspan="13" class="no-data">❌ ' + errorMessage + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="14" class="no-data">❌ ' + errorMessage + '</td></tr>';
         if (countSpan) countSpan.textContent = '(오류)';
       }
     }
