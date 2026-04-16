@@ -603,6 +603,40 @@ let availableMonths = [];
 let isUploading = false;
 let currentPhotoSessionId = '';
 
+function decodeQrBinaryPayload(binaryData) {
+    if (!binaryData || !binaryData.length) return '';
+    try {
+        if (typeof TextDecoder !== 'undefined') {
+            return new TextDecoder('utf-8').decode(new Uint8Array(binaryData));
+        }
+    } catch (e) {
+        // fallback below
+    }
+    try {
+        let out = '';
+        for (let i = 0; i < binaryData.length; i++) {
+            out += String.fromCharCode((binaryData[i] || 0) & 0xff);
+        }
+        return out;
+    } catch (e2) {
+        return '';
+    }
+}
+
+function extractQrValue(code) {
+    if (!code) return '';
+    if (typeof code.data === 'string' && code.data.length > 0) return code.data;
+    if (typeof code.text === 'string' && code.text.length > 0) return code.text;
+    const fromBinary = decodeQrBinaryPayload(code.binaryData);
+    if (fromBinary && fromBinary.length > 0) return fromBinary;
+    // 최후 fallback: 객체를 문자열화해도 비면 빈값
+    try {
+        return String(code.data || code.text || '');
+    } catch (e) {
+        return '';
+    }
+}
+
 // ========= 초기화 =========
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📱 QR 자동 스캔 페이지 초기화');
@@ -707,23 +741,8 @@ async function startAutoQRScan() {
                     });
                     
                     if (code) {
-                        let qrValue = '';
-                        if (typeof code.data === 'string') {
-                            qrValue = code.data;
-                        } else if (typeof code.text === 'string') {
-                            qrValue = code.text;
-                        } else if (code.binaryData && code.binaryData.length) {
-                            try {
-                                qrValue = new TextDecoder('utf-8').decode(new Uint8Array(code.binaryData));
-                            } catch (e) {
-                                try {
-                                    qrValue = String.fromCharCode.apply(null, Array.from(code.binaryData));
-                                } catch (e2) {
-                                    qrValue = '';
-                                }
-                            }
-                        }
-                        qrValue = (qrValue || '').trim();
+                        const qrValueRaw = extractQrValue(code);
+                        const qrValue = (qrValueRaw || '').trim();
                         if (!qrValue) {
                             // 일부 디바이스에서 빈 payload가 감지되는 케이스: 재시도
                             console.warn('⚠️ QR 감지됨(빈 payload) - 재스캔');
