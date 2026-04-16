@@ -22,7 +22,7 @@ _KIND_COLOR_HEX = re.compile(r'^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$')
 
 
 def normalize_kind_color(value, pallet_kind: str) -> Optional[str]:
-    """아주/kpp 표시용 색상 (#RGB 또는 #RRGGBB). 그 외 종류·잘못된 값은 None."""
+    """아주/kpp 표시용 색상 (#RGB 또는 #RRGGBB, 또는 초록/빨강). 그 외 종류·잘못된 값은 None."""
     kind = (pallet_kind or '').strip()
     if kind not in ('아주', 'kpp'):
         return None
@@ -31,6 +31,11 @@ def normalize_kind_color(value, pallet_kind: str) -> Optional[str]:
     s = str(value).strip()
     if not s:
         return None
+    sl = s.lower()
+    if s in ('초록',) or sl == 'green':
+        return '#00b894'
+    if s in ('빨강',) or sl == 'red':
+        return '#e74c3c'
     if not _KIND_COLOR_HEX.match(s):
         return None
     return s
