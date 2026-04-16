@@ -3283,6 +3283,7 @@
           const vrDisp = r.vendor_return_status_effective || r.vendor_return_status || '미반납';
           const isDone = (r.vendor_return_status === '반납완료');
           const pid = r.pallet_id || '';
+          const inDate = r.in_date || '';
           var kcRaw = (r.kind_color != null && r.kind_color !== undefined) ? String(r.kind_color).trim() : '';
           var colorText = palKindColorToText(kcRaw);
           var colorCell = '<span style="color:#999;font-size:11px;">-</span>';
@@ -3290,9 +3291,9 @@
           let actionCell = '<span style="color:#999;font-size:11px;">-</span>';
           if (isAdmin) {
             if (isDone) {
-              actionCell = '<button type="button" class="pal-btn pal-btn-secondary" onclick="void palSubmitVendorReturn(' + JSON.stringify(pid) + ',' + JSON.stringify('미반납') + ')" style="padding:4px 8px;font-size:10px;">미반납으로</button>';
+              actionCell = '<button type="button" class="pal-btn pal-btn-secondary" data-pallet-id="' + palEscapeHtml(pid) + '" data-status="미반납" onclick="void palOnVendorReturnStatusButtonClick(this)" style="padding:4px 8px;font-size:10px;">미반납으로</button>';
             } else {
-              actionCell = '<button type="button" class="pal-btn" onclick="void palSubmitVendorReturn(' + JSON.stringify(pid) + ',' + JSON.stringify('반납완료') + ')" style="padding:4px 8px;font-size:10px;background:#00b894;color:#fff;">반납완료</button>';
+              actionCell = '<button type="button" class="pal-btn" data-pallet-id="' + palEscapeHtml(pid) + '" data-status="반납완료" onclick="void palOnVendorReturnStatusButtonClick(this)" style="padding:4px 8px;font-size:10px;background:#00b894;color:#fff;">반납완료</button>';
             }
           }
           return '<tr>' +
@@ -3305,9 +3306,9 @@
             '<td style="font-size:11px;">' + palEscapeHtml(r.status || '') + '</td>' +
             '<td style="font-size:11px;font-weight:600;">' + palEscapeHtml(vrDisp) + '</td>' +
             '<td style="font-size:11px;">' + palEscapeHtml(r.vendor_returned_at || '-') + '</td>' +
-            '<td style="font-size:11px;">' + palEscapeHtml(r.in_date || '') + '</td>' +
+            '<td style="font-size:11px;">' + palEscapeHtml(inDate) + '</td>' +
             '<td style="font-size:11px;white-space:nowrap;">' + actionCell +
-              ' <button type="button" class="pal-btn" onclick="void palViewVendorReturnQRCode(' + JSON.stringify(pid) + ',' + JSON.stringify(r.in_date || '') + ')" style="padding:4px 8px;font-size:10px;background:#6f42c1;color:#fff;">반납QR</button>' +
+              ' <button type="button" class="pal-btn" data-pallet-id="' + palEscapeHtml(pid) + '" data-in-date="' + palEscapeHtml(inDate) + '" onclick="void palOnVendorReturnQrButtonClick(this)" style="padding:4px 8px;font-size:10px;background:#6f42c1;color:#fff;">반납QR</button>' +
             '</td>' +
             '</tr>';
         }).join('');
@@ -3374,6 +3375,24 @@
       }
     }
     window.palPrintSelectedVendorReturnQrs = palPrintSelectedVendorReturnQrs;
+
+    function palOnVendorReturnQrButtonClick(btn) {
+      if (!btn) return;
+      var pid = (btn.getAttribute('data-pallet-id') || '').trim();
+      var inDate = (btn.getAttribute('data-in-date') || '').trim();
+      if (!pid) return;
+      palViewVendorReturnQRCode(pid, inDate);
+    }
+    window.palOnVendorReturnQrButtonClick = palOnVendorReturnQrButtonClick;
+
+    function palOnVendorReturnStatusButtonClick(btn) {
+      if (!btn) return;
+      var pid = (btn.getAttribute('data-pallet-id') || '').trim();
+      var status = (btn.getAttribute('data-status') || '').trim();
+      if (!pid || !status) return;
+      palSubmitVendorReturn(pid, status);
+    }
+    window.palOnVendorReturnStatusButtonClick = palOnVendorReturnStatusButtonClick;
 
     function palKindColorToText(rawColor) {
       var s = (rawColor == null || rawColor == undefined) ? '' : String(rawColor).trim().toLowerCase();
