@@ -1990,6 +1990,22 @@
         </div>
       </div>
       
+      <!-- 정산 전달 팝업: 명세서 미리보기 (팝업 z-index 10000 위에 표시) -->
+      <div id="settlementDeliveryStatementModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.55); z-index: 10002; overflow-y: auto;" onclick="if(event.target.id==='settlementDeliveryStatementModal') closeSettlementDeliveryStatementPreview()">
+        <div style="max-width: 720px; margin: 24px auto; background: white; border-radius: 14px; padding: 24px; box-shadow: 0 4px 24px rgba(0,0,0,0.25);" onclick="event.stopPropagation()">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+            <h2 style="margin: 0; color: #ff6b35; font-weight: 700;">정산 명세서</h2>
+            <button type="button" onclick="closeSettlementDeliveryStatementPreview()" style="background: #e17055; color: white; border: none; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; font-size: 18px;">×</button>
+          </div>
+          <div id="settlementDeliveryStatementPreviewContent" style="margin-bottom: 20px;"></div>
+          <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; padding-top: 16px; border-top: 2px solid #f0f0f0;">
+            <button type="button" class="save-btn" onclick="downloadSettlementDeliveryStatement()" style="background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);">📥 다운로드</button>
+            <button type="button" class="save-btn" onclick="printSettlementDeliveryStatement()" style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);">🖨️ 프린트</button>
+            <button type="button" class="save-btn" onclick="closeSettlementDeliveryStatementPreview()" style="background: linear-gradient(135deg, #636e72 0%, #2d3436 100%);">닫기</button>
+          </div>
+        </div>
+      </div>
+      
       <!-- 메뉴바 (화주사 모드만 표시) -->
       <div class="menu-bar" id="menuBar" style="display: none;">
         <button type="button" class="menu-item" id="companyInfoMenuBtn" onclick="switchMenu('companyInfo')">👤 화주사 정보</button>
@@ -13988,6 +14004,188 @@
     }
     window.showSettlementPopupCloseButtons = showSettlementPopupCloseButtons;
     
+    function ssdGetConsignorSettlementHeaders() {
+      const encodeHeader = (value) => encodeURIComponent((value || '').toString().trim());
+      return {
+        'X-User-Role': encodeHeader('화주사'),
+        'X-User-Name': encodeHeader(currentUsername),
+        'X-Company-Name': encodeHeader(currentCompany)
+      };
+    }
+
+    function ssdAttachmentLinks(fileUrl) {
+      const raw = (fileUrl && String(fileUrl).trim()) ? String(fileUrl).trim() : '';
+      if (!raw) {
+        return '<span style="color:#b2bec3;font-size:12px;">첨부 없음</span>';
+      }
+      const u = encodeURI(raw);
+      return '<a href="' + u + '" target="_blank" rel="noopener noreferrer" style="padding:4px 8px;background:#74b9ff;color:white;border-radius:4px;text-decoration:none;font-size:12px;white-space:nowrap;">👁️ 보기</a>' +
+        '<a href="' + u + '" target="_blank" rel="noopener noreferrer" download style="padding:4px 8px;background:#00b894;color:white;border-radius:4px;text-decoration:none;font-size:12px;white-space:nowrap;margin-left:6px;">📥 다운로드</a>';
+    }
+
+    function ssdBuildStatementPreviewHtml(settlement) {
+      const totalAmount = (settlement.work_fee || 0) + (settlement.inout_fee || 0) +
+        (settlement.shipping_fee || 0) + (settlement.collect_on_delivery_fee || 0) +
+        (settlement.return_fee || 0) + (settlement.storage_fee || 0) +
+        (settlement.special_work_fee || 0) - (settlement.error_deduction || 0);
+      const tax = Math.floor(totalAmount * 0.1);
+      const finalAmount = totalAmount + tax;
+      const cn = typeof escapeHtml === 'function' ? escapeHtml(settlement.company_name || '') : (settlement.company_name || '');
+      const ym = typeof escapeHtml === 'function' ? escapeHtml(settlement.settlement_year_month || '') : (settlement.settlement_year_month || '');
+      const memoBlock = settlement.memo
+        ? ('<div style="margin-bottom: 18px;"><h3 style="color: #2d3436; font-size: 14px; font-weight: 700; margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px solid #ddd;">■ 비고</h3>' +
+          '<div style="padding: 8px; border: 1px solid #ddd; background: #f8f9fa; font-size: 11px;">' +
+          (typeof escapeHtml === 'function' ? escapeHtml(settlement.memo) : settlement.memo) +
+          '</div></div>')
+        : '';
+      return (
+        '<div style="font-family: \'Malgun Gothic\', sans-serif;">' +
+        '<div style="text-align: center; margin-bottom: 20px;"><h1 style="margin: 0; color: #2d3436; font-size: 20px; font-weight: 700;">정산 명세서</h1></div>' +
+        '<div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">' +
+        '<div style="flex: 1; min-width: 260px;"><h3 style="color: #2d3436; font-size: 14px; font-weight: 700; margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px solid #ddd;">■ 공급받는자 정보</h3>' +
+        '<table style="width: 100%; border-collapse: collapse;"><tr><td style="padding: 5px 6px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600; width: 100px; font-size: 11px;">상호</td><td style="padding: 5px 6px; border: 1px solid #ddd; font-size: 11px;">' + cn + '</td></tr>' +
+        '<tr><td style="padding: 5px 6px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600; font-size: 11px;">정산년월</td><td style="padding: 5px 6px; border: 1px solid #ddd; font-size: 11px;">' + ym + '</td></tr></table></div>' +
+        '<div style="flex: 1; min-width: 260px;"><h3 style="color: #2d3436; font-size: 14px; font-weight: 700; margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px solid #ddd;">■ 공급자 정보</h3>' +
+        '<table style="width: 100%; border-collapse: collapse;"><tr><td style="padding: 5px 6px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600; width: 100px; font-size: 11px;">상호</td><td style="padding: 5px 6px; border: 1px solid #ddd; font-size: 11px;">제이제이</td></tr>' +
+        '<tr><td style="padding: 5px 6px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600; font-size: 11px;">사업자등록번호</td><td style="padding: 5px 6px; border: 1px solid #ddd; font-size: 11px;">803-15-01907</td></tr>' +
+        '<tr><td style="padding: 5px 6px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600; font-size: 11px;">대표자</td><td style="padding: 5px 6px; border: 1px solid #ddd; font-size: 11px;">이정민</td></tr>' +
+        '<tr><td style="padding: 5px 6px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600; font-size: 11px;">사업장소재지</td><td style="padding: 5px 6px; border: 1px solid #ddd; font-size: 11px;">경기도 김포시 통진읍 월하로 352-18</td></tr></table></div></div>' +
+        '<div style="margin-bottom: 18px;"><h3 style="color: #2d3436; font-size: 14px; font-weight: 700; margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px solid #ddd;">■ 정산 내역</h3>' +
+        '<table style="width: 100%; border-collapse: collapse;"><thead><tr style="background: #4472C4; color: white;">' +
+        '<th style="padding: 8px 6px; border: 1px solid #ddd; text-align: center; font-weight: 600; font-size: 12px;">항목</th>' +
+        '<th style="padding: 8px 6px; border: 1px solid #ddd; text-align: right; font-weight: 600; font-size: 12px;">금액 (원)</th></tr></thead><tbody>' +
+        '<tr><td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">작업비</td><td style="padding: 6px; border: 1px solid #ddd; text-align: right; font-size: 11px;">' + (settlement.work_fee || 0).toLocaleString() + '</td></tr>' +
+        '<tr><td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">입출고비</td><td style="padding: 6px; border: 1px solid #ddd; text-align: right; font-size: 11px;">' + (settlement.inout_fee || 0).toLocaleString() + '</td></tr>' +
+        '<tr><td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">택배비</td><td style="padding: 6px; border: 1px solid #ddd; text-align: right; font-size: 11px;">' + (settlement.shipping_fee || 0).toLocaleString() + '</td></tr>' +
+        '<tr><td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">착불 택배비</td><td style="padding: 6px; border: 1px solid #ddd; text-align: right; font-size: 11px;">' + (settlement.collect_on_delivery_fee || 0).toLocaleString() + '</td></tr>' +
+        '<tr><td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">반품비 (건당 500원)</td><td style="padding: 6px; border: 1px solid #ddd; text-align: right; font-size: 11px;">' + (settlement.return_fee || 0).toLocaleString() + '</td></tr>' +
+        '<tr><td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">보관료</td><td style="padding: 6px; border: 1px solid #ddd; text-align: right; font-size: 11px;">' + (settlement.storage_fee || 0).toLocaleString() + '</td></tr>' +
+        '<tr><td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">특수작업</td><td style="padding: 6px; border: 1px solid #ddd; text-align: right; font-size: 11px;">' + (settlement.special_work_fee || 0).toLocaleString() + '</td></tr>' +
+        '<tr><td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">오배송/누락 차감</td><td style="padding: 6px; border: 1px solid #ddd; text-align: right; color: #e74c3c; font-size: 11px;">-' + (settlement.error_deduction || 0).toLocaleString() + '</td></tr>' +
+        '<tr style="background: #D9E1F2;"><td style="padding: 6px; border: 1px solid #ddd; font-weight: 700; font-size: 11px;">총액</td><td style="padding: 6px; border: 1px solid #ddd; text-align: right; font-weight: 700; font-size: 11px;">' + totalAmount.toLocaleString() + '</td></tr>' +
+        '<tr><td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">부가세 (10%)</td><td style="padding: 6px; border: 1px solid #ddd; text-align: right; font-size: 11px;">' + tax.toLocaleString() + '</td></tr>' +
+        '<tr style="background: #D9E1F2;"><td style="padding: 6px; border: 1px solid #ddd; font-weight: 700; font-size: 12px;">결제금액</td><td style="padding: 6px; border: 1px solid #ddd; text-align: right; font-weight: 700; font-size: 12px;">' + finalAmount.toLocaleString() + '</td></tr>' +
+        '</tbody></table></div>' +
+        '<div style="margin-bottom: 18px;"><h3 style="color: #2d3436; font-size: 14px; font-weight: 700; margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px solid #ddd;">■ 입금 계좌 정보</h3>' +
+        '<table style="width: 100%; border-collapse: collapse;">' +
+        '<tr><td style="padding: 5px 6px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600; width: 100px; font-size: 11px;">은행</td><td style="padding: 5px 6px; border: 1px solid #ddd; font-size: 11px;">KB국민은행</td></tr>' +
+        '<tr><td style="padding: 5px 6px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600; font-size: 11px;">계좌번호</td><td style="padding: 5px 6px; border: 1px solid #ddd; font-size: 11px;">910601-01-494700</td></tr>' +
+        '<tr><td style="padding: 5px 6px; border: 1px solid #ddd; background: #f8f9fa; font-weight: 600; font-size: 11px;">예금주</td><td style="padding: 5px 6px; border: 1px solid #ddd; font-size: 11px;">이정민(제이제이)</td></tr></table></div>' +
+        memoBlock +
+        '</div>'
+      );
+    }
+
+    window.settlementDeliveryStatementSettlementId = null;
+
+    async function showSettlementDeliveryStatementPreview(settlementId) {
+      if (!settlementId) {
+        alert('정산 정보를 찾을 수 없습니다.');
+        return;
+      }
+      const modal = document.getElementById('settlementDeliveryStatementModal');
+      const contentEl = document.getElementById('settlementDeliveryStatementPreviewContent');
+      if (!modal || !contentEl) return;
+      contentEl.innerHTML = '<div style="text-align:center;padding:24px;color:#636e72;">불러오는 중...</div>';
+      modal.style.display = 'block';
+      try {
+        if (window.settlementDeliveryPopupData && window.settlementDeliveryPopupData.isPreview) {
+          const s = (window.settlementDeliveryPopupData.settlements || []).find(function (x) {
+            return Number(x.id) === Number(settlementId);
+          });
+          if (!s) throw new Error('정산 정보를 찾을 수 없습니다.');
+          window.settlementDeliveryStatementSettlementId = settlementId;
+          contentEl.innerHTML = ssdBuildStatementPreviewHtml(s);
+          return;
+        }
+        const response = await fetch('/api/settlements/' + settlementId, {
+          method: 'GET',
+          headers: ssdGetConsignorSettlementHeaders(),
+          credentials: 'include'
+        });
+        const result = await response.json();
+        if (!result.success || !result.data) {
+          throw new Error(result.message || '정산 정보를 불러올 수 없습니다.');
+        }
+        window.settlementDeliveryStatementSettlementId = settlementId;
+        contentEl.innerHTML = ssdBuildStatementPreviewHtml(result.data);
+      } catch (e) {
+        console.error('[정산 팝업] 명세 미리보기:', e);
+        contentEl.innerHTML = '<div style="text-align:center;padding:20px;color:#e74c3c;">' + (e.message || '오류') + '</div>';
+        window.settlementDeliveryStatementSettlementId = null;
+      }
+    }
+    window.showSettlementDeliveryStatementPreview = showSettlementDeliveryStatementPreview;
+
+    function closeSettlementDeliveryStatementPreview() {
+      const modal = document.getElementById('settlementDeliveryStatementModal');
+      if (modal) modal.style.display = 'none';
+    }
+    window.closeSettlementDeliveryStatementPreview = closeSettlementDeliveryStatementPreview;
+
+    async function downloadSettlementDeliveryStatement() {
+      const id = window.settlementDeliveryStatementSettlementId;
+      if (!id) {
+        alert('명세서를 불러온 뒤 다시 시도해주세요.');
+        return;
+      }
+      try {
+        const response = await fetch('/api/settlements/' + id + '/statement', {
+          method: 'GET',
+          headers: ssdGetConsignorSettlementHeaders(),
+          credentials: 'include'
+        });
+        if (!response.ok) {
+          const errJson = await response.json().catch(function () { return {}; });
+          throw new Error(errJson.message || '명세서 다운로드에 실패했습니다.');
+        }
+        const blob = await response.blob();
+        const cd = response.headers.get('Content-Disposition') || '';
+        let filename = '정산명세서_' + id + '.xlsx';
+        const mUtf = cd.match(/filename\*=UTF-8''([^;\s]+)/i);
+        const mQ = cd.match(/filename="([^"]+)"/i);
+        if (mUtf && mUtf[1]) {
+          try { filename = decodeURIComponent(mUtf[1].trim()); } catch (e2) { filename = mUtf[1]; }
+        } else if (mQ && mQ[1]) {
+          filename = mQ[1].trim();
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error('[정산 팝업] 명세 다운로드:', e);
+        alert(e.message || '다운로드 중 오류가 발생했습니다.');
+      }
+    }
+    window.downloadSettlementDeliveryStatement = downloadSettlementDeliveryStatement;
+
+    function printSettlementDeliveryStatement() {
+      const previewContent = document.getElementById('settlementDeliveryStatementPreviewContent');
+      if (!previewContent || !previewContent.innerHTML.trim()) {
+        alert('명세서 내용을 찾을 수 없습니다.');
+        return;
+      }
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(
+        '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>정산 명세서</title><style>' +
+        '*{margin:0;padding:0;box-sizing:border-box;}body{font-family:\'Malgun Gothic\',sans-serif;padding:0;margin:0;}' +
+        '.print-wrapper{padding:20px;max-width:100%;}@media print{@page{size:A4 portrait;margin:15mm;}body{padding:0;margin:0;height:100%;overflow:hidden;}html{height:100%;overflow:hidden;}.print-wrapper{padding:15px;margin:0 auto;}}</style></head><body>' +
+        '<div class="print-wrapper">' + previewContent.innerHTML + '</div></body></html>'
+      );
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(function () {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
+    }
+    window.printSettlementDeliveryStatement = printSettlementDeliveryStatement;
+
     /**
      * 정산 상세 HTML (팝업 내 상세 보기 — API 응답 객체와 동일 필드 사용)
      */
@@ -13998,9 +14196,15 @@
         (settlementDetail.special_work_fee || 0) - (settlementDetail.error_deduction || 0);
       const tax = Math.floor(totalAmount * 0.1);
       const finalAmount = totalAmount + tax;
+      const sid = settlementDetail.id;
       
       let detailHtml = '<div style="line-height: 1.8;">';
-      detailHtml += '<h3 style="margin: 0 0 20px 0; color: #ff6b35; font-weight: 700; font-size: 18px;">정산 상세 내역</h3>';
+      detailHtml += '<h3 style="margin: 0 0 12px 0; color: #ff6b35; font-weight: 700; font-size: 18px;">정산 상세 내역</h3>';
+      if (sid) {
+        detailHtml += '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">';
+        detailHtml += '<button type="button" class="save-btn" onclick="showSettlementDeliveryStatementPreview(' + sid + ')" style="padding:10px 16px;font-size:14px;font-weight:600;background:linear-gradient(135deg,#0984e3 0%,#74b9ff 100%);border:none;border-radius:8px;color:white;cursor:pointer;">👁️ 정산 명세서 미리보기</button>';
+        detailHtml += '</div>';
+      }
       
       detailHtml += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px;">';
       detailHtml += `<div><strong>화주사:</strong> ${settlementDetail.company_name || ''}</div>`;
@@ -14013,10 +14217,7 @@
       detailHtml += '<span>작업비</span>';
       detailHtml += '<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">';
       detailHtml += `<span style="font-weight: 600;">${(settlementDetail.work_fee || 0).toLocaleString()}원</span>`;
-      if (settlementDetail.work_fee_file_url) {
-        detailHtml += `<a href="${settlementDetail.work_fee_file_url}" target="_blank" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 12px; white-space: nowrap;">👁️ 미리보기</a>`;
-        detailHtml += `<a href="${settlementDetail.work_fee_file_url}" target="_blank" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 12px; white-space: nowrap;">📥 다운로드</a>`;
-      }
+      detailHtml += ssdAttachmentLinks(settlementDetail.work_fee_file_url);
       detailHtml += '</div>';
       detailHtml += '</div>';
       detailHtml += '</div>';
@@ -14025,10 +14226,7 @@
       detailHtml += '<span>입출고비</span>';
       detailHtml += '<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">';
       detailHtml += `<span style="font-weight: 600;">${(settlementDetail.inout_fee || 0).toLocaleString()}원</span>`;
-      if (settlementDetail.inout_fee_file_url) {
-        detailHtml += `<a href="${settlementDetail.inout_fee_file_url}" target="_blank" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 12px; white-space: nowrap;">👁️ 미리보기</a>`;
-        detailHtml += `<a href="${settlementDetail.inout_fee_file_url}" target="_blank" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 12px; white-space: nowrap;">📥 다운로드</a>`;
-      }
+      detailHtml += ssdAttachmentLinks(settlementDetail.inout_fee_file_url);
       detailHtml += '</div>';
       detailHtml += '</div>';
       detailHtml += '</div>';
@@ -14037,13 +14235,16 @@
       detailHtml += '<span>택배비</span>';
       detailHtml += '<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">';
       detailHtml += `<span style="font-weight: 600;">${(settlementDetail.shipping_fee || 0).toLocaleString()}원</span>`;
-      if (settlementDetail.shipping_fee_file_url) {
-        detailHtml += `<a href="${settlementDetail.shipping_fee_file_url}" target="_blank" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 12px; white-space: nowrap;">👁️ 미리보기</a>`;
-        detailHtml += `<a href="${settlementDetail.shipping_fee_file_url}" target="_blank" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 12px; white-space: nowrap;">📥 다운로드</a>`;
-      }
+      detailHtml += ssdAttachmentLinks(settlementDetail.shipping_fee_file_url);
       detailHtml += '</div>';
       detailHtml += '</div>';
       detailHtml += '</div>';
+      detailHtml += '<div style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
+      detailHtml += '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">';
+      detailHtml += '<span>세금계산서·첨부</span>';
+      detailHtml += '<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">';
+      detailHtml += ssdAttachmentLinks(settlementDetail.tax_invoice_file_url);
+      detailHtml += '</div></div></div>';
       detailHtml += '<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">';
       detailHtml += '<span>착불 택배비</span>';
       detailHtml += `<span style="font-weight: 600;">${(settlementDetail.collect_on_delivery_fee || 0).toLocaleString()}원</span>`;
@@ -14077,11 +14278,28 @@
       detailHtml += `<span style="font-weight: 700; font-size: 18px; color: #ff6b35;">${finalAmount.toLocaleString()}원</span>`;
       detailHtml += '</div>';
       detailHtml += '</div>';
+
+      var ssdFiles = settlementDetail.files;
+      if (Array.isArray(ssdFiles) && ssdFiles.length > 0) {
+        var typeLabel = { work_fee: '작업비', inout_fee: '입출고비', shipping_fee: '택배비' };
+        detailHtml += '<div style="margin-top: 14px; padding: 14px; background: #f0f4ff; border-radius: 8px; border: 1px solid #c8d6ff;">';
+        detailHtml += '<div style="font-weight: 700; margin-bottom: 10px; color: #2d3436;">관리자 업로드 첨부 (상세 내역)</div>';
+        ssdFiles.forEach(function (f) {
+          var url = (f.file_url || '').toString().trim();
+          var fn = (f.file_name || '파일').toString();
+          var ft = (f.file_type || '').toString();
+          var label = typeLabel[ft] || ft || '첨부';
+          detailHtml += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 0;border-bottom:1px solid #dde4ff;">';
+          detailHtml += '<span style="font-size:13px;color:#2d3436;">' + label + ' · ' + (typeof escapeHtml === 'function' ? escapeHtml(fn) : fn) + '</span>';
+          detailHtml += '<span>' + ssdAttachmentLinks(url) + '</span></div>';
+        });
+        detailHtml += '</div>';
+      }
       
       if (settlementDetail.memo) {
         detailHtml += '<div style="margin-top: 15px; padding: 12px; background: #f8f9fa; border-radius: 8px;">';
         detailHtml += '<div style="font-weight: 600; margin-bottom: 5px;">비고:</div>';
-        detailHtml += `<div style="color: #636e72;">${settlementDetail.memo}</div>`;
+        detailHtml += `<div style="color: #636e72;">${typeof escapeHtml === 'function' ? escapeHtml(settlementDetail.memo) : settlementDetail.memo}</div>`;
         detailHtml += '</div>';
       }
       
@@ -14129,18 +14347,9 @@
           return;
         }
         
-        // 헤더 생성
-        const encodeHeader = (value) => encodeURIComponent((value || '').toString().trim());
-        const headers = {
-          'X-User-Role': encodeHeader('화주사'),
-          'X-User-Name': encodeHeader(currentUsername),
-          'X-Company-Name': encodeHeader(currentCompany)
-        };
-        
-        // 정산 상세 조회
         const response = await fetch(`/api/settlements/${settlementId}`, {
           method: 'GET',
-          headers: headers,
+          headers: ssdGetConsignorSettlementHeaders(),
           credentials: 'include'
         });
         
@@ -14247,14 +14456,7 @@
       confirmButton.disabled = true;
       confirmButton.textContent = '처리 중...';
       
-      // 헤더 생성
-      const encodeHeader = (value) => encodeURIComponent((value || '').toString().trim());
-      const headers = {
-        'Content-Type': 'application/json',
-        'X-User-Role': encodeHeader('화주사'),
-        'X-User-Name': encodeHeader(currentUsername),
-        'X-Company-Name': encodeHeader(currentCompany)
-      };
+      const headers = Object.assign({ 'Content-Type': 'application/json' }, ssdGetConsignorSettlementHeaders());
       
       // 각 정산을 순차적으로 정산확인 처리
       let successCount = 0;
