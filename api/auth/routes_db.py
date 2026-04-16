@@ -43,7 +43,8 @@ def login():
         }
     """
     try:
-        data = request.get_json()
+        # malformed JSON도 500 대신 400 JSON 응답으로 처리
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({
                 'success': False,
@@ -62,9 +63,9 @@ def login():
         # 데이터베이스에서 계정 정보 조회
         try:
             company = get_company_by_username(username)
-            print(f"🔍 계정 조회 결과: {company}")
+            print(f"[AUTH] 계정 조회 결과: {company}")
         except Exception as db_error:
-            print(f"❌ 데이터베이스 조회 오류: {db_error}")
+            print(f"[AUTH][ERROR] 데이터베이스 조회 오류: {db_error}")
             import traceback
             traceback.print_exc()
             return jsonify({
@@ -73,7 +74,7 @@ def login():
             }), 500
         
         if not company:
-            print(f"⚠️ 계정을 찾을 수 없음: {username}")
+            print(f"[AUTH][WARN] 계정을 찾을 수 없음: {username}")
             return jsonify({
                 'success': False,
                 'message': '아이디 또는 비밀번호가 일치하지 않습니다.'
@@ -91,7 +92,7 @@ def login():
                 }), 403
         
         # 비밀번호 확인
-        print(f"🔐 비밀번호 확인: 입력된 비밀번호 길이={len(password)}, 저장된 비밀번호 길이={len(company.get('password', ''))}")
+        print(f"[AUTH] 비밀번호 확인: 입력 길이={len(password)}, 저장 길이={len(company.get('password', ''))}")
         if company.get('password') != password:
             return jsonify({
                 'success': False,
@@ -103,7 +104,7 @@ def login():
         
         # 로그인 성공
         role = (company['role'] or '화주사').strip()
-        print(f"✅ 로그인 성공: {company['company_name']} ({company['username']}), 권한: '{role}'")
+        print(f"[AUTH] 로그인 성공: {company['company_name']} ({company['username']}), 권한: '{role}'")
         
         return jsonify({
             'success': True,
@@ -114,7 +115,7 @@ def login():
         })
         
     except Exception as e:
-        print(f"❌ 로그인 오류: {e}")
+        print(f"[AUTH][ERROR] 로그인 오류: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({

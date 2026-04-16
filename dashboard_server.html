@@ -3388,7 +3388,20 @@
   
   <script>
     // API 기본 URL (서버 주소)
-    const API_BASE_URL = window.location.origin; // 현재 도메인 사용
+    const API_BASE_URL = (function resolveApiBaseUrl() {
+      const origin = window.location.origin || '';
+      const protocol = window.location.protocol || '';
+      const host = window.location.hostname || '';
+      // Cursor 내장 브라우저/파일 미리보기 등 비표준 오리진에서는 로컬 API로 강제
+      if (!origin || origin === 'null' || protocol === 'file:' || protocol === 'vscode-webview:') {
+        return 'http://127.0.0.1:5000';
+      }
+      // 실제 웹 배포/로컬 서버는 현재 오리진 유지
+      if (host === '127.0.0.1' || host === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+        return origin;
+      }
+      return origin;
+    })();
     
     // 전역 변수
     let currentCompany = '';

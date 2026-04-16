@@ -1972,6 +1972,83 @@ def scan_qr():
         }), 500
 
 
+def _extract_pallet_id_from_qr_text(qr_text: str) -> str:
+    """반납 전용 QR 문자열에서 파레트 ID 추출."""
+    if not qr_text:
+        return ''
+    text = str(qr_text).strip()
+    if not text:
+        return ''
+    # 신규 반납 전용 QR 포맷: PALLET_RETURN|<pallet_id>|...
+    if text.startswith('PALLET_RETURN|'):
+        parts = text.split('|')
+        pid = parts[1].strip() if len(parts) > 1 else ''
+        if pid:
+            return pid
+
+    # URL 포맷: ...?mode=vendor_return&pallet_id=...
+    try:
+        import urllib.parse
+        parsed = urllib.parse.urlparse(text)
+        qs = urllib.parse.parse_qs(parsed.query or '')
+        mode = (qs.get('mode') or [''])[0].strip()
+        pid = ((qs.get('pallet_id') or [''])[0] or (qs.get('palletId') or [''])[0]).strip()
+        if mode == 'vendor_return' and pid:
+            return pid
+    except Exception:
+        pass
+    # JSON 형식 지원: {"pallet_id":"..."}
+    try:
+        import json
+        obj = json.loads(text)
+        if isinstance(obj, dict):
+            pid = str(obj.get('pallet_id') or obj.get('palletId') or '').strip()
+            if pid:
+                return pid
+    except Exception:
+        pass
+    # 반납 전용 포맷이 아니면 빈값
+    return ''
+
+
+@pallets_bp.route('/vendor-return/by-qr', methods=['POST'])
+def pallet_vendor_return_by_qr():
+    """모바일 QR 스캔으로 아주·kpp 파레트 반납완료 처리."""
+    try:
+        data = request.get_json(silent=True) or {}
+        qr_text = (data.get('qr_text') or data.get('qrText') or '').strip()
+        pallet_id = (data.get('pallet_id') or data.get('palletId') or '').strip()
+        if not pallet_id:
+            pallet_id = _extract_pallet_id_from_qr_text(qr_text)
+        if not pallet_id:
+            return jsonify({'success': False, 'message': '반납 QR에서 파레트 ID를 찾을 수 없습니다.'}), 400
+
+        ok, msg, pallet = update_vendor_return(
+            pallet_id=pallet_id,
+            new_status='반납완료',
+            returned_at=date.today(),
+            processed_by='QR Mobile',
+        )
+        if not ok:
+            return jsonify({'success': False, 'message': msg}), 400
+
+        return jsonify({
+            'success': True,
+            'message': msg,
+            'data': {
+                'pallet_id': pallet.get('pallet_id') if pallet else pallet_id,
+                'company_name': pallet.get('company_name') if pallet else '',
+                'pallet_kind': pallet.get('pallet_kind') if pallet else '',
+                'vendor_return_status': pallet.get('vendor_return_status') if pallet else '반납완료',
+            }
+        }), 200
+    except Exception as e:
+        print(f'vendor-return/by-qr 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @pallets_bp.route('/labels/filter', methods=['GET'])
 def filter_labels():
     """

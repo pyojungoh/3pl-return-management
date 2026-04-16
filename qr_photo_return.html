@@ -734,6 +734,10 @@ async function handleQRDetected(rawValue) {
     stopQRScan();
     
     const parsed = parseScannedPayload(rawValue);
+    if (parsed.mode === 'vendor_return') {
+        await processVendorReturnByQr(rawValue, parsed);
+        return;
+    }
     currentPhotoSessionId = parsed.sessionId || '';
     currentTrackingNumber = parsed.trackingNumber || rawValue || '';
     
@@ -1277,10 +1281,47 @@ function parseScannedPayload(rawValue) {
     if (!value) {
         return fallback;
     }
+
+    // 파레트 반납 전용 QR(신규 포맷): PALLET_RETURN|<pallet_id>|<company>|<kind>
+    if (value.startsWith('PALLET_RETURN|')) {
+        const parts = value.split('|');
+        const pid = (parts[1] || '').trim();
+        if (pid) {
+            return {
+                mode: 'vendor_return',
+                palletId: pid,
+                trackingNumber: pid
+            };
+        }
+    }
+
+    // 파레트 반납 전용 QR(신규 포맷): URL query mode=vendor_return&pallet_id=...
+    try {
+        const url = new URL(value);
+        const qs = url.searchParams;
+        const mode = (qs.get('mode') || '').trim();
+        const pid = (qs.get('pallet_id') || qs.get('palletId') || '').trim();
+        if (mode === 'vendor_return' && pid) {
+            return {
+                mode: 'vendor_return',
+                palletId: pid,
+                trackingNumber: pid
+            };
+        }
+    } catch (error) {
+        // URL이 아니면 다음 규칙으로 진행
+    }
     
     // JSON 형태 ({ "sessionId": "...", "trackingNumber": "..." })
     try {
         const parsed = JSON.parse(value);
+        if (parsed && parsed.mode === 'vendor_return' && (parsed.pallet_id || parsed.palletId)) {
+            return {
+                mode: 'vendor_return',
+                palletId: parsed.pallet_id || parsed.palletId,
+                trackingNumber: parsed.pallet_id || parsed.palletId
+            };
+        }
         if (parsed && (parsed.sessionId || parsed.trackingNumber || parsed.tracking)) {
             return {
                 sessionId: parsed.sessionId || '',
@@ -1317,6 +1358,35 @@ function parseScannedPayload(rawValue) {
     }
     
     return fallback;
+}
+
+async function processVendorReturnByQr(rawValue, parsed) {
+    try {
+        showQRStatus('반납 QR 인식 완료. 반납 처리 중...', 'success');
+        const response = await fetch('/api/pallets/vendor-return/by-qr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                qr_text: rawValue,
+                pallet_id: parsed && parsed.palletId ? parsed.palletId : ''
+            })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            alert('반납 처리 실패: ' + ((data && data.message) ? data.message : '요청 오류'));
+            setTimeout(() => startAutoQRScan(), 200);
+            return;
+        }
+        const info = data.data || {};
+        const company = info.company_name || '-';
+        const pid = info.pallet_id || (parsed && parsed.palletId) || '-';
+        alert(company + ' 화주의 파레트 ' + pid + ' 반납이 완료되었습니다.');
+        setTimeout(() => startAutoQRScan(), 200);
+    } catch (error) {
+        console.error('❌ 반납 QR 처리 오류:', error);
+        alert('반납 처리 중 오류가 발생했습니다.');
+        setTimeout(() => startAutoQRScan(), 200);
+    }
 }
 
 function extractSessionParams(fragment) {
