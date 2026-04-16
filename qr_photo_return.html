@@ -729,17 +729,29 @@ async function startAutoQRScan() {
 
 // ========= QR 코드 감지 처리 =========
 async function handleQRDetected(rawValue) {
-    console.log('📦 QR 코드 인식 완료:', rawValue);
+    const scannedText = (rawValue == null ? '' : String(rawValue)).trim();
+    console.log('📦 QR 코드 인식 완료:', scannedText);
     
     stopQRScan();
-    
-    const parsed = parseScannedPayload(rawValue);
+
+    if (!scannedText) {
+        showQRStatus('⚠️ QR 데이터가 비어 있습니다. 다시 시도해주세요.', 'error');
+        setTimeout(() => startAutoQRScan(), 1200);
+        return;
+    }
+
+    const parsed = parseScannedPayload(scannedText);
+    if (parsed.mode === 'legacy_storage_qr') {
+        alert('이 QR은 보관종료용 기존 QR입니다. 반납 처리용으로는 반납QR을 새로 출력해 사용해주세요.');
+        setTimeout(() => startAutoQRScan(), 200);
+        return;
+    }
     if (parsed.mode === 'vendor_return') {
-        await processVendorReturnByQr(rawValue, parsed);
+        await processVendorReturnByQr(scannedText, parsed);
         return;
     }
     currentPhotoSessionId = parsed.sessionId || '';
-    currentTrackingNumber = parsed.trackingNumber || rawValue || '';
+    currentTrackingNumber = (parsed.trackingNumber || scannedText || '').trim();
     
     if (!currentTrackingNumber) {
         showQRStatus('⚠️ 송장번호를 읽을 수 없습니다. 다시 시도해주세요.', 'error');
@@ -1282,9 +1294,17 @@ function parseScannedPayload(rawValue) {
         return fallback;
     }
 
-    // 파레트 반납 전용 QR(신규 포맷): PALLET_RETURN|<pallet_id>|<company>|<kind>
-    if (value.startsWith('PALLET_RETURN|')) {
-        const parts = value.split('|');
+    // URL 인코딩된 텍스트까지 대비
+    let decodedValue = value;
+    try {
+        decodedValue = decodeURIComponent(value);
+    } catch (error) {
+        decodedValue = value;
+    }
+
+    // 파레트 반납 전용 QR(신규 포맷): PALLET_RETURN|<pallet_id>|<company>|<product>|<kind>
+    if (/^PALLET_RETURN\s*\|/i.test(decodedValue)) {
+        const parts = decodedValue.split('|');
         const pid = (parts[1] || '').trim();
         if (pid) {
             return {
@@ -1295,9 +1315,14 @@ function parseScannedPayload(rawValue) {
         }
     }
 
+    // 기존 보관종료용 Google Form QR (반납 처리 대상 아님)
+    if (decodedValue.indexOf('entry.419411235=') >= 0 && decodedValue.indexOf('entry.427884801=') >= 0) {
+        return { mode: 'legacy_storage_qr', trackingNumber: value };
+    }
+
     // 파레트 반납 전용 QR(신규 포맷): URL query mode=vendor_return&pallet_id=...
     try {
-        const url = new URL(value);
+        const url = new URL(decodedValue);
         const qs = url.searchParams;
         const mode = (qs.get('mode') || '').trim();
         const pid = (qs.get('pallet_id') || qs.get('palletId') || '').trim();
@@ -1314,7 +1339,7 @@ function parseScannedPayload(rawValue) {
     
     // JSON 형태 ({ "sessionId": "...", "trackingNumber": "..." })
     try {
-        const parsed = JSON.parse(value);
+        const parsed = JSON.parse(decodedValue);
         if (parsed && parsed.mode === 'vendor_return' && (parsed.pallet_id || parsed.palletId)) {
             return {
                 mode: 'vendor_return',
@@ -1334,7 +1359,7 @@ function parseScannedPayload(rawValue) {
     
     // URL 또는 해시 쿼리 형태
     try {
-        const url = new URL(value);
+        const url = new URL(decodedValue);
         const searchParams = extractSessionParams(url.search);
         const hashParams = extractSessionParams(url.hash);
         const sessionId = searchParams.sessionId || hashParams.sessionId || '';
