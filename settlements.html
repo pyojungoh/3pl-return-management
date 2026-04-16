@@ -1320,7 +1320,7 @@
         // 상태 버튼 (관리자만 - 클릭 시 모달 표시)
         const statusButton = `
           <button type="button" class="st-btn" 
-                  onclick="stShowStatusChangeModal(${item.id}, ${JSON.stringify(status)})"
+                  onclick='stShowStatusChangeModal(${item.id}, ${JSON.stringify(status)})'
                   style="padding: 4px 8px; font-size: 11px; background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">
             ${status}
           </button>
