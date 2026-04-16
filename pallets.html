@@ -2198,19 +2198,31 @@
       }
     }
 
-    function palBuildSingleLabelHtml(palletId, product, vendor, inDateStr, qrDataUrl) {
+    function palBuildSingleLabelHtml(palletId, product, vendor, inDateStr, qrDataUrl, opts) {
+      var o = opts || {};
+      var mode = o.mode || 'storage';
+      var kind = o.kind || '';
+      var isVendorReturn = (mode === 'vendor_return');
+      var titleText = isVendorReturn ? '반납 전용 QR' : '보관종료 QR';
+      var titleBg = isVendorReturn ? '#6f42c1' : '#17a2b8';
+      var qrSize = isVendorReturn ? 124 : 140;
+      var subLine = isVendorReturn
+        ? ('화주사: ' + palEscapeHtml(vendor || '-') + ' / 종류: ' + palEscapeHtml(kind || '-'))
+        : ('화주사: ' + palEscapeHtml(vendor || ''));
+
       return (
         '<div class="pal-qr-label-page">' +
-        '<div style="width:100%;text-align:center;flex-shrink:0;margin-bottom:3px;">' +
-        '<div style="font-size:11px;font-weight:600;margin-bottom:2px;line-height:1.2;">\ud30c\ub808\ud2b8 ID: ' + palEscapeHtml(palletId) + '</div>' +
-        '<div style="font-size:11px;font-weight:600;margin-bottom:3px;line-height:1.2;">' + palEscapeHtml(product || '-') + '</div>' +
+        '<div style="width:100%;text-align:center;flex-shrink:0;margin-bottom:4px;">' +
+        '<div style="display:inline-block;padding:2px 8px;border-radius:999px;background:' + titleBg + ';color:#fff;font-size:10px;font-weight:800;margin-bottom:3px;">' + titleText + '</div>' +
+        '<div style="font-size:11px;font-weight:700;margin-bottom:2px;line-height:1.2;">파레트 ID: ' + palEscapeHtml(palletId) + '</div>' +
+        '<div style="font-size:11px;font-weight:600;margin-bottom:2px;line-height:1.2;">' + palEscapeHtml(product || '-') + '</div>' +
+        '<div style="font-size:10px;color:#495057;line-height:1.2;">' + subLine + '</div>' +
         '</div>' +
-        '<div style="display:flex;align-items:center;justify-content:center;margin-bottom:3px;width:100%;flex-shrink:0;">' +
-        '<img src="' + qrDataUrl + '" alt="QR" style="width:150px;height:150px;object-fit:contain;">' +
+        '<div style="display:flex;align-items:center;justify-content:center;margin:4px 0;width:100%;flex-shrink:0;">' +
+        '<img src="' + qrDataUrl + '" alt="QR" style="width:' + qrSize + 'px;height:' + qrSize + 'px;object-fit:contain;">' +
         '</div>' +
         '<div style="width:100%;text-align:center;flex-shrink:0;">' +
-        '<div style="font-size:11px;font-weight:600;margin-bottom:2px;line-height:1.2;">\ud654\uc8fc\uc0ac: ' + palEscapeHtml(vendor || '') + '</div>' +
-        '<div style="font-size:11px;font-weight:600;line-height:1.2;">\uc785\uace0\uc77c: ' + palEscapeHtml(inDateStr) + '</div>' +
+        '<div style="font-size:10px;font-weight:600;line-height:1.2;">입고일: ' + palEscapeHtml(inDateStr) + '</div>' +
         '</div></div>'
       );
     }
@@ -3360,9 +3372,12 @@
           const kind = (row.pallet_kind || '').trim();
           if (!(kind === '아주' || kind === 'kpp')) continue;
           const qrText = palBuildVendorReturnQrText(row.pallet_id, row.company_name || '', row.product_name || '', kind);
-          const dataUrl = await palQrTextToDataUrl(qrText, 150);
+          const dataUrl = await palQrTextToDataUrl(qrText, palCurrentQRMode === 'vendor_return' ? 124 : 140);
           const inStr = palFormatPalletInDateForLabel(row.in_date || '');
-          parts.push(palBuildSingleLabelHtml(row.pallet_id, row.product_name, row.company_name, inStr, dataUrl));
+          parts.push(palBuildSingleLabelHtml(row.pallet_id, row.product_name, row.company_name, inStr, dataUrl, {
+            mode: 'vendor_return',
+            kind: row.pallet_kind || ''
+          }));
         }
         if (parts.length === 0) {
           alert('인쇄 가능한 아주/kpp 파레트가 없습니다.');
@@ -3711,8 +3726,11 @@
         var qrText = palCurrentQRMode === 'vendor_return'
           ? palBuildVendorReturnQrText(palletId, vendor, product, palCurrentQRMeta && palCurrentQRMeta.pallet_kind)
           : palBuildPalletQrText(palletId, vendor, product);
-        var dataUrl = await palQrTextToDataUrl(qrText, 150);
-        var html = palBuildSingleLabelHtml(palletId, product, vendor, inDateStr, dataUrl);
+        var dataUrl = await palQrTextToDataUrl(qrText, palCurrentQRMode === 'vendor_return' ? 124 : 140);
+        var html = palBuildSingleLabelHtml(palletId, product, vendor, inDateStr, dataUrl, {
+          mode: palCurrentQRMode,
+          kind: (palCurrentQRMeta && palCurrentQRMeta.pallet_kind) || ''
+        });
         await palExecuteRollQrPrint(html);
       } catch (error) {
         console.error('QR \ucf54\ub4dc \uc778\uc1c4 \uc624\ub958:', error);

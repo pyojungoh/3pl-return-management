@@ -352,6 +352,93 @@ body {
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
 }
 
+.return-result-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  background: rgba(0, 0, 0, 0.65);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+}
+
+.return-result-modal.show {
+  display: flex;
+}
+
+.return-result-card {
+  width: min(90vw, 480px);
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+  padding: 26px 22px 20px;
+  text-align: center;
+}
+
+.return-result-icon {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: #e8f8f3;
+  color: #0f5132;
+  border: 2px solid #b7ebd8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  font-weight: 800;
+}
+
+.return-result-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: #212529;
+  margin-bottom: 10px;
+}
+
+.return-result-desc {
+  font-size: 17px;
+  color: #495057;
+  line-height: 1.55;
+  margin-bottom: 16px;
+  word-break: keep-all;
+}
+
+.return-result-chip-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.return-result-chip {
+  font-size: 13px;
+  color: #495057;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 999px;
+  padding: 5px 11px;
+}
+
+.return-result-btn {
+  width: 100%;
+  height: 52px;
+  border: none;
+  border-radius: 12px;
+  background: #4CAF50;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.return-result-btn:active {
+  background: #45a049;
+}
+
 .spinner {
   width: 50px;
   height: 50px;
@@ -581,6 +668,20 @@ body {
       <div class="progressbar">
         <div id="overlayBar"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- 반납 QR 결과 모달 -->
+  <div id="returnResultModal" class="return-result-modal">
+    <div class="return-result-card">
+      <div class="return-result-icon">✓</div>
+      <div class="return-result-title">반납 완료</div>
+      <div id="returnResultDesc" class="return-result-desc">반납이 완료되었습니다.</div>
+      <div class="return-result-chip-wrap">
+        <span id="returnResultCompany" class="return-result-chip">화주사: -</span>
+        <span id="returnResultPallet" class="return-result-chip">파레트: -</span>
+      </div>
+      <button id="returnResultConfirmBtn" type="button" class="return-result-btn">확인</button>
     </div>
   </div>
 
@@ -1446,13 +1547,42 @@ async function processVendorReturnByQr(rawValue, parsed) {
         const info = data.data || {};
         const company = info.company_name || '-';
         const pid = info.pallet_id || (parsed && parsed.palletId) || '-';
-        alert(company + ' 화주의 파레트 ' + pid + ' 반납이 완료되었습니다.');
+        await showReturnResultModal(company, pid);
         setTimeout(() => startAutoQRScan(), 200);
     } catch (error) {
         console.error('❌ 반납 QR 처리 오류:', error);
         alert('반납 처리 중 오류가 발생했습니다.');
         setTimeout(() => startAutoQRScan(), 200);
     }
+}
+
+function showReturnResultModal(company, palletId) {
+    return new Promise(function(resolve) {
+        const modal = document.getElementById('returnResultModal');
+        const desc = document.getElementById('returnResultDesc');
+        const chipCompany = document.getElementById('returnResultCompany');
+        const chipPallet = document.getElementById('returnResultPallet');
+        const confirmBtn = document.getElementById('returnResultConfirmBtn');
+        if (!modal || !desc || !chipCompany || !chipPallet || !confirmBtn) {
+            resolve();
+            return;
+        }
+
+        const c = (company || '-').toString();
+        const p = (palletId || '-').toString();
+        desc.textContent = c + ' 화주의 파레트 반납 처리가 완료되었습니다.';
+        chipCompany.textContent = '화주사: ' + c;
+        chipPallet.textContent = '파레트: ' + p;
+
+        const done = function() {
+            modal.classList.remove('show');
+            confirmBtn.removeEventListener('click', done);
+            resolve();
+        };
+
+        confirmBtn.addEventListener('click', done);
+        modal.classList.add('show');
+    });
 }
 
 function extractSessionParams(fragment) {
