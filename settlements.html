@@ -728,8 +728,8 @@
       
       <!-- 버튼 -->
       <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 20px; border-top: 2px solid #f0f0f0;">
-        <button class="st-btn" onclick="stSaveStatusChange()" style="background: linear-gradient(135deg, #00b894 0%, #00a085 100%);">저장</button>
-        <button class="st-btn-secondary" onclick="stCloseStatusChangeModal()">취소</button>
+        <button type="button" id="stStatusChangeSaveBtn" class="st-btn" onclick="stSaveStatusChange()" style="background: linear-gradient(135deg, #00b894 0%, #00a085 100%);">저장</button>
+        <button type="button" class="st-btn-secondary" onclick="stCloseStatusChangeModal()">취소</button>
       </div>
     </div>
   </div>
@@ -1251,7 +1251,7 @@
                            (item.special_work_fee || 0) - (item.error_deduction || 0);
         const tax = Math.floor(totalAmount * 0.1); // 세금 (부가세 10%)
         const finalAmount = totalAmount + tax; // 결제금액 (총액 + 세금)
-        const status = item.status || '대기';
+        const status = (item.status || '대기').toString().trim();
         
         // 상태별 색상
         let statusColor = '#2d3436';
@@ -1319,8 +1319,8 @@
         
         // 상태 버튼 (관리자만 - 클릭 시 모달 표시)
         const statusButton = `
-          <button class="st-btn" 
-                  onclick="stShowStatusChangeModal(${item.id}, '${status}')"
+          <button type="button" class="st-btn" 
+                  onclick="stShowStatusChangeModal(${item.id}, ${JSON.stringify(status)})"
                   style="padding: 4px 8px; font-size: 11px; background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">
             ${status}
           </button>
@@ -1374,7 +1374,7 @@
                            (item.special_work_fee || 0) - (item.error_deduction || 0);
         const tax = Math.floor(totalAmount * 0.1); // 세금 (부가세 10%)
         const finalAmount = totalAmount + tax; // 결제금액 (총액 + 세금)
-        const status = item.status || '대기';
+        const status = (item.status || '대기').toString().trim();
         
         // 상태별 색상
         let statusColor = '#2d3436';
@@ -3135,7 +3135,14 @@
           status: '입금완료'
         })
       })
-        .then(response => response.json())
+        .then(response => {
+          if (!response.ok) {
+            return response.json().then(data => {
+              throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`);
+            });
+          }
+          return response.json();
+        })
         .then(data => {
           if (data.success) {
             alert('입금확인이 완료되었습니다.');
@@ -3146,7 +3153,7 @@
         })
         .catch(error => {
           console.error('[ST] 입금확인 처리 오류:', error);
-          alert('입금확인 처리 중 오류가 발생했습니다.');
+          alert(error.message || '입금확인 처리 중 오류가 발생했습니다.');
         });
     }
 
@@ -3172,7 +3179,14 @@
           status: targetStatus
         })
       })
-        .then(response => response.json())
+        .then(response => {
+          if (!response.ok) {
+            return response.json().then(data => {
+              throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`);
+            });
+          }
+          return response.json();
+        })
         .then(data => {
           if (data.success) {
             alert(`상태가 "${statusName}"로 변경되었습니다.`);
@@ -3183,7 +3197,7 @@
         })
         .catch(error => {
           console.error('[ST] 상태 되돌리기 오류:', error);
-          alert('상태 변경 중 오류가 발생했습니다.');
+          alert(error.message || '상태 변경 중 오류가 발생했습니다.');
         });
     }
 
@@ -3394,17 +3408,27 @@
       // 모달의 현재 정산 ID 저장
       stCurrentStatusModalSettlementId = settlementId;
       
+      const statusNorm = (currentStatus == null || currentStatus === ''
+        ? '대기'
+        : String(currentStatus)).trim() || '대기';
+      
       // 현재 상태 표시
       const currentStatusDisplay = document.getElementById('stCurrentStatusDisplay');
       if (currentStatusDisplay) {
-        currentStatusDisplay.textContent = currentStatus || '대기';
+        currentStatusDisplay.textContent = statusNorm;
       }
       
       // 라디오 버튼 초기화 (현재 상태 선택)
       const radioButtons = document.querySelectorAll('input[name="stStatusSelection"]');
       radioButtons.forEach(radio => {
-        radio.checked = (radio.value === currentStatus);
+        radio.checked = (radio.value === statusNorm);
       });
+      
+      const saveBtn = document.getElementById('stStatusChangeSaveBtn');
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '저장';
+      }
       
       // 모달 표시
       const modal = document.getElementById('stStatusChangeModal');
@@ -3416,6 +3440,11 @@
     
     // 상태 변경 모달 닫기
     function stCloseStatusChangeModal() {
+      const saveBtn = document.getElementById('stStatusChangeSaveBtn');
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '저장';
+      }
       const modal = document.getElementById('stStatusChangeModal');
       if (modal) {
         modal.style.display = 'none';
@@ -3439,7 +3468,7 @@
       }
       
       const newStatus = selectedRadio.value;
-      const currentStatus = document.getElementById('stCurrentStatusDisplay')?.textContent || '';
+      const currentStatus = (document.getElementById('stCurrentStatusDisplay')?.textContent || '').trim();
       
       // 현재 상태와 동일하면 변경하지 않음
       if (newStatus === currentStatus) {
@@ -3461,11 +3490,11 @@
         return;
       }
       
-      // 저장 버튼 비활성화 및 로딩 표시
-      const saveButton = document.querySelector('button[onclick="stSaveStatusChange()"]');
-      const originalText = saveButton.textContent;
-      saveButton.disabled = true;
-      saveButton.textContent = '저장 중...';
+      const saveButton = document.getElementById('stStatusChangeSaveBtn');
+      if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.textContent = '저장 중...';
+      }
       
       // API 호출
       fetch(`/api/settlements/${stCurrentStatusModalSettlementId}/update-status`, {
@@ -3503,15 +3532,18 @@
             }
           } else {
             alert(data.message || '상태 변경에 실패했습니다.');
-            saveButton.disabled = false;
-            saveButton.textContent = originalText;
           }
         })
         .catch(error => {
           console.error('[ST] 상태 변경 오류:', error);
           alert(error.message || '상태 변경 중 오류가 발생했습니다.');
-          saveButton.disabled = false;
-          saveButton.textContent = originalText;
+        })
+        .finally(() => {
+          const btn = document.getElementById('stStatusChangeSaveBtn');
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '저장';
+          }
         });
     }
     window.stSaveStatusChange = stSaveStatusChange;

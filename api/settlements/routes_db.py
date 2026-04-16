@@ -1908,7 +1908,7 @@ def update_settlement_status(settlement_id):
             
             settlement = dict(row) if USE_POSTGRESQL else dict(zip([desc[0] for desc in cursor.description], row))
             settlement_company_name = settlement.get('company_name', '')
-            current_status = settlement.get('status', '')
+            current_status = (settlement.get('status') or '').strip()
             
             print(f'[정산상태변경] role={role}, company_name={company_name}, settlement_company_name={settlement_company_name}, current_status={current_status}, new_status={new_status}')
             
