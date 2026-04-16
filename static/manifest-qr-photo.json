@@ -2,7 +2,7 @@
   "name": "반품 사진 등록",
   "short_name": "QR 사진",
   "description": "QR 코드 스캔 및 반품 사진 등록",
-  "start_url": "/qr_photo_return.html",
+  "start_url": "/qr-photo",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#4CAF50",

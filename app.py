@@ -301,6 +301,8 @@ def admin():
     return qrmobile()
 
 @app.route('/qr-photo')
+@app.route('/qr-photo/')
+@app.route('/qr_photo_return.html')
 def qr_photo():
     """QR 자동 스캔 및 사진 촬영 페이지 (모듈화)"""
     try:
