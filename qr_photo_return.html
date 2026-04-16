@@ -707,8 +707,30 @@ async function startAutoQRScan() {
                     });
                     
                     if (code) {
-                        console.log('✅ QR 코드 감지됨:', code.data);
-                        handleQRDetected(code.data);
+                        let qrValue = '';
+                        if (typeof code.data === 'string') {
+                            qrValue = code.data;
+                        } else if (typeof code.text === 'string') {
+                            qrValue = code.text;
+                        } else if (code.binaryData && code.binaryData.length) {
+                            try {
+                                qrValue = new TextDecoder('utf-8').decode(new Uint8Array(code.binaryData));
+                            } catch (e) {
+                                try {
+                                    qrValue = String.fromCharCode.apply(null, Array.from(code.binaryData));
+                                } catch (e2) {
+                                    qrValue = '';
+                                }
+                            }
+                        }
+                        qrValue = (qrValue || '').trim();
+                        if (!qrValue) {
+                            // 일부 디바이스에서 빈 payload가 감지되는 케이스: 재시도
+                            console.warn('⚠️ QR 감지됨(빈 payload) - 재스캔');
+                        } else {
+                            console.log('✅ QR 코드 감지됨:', qrValue);
+                            handleQRDetected(qrValue);
+                        }
                     }
                     
                     scanAttempts++;
