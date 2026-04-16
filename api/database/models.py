@@ -690,6 +690,8 @@ def init_db():
                     quantity INTEGER DEFAULT 1,
                     is_service INTEGER DEFAULT 0,
                     pallet_kind TEXT NOT NULL DEFAULT '일반',
+                    vendor_return_status TEXT,
+                    vendor_returned_at DATE,
                     notes TEXT,
                     created_by TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -734,6 +736,22 @@ def init_db():
                 )
             except Exception as e:
                 print(f"[경고] pallets.pallet_kind 마이그레이션(PostgreSQL): {e}")
+            try:
+                cursor.execute('ALTER TABLE pallets ADD COLUMN IF NOT EXISTS vendor_return_status TEXT')
+            except Exception as e:
+                print(f"[경고] pallets.vendor_return_status 마이그레이션(PostgreSQL): {e}")
+            try:
+                cursor.execute('ALTER TABLE pallets ADD COLUMN IF NOT EXISTS vendor_returned_at DATE')
+            except Exception as e:
+                print(f"[경고] pallets.vendor_returned_at 마이그레이션(PostgreSQL): {e}")
+            try:
+                cursor.execute('''
+                    UPDATE pallets SET vendor_return_status = '미반납'
+                    WHERE pallet_kind IN ('아주', 'kpp')
+                      AND (vendor_return_status IS NULL OR TRIM(vendor_return_status) = '')
+                ''')
+            except Exception as e:
+                print(f"[경고] pallets.vendor_return_status 백필(PostgreSQL): {e}")
             
             # pallet_fees 테이블 (화주사별 보관료 설정)
             cursor.execute('''
@@ -1522,6 +1540,8 @@ def init_db():
                     quantity INTEGER DEFAULT 1,
                     is_service INTEGER DEFAULT 0,
                     pallet_kind TEXT NOT NULL DEFAULT '일반',
+                    vendor_return_status TEXT,
+                    vendor_returned_at DATE,
                     notes TEXT,
                     created_by TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1567,6 +1587,24 @@ def init_db():
             except Exception as e:
                 if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
                     print(f"[경고] pallets.pallet_kind 마이그레이션(SQLite): {e}")
+            try:
+                cursor.execute('ALTER TABLE pallets ADD COLUMN vendor_return_status TEXT')
+            except Exception as e:
+                if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
+                    print(f"[경고] pallets.vendor_return_status 마이그레이션(SQLite): {e}")
+            try:
+                cursor.execute('ALTER TABLE pallets ADD COLUMN vendor_returned_at DATE')
+            except Exception as e:
+                if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
+                    print(f"[경고] pallets.vendor_returned_at 마이그레이션(SQLite): {e}")
+            try:
+                cursor.execute('''
+                    UPDATE pallets SET vendor_return_status = '미반납'
+                    WHERE pallet_kind IN ('아주', 'kpp')
+                      AND (vendor_return_status IS NULL OR TRIM(vendor_return_status) = '')
+                ''')
+            except Exception as e:
+                print(f"[경고] pallets.vendor_return_status 백필(SQLite): {e}")
             
             # pallet_fees 테이블 (화주사별 보관료 설정)
             cursor.execute('''

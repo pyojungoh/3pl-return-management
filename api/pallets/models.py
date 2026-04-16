@@ -97,6 +97,12 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
         pallet_id = generate_pallet_id(in_date)
     
     pallet_kind_norm = normalize_pallet_kind(pallet_kind)
+    if pallet_kind_norm in ('아주', 'kpp'):
+        vendor_return_status = '미반납'
+        vendor_returned_at = None
+    else:
+        vendor_return_status = None
+        vendor_returned_at = None
     
     # 디버깅: 요청받은 pallet_id 로깅
     print(f"[DEBUG] create_pallet 호출 - pallet_id: {pallet_id}, company_name: {company_name}, pallet_kind: {pallet_kind_norm}")
@@ -117,11 +123,13 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
                 INSERT INTO pallets (
                     pallet_id, company_name, product_name, status,
                     in_date, storage_location, quantity, is_service, pallet_kind,
+                    vendor_return_status, vendor_returned_at,
                     notes, created_by, created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ''', (pallet_id, company_name, product_name, '입고됨',
                   in_date, storage_location, quantity, 1 if is_service else 0,
-                  pallet_kind_norm, notes, created_by))
+                  pallet_kind_norm, vendor_return_status, vendor_returned_at,
+                  notes, created_by))
             
             # 트랜잭션 이력 저장
             cursor.execute('''
@@ -135,11 +143,13 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
                 INSERT INTO pallets (
                     pallet_id, company_name, product_name, status,
                     in_date, storage_location, quantity, is_service, pallet_kind,
+                    vendor_return_status, vendor_returned_at,
                     notes, created_by, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ''', (pallet_id, company_name, product_name, '입고됨',
                   in_date, storage_location, quantity, 1 if is_service else 0,
-                  pallet_kind_norm, notes, created_by))
+                  pallet_kind_norm, vendor_return_status, vendor_returned_at,
+                  notes, created_by))
             
             # 트랜잭션 이력 저장
             cursor.execute('''
@@ -378,6 +388,175 @@ def get_pallet_by_id(pallet_id: str) -> Optional[Dict]:
             return dict(row)
         else:
             return dict(zip([col[0] for col in cursor.description], row))
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def _serialize_pallet_row_dates(row: Dict) -> Dict:
+    """JSON 응답용 date/datetime 필드를 ISO 문자열로."""
+    out = {}
+    for k, v in dict(row).items():
+        if v is not None and hasattr(v, 'isoformat'):
+            try:
+                out[k] = v.isoformat()
+            except Exception:
+                out[k] = str(v)
+        else:
+            out[k] = v
+    vr = out.get('vendor_return_status')
+    out['vendor_return_status_effective'] = vr if vr else '미반납'
+    return out
+
+
+def get_vendor_return_pallets(
+    company_name: Optional[str] = None,
+    return_status: str = '전체',
+    role: str = '관리자',
+    user_company: Optional[str] = None,
+) -> List[Dict]:
+    """
+    아주·kpp 파레트만 조회 (화주 회수/반납 추적용).
+    return_status: 전체 | 미반납 | 반납완료
+    """
+    conn = get_db_connection()
+    try:
+        if USE_POSTGRESQL:
+            from psycopg2.extras import RealDictCursor
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
+        sym = '%s' if USE_POSTGRESQL else '?'
+        q = '''
+            SELECT pallet_id, company_name, product_name, pallet_kind, status,
+                   in_date, out_date, vendor_return_status, vendor_returned_at, notes
+            FROM pallets
+            WHERE pallet_kind IN ('아주', 'kpp')
+        '''
+        params = []
+        if role != '관리자':
+            uc = (user_company or '').strip()
+            if not uc:
+                return []
+            q += f' AND company_name = {sym}'
+            params.append(uc)
+        elif company_name and str(company_name).strip():
+            q += f' AND company_name = {sym}'
+            params.append(str(company_name).strip())
+        rs = (return_status or '전체').strip()
+        if rs == '미반납':
+            q += ' AND (vendor_return_status IS NULL OR vendor_return_status = ' + sym + ')'
+            params.append('미반납')
+        elif rs == '반납완료':
+            q += f' AND vendor_return_status = {sym}'
+            params.append('반납완료')
+        q += ' ORDER BY in_date DESC, pallet_id DESC'
+        cursor.execute(q, params)
+        rows = cursor.fetchall()
+        result = []
+        if USE_POSTGRESQL:
+            for row in rows:
+                result.append(_serialize_pallet_row_dates(dict(row)))
+        else:
+            cols = [c[0] for c in cursor.description]
+            for row in rows:
+                result.append(_serialize_pallet_row_dates(dict(zip(cols, row))))
+        return result
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def update_vendor_return(
+    pallet_id: str,
+    new_status: str,
+    returned_at=None,
+    processed_by: str = None,
+) -> Tuple[bool, str, Optional[Dict]]:
+    """
+    아주·kpp 파레트의 화주 반납(회수) 상태 설정.
+    new_status: 미반납 | 반납완료
+    """
+    if new_status not in ('미반납', '반납완료'):
+        return False, '반납 상태는 미반납 또는 반납완료만 가능합니다.', None
+    pallet = get_pallet_by_id(pallet_id)
+    if not pallet:
+        return False, '파레트를 찾을 수 없습니다.', None
+    kind = (pallet.get('pallet_kind') or '일반').strip()
+    if kind not in ('아주', 'kpp'):
+        return False, '아주·kpp 파레트만 반납 설정이 가능합니다.', None
+    vr_at = None
+    if new_status == '반납완료':
+        if returned_at is None:
+            vr_at = date.today()
+        elif isinstance(returned_at, str):
+            try:
+                vr_at = datetime.strptime(returned_at[:10], '%Y-%m-%d').date()
+            except ValueError:
+                return False, '반납일 형식이 올바르지 않습니다. (YYYY-MM-DD)', None
+        elif isinstance(returned_at, date):
+            vr_at = returned_at
+        else:
+            vr_at = date.today()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if new_status == '미반납':
+            if USE_POSTGRESQL:
+                cursor.execute(
+                    '''UPDATE pallets SET vendor_return_status = %s, vendor_returned_at = NULL,
+                       updated_at = CURRENT_TIMESTAMP WHERE pallet_id = %s''',
+                    ('미반납', pallet_id),
+                )
+            else:
+                cursor.execute(
+                    '''UPDATE pallets SET vendor_return_status = ?, vendor_returned_at = NULL,
+                       updated_at = CURRENT_TIMESTAMP WHERE pallet_id = ?''',
+                    ('미반납', pallet_id),
+                )
+        else:
+            if USE_POSTGRESQL:
+                cursor.execute(
+                    '''UPDATE pallets SET vendor_return_status = %s, vendor_returned_at = %s,
+                       updated_at = CURRENT_TIMESTAMP WHERE pallet_id = %s''',
+                    ('반납완료', vr_at, pallet_id),
+                )
+            else:
+                cursor.execute(
+                    '''UPDATE pallets SET vendor_return_status = ?, vendor_returned_at = ?,
+                       updated_at = CURRENT_TIMESTAMP WHERE pallet_id = ?''',
+                    ('반납완료', vr_at, pallet_id),
+                )
+        note = f'[화주반납] {new_status}'
+        if processed_by:
+            note += f' ({processed_by})'
+        try:
+            if USE_POSTGRESQL:
+                cursor.execute(
+                    '''INSERT INTO pallet_transactions (
+                        pallet_id, transaction_type, quantity, transaction_date,
+                        processed_by, notes, created_at
+                    ) VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, CURRENT_TIMESTAMP)''',
+                    (pallet_id, '화주반납', pallet.get('quantity', 1) or 1, processed_by or '', note),
+                )
+            else:
+                cursor.execute(
+                    '''INSERT INTO pallet_transactions (
+                        pallet_id, transaction_type, quantity, transaction_date,
+                        processed_by, notes, created_at
+                    ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, CURRENT_TIMESTAMP)''',
+                    (pallet_id, '화주반납', pallet.get('quantity', 1) or 1, processed_by or '', note),
+                )
+        except Exception as te:
+            print(f"[경고] 화주반납 트랜잭션 로그 실패(무시): {te}")
+        conn.commit()
+        updated = get_pallet_by_id(pallet_id)
+        if updated:
+            updated = _serialize_pallet_row_dates(updated)
+        return True, '반납 상태가 저장되었습니다.', updated
+    except Exception as e:
+        conn.rollback() if USE_POSTGRESQL else None
+        return False, f'저장 실패: {str(e)}', None
     finally:
         cursor.close()
         conn.close()

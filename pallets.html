@@ -657,6 +657,7 @@
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('revenue')">📈 월별 수입 현황</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('inbound')">📦 파레트 관리</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('status')">📊 파레트 현황</button>
+      <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('collect')">🔄 아주·KPP 반납</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('fee')">💰 보관료 설정</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('label')">🏷️ 라벨 출력</button>
     </div>
@@ -1109,6 +1110,61 @@
         </div>
       </div>
       
+      <!-- 아주·KPP 화주 반납(회수) 추적 (관리자 하위 메뉴) -->
+      <div id="palPageCollect" class="pal-content-page">
+        <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 12px;">🔄 아주·KPP 반납 관리</h2>
+        <p style="color: #636e72; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+          아주·kpp 파레트는 보관 중 화주에게 반납(회수) 여부를 별도로 관리합니다.
+          <strong>시스템 상태</strong>는 입고/보관종료(보관료 기준)이며, <strong>반납</strong>은 화주사로의 물리 반납 완료 여부입니다.
+        </p>
+        <div class="pal-filters" style="margin-bottom: 16px;">
+          <div class="pal-filter-group pal-admin-only">
+            <label>화주사</label>
+            <div class="pal-searchable-select">
+              <input type="text" id="palCollectCompanyInput" class="pal-form-input" placeholder="전체 또는 화주사 선택" autocomplete="off">
+              <input type="hidden" id="palCollectCompanyName">
+              <div class="pal-dropdown-list" id="palCollectCompanyDropdown"></div>
+            </div>
+          </div>
+          <div class="pal-filter-group">
+            <label>반납 상태</label>
+            <select id="palCollectReturnStatus" class="pal-form-input">
+              <option value="전체">전체</option>
+              <option value="미반납">미반납</option>
+              <option value="반납완료">반납완료</option>
+            </select>
+          </div>
+          <div class="pal-filter-group">
+            <button type="button" class="pal-btn" onclick="palLoadVendorReturnList()" style="height: 40px;">조회</button>
+          </div>
+        </div>
+        <div class="pal-table-container">
+          <div class="pal-table-header">
+            <h3>목록 <span id="palVendorReturnCount" style="font-size: 14px; color: #636e72;">(0건)</span></h3>
+          </div>
+          <div class="pal-table-scroll-wrapper">
+            <table class="pal-table">
+              <thead>
+                <tr>
+                  <th style="font-size: 11px;">화주사</th>
+                  <th style="font-size: 11px;">파레트 ID</th>
+                  <th style="font-size: 11px;">종류</th>
+                  <th style="font-size: 11px;">품목명</th>
+                  <th style="font-size: 11px;">시스템 상태</th>
+                  <th style="font-size: 11px;">반납</th>
+                  <th style="font-size: 11px;">반납일</th>
+                  <th style="font-size: 11px;">입고일</th>
+                  <th style="font-size: 11px;">작업</th>
+                </tr>
+              </thead>
+              <tbody id="palVendorReturnTableBody">
+                <tr><td colspan="9" class="no-data">조회 버튼을 눌러 주세요.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
       <!-- 라벨 출력 페이지 -->
       <div id="palPageLabel" class="pal-content-page">
         <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 20px;">🏷️ 라벨 출력</h2>
@@ -1480,6 +1536,8 @@
         // 파레트 현황 페이지 초기화
         palLoadPallets();
         palUpdateStats();
+      } else if (menuId === 'collect') {
+        palLoadVendorReturnList();
       } else if (menuId === 'label') {
         // 라벨 출력 페이지 초기화
         palInitLabelPage();
@@ -1829,7 +1887,8 @@
         { input: 'palInboundCompanyInput', hidden: 'palInboundCompanyName', dropdown: 'palInboundCompanyDropdown' },
         { input: 'palFilterCompanyInput', hidden: 'palFilterCompanyName', dropdown: 'palFilterCompanyDropdown' },
         { input: 'palFeeCompanyInput', hidden: 'palFeeCompanyName', dropdown: 'palFeeCompanyDropdown' },
-        { input: 'palSettlementCompanyInput', hidden: 'palSettlementCompanyName', dropdown: 'palSettlementCompanyDropdown' }
+        { input: 'palSettlementCompanyInput', hidden: 'palSettlementCompanyName', dropdown: 'palSettlementCompanyDropdown' },
+        { input: 'palCollectCompanyInput', hidden: 'palCollectCompanyName', dropdown: 'palCollectCompanyDropdown' }
       ];
       
       dropdowns.forEach(config => {
@@ -3095,6 +3154,111 @@
         if (countSpan) countSpan.textContent = '(오류)';
       }
     }
+    
+    async function palLoadVendorReturnList() {
+      const tbody = document.getElementById('palVendorReturnTableBody');
+      const countEl = document.getElementById('palVendorReturnCount');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="9" class="no-data">불러오는 중...</td></tr>';
+      try {
+        const hiddenEl = document.getElementById('palCollectCompanyName');
+        const inputEl = document.getElementById('palCollectCompanyInput');
+        const company = ((hiddenEl && hiddenEl.value) || (inputEl && inputEl.value) || '').trim();
+        const rsEl = document.getElementById('palCollectReturnStatus');
+        const returnStatus = (rsEl && rsEl.value) ? rsEl.value : '전체';
+        const params = new URLSearchParams();
+        if (company) params.append('company', company);
+        if (returnStatus && returnStatus !== '전체') params.append('return_status', returnStatus);
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/vendor-return-list?${params.toString()}`, {
+          headers: palGetUserHeaders(),
+          credentials: 'include'
+        });
+        const result = await response.json();
+        if (!result.success) {
+          tbody.innerHTML = '<tr><td colspan="9" class="no-data">❌ ' + palEscapeHtml(result.message || '오류') + '</td></tr>';
+          if (countEl) countEl.textContent = '(0건)';
+          return;
+        }
+        const rows = result.data || [];
+        if (countEl) countEl.textContent = '(' + rows.length + '건)';
+        if (rows.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터가 없습니다.</td></tr>';
+          return;
+        }
+        const isAdmin = (palCurrentRole === '관리자');
+        tbody.innerHTML = rows.map(function (r) {
+          const vrDisp = r.vendor_return_status_effective || r.vendor_return_status || '미반납';
+          const isDone = (r.vendor_return_status === '반납완료');
+          const pid = r.pallet_id || '';
+          let actionCell = '<span style="color:#999;font-size:11px;">-</span>';
+          if (isAdmin) {
+            if (isDone) {
+              actionCell = '<button type="button" class="pal-btn pal-btn-secondary" onclick="void palSubmitVendorReturn(' + JSON.stringify(pid) + ',' + JSON.stringify('미반납') + ')" style="padding:4px 8px;font-size:10px;">미반납으로</button>';
+            } else {
+              actionCell = '<button type="button" class="pal-btn" onclick="void palSubmitVendorReturn(' + JSON.stringify(pid) + ',' + JSON.stringify('반납완료') + ')" style="padding:4px 8px;font-size:10px;background:#00b894;color:#fff;">반납완료</button>';
+            }
+          }
+          return '<tr>' +
+            '<td style="font-size:11px;">' + palEscapeHtml(r.company_name || '') + '</td>' +
+            '<td style="font-size:11px;">' + palEscapeHtml(pid) + '</td>' +
+            '<td style="font-size:11px;">' + palEscapeHtml(r.pallet_kind || '') + '</td>' +
+            '<td style="font-size:11px;word-break:break-word;">' + palEscapeHtml(r.product_name || '') + '</td>' +
+            '<td style="font-size:11px;">' + palEscapeHtml(r.status || '') + '</td>' +
+            '<td style="font-size:11px;font-weight:600;">' + palEscapeHtml(vrDisp) + '</td>' +
+            '<td style="font-size:11px;">' + palEscapeHtml(r.vendor_returned_at || '-') + '</td>' +
+            '<td style="font-size:11px;">' + palEscapeHtml(r.in_date || '') + '</td>' +
+            '<td style="font-size:11px;">' + actionCell + '</td>' +
+            '</tr>';
+        }).join('');
+      } catch (error) {
+        console.error('[PAL] vendor-return-list:', error);
+        tbody.innerHTML = '<tr><td colspan="9" class="no-data">❌ 목록을 불러오지 못했습니다.</td></tr>';
+        if (countEl) countEl.textContent = '(0건)';
+      }
+    }
+    window.palLoadVendorReturnList = palLoadVendorReturnList;
+    
+    async function palSubmitVendorReturn(palletId, status) {
+      if (palCurrentRole !== '관리자') {
+        alert('관리자만 반납 설정이 가능합니다.');
+        return;
+      }
+      var returnedAt = null;
+      if (status === '반납완료') {
+        var def = new Date().toISOString().split('T')[0];
+        var d = prompt('반납일 (YYYY-MM-DD)', def);
+        if (d === null) return;
+        var ds = (d || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(ds)) {
+          alert('날짜 형식을 확인하세요.');
+          return;
+        }
+        returnedAt = ds;
+      } else {
+        if (!confirm('미반납으로 되돌릴까요?')) return;
+      }
+      try {
+        var body = { status: status === '반납완료' ? '반납완료' : '미반납' };
+        if (returnedAt) body.returned_at = returnedAt;
+        var res = await fetch(PAL_API_BASE_URL + '/api/pallets/' + encodeURIComponent(palletId) + '/vendor-return', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...palGetUserHeaders() },
+          credentials: 'include',
+          body: JSON.stringify(body)
+        });
+        var j = await res.json();
+        if (j.success) {
+          alert(j.message || '저장되었습니다.');
+          palLoadVendorReturnList();
+        } else {
+          alert(j.message || '저장에 실패했습니다.');
+        }
+      } catch (e) {
+        console.error(e);
+        alert('요청 중 오류가 발생했습니다.');
+      }
+    }
+    window.palSubmitVendorReturn = palSubmitVendorReturn;
     
     // QR 코드 관련 전역 변수
     // QR 관련 변수 (중복 선언 방지)

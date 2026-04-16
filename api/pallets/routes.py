@@ -9,7 +9,8 @@ from api.pallets.models import (
     calculate_fee, get_pallet_fee, set_pallet_fee,
     generate_monthly_settlement, get_settlements, get_settlement_detail,
     update_settlement_status, delete_settlement, delete_settlement,
-    get_monthly_revenue, get_daily_fees_batch
+    get_monthly_revenue, get_daily_fees_batch,
+    get_vendor_return_pallets, update_vendor_return,
 )
 
 # Blueprint 생성
@@ -487,6 +488,55 @@ def pallet_list():
             'success': False,
             'message': f'파레트 목록 조회 실패: {str(e)}'
         }), 500
+
+
+@pallets_bp.route('/vendor-return-list', methods=['GET'])
+def pallet_vendor_return_list():
+    """아주·kpp 파레트 화주 반납(회수) 현황. 관리자: 전체/필터, 화주사: 자사만 조회."""
+    try:
+        role, company_name, username = get_user_context()
+        filter_company = request.args.get('company', '').strip()
+        return_status = request.args.get('return_status', '전체').strip() or '전체'
+        if role != '관리자':
+            filter_company = company_name or ''
+        rows = get_vendor_return_pallets(
+            company_name=filter_company if filter_company else None,
+            return_status=return_status,
+            role=role or '화주사',
+            user_company=company_name,
+        )
+        return jsonify({'success': True, 'data': rows, 'count': len(rows)}), 200
+    except Exception as e:
+        print(f'vendor-return-list 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@pallets_bp.route('/<string:pallet_id>/vendor-return', methods=['POST'])
+def pallet_vendor_return_update(pallet_id):
+    """아주·kpp 파레트 반납 상태 설정 (관리자 전용)."""
+    try:
+        role, company_name, username = get_user_context()
+        if role != '관리자':
+            return jsonify({'success': False, 'message': '관리자만 반납 설정이 가능합니다.'}), 403
+        data = request.get_json() or {}
+        new_status = (data.get('status') or '').strip()
+        returned_at = data.get('returned_at')
+        ok, msg, pallet = update_vendor_return(
+            pallet_id=pallet_id,
+            new_status=new_status,
+            returned_at=returned_at,
+            processed_by=username,
+        )
+        if ok:
+            return jsonify({'success': True, 'message': msg, 'data': pallet}), 200
+        return jsonify({'success': False, 'message': msg}), 400
+    except Exception as e:
+        print(f'vendor-return 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @pallets_bp.route('/<string:pallet_id>', methods=['GET'])
