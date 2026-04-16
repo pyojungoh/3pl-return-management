@@ -1155,6 +1155,9 @@
           <div class="pal-table-header">
             <h3>목록 <span id="palVendorReturnCount" style="font-size: 14px; color: #636e72;">(0건)</span></h3>
           </div>
+          <div id="palVendorReturnStats" style="padding: 12px 14px; border-bottom: 1px solid #e9ecef; background: #f8f9fa;">
+            <div style="font-size: 12px; color: #636e72;">조회 후 통계가 표시됩니다.</div>
+          </div>
           <div class="pal-table-scroll-wrapper">
             <table class="pal-table">
               <thead>
@@ -3226,8 +3229,10 @@
     async function palLoadVendorReturnList() {
       const tbody = document.getElementById('palVendorReturnTableBody');
       const countEl = document.getElementById('palVendorReturnCount');
+      const statsEl = document.getElementById('palVendorReturnStats');
       if (!tbody) return;
       tbody.innerHTML = '<tr><td colspan="10" class="no-data">불러오는 중...</td></tr>';
+      if (statsEl) statsEl.innerHTML = '<div style="font-size:12px;color:#636e72;">통계 계산 중...</div>';
       try {
         const hiddenEl = document.getElementById('palCollectCompanyName');
         const inputEl = document.getElementById('palCollectCompanyInput');
@@ -3245,10 +3250,12 @@
         if (!result.success) {
           tbody.innerHTML = '<tr><td colspan="10" class="no-data">❌ ' + palEscapeHtml(result.message || '오류') + '</td></tr>';
           if (countEl) countEl.textContent = '(0건)';
+          if (statsEl) statsEl.innerHTML = '<div style="font-size:12px;color:#dc3545;">통계를 불러오지 못했습니다.</div>';
           return;
         }
         const rows = result.data || [];
         if (countEl) countEl.textContent = '(' + rows.length + '건)';
+        if (statsEl) palRenderVendorReturnStats(rows, statsEl);
         if (rows.length === 0) {
           tbody.innerHTML = '<tr><td colspan="10" class="no-data">데이터가 없습니다.</td></tr>';
           return;
@@ -3259,11 +3266,9 @@
           const isDone = (r.vendor_return_status === '반납완료');
           const pid = r.pallet_id || '';
           var kcRaw = (r.kind_color != null && r.kind_color !== undefined) ? String(r.kind_color).trim() : '';
+          var colorText = palKindColorToText(kcRaw);
           var colorCell = '<span style="color:#999;font-size:11px;">-</span>';
-          if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(kcRaw)) {
-            colorCell = '<span title="' + palEscapeHtml(kcRaw) + '" style="display:inline-block;width:20px;height:20px;border-radius:4px;background:' + kcRaw + ';border:1px solid #b2bec3;vertical-align:middle;"></span>' +
-              ' <span style="font-size:10px;color:#636e72;">' + palEscapeHtml(kcRaw) + '</span>';
-          }
+          if (colorText) colorCell = '<span style="font-size:11px;">' + palEscapeHtml(colorText) + '</span>';
           let actionCell = '<span style="color:#999;font-size:11px;">-</span>';
           if (isAdmin) {
             if (isDone) {
@@ -3289,9 +3294,114 @@
         console.error('[PAL] vendor-return-list:', error);
         tbody.innerHTML = '<tr><td colspan="10" class="no-data">❌ 목록을 불러오지 못했습니다.</td></tr>';
         if (countEl) countEl.textContent = '(0건)';
+        if (statsEl) statsEl.innerHTML = '<div style="font-size:12px;color:#dc3545;">통계를 불러오지 못했습니다.</div>';
       }
     }
     window.palLoadVendorReturnList = palLoadVendorReturnList;
+
+    function palKindColorToText(rawColor) {
+      var s = (rawColor == null || rawColor == undefined) ? '' : String(rawColor).trim().toLowerCase();
+      if (!s) return '';
+      if (s === '초록' || s === 'green' || s === '#00b894' || s === '#2ecc71') return '초록';
+      if (s === '빨강' || s === 'red' || s === '#e74c3c' || s === '#ff0000') return '빨강';
+      return '';
+    }
+
+    function palRenderVendorReturnStats(rows, mountEl) {
+      if (!mountEl) return;
+      var total = rows.length;
+      var totalAju = 0;
+      var totalKpp = 0;
+      var kppGreen = 0;
+      var kppRed = 0;
+      var ajuGreen = 0;
+      var ajuRed = 0;
+      var byCompany = {};
+
+      rows.forEach(function (r) {
+        var company = (r.company_name || '').trim() || '(미지정)';
+        var kind = (r.pallet_kind || '').trim();
+        var colorText = palKindColorToText(r.kind_color);
+        if (!byCompany[company]) {
+          byCompany[company] = {
+            total: 0,
+            kpp: 0,
+            aju: 0,
+            kppGreen: 0,
+            kppRed: 0,
+            ajuGreen: 0,
+            ajuRed: 0
+          };
+        }
+        byCompany[company].total += 1;
+
+        if (kind === 'kpp') {
+          totalKpp += 1;
+          byCompany[company].kpp += 1;
+          if (colorText === '초록') {
+            kppGreen += 1;
+            byCompany[company].kppGreen += 1;
+          } else if (colorText === '빨강') {
+            kppRed += 1;
+            byCompany[company].kppRed += 1;
+          }
+        } else if (kind === '아주') {
+          totalAju += 1;
+          byCompany[company].aju += 1;
+          if (colorText === '초록') {
+            ajuGreen += 1;
+            byCompany[company].ajuGreen += 1;
+          } else if (colorText === '빨강') {
+            ajuRed += 1;
+            byCompany[company].ajuRed += 1;
+          }
+        }
+      });
+
+      var companyRows = Object.keys(byCompany).sort().map(function (company) {
+        var s = byCompany[company];
+        return '<tr>' +
+          '<td style="padding:4px 6px;border:1px solid #dee2e6;">' + palEscapeHtml(company) + '</td>' +
+          '<td style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">' + s.total + '</td>' +
+          '<td style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">' + s.kpp + '</td>' +
+          '<td style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">' + s.kppGreen + '</td>' +
+          '<td style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">' + s.kppRed + '</td>' +
+          '<td style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">' + s.aju + '</td>' +
+          '<td style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">' + s.ajuGreen + '</td>' +
+          '<td style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">' + s.ajuRed + '</td>' +
+          '</tr>';
+      }).join('');
+
+      if (!companyRows) {
+        companyRows = '<tr><td colspan="8" style="padding:6px;border:1px solid #dee2e6;color:#999;">데이터 없음</td></tr>';
+      }
+
+      mountEl.innerHTML =
+        '<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;">' +
+          '<div style="min-width:260px;font-size:12px;line-height:1.8;">' +
+            '<div><strong>전체:</strong> ' + total + '개</div>' +
+            '<div><strong>kpp:</strong> ' + totalKpp + '개 (초록 ' + kppGreen + ' / 빨강 ' + kppRed + ')</div>' +
+            '<div><strong>아주:</strong> ' + totalAju + '개 (초록 ' + ajuGreen + ' / 빨강 ' + ajuRed + ')</div>' +
+          '</div>' +
+          '<div style="flex:1;min-width:520px;overflow:auto;">' +
+            '<table style="width:100%;border-collapse:collapse;background:#fff;font-size:11px;">' +
+              '<thead>' +
+                '<tr style="background:#f1f3f5;">' +
+                  '<th style="padding:4px 6px;border:1px solid #dee2e6;text-align:left;">화주사</th>' +
+                  '<th style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">전체</th>' +
+                  '<th style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">kpp</th>' +
+                  '<th style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">kpp 초록</th>' +
+                  '<th style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">kpp 빨강</th>' +
+                  '<th style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">아주</th>' +
+                  '<th style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">아주 초록</th>' +
+                  '<th style="padding:4px 6px;border:1px solid #dee2e6;text-align:right;">아주 빨강</th>' +
+                '</tr>' +
+              '</thead>' +
+              '<tbody>' + companyRows + '</tbody>' +
+            '</table>' +
+          '</div>' +
+        '</div>';
+    }
     
     async function palSubmitVendorReturn(palletId, status) {
       if (palCurrentRole !== '관리자') {
