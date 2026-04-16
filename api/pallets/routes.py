@@ -131,7 +131,8 @@ def pallet_inbound():
                     is_service=pallet_data.get('is_service', False),
                     notes=pallet_data.get('notes'),
                     created_by=username,
-                    pallet_kind=pallet_data.get('pallet_kind')
+                    pallet_kind=pallet_data.get('pallet_kind'),
+                    kind_color=pallet_data.get('kind_color'),
                 )
                 
                 if success:
@@ -167,7 +168,8 @@ def pallet_inbound():
                 is_service=data.get('is_service', False),
                 notes=data.get('notes'),
                 created_by=username,
-                pallet_kind=data.get('pallet_kind')
+                pallet_kind=data.get('pallet_kind'),
+                kind_color=data.get('kind_color'),
             )
             
             print(f"[DEBUG] create_pallet 결과 - success: {success}, message: {message}")

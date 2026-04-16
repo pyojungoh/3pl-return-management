@@ -82,17 +82,18 @@ def get_db_connection():
 # 배포 DB가 수동 마이그레이션 없이 올라간 경우 대비 (settlements.return_fee)
 _SETTLEMENT_RETURN_FEE_COLUMN_OK = False
 
-# pallets 확장 컬럼 (init_db ALTER 실패·구 PG 버전 등 대비, 요청 시 1회 보강)
-_PALLETS_EXTRA_COLUMNS_OK = False
+# pallets 확장 컬럼 (스키마 변경 시 버전만 올리면 재보강)
+_PALLETS_SCHEMA_ENSURE_VERSION = 2
+_LAST_PALLETS_ENSURE_VERSION = 0
 
 
 def ensure_pallet_table_columns():
     """
-    pallets에 pallet_kind, vendor_return_status, vendor_returned_at 컬럼이 없으면 추가.
-    PostgreSQL에서 ADD COLUMN IF NOT EXISTS 미지원/조용한 실패 시에도 동작하도록 information_schema로 판별.
+    pallets에 pallet_kind, vendor_return_status, vendor_returned_at, kind_color 컬럼이 없으면 추가.
+    PostgreSQL은 information_schema로 판별 (구버전 PG 호환).
     """
-    global _PALLETS_EXTRA_COLUMNS_OK
-    if _PALLETS_EXTRA_COLUMNS_OK:
+    global _LAST_PALLETS_ENSURE_VERSION
+    if _LAST_PALLETS_ENSURE_VERSION >= _PALLETS_SCHEMA_ENSURE_VERSION:
         return
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -115,6 +116,8 @@ def ensure_pallet_table_columns():
                 cursor.execute('ALTER TABLE pallets ADD COLUMN vendor_return_status TEXT')
             if not col_exists('pallets', 'vendor_returned_at'):
                 cursor.execute('ALTER TABLE pallets ADD COLUMN vendor_returned_at DATE')
+            if not col_exists('pallets', 'kind_color'):
+                cursor.execute('ALTER TABLE pallets ADD COLUMN kind_color TEXT')
             try:
                 cursor.execute(
                     """UPDATE pallets SET vendor_return_status = '미반납'
@@ -128,6 +131,7 @@ def ensure_pallet_table_columns():
                 "ALTER TABLE pallets ADD COLUMN pallet_kind TEXT NOT NULL DEFAULT '일반'",
                 'ALTER TABLE pallets ADD COLUMN vendor_return_status TEXT',
                 'ALTER TABLE pallets ADD COLUMN vendor_returned_at DATE',
+                'ALTER TABLE pallets ADD COLUMN kind_color TEXT',
             ):
                 try:
                     cursor.execute(sql)
@@ -144,8 +148,8 @@ def ensure_pallet_table_columns():
             except Exception as ue:
                 print(f"[경고] pallets vendor_return_status 백필(ensure SQLite): {ue}")
         conn.commit()
-        _PALLETS_EXTRA_COLUMNS_OK = True
-        print('[성공] pallets 확장 컬럼(pallet_kind 등) 보강 완료')
+        _LAST_PALLETS_ENSURE_VERSION = _PALLETS_SCHEMA_ENSURE_VERSION
+        print('[성공] pallets 확장 컬럼 보강 완료')
     except Exception as e:
         try:
             conn.rollback()
@@ -766,6 +770,7 @@ def init_db():
                     pallet_kind TEXT NOT NULL DEFAULT '일반',
                     vendor_return_status TEXT,
                     vendor_returned_at DATE,
+                    kind_color TEXT,
                     notes TEXT,
                     created_by TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -818,6 +823,10 @@ def init_db():
                 cursor.execute('ALTER TABLE pallets ADD COLUMN IF NOT EXISTS vendor_returned_at DATE')
             except Exception as e:
                 print(f"[경고] pallets.vendor_returned_at 마이그레이션(PostgreSQL): {e}")
+            try:
+                cursor.execute('ALTER TABLE pallets ADD COLUMN IF NOT EXISTS kind_color TEXT')
+            except Exception as e:
+                print(f"[경고] pallets.kind_color 마이그레이션(PostgreSQL): {e}")
             try:
                 cursor.execute('''
                     UPDATE pallets SET vendor_return_status = '미반납'
@@ -1616,6 +1625,7 @@ def init_db():
                     pallet_kind TEXT NOT NULL DEFAULT '일반',
                     vendor_return_status TEXT,
                     vendor_returned_at DATE,
+                    kind_color TEXT,
                     notes TEXT,
                     created_by TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1671,6 +1681,11 @@ def init_db():
             except Exception as e:
                 if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
                     print(f"[경고] pallets.vendor_returned_at 마이그레이션(SQLite): {e}")
+            try:
+                cursor.execute('ALTER TABLE pallets ADD COLUMN kind_color TEXT')
+            except Exception as e:
+                if 'duplicate column' not in str(e).lower() and 'already exists' not in str(e).lower():
+                    print(f"[경고] pallets.kind_color 마이그레이션(SQLite): {e}")
             try:
                 cursor.execute('''
                     UPDATE pallets SET vendor_return_status = '미반납'

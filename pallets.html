@@ -871,6 +871,13 @@
                   </label>
                 </div>
               </div>
+              <div class="pal-form-group" id="palInboundKindColorRow" style="display: none;">
+                <label class="pal-form-label">종류 색상 (아주·kpp)</label>
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                  <input type="color" id="palInboundKindColor" value="#00b894" title="구분 색상" style="width: 52px; height: 36px; padding: 2px; border: 1px solid #dfe6e9; border-radius: 6px; cursor: pointer;">
+                  <span style="font-size: 12px; color: #636e72;">초록·빨강 등 현장 구분용으로 선택하세요.</span>
+                </div>
+              </div>
               
               <!-- 품목 리스트 -->
               <div class="pal-form-group">
@@ -911,7 +918,7 @@
               <p style="margin: 0; font-size: 13px; color: #636e72; line-height: 1.6;">
                 CSV 또는 Excel 파일을 업로드하세요.<br>
                 필수 컬럼: 화주사, 품목명, 입고일 (YYYY-MM-DD)<br>
-                선택 컬럼: 파레트 ID, 보관 위치, 수량, 서비스 여부, 비고, 파레트종류 (일반·아주·kpp·기타, 생략 시 일반)
+                선택 컬럼: 파레트 ID, 보관 위치, 수량, 서비스 여부, 비고, 파레트종류 (일반·아주·kpp·기타, 생략 시 일반), 종류색상 (#RRGGBB 또는 #RGB, 아주·kpp일 때만)
               </p>
             </div>
             <div class="pal-form-group">
@@ -1149,6 +1156,7 @@
                   <th style="font-size: 11px;">화주사</th>
                   <th style="font-size: 11px;">파레트 ID</th>
                   <th style="font-size: 11px;">종류</th>
+                  <th style="font-size: 11px;">색상</th>
                   <th style="font-size: 11px;">품목명</th>
                   <th style="font-size: 11px;">시스템 상태</th>
                   <th style="font-size: 11px;">반납</th>
@@ -1158,7 +1166,7 @@
                 </tr>
               </thead>
               <tbody id="palVendorReturnTableBody">
-                <tr><td colspan="9" class="no-data">조회 버튼을 눌러 주세요.</td></tr>
+                <tr><td colspan="10" class="no-data">조회 버튼을 눌러 주세요.</td></tr>
               </tbody>
             </table>
           </div>
@@ -2406,6 +2414,14 @@
       }
     }
     
+    function palUpdateInboundKindColorRowVisibility() {
+      var row = document.getElementById('palInboundKindColorRow');
+      if (!row) return;
+      var kind = palGetSelectedPalletKind();
+      var show = (kind === '아주' || kind === 'kpp');
+      row.style.display = show ? '' : 'none';
+    }
+
     function palOnInboundKindCheckboxChange(changed) {
       const form = document.getElementById('palInboundForm');
       if (!form || !changed) return;
@@ -2424,6 +2440,7 @@
           if (g) g.checked = true;
         }
       }
+      palUpdateInboundKindColorRowVisibility();
     }
     window.palOnInboundKindCheckboxChange = palOnInboundKindCheckboxChange;
 
@@ -2440,6 +2457,9 @@
         var el = document.getElementById(id);
         if (el) el.checked = (i === 0);
       });
+      var colorEl = document.getElementById('palInboundKindColor');
+      if (colorEl) colorEl.value = '#00b894';
+      palUpdateInboundKindColorRowVisibility();
     }
 
     // 파레트 입고 처리
@@ -2502,6 +2522,11 @@
           }
           
           const palletKind = palGetSelectedPalletKind();
+          var kindColor = null;
+          if (palletKind === '아주' || palletKind === 'kpp') {
+            var colorInput = document.getElementById('palInboundKindColor');
+            if (colorInput && colorInput.value) kindColor = colorInput.value;
+          }
           for (let i = 0; i < quantity; i++) {
             pallets.push({
               pallet_id: null, // 자동 생성
@@ -2512,6 +2537,7 @@
               quantity: 1, // 각 파레트는 수량 1
               is_service: document.getElementById('palInboundIsService').checked,
               pallet_kind: palletKind,
+              kind_color: kindColor,
               notes: document.getElementById('palInboundNotes').value || null
             });
           }
@@ -2599,6 +2625,7 @@
               quantity: parseInt(pallet['수량'] || pallet['quantity'] || 1),
               is_service: pallet['서비스 여부'] === 'Y' || pallet['is_service'] === true,
               pallet_kind: pallet['파레트종류'] || pallet['pallet_kind'] || '일반',
+              kind_color: pallet['종류색상'] || pallet['kind_color'] || null,
               notes: pallet['비고'] || pallet['notes'] || null
             });
           }
@@ -3092,6 +3119,12 @@
               
               const inDateForRenewal = pallet.in_date ? new Date(pallet.in_date + 'T00:00:00+09:00') : null;
               const renewalDateStr = palCalcRenewalDate(inDateForRenewal, pallet.out_date || null);
+              const pkDisp = pallet.pallet_kind || '일반';
+              const kcDisp = (pallet.kind_color != null && pallet.kind_color !== undefined) ? String(pallet.kind_color).trim() : '';
+              const showKindSwatch = (pkDisp === '아주' || pkDisp === 'kpp') && /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(kcDisp);
+              const kindSwatchHtml = showKindSwatch
+                ? ' <span title="' + palEscapeHtml(kcDisp) + '" style="display:inline-block;width:14px;height:14px;border-radius:3px;background:' + kcDisp + ';border:1px solid #b2bec3;vertical-align:middle;"></span>'
+                : '';
               
               return `
               <tr>
@@ -3102,7 +3135,7 @@
                 <td style="font-size: 11px; width: 90px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${palEscapeHtml(pallet.pallet_id)}">${palEscapeHtml(pallet.pallet_id)}</td>
                 <td style="font-size: 11px; width: 110px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${palEscapeHtml(pallet.company_name || '')}">${palEscapeHtml(pallet.company_name || '')}</td>
                 <td style="font-size: 11px; white-space: normal; word-break: break-word; max-width: 150px;">${palEscapeHtml(pallet.product_name || '')}</td>
-                <td style="font-size: 11px; white-space: nowrap;">${palEscapeHtml(pallet.pallet_kind || '일반')}</td>
+                <td style="font-size: 11px; white-space: nowrap;">${palEscapeHtml(pkDisp)}${kindSwatchHtml}</td>
                 <td style="font-size: 11px; font-weight: 600;">${palEscapeHtml(statusText)}</td>
                 <td style="font-size: 11px;">${pallet.in_date || ''}</td>
                 <td style="font-size: 11px;">${renewalDateStr}</td>
@@ -3159,7 +3192,7 @@
       const tbody = document.getElementById('palVendorReturnTableBody');
       const countEl = document.getElementById('palVendorReturnCount');
       if (!tbody) return;
-      tbody.innerHTML = '<tr><td colspan="9" class="no-data">불러오는 중...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" class="no-data">불러오는 중...</td></tr>';
       try {
         const hiddenEl = document.getElementById('palCollectCompanyName');
         const inputEl = document.getElementById('palCollectCompanyInput');
@@ -3175,14 +3208,14 @@
         });
         const result = await response.json();
         if (!result.success) {
-          tbody.innerHTML = '<tr><td colspan="9" class="no-data">❌ ' + palEscapeHtml(result.message || '오류') + '</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="10" class="no-data">❌ ' + palEscapeHtml(result.message || '오류') + '</td></tr>';
           if (countEl) countEl.textContent = '(0건)';
           return;
         }
         const rows = result.data || [];
         if (countEl) countEl.textContent = '(' + rows.length + '건)';
         if (rows.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터가 없습니다.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="10" class="no-data">데이터가 없습니다.</td></tr>';
           return;
         }
         const isAdmin = (palCurrentRole === '관리자');
@@ -3190,6 +3223,12 @@
           const vrDisp = r.vendor_return_status_effective || r.vendor_return_status || '미반납';
           const isDone = (r.vendor_return_status === '반납완료');
           const pid = r.pallet_id || '';
+          var kcRaw = (r.kind_color != null && r.kind_color !== undefined) ? String(r.kind_color).trim() : '';
+          var colorCell = '<span style="color:#999;font-size:11px;">-</span>';
+          if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(kcRaw)) {
+            colorCell = '<span title="' + palEscapeHtml(kcRaw) + '" style="display:inline-block;width:20px;height:20px;border-radius:4px;background:' + kcRaw + ';border:1px solid #b2bec3;vertical-align:middle;"></span>' +
+              ' <span style="font-size:10px;color:#636e72;">' + palEscapeHtml(kcRaw) + '</span>';
+          }
           let actionCell = '<span style="color:#999;font-size:11px;">-</span>';
           if (isAdmin) {
             if (isDone) {
@@ -3202,6 +3241,7 @@
             '<td style="font-size:11px;">' + palEscapeHtml(r.company_name || '') + '</td>' +
             '<td style="font-size:11px;">' + palEscapeHtml(pid) + '</td>' +
             '<td style="font-size:11px;">' + palEscapeHtml(r.pallet_kind || '') + '</td>' +
+            '<td style="font-size:11px;white-space:nowrap;">' + colorCell + '</td>' +
             '<td style="font-size:11px;word-break:break-word;">' + palEscapeHtml(r.product_name || '') + '</td>' +
             '<td style="font-size:11px;">' + palEscapeHtml(r.status || '') + '</td>' +
             '<td style="font-size:11px;font-weight:600;">' + palEscapeHtml(vrDisp) + '</td>' +
@@ -3212,7 +3252,7 @@
         }).join('');
       } catch (error) {
         console.error('[PAL] vendor-return-list:', error);
-        tbody.innerHTML = '<tr><td colspan="9" class="no-data">❌ 목록을 불러오지 못했습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="no-data">❌ 목록을 불러오지 못했습니다.</td></tr>';
         if (countEl) countEl.textContent = '(0건)';
       }
     }

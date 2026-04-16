@@ -2,6 +2,7 @@
 파레트 보관료 관리 시스템 - 데이터베이스 함수
 """
 import os
+import re
 import math
 from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict, Tuple
@@ -17,6 +18,22 @@ from api.database.models import (
 # ========================================
 
 VALID_PALLET_KINDS = ('일반', '아주', 'kpp', '기타')
+_KIND_COLOR_HEX = re.compile(r'^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$')
+
+
+def normalize_kind_color(value, pallet_kind: str) -> Optional[str]:
+    """아주/kpp 표시용 색상 (#RGB 또는 #RRGGBB). 그 외 종류·잘못된 값은 None."""
+    kind = (pallet_kind or '').strip()
+    if kind not in ('아주', 'kpp'):
+        return None
+    if value is None:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    if not _KIND_COLOR_HEX.match(s):
+        return None
+    return s
 
 
 def normalize_pallet_kind(value) -> str:
@@ -82,7 +99,8 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
                  product_name: str = None, in_date: date = None,
                  storage_location: str = None, quantity: int = 1,
                  is_service: bool = False, notes: str = None,
-                 created_by: str = None, pallet_kind: str = None) -> Tuple[bool, str, Optional[Dict]]:
+                 created_by: str = None, pallet_kind: str = None,
+                 kind_color: str = None) -> Tuple[bool, str, Optional[Dict]]:
     """
     파레트 입고 처리
     
@@ -102,6 +120,7 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
         pallet_id = generate_pallet_id(in_date)
     
     pallet_kind_norm = normalize_pallet_kind(pallet_kind)
+    kind_color_norm = normalize_kind_color(kind_color, pallet_kind_norm)
     if pallet_kind_norm in ('아주', 'kpp'):
         vendor_return_status = '미반납'
         vendor_returned_at = None
@@ -130,12 +149,12 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
                 INSERT INTO pallets (
                     pallet_id, company_name, product_name, status,
                     in_date, storage_location, quantity, is_service, pallet_kind,
-                    vendor_return_status, vendor_returned_at,
+                    kind_color, vendor_return_status, vendor_returned_at,
                     notes, created_by, created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ''', (pallet_id, company_name, product_name, '입고됨',
                   in_date, storage_location, quantity, 1 if is_service else 0,
-                  pallet_kind_norm, vendor_return_status, vendor_returned_at,
+                  pallet_kind_norm, kind_color_norm, vendor_return_status, vendor_returned_at,
                   notes, created_by))
             
             # 트랜잭션 이력 저장
@@ -150,12 +169,12 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
                 INSERT INTO pallets (
                     pallet_id, company_name, product_name, status,
                     in_date, storage_location, quantity, is_service, pallet_kind,
-                    vendor_return_status, vendor_returned_at,
+                    kind_color, vendor_return_status, vendor_returned_at,
                     notes, created_by, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ''', (pallet_id, company_name, product_name, '입고됨',
                   in_date, storage_location, quantity, 1 if is_service else 0,
-                  pallet_kind_norm, vendor_return_status, vendor_returned_at,
+                  pallet_kind_norm, kind_color_norm, vendor_return_status, vendor_returned_at,
                   notes, created_by))
             
             # 트랜잭션 이력 저장
@@ -437,7 +456,7 @@ def get_vendor_return_pallets(
             cursor = conn.cursor()
         sym = '%s' if USE_POSTGRESQL else '?'
         q = '''
-            SELECT pallet_id, company_name, product_name, pallet_kind, status,
+            SELECT pallet_id, company_name, product_name, pallet_kind, kind_color, status,
                    in_date, out_date, vendor_return_status, vendor_returned_at, notes
             FROM pallets
             WHERE pallet_kind IN ('아주', 'kpp')
