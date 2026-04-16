@@ -36,7 +36,7 @@ app.config['JSON_AS_ASCII'] = False  # 한글 지원
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # 데이터베이스 초기화
-from api.database.models import init_db, get_company_by_username, create_company, fix_missing_return_ids
+from api.database.models import init_db, get_company_by_username, create_company, fix_missing_return_ids, ensure_pallet_table_columns
 
 # NOTE:
 # - Vercel(Serverless)에서는 import 시점에 예외가 발생하면 함수 자체가 크래시하여 사이트 접속이 불가해집니다.
@@ -63,6 +63,11 @@ def ensure_db_ready():
         print(f"[오류] DB 초기화 실패 (부팅은 계속 진행): {e}")
         import traceback
         traceback.print_exc()
+    
+    try:
+        ensure_pallet_table_columns()
+    except Exception as e:
+        print(f"[경고] pallets 확장 컬럼 보강 중 오류 (무시 가능): {e}")
     
     # 기존 반품 데이터에 ID가 없는 경우 ID 생성
     if DB_READY:

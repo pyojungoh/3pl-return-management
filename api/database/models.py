@@ -82,6 +82,80 @@ def get_db_connection():
 # 배포 DB가 수동 마이그레이션 없이 올라간 경우 대비 (settlements.return_fee)
 _SETTLEMENT_RETURN_FEE_COLUMN_OK = False
 
+# pallets 확장 컬럼 (init_db ALTER 실패·구 PG 버전 등 대비, 요청 시 1회 보강)
+_PALLETS_EXTRA_COLUMNS_OK = False
+
+
+def ensure_pallet_table_columns():
+    """
+    pallets에 pallet_kind, vendor_return_status, vendor_returned_at 컬럼이 없으면 추가.
+    PostgreSQL에서 ADD COLUMN IF NOT EXISTS 미지원/조용한 실패 시에도 동작하도록 information_schema로 판별.
+    """
+    global _PALLETS_EXTRA_COLUMNS_OK
+    if _PALLETS_EXTRA_COLUMNS_OK:
+        return
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if USE_POSTGRESQL:
+            def col_exists(table: str, col: str) -> bool:
+                cursor.execute(
+                    """SELECT 1 FROM information_schema.columns
+                       WHERE table_schema = 'public' AND table_name = %s AND column_name = %s
+                       LIMIT 1""",
+                    (table, col),
+                )
+                return cursor.fetchone() is not None
+
+            if not col_exists('pallets', 'pallet_kind'):
+                cursor.execute(
+                    "ALTER TABLE pallets ADD COLUMN pallet_kind TEXT NOT NULL DEFAULT '일반'"
+                )
+            if not col_exists('pallets', 'vendor_return_status'):
+                cursor.execute('ALTER TABLE pallets ADD COLUMN vendor_return_status TEXT')
+            if not col_exists('pallets', 'vendor_returned_at'):
+                cursor.execute('ALTER TABLE pallets ADD COLUMN vendor_returned_at DATE')
+            try:
+                cursor.execute(
+                    """UPDATE pallets SET vendor_return_status = '미반납'
+                       WHERE pallet_kind IN ('아주', 'kpp')
+                         AND (vendor_return_status IS NULL OR TRIM(vendor_return_status) = '')"""
+                )
+            except Exception as ue:
+                print(f"[경고] pallets vendor_return_status 백필(ensure): {ue}")
+        else:
+            for sql in (
+                "ALTER TABLE pallets ADD COLUMN pallet_kind TEXT NOT NULL DEFAULT '일반'",
+                'ALTER TABLE pallets ADD COLUMN vendor_return_status TEXT',
+                'ALTER TABLE pallets ADD COLUMN vendor_returned_at DATE',
+            ):
+                try:
+                    cursor.execute(sql)
+                except OperationalError as e:
+                    err = str(e).lower()
+                    if 'duplicate' not in err and 'already exists' not in err:
+                        raise
+            try:
+                cursor.execute(
+                    """UPDATE pallets SET vendor_return_status = '미반납'
+                       WHERE pallet_kind IN ('아주', 'kpp')
+                         AND (vendor_return_status IS NULL OR TRIM(vendor_return_status) = '')"""
+                )
+            except Exception as ue:
+                print(f"[경고] pallets vendor_return_status 백필(ensure SQLite): {ue}")
+        conn.commit()
+        _PALLETS_EXTRA_COLUMNS_OK = True
+        print('[성공] pallets 확장 컬럼(pallet_kind 등) 보강 완료')
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        print(f"[경고] ensure_pallet_table_columns 실패: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
 
 def ensure_settlement_return_fee_column(conn):
     """settlements.return_fee 컬럼이 없으면 추가. 프로세스당 최초 1회만 ALTER 시도."""

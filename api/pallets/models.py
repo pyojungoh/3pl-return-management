@@ -5,7 +5,12 @@ import os
 import math
 from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict, Tuple
-from api.database.models import get_db_connection, USE_POSTGRESQL, is_company_deactivated
+from api.database.models import (
+    get_db_connection,
+    USE_POSTGRESQL,
+    is_company_deactivated,
+    ensure_pallet_table_columns,
+)
 
 # ========================================
 # 파레트 관리 함수
@@ -106,6 +111,8 @@ def create_pallet(pallet_id: str = None, company_name: str = None,
     
     # 디버깅: 요청받은 pallet_id 로깅
     print(f"[DEBUG] create_pallet 호출 - pallet_id: {pallet_id}, company_name: {company_name}, pallet_kind: {pallet_kind_norm}")
+    
+    ensure_pallet_table_columns()
     
     # 중복 체크 (INSERT 전에 미리 확인)
     existing_pallet = get_pallet_by_id(pallet_id)
@@ -369,6 +376,7 @@ def get_pallet_by_id(pallet_id: str) -> Optional[Dict]:
     """
     파레트 상세 조회
     """
+    ensure_pallet_table_columns()
     conn = get_db_connection()
     
     try:
@@ -419,6 +427,7 @@ def get_vendor_return_pallets(
     아주·kpp 파레트만 조회 (화주 회수/반납 추적용).
     return_status: 전체 | 미반납 | 반납완료
     """
+    ensure_pallet_table_columns()
     conn = get_db_connection()
     try:
         if USE_POSTGRESQL:
@@ -485,6 +494,7 @@ def update_vendor_return(
     kind = (pallet.get('pallet_kind') or '일반').strip()
     if kind not in ('아주', 'kpp'):
         return False, '아주·kpp 파레트만 반납 설정이 가능합니다.', None
+    ensure_pallet_table_columns()
     vr_at = None
     if new_status == '반납완료':
         if returned_at is None:
@@ -646,6 +656,7 @@ def get_pallets(company_name: str = None, status: str = None,
         pallet_id: 파레트 ID 부분 일치(LIKE). 콤마로 구분 시 각 토큰을 OR로 검색
         product_name: 품목명 부분 일치 검색 (LIKE 검색)
     """
+    ensure_pallet_table_columns()
     conn = get_db_connection()
     
     try:
