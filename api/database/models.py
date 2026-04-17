@@ -6290,7 +6290,7 @@ HOMEPAGE_PORTAL_DEFAULT: Dict[str, Any] = {
     'cta_label': '',
     'cta_url': '',
     'browser_tab_title': '',
-    'meta_description': '3PL 반품·출고·스케줄·CS 통합 관리 포털입니다.',
+    'meta_description': '김포·인천·경기 3PL 추천 물류 파트너 JJAY 3PL. 입고·출고·반품·CS·정산을 통합 운영하는 3PL 솔루션과 비교견적 서비스를 제공합니다.',
     'footer_copyright': '© JJAY 3PL. All rights reserved.',
     'footer_seo_block': '상호·대표·사업자등록번호·주소·통신판매업 신고 등 검색 노출용 정보를 이 영역에 입력하세요.',
     'quote_section_title': '견적 · 서비스 문의',

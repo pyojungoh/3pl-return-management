@@ -866,8 +866,19 @@
     var meta = document.getElementById('hpMetaDescription');
     if (meta) {
       var md = (config.meta_description || '').trim();
-      meta.setAttribute('content', md || '3PL 반품·출고·스케줄·CS 통합 관리 포털');
+      var defaultMd = '김포·인천·경기 3PL 추천 물류 파트너 JJAY 3PL. 입고·출고·반품·CS·정산을 통합 운영하는 3PL 솔루션과 비교견적 서비스를 제공합니다.';
+      meta.setAttribute('content', md || defaultMd);
+      var ogDesc = document.getElementById('hpOgDescription');
+      if (ogDesc) ogDesc.setAttribute('content', md || defaultMd);
+      var twDesc = document.getElementById('hpTwitterDescription');
+      if (twDesc) twDesc.setAttribute('content', md || defaultMd);
     }
+
+    var titleText = (config.browser_tab_title || '').trim() || buildPortalTabTitle(config);
+    var ogTitle = document.getElementById('hpOgTitle');
+    if (ogTitle) ogTitle.setAttribute('content', titleText);
+    var twTitle = document.getElementById('hpTwitterTitle');
+    if (twTitle) twTitle.setAttribute('content', titleText);
 
     var navText = document.getElementById('hpNavBrandText');
     if (navText) navText.textContent = config.hero_title || '';

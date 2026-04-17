@@ -1591,6 +1591,14 @@ html.hp-view-quote-only {
   gap: 10px;
 }
 
+.hp-footer-seo-region {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #cbd5e1;
+  word-break: keep-all;
+}
+
 .hp-footer-jump {
   margin: 0 0 8px;
   font-size: 13px;
