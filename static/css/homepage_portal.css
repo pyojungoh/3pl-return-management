@@ -421,6 +421,7 @@ body.hp-portal-page {
   text-transform: uppercase;
   color: var(--hp-accent);
   margin: 0 0 12px;
+  animation: hpHeroFloatSoft 5.6s ease-in-out infinite;
 }
 
 .hp-hero-title {
@@ -430,6 +431,7 @@ body.hp-portal-page {
   line-height: 1.15;
   letter-spacing: -0.03em;
   color: var(--hp-ink);
+  animation: hpHeroSlidePulse 6.8s ease-in-out infinite;
 }
 
 .hp-hero-desc {
@@ -438,12 +440,38 @@ body.hp-portal-page {
   line-height: 1.65;
   color: var(--hp-muted);
   max-width: 34em;
+  animation: hpHeroFloatSoft 7.4s ease-in-out infinite;
+  animation-delay: 0.28s;
 }
 
 .hp-hero-btns {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  animation: hpHeroFloatSoft 6.2s ease-in-out infinite;
+  animation-delay: 0.4s;
+}
+
+@keyframes hpHeroFloatSoft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes hpHeroSlidePulse {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    text-shadow: none;
+  }
+  50% {
+    transform: translate3d(0, -4px, 0);
+    text-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  }
 }
 
 .hp-btn-solid {
@@ -1375,6 +1403,13 @@ body.hp-portal-page {
 @media (prefers-reduced-motion: reduce) {
   .hp-quote-impact-cta:hover {
     transform: none;
+  }
+
+  .hp-hero-kicker,
+  .hp-hero-title,
+  .hp-hero-desc,
+  .hp-hero-btns {
+    animation: none !important;
   }
 }
 
