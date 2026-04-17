@@ -13,6 +13,8 @@
   var _lastPortalConfig = null;
   var _hpPortalUploadApiBase = '';
   var _hpSvcCarouselCleanup = null;
+  var _hpScrollFxBound = false;
+  var _hpScrollObserver = null;
 
   function ensureDefaultTitleCaptured() {
     if (_defaultAppTitle != null) return;
@@ -970,6 +972,7 @@
 
     applyDocumentTitleForPortal(config);
     syncHpPortalViewFromHash();
+    refreshScrollFxTargets();
   }
 
   function getModalEl() {
@@ -1144,6 +1147,80 @@
     });
   }
 
+  function _hpScrollFxSetTargets() {
+    var root = document.getElementById('loginSection');
+    if (!root) return;
+    var groups = [
+      { sel: '.hp-hero-copy', dir: 'up' },
+      { sel: '.hp-hero-art', dir: 'right' },
+      { sel: '#hpMarqueeRoot', dir: 'up' },
+      { sel: '.hp-sec-header', dir: 'up' },
+      { sel: '.hp-quote-intro-wrap', dir: 'up' },
+      { sel: '.hp-quote-teaser', dir: 'up' },
+      { sel: '.hp-quote-card', dir: 'up' }
+    ];
+    groups.forEach(function (g) {
+      root.querySelectorAll(g.sel).forEach(function (el) {
+        el.classList.add('hp-reveal', 'hp-reveal--' + g.dir);
+      });
+    });
+    function markStagger(sel, step, dir) {
+      root.querySelectorAll(sel).forEach(function (group) {
+        var items = group.querySelectorAll(':scope > *');
+        var i;
+        for (i = 0; i < items.length; i += 1) {
+          var it = items[i];
+          it.classList.add('hp-reveal', 'hp-reveal--' + (dir || 'up'));
+          it.style.setProperty('--hp-reveal-delay', (i * step).toFixed(2) + 's');
+        }
+      });
+    }
+    markStagger('#hpYoutubeGrid', 0.1, 'up');
+    markStagger('#hpServicesCarouselRoot .hp-svc-carousel-static', 0.08, 'up');
+    markStagger('#hpServicesCarouselRoot .hp-svc-carousel-track', 0.05, 'up');
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      root.querySelectorAll('.hp-reveal').forEach(function (el) {
+        el.classList.add('is-visible');
+      });
+    }
+  }
+
+  function refreshScrollFxTargets() {
+    _hpScrollFxSetTargets();
+    if (!_hpScrollObserver) return;
+    document.querySelectorAll('.hp-reveal:not(.is-visible)').forEach(function (el) {
+      _hpScrollObserver.observe(el);
+    });
+  }
+
+  function initScrollFxOnce() {
+    if (_hpScrollFxBound) {
+      refreshScrollFxTargets();
+      return;
+    }
+    _hpScrollFxBound = true;
+    _hpScrollFxSetTargets();
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.querySelectorAll('.hp-reveal').forEach(function (el) {
+        el.classList.add('is-visible');
+      });
+      return;
+    }
+    _hpScrollObserver = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add('is-visible');
+          _hpScrollObserver.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.16, rootMargin: '0px 0px -8% 0px' }
+    );
+    document.querySelectorAll('.hp-reveal:not(.is-visible)').forEach(function (el) {
+      _hpScrollObserver.observe(el);
+    });
+  }
+
   function fetchConfig(apiBase) {
     var base = (apiBase || '').replace(/\/$/, '');
     return fetch(base + '/api/homepage/config')
@@ -1160,6 +1237,7 @@
     bindHpHashRoutingOnce();
     bindMobileNavOnce();
     bindQuoteFormOnce();
+    initScrollFxOnce();
     return fetchConfig(apiBase)
       .then(function (cfg) {
         if (cfg) applyLoginLayout(cfg);

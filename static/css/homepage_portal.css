@@ -378,8 +378,11 @@ body.hp-portal-page {
 .hp-hero {
   position: relative;
   scroll-margin-top: calc(var(--hp-header-h) + 12px);
-  padding: clamp(36px, 8vw, 72px) 0 clamp(48px, 10vw, 88px);
+  min-height: calc(100vh - var(--hp-header-h));
+  padding: clamp(72px, 11vh, 130px) 0 clamp(82px, 12vh, 150px);
   overflow: hidden;
+  display: flex;
+  align-items: center;
 }
 
 .hp-hero-glow {
@@ -401,6 +404,11 @@ body.hp-portal-page {
 }
 
 @media (max-width: 900px) {
+  .hp-hero {
+    min-height: calc(100vh - var(--hp-header-h));
+    padding: clamp(56px, 9vh, 98px) 0 clamp(66px, 10vh, 112px);
+  }
+
   .hp-hero-layout {
     grid-template-columns: 1fr;
   }
@@ -627,7 +635,9 @@ body.hp-portal-page {
 /* ----- 비교견적 활동 티커 (구 파트너 영역) ----- */
 .hp-partners-block {
   padding: clamp(44px, 7vw, 88px) 0;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 55%, #f1f5f9 100%);
+  background:
+    radial-gradient(ellipse 80% 55% at 90% 0%, rgba(99, 102, 241, 0.08), transparent 52%),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 58%, #eef2ff 100%);
 }
 
 .hp-sec-head-split {
@@ -807,7 +817,9 @@ body.hp-portal-page {
 /* ----- 유튜브 ----- */
 .hp-youtube-block {
   padding: clamp(48px, 8vw, 96px) 0;
-  background: #fff;
+  background:
+    radial-gradient(ellipse 65% 50% at 10% 8%, rgba(255, 107, 53, 0.08), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #fff7ed 40%, #ffffff 100%);
   border-top: 1px solid var(--hp-line);
 }
 
@@ -853,8 +865,51 @@ body.hp-portal-page {
   scroll-margin-top: calc(var(--hp-header-h) + 12px);
   padding: clamp(40px, 7vw, 72px) 0 clamp(56px, 9vw, 96px);
   background:
-    radial-gradient(ellipse 70% 55% at 50% -10%, rgba(255, 107, 53, 0.06), transparent 55%),
-    #fff;
+    radial-gradient(ellipse 70% 55% at 50% -10%, rgba(255, 107, 53, 0.09), transparent 55%),
+    radial-gradient(ellipse 64% 48% at 0% 100%, rgba(59, 130, 246, 0.08), transparent 58%),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+/* ----- 스크롤 리빌 모션 ----- */
+.hp-reveal {
+  --hp-reveal-delay: 0s;
+  opacity: 0;
+  will-change: transform, opacity, filter;
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--hp-reveal-delay),
+    transform 0.85s cubic-bezier(0.22, 1, 0.36, 1) var(--hp-reveal-delay),
+    filter 0.85s cubic-bezier(0.22, 1, 0.36, 1) var(--hp-reveal-delay);
+  filter: blur(7px);
+}
+
+.hp-reveal--up {
+  transform: translate3d(0, 38px, 0) scale(0.98);
+}
+
+.hp-reveal--right {
+  transform: translate3d(40px, 0, 0) scale(0.98);
+}
+
+.hp-reveal--left {
+  transform: translate3d(-40px, 0, 0) scale(0.98);
+}
+
+.hp-reveal.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  filter: blur(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hp-reveal,
+  .hp-reveal--up,
+  .hp-reveal--right,
+  .hp-reveal--left {
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+  }
 }
 
 .hp-sec-header {
