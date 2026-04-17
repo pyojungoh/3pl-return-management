@@ -19,7 +19,8 @@ homepage_bp = Blueprint('homepage', __name__, url_prefix='/api/homepage')
 
 def _verify_admin_actor():
     """헤더 + DB로 관리자 이중 확인 (다른 모듈과 동일 패턴)."""
-    role = (request.headers.get('X-User-Role') or '').strip()
+    raw_role = request.headers.get('X-User-Role') or ''
+    role = unquote(raw_role.strip())
     raw_name = request.headers.get('X-User-Name') or ''
     username = unquote(raw_name.strip())
     if role != '관리자' or not username:

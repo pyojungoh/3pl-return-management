@@ -1175,7 +1175,7 @@
     var name = localStorage.getItem('client_username') || '';
     return {
       'Content-Type': 'application/json',
-      'X-User-Role': role,
+      'X-User-Role': encodeURIComponent(role),
       'X-User-Name': encodeURIComponent(name)
     };
   }
@@ -1184,7 +1184,7 @@
     var role = localStorage.getItem('client_role') || '';
     var name = localStorage.getItem('client_username') || '';
     return {
-      'X-User-Role': role,
+      'X-User-Role': encodeURIComponent(role),
       'X-User-Name': encodeURIComponent(name)
     };
   }
