@@ -6298,6 +6298,43 @@ HOMEPAGE_PORTAL_DEFAULT: Dict[str, Any] = {
     'inquiry_email': '',
     'service_section_title': '3PL 서비스 소개',
     'service_section_lead': '연결 창고·자체 솔루션·정산·출고 품질까지, 화주사 운영에 필요한 요소를 한곳에서 제안합니다.',
+    'service_cards': [
+        {
+            'image_url': '',
+            'title': '넓은 연결 창고 · 3단 적재',
+            'body': '4동을 이어 사용하는 넓고 쾌적한 창고 환경이며, 3단 적재가 가능해 보관 효율을 높입니다.',
+        },
+        {
+            'image_url': '',
+            'title': '자체 솔루션 · C/S·반품 가시화',
+            'body': '자체 개발 솔루션으로 빠른 C/S 처리와 상세한 반품 내역 확인을 지원합니다.',
+        },
+        {
+            'image_url': '',
+            'title': '반품·누락 투명 보상',
+            'body': '솔루션으로 반품·누락을 명확히 기록하고, 규정에 따른 투명한 보상 체계를 운영합니다.',
+        },
+        {
+            'image_url': '',
+            'title': '꼼꼼한 정산서 · 미리보기·사진',
+            'body': '세밀한 정산 내역과 함께 미리보기, 증빙 사진 등을 연계해 숫자와 현장을 동시에 확인할 수 있습니다.',
+        },
+        {
+            'image_url': '',
+            'title': '당일 100% 출고',
+            'body': '일일 출고 목표를 당일 내 100% 완료하도록 프로세스를 설계·운영합니다.',
+        },
+        {
+            'image_url': '',
+            'title': '전 직원 바코드 · 오배송 0% 지향',
+            'body': '전 직원 바코드 스캔으로 피킹·패킹 전 과정을 검증해 오배송을 구조적으로 줄입니다.',
+        },
+        {
+            'image_url': '',
+            'title': 'QR 파레트 · 입·출고 전산',
+            'body': '보관 파레트 전용 자체 개발 QR 전산으로 입고·출고를 실시간 추적합니다.',
+        },
+    ],
     'banner_images': [],
     'partner_section_title': '실시간 비교견적 흐름',
     'partner_section_lead': '지금 이 순간에도 여러 화주사가 단가·조건을 비교하고 있습니다.',
@@ -6305,6 +6342,7 @@ HOMEPAGE_PORTAL_DEFAULT: Dict[str, Any] = {
     'youtube_section_title': '영상으로 보는 서비스',
     'youtube_section_lead': '물류 현장과 시스템을 영상에서 만나 보세요.',
     'youtube_items': [],
+    'hero_slides': [],
 }
 
 
@@ -6360,6 +6398,34 @@ def _merge_homepage_portal_dict(data: Optional[Dict]) -> Dict[str, Any]:
                 if len(yt) >= 12:
                     break
             out[k] = yt
+        elif k == 'hero_slides' and isinstance(v, list):
+            slides = []
+            for item in v[:12]:
+                if not isinstance(item, dict):
+                    continue
+                img = str(item.get('image_url', '') or '').strip()[:800]
+                if not img:
+                    continue
+                slides.append({
+                    'image_url': img,
+                    'button_label': str(item.get('button_label', '') or '').strip()[:80] or '자세히 보기',
+                    'link_url': str(item.get('link_url', '') or '').strip()[:800],
+                })
+            out[k] = slides
+        elif k == 'service_cards' and isinstance(v, list):
+            cards = []
+            for item in v[:8]:
+                if not isinstance(item, dict):
+                    continue
+                title = str(item.get('title', '') or '').strip()[:120]
+                if not title:
+                    continue
+                cards.append({
+                    'image_url': str(item.get('image_url', '') or '').strip()[:800],
+                    'title': title,
+                    'body': str(item.get('body', '') or '').strip()[:1200],
+                })
+            out[k] = cards
         elif k == 'notice_visible':
             out[k] = bool(v)
         elif k in out:
@@ -6465,6 +6531,8 @@ def set_homepage_portal_config(partial: Dict[str, Any], editor_username: str) ->
     for k, v in (partial or {}).items():
         if k == 'features' and isinstance(v, list):
             merged['features'] = _merge_homepage_portal_dict({'features': v})['features']
+        elif k == 'service_cards' and isinstance(v, list):
+            merged['service_cards'] = _merge_homepage_portal_dict({'service_cards': v})['service_cards']
         elif k == 'notice_visible':
             merged[k] = bool(v)
         elif k in merged:

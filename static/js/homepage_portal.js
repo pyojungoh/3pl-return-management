@@ -11,6 +11,8 @@
   var _mobileNavBound = false;
   var _escHandler = null;
   var _lastPortalConfig = null;
+  var _hpPortalUploadApiBase = '';
+  var _hpSvcCarouselCleanup = null;
 
   function ensureDefaultTitleCaptured() {
     if (_defaultAppTitle != null) return;
@@ -119,6 +121,139 @@
     return list.map(function (v) {
       return (v.video_id || '') + '|' + (v.title || '');
     }).join('\n');
+  }
+
+  var _hpHeroSliderTimer = null;
+
+  function _hpHeroSliderClearTimer() {
+    if (_hpHeroSliderTimer) {
+      clearInterval(_hpHeroSliderTimer);
+      _hpHeroSliderTimer = null;
+    }
+  }
+
+  function buildHeroSlides(slides) {
+    var root = document.getElementById('hpHeroSliderRoot');
+    if (!root) return;
+    _hpHeroSliderClearTimer();
+    root.innerHTML = '';
+    root.style.display = 'none';
+    if (!slides || !slides.length) return;
+
+    root.style.display = 'block';
+    var viewport = document.createElement('div');
+    viewport.className = 'hp-hero-slider-viewport';
+    var track = document.createElement('div');
+    track.className = 'hp-hero-slider-track';
+    var n = slides.length;
+    var idx = 0;
+
+    slides.forEach(function (s, i) {
+      var slide = document.createElement('div');
+      slide.className = 'hp-hero-slide';
+      slide.setAttribute('role', 'group');
+      slide.setAttribute('aria-roledescription', 'slide');
+      slide.setAttribute('aria-label', '슬라이드 ' + (i + 1) + ' / ' + n);
+      var img = document.createElement('img');
+      img.src = s.image_url;
+      img.alt = '';
+      img.className = 'hp-hero-slide-img';
+      img.loading = i === 0 ? 'eager' : 'lazy';
+      img.decoding = 'async';
+      slide.appendChild(img);
+      var href = String(s.link_url || '').trim();
+      var lab = String(s.button_label || '').trim() || '자세히 보기';
+      var btn;
+      if (href) {
+        btn = document.createElement('a');
+        btn.href = href;
+        if (/^https?:\/\//i.test(href)) {
+          btn.target = '_blank';
+          btn.rel = 'noopener noreferrer';
+        }
+      } else {
+        btn = document.createElement('span');
+      }
+      btn.className = 'hp-hero-slide-cta hp-btn-solid';
+      btn.textContent = lab;
+      slide.appendChild(btn);
+      track.appendChild(slide);
+    });
+
+    track.style.width = n * 100 + '%';
+    track.querySelectorAll('.hp-hero-slide').forEach(function (sl) {
+      sl.style.flex = '0 0 ' + 100 / n + '%';
+    });
+
+    var prev = document.createElement('button');
+    prev.type = 'button';
+    prev.className = 'hp-hero-slider-arrow hp-hero-slider-arrow--prev';
+    prev.setAttribute('aria-label', '이전 슬라이드');
+    prev.innerHTML = '‹';
+    var next = document.createElement('button');
+    next.type = 'button';
+    next.className = 'hp-hero-slider-arrow hp-hero-slider-arrow--next';
+    next.setAttribute('aria-label', '다음 슬라이드');
+    next.innerHTML = '›';
+    var dots = document.createElement('div');
+    dots.className = 'hp-hero-slider-dots';
+
+    function render() {
+      var pct = (100 / n) * idx;
+      track.style.transform = 'translateX(-' + pct + '%)';
+      prev.disabled = n <= 1;
+      next.disabled = n <= 1;
+      dots.querySelectorAll('button').forEach(function (b, j) {
+        b.classList.toggle('hp-hero-slider-dot--active', j === idx);
+      });
+    }
+
+    function go(delta) {
+      idx = (idx + delta + n) % n;
+      render();
+    }
+
+    function startAutoplay() {
+      _hpHeroSliderClearTimer();
+      if (n > 1) {
+        _hpHeroSliderTimer = setInterval(function () {
+          go(1);
+        }, 6000);
+      }
+    }
+
+    for (var d = 0; d < n; d++) {
+      (function (j) {
+        var dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'hp-hero-slider-dot';
+        dot.setAttribute('aria-label', '슬라이드 ' + (j + 1));
+        dot.addEventListener('click', function () {
+          idx = j;
+          render();
+        });
+        dots.appendChild(dot);
+      })(d);
+    }
+
+    prev.addEventListener('click', function () {
+      go(-1);
+    });
+    next.addEventListener('click', function () {
+      go(1);
+    });
+
+    viewport.addEventListener('mouseenter', _hpHeroSliderClearTimer);
+    viewport.addEventListener('mouseleave', startAutoplay);
+
+    viewport.appendChild(track);
+    viewport.appendChild(prev);
+    viewport.appendChild(next);
+    viewport.appendChild(dots);
+    root.appendChild(viewport);
+
+    render();
+    startAutoplay();
   }
 
   function buildMarquee(imgs) {
@@ -377,6 +512,351 @@
     });
   }
 
+  var DEFAULT_SERVICE_CARDS = [
+    { image_url: '', title: '넓은 연결 창고 · 3단 적재', body: '4동을 이어 사용하는 넓고 쾌적한 창고 환경이며, 3단 적재가 가능해 보관 효율을 높입니다.' },
+    { image_url: '', title: '자체 솔루션 · C/S·반품 가시화', body: '자체 개발 솔루션으로 빠른 C/S 처리와 상세한 반품 내역 확인을 지원합니다.' },
+    { image_url: '', title: '반품·누락 투명 보상', body: '솔루션으로 반품·누락을 명확히 기록하고, 규정에 따른 투명한 보상 체계를 운영합니다.' },
+    { image_url: '', title: '꼼꼼한 정산서 · 미리보기·사진', body: '세밀한 정산 내역과 함께 미리보기, 증빙 사진 등을 연계해 숫자와 현장을 동시에 확인할 수 있습니다.' },
+    { image_url: '', title: '당일 100% 출고', body: '일일 출고 목표를 당일 내 100% 완료하도록 프로세스를 설계·운영합니다.' },
+    { image_url: '', title: '전 직원 바코드 · 오배송 0% 지향', body: '전 직원 바코드 스캔으로 피킹·패킹 전 과정을 검증해 오배송을 구조적으로 줄입니다.' },
+    { image_url: '', title: 'QR 파레트 · 입·출고 전산', body: '보관 파레트 전용 자체 개발 QR 전산으로 입고·출고를 실시간 추적합니다.' }
+  ];
+
+  function effectiveServiceCards(config) {
+    var raw = (config && config.service_cards) || [];
+    var list = [];
+    raw.forEach(function (item) {
+      if (!item || typeof item !== 'object') return;
+      var title = String(item.title || '').trim();
+      if (!title) return;
+      list.push({
+        image_url: String(item.image_url || '').trim(),
+        title: title,
+        body: String(item.body || '').trim()
+      });
+    });
+    list = list.slice(0, 8);
+    if (list.length >= 3) return list;
+    var out = list.slice();
+    for (var i = 0; out.length < 3 && i < DEFAULT_SERVICE_CARDS.length; i++) {
+      var d = DEFAULT_SERVICE_CARDS[i];
+      if (!out.some(function (x) { return x.title === d.title; })) out.push({ image_url: d.image_url, title: d.title, body: d.body });
+    }
+    return out.slice(0, 8);
+  }
+
+  function _hpStopServiceCarousel() {
+    if (typeof _hpSvcCarouselCleanup === 'function') {
+      try {
+        _hpSvcCarouselCleanup();
+      } catch (e) {
+        /* noop */
+      }
+    }
+    _hpSvcCarouselCleanup = null;
+  }
+
+  function buildServiceCarousel(config) {
+    var root = document.getElementById('hpServicesCarouselRoot');
+    if (!root) return;
+    _hpStopServiceCarousel();
+    root.classList.remove('hp-svc-carousel-static');
+    root.innerHTML = '';
+    var cards = effectiveServiceCards(config);
+    var n = cards.length;
+    if (n < 1) return;
+
+    var reduceMotion = false;
+    try {
+      reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (e) {
+      reduceMotion = false;
+    }
+
+    function oneCardEl(c, idx) {
+      var art = document.createElement('article');
+      art.className = 'hp-svc-orbit-card';
+      art.setAttribute('role', 'group');
+      art.setAttribute('aria-roledescription', 'slide');
+      art.setAttribute('aria-label', (c.title || '서비스') + ' ' + (idx + 1) + ' / ' + n);
+      var media = document.createElement('div');
+      media.className = 'hp-svc-orbit-card-media';
+      var url = (c.image_url || '').trim();
+      if (url) {
+        var im = document.createElement('img');
+        im.src = url;
+        im.alt = '';
+        im.loading = idx === 0 ? 'eager' : 'lazy';
+        im.decoding = 'async';
+        media.appendChild(im);
+      } else {
+        var ph = document.createElement('div');
+        ph.className = 'hp-svc-orbit-card-ph';
+        ph.textContent = 'Photo';
+        media.appendChild(ph);
+      }
+      var text = document.createElement('div');
+      text.className = 'hp-svc-orbit-card-text';
+      var h = document.createElement('h3');
+      h.className = 'hp-svc-orbit-card-title';
+      h.textContent = c.title || '';
+      var p = document.createElement('p');
+      p.className = 'hp-svc-orbit-card-body';
+      p.textContent = c.body || '';
+      text.appendChild(h);
+      text.appendChild(p);
+      art.appendChild(media);
+      art.appendChild(text);
+      return art;
+    }
+
+    if (reduceMotion || n < 3) {
+      var wrap = document.createElement('div');
+      wrap.className = 'hp-svc-carousel-static';
+      cards.forEach(function (c, i) {
+        wrap.appendChild(oneCardEl(c, i));
+      });
+      root.appendChild(wrap);
+      return;
+    }
+
+    root.classList.remove('hp-svc-carousel-static');
+    var stage = document.createElement('div');
+    stage.className = 'hp-svc-carousel-stage';
+    var track = document.createElement('div');
+    track.className = 'hp-svc-carousel-track';
+    var nodes = cards.map(function (c, i) {
+      return oneCardEl(c, i);
+    });
+    nodes.forEach(function (node) {
+      track.appendChild(node);
+    });
+    stage.appendChild(track);
+    root.appendChild(stage);
+
+    var angle = 0;
+    var mousePaused = false;
+    var rafId = null;
+    var lastTs = 0;
+    var dwellUntil = 0;
+    var dwellStartTs = 0;
+    var lastLeader = -1;
+    var DWELL_MS = 2200;
+    var ZOOM_IN_MS = 420;
+    var ZOOM_OUT_MS = 420;
+    var HOLD_CENTER_MS = Math.max(200, DWELL_MS - ZOOM_IN_MS - ZOOM_OUT_MS);
+    var LEADER_MIN = 0.94;
+
+    function easeInOutCubic(t) {
+      t = Math.min(1, Math.max(0, t));
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    function layout(ts) {
+      if (!lastTs) lastTs = ts;
+      var dt = Math.min(48, Math.max(0, ts - lastTs));
+      lastTs = ts;
+
+      var dwellActive = dwellUntil > 0 && ts < dwellUntil;
+      if (!mousePaused && !dwellActive) {
+        angle += (dt / 1000) * 0.34;
+      }
+
+      var rx = 38;
+      var ry = 26;
+      var i;
+      var frontIdx = 0;
+      var maxF = -1;
+      var thetas = [];
+      var fronts = [];
+      for (i = 0; i < n; i += 1) {
+        var th = (Math.PI * 2 * i) / n + angle + Math.PI / 2;
+        thetas.push(th);
+        var fn = (1 + Math.sin(th)) / 2;
+        fronts.push(fn);
+        if (fn > maxF) {
+          maxF = fn;
+          frontIdx = i;
+        }
+      }
+
+      if (!mousePaused && maxF > LEADER_MIN && frontIdx !== lastLeader) {
+        lastLeader = frontIdx;
+        dwellStartTs = ts;
+        dwellUntil = ts + DWELL_MS;
+      }
+
+      var dwellElapsed = dwellActive ? ts - dwellStartTs : 0;
+      var centerBlend = 0;
+      if (dwellActive) {
+        if (dwellElapsed < ZOOM_IN_MS) {
+          centerBlend = easeInOutCubic(dwellElapsed / ZOOM_IN_MS);
+        } else if (dwellElapsed < ZOOM_IN_MS + HOLD_CENTER_MS) {
+          centerBlend = 1;
+        } else {
+          centerBlend = 1 - easeInOutCubic((dwellElapsed - ZOOM_IN_MS - HOLD_CENTER_MS) / ZOOM_OUT_MS);
+        }
+      }
+
+      var peakOrbitScale = 0.58 + 0.42;
+      var dwellCenterScale = peakOrbitScale * 2;
+      for (i = 0; i < n; i += 1) {
+        var theta = thetas[i];
+        var frontness = fronts[i];
+        var orbitX = 50 + Math.cos(theta) * rx;
+        var orbitY = 44 + Math.sin(theta) * ry;
+        var orbitScale = 0.58 + 0.42 * frontness;
+        var x = orbitX;
+        var y = orbitY;
+        var scale = orbitScale;
+        var opacity = 0.45 + 0.55 * frontness;
+        var blurPx = (1 - frontness) * 2.2;
+        var z = Math.round(100 + 80 * frontness);
+        if (dwellActive && i === frontIdx) {
+          x = orbitX + (50 - orbitX) * centerBlend;
+          y = orbitY + (50 - orbitY) * centerBlend;
+          scale = orbitScale + (dwellCenterScale - orbitScale) * centerBlend;
+          opacity = 0.55 + 0.45 * (0.45 + 0.55 * frontness) + 0.2 * centerBlend;
+          if (opacity > 1) opacity = 1;
+          blurPx = (1 - frontness) * 2.2 * (1 - centerBlend);
+          z = 380 + Math.round(60 * centerBlend);
+        } else if (dwellActive) {
+          opacity *= 1 - 0.52 * centerBlend;
+          blurPx = Math.max(blurPx, 0.9 + 0.7 * centerBlend);
+        }
+        var node = nodes[i];
+        node.style.left = x + '%';
+        node.style.top = y + '%';
+        node.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+        node.style.opacity = String(opacity);
+        node.style.zIndex = String(z);
+        node.style.filter = blurPx > 0.12 ? 'blur(' + blurPx.toFixed(2) + 'px)' : 'none';
+        var leaderProminent = dwellActive && i === frontIdx && centerBlend > 0.65;
+        node.style.pointerEvents = leaderProminent ? 'auto' : !dwellActive && frontness > 0.82 ? 'auto' : 'none';
+        node.classList.toggle(
+          'hp-svc-orbit-card--front',
+          (dwellActive && i === frontIdx && centerBlend > 0.35) || (!dwellActive && frontness > 0.88)
+        );
+      }
+      rafId = window.requestAnimationFrame(layout);
+    }
+
+    rafId = window.requestAnimationFrame(layout);
+
+    function onEnter() {
+      mousePaused = true;
+    }
+    function onLeave() {
+      mousePaused = false;
+    }
+    root.addEventListener('mouseenter', onEnter);
+    root.addEventListener('mouseleave', onLeave);
+
+    _hpSvcCarouselCleanup = function () {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      rafId = null;
+      root.removeEventListener('mouseenter', onEnter);
+      root.removeEventListener('mouseleave', onLeave);
+    };
+  }
+
+  var HP_SVC_CARD_MAX = 8;
+
+  function updateSvcCardRowPreview(row) {
+    if (!row) return;
+    var urlIn = row.querySelector('.hp-svc-card-img-url');
+    var prev = row.querySelector('.hp-svc-card-editor-preview-img');
+    var ph = row.querySelector('.hp-svc-card-editor-preview-ph');
+    var u = urlIn && urlIn.value ? urlIn.value.trim() : '';
+    if (prev) {
+      if (u) {
+        prev.src = u;
+        prev.style.display = 'block';
+        if (ph) ph.style.display = 'none';
+      } else {
+        prev.removeAttribute('src');
+        prev.style.display = 'none';
+        if (ph) ph.style.display = 'flex';
+      }
+    }
+  }
+
+  function buildServiceCardRowEl(data) {
+    data = data || {};
+    var row = document.createElement('div');
+    row.className = 'hp-svc-card-editor-row';
+    row.innerHTML =
+      '<div class="hp-svc-card-editor-preview">' +
+      '<img class="hp-svc-card-editor-preview-img" alt="" style="display:none;" />' +
+      '<span class="hp-svc-card-editor-preview-ph">이미지</span>' +
+      '</div>' +
+      '<div class="hp-svc-card-editor-fields">' +
+      '<label class="hp-hero-slide-label"><span>이미지 URL</span><input type="text" class="request-input hp-svc-card-img-url" placeholder="https://…" /></label>' +
+      '<div class="hp-hero-slide-upload-wrap">' +
+      '<input type="file" class="hp-svc-card-file" accept="image/*" style="display:none;" />' +
+      '<button type="button" class="refresh-btn hp-svc-card-upload-btn">📤 Cloudinary 업로드</button>' +
+      '</div>' +
+      '<label class="hp-hero-slide-label"><span>카드 제목</span><input type="text" class="request-input hp-svc-card-title-inp" placeholder="한 줄 제목" /></label>' +
+      '<label class="hp-hero-slide-label"><span>본문</span><textarea class="request-input hp-svc-card-body-inp" rows="3" placeholder="설명 문구"></textarea></label>' +
+      '</div>' +
+      '<button type="button" class="hp-svc-card-editor-remove" title="삭제">✕</button>';
+
+    var imgUrl = row.querySelector('.hp-svc-card-img-url');
+    var tit = row.querySelector('.hp-svc-card-title-inp');
+    var body = row.querySelector('.hp-svc-card-body-inp');
+    if (imgUrl) imgUrl.value = String(data.image_url || '').trim();
+    if (tit) tit.value = String(data.title || '').trim();
+    if (body) body.value = String(data.body || '').trim();
+    updateSvcCardRowPreview(row);
+    if (imgUrl) {
+      imgUrl.addEventListener('input', function () {
+        updateSvcCardRowPreview(row);
+      });
+    }
+    return row;
+  }
+
+  function serviceCardRowCount() {
+    var ed = document.getElementById('hpServiceCardsEditor');
+    return ed ? ed.querySelectorAll('.hp-svc-card-editor-row').length : 0;
+  }
+
+  function refreshServiceCardAddBtn() {
+    var b = document.getElementById('hpServiceCardAddBtn');
+    if (!b) return;
+    b.disabled = serviceCardRowCount() >= HP_SVC_CARD_MAX;
+  }
+
+  function renderServiceCardsEditor(list) {
+    var wrap = document.getElementById('hpServiceCardsEditor');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    var arr = list && list.length ? list.slice(0, HP_SVC_CARD_MAX) : [{}];
+    arr.forEach(function (s) {
+      wrap.appendChild(buildServiceCardRowEl(s));
+    });
+    refreshServiceCardAddBtn();
+  }
+
+  function getServiceCardsFromEditor() {
+    var wrap = document.getElementById('hpServiceCardsEditor');
+    var out = [];
+    if (!wrap) return out;
+    wrap.querySelectorAll('.hp-svc-card-editor-row').forEach(function (row) {
+      var tit = row.querySelector('.hp-svc-card-title-inp');
+      var title = tit && tit.value ? tit.value.trim() : '';
+      if (!title) return;
+      var img = row.querySelector('.hp-svc-card-img-url');
+      var body = row.querySelector('.hp-svc-card-body-inp');
+      out.push({
+        image_url: img && img.value ? img.value.trim() : '',
+        title: title,
+        body: body && body.value ? body.value.trim() : ''
+      });
+    });
+    return out.slice(0, HP_SVC_CARD_MAX);
+  }
+
   function applyLoginLayout(config) {
     if (!config) return;
     _lastPortalConfig = config;
@@ -403,6 +883,7 @@
     }
 
     buildMarquee(config.banner_images || []);
+    buildHeroSlides(config.hero_slides || []);
 
     var pTitle = document.getElementById('hpPartnerTitle');
     if (pTitle) pTitle.textContent = config.partner_section_title || '';
@@ -429,6 +910,7 @@
         config.service_section_lead ||
         '연결 창고·자체 솔루션·정산·출고 품질까지, 화주사 운영에 필요한 요소를 한곳에서 제안합니다.';
     }
+    buildServiceCarousel(config);
 
     var lt = document.getElementById('hpLoginCardTitle');
     if (lt) lt.textContent = config.login_card_title || '로그인';
@@ -698,6 +1180,136 @@
     };
   }
 
+  function adminHeadersMultipart() {
+    var role = localStorage.getItem('client_role') || '';
+    var name = localStorage.getItem('client_username') || '';
+    return {
+      'X-User-Role': role,
+      'X-User-Name': encodeURIComponent(name)
+    };
+  }
+
+  function uploadHomepagePortalImage(apiBase, file) {
+    var base = (apiBase || '').replace(/\/$/, '');
+    if (!base && window.location && window.location.origin && window.location.origin !== 'null') {
+      base = window.location.origin.replace(/\/$/, '');
+    }
+    var path = base ? base + '/api/homepage/upload-image' : '/api/homepage/upload-image';
+    var fd = new FormData();
+    fd.append('file', file);
+    return fetch(path, {
+      method: 'POST',
+      headers: adminHeadersMultipart(),
+      body: fd
+    })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          return { ok: r.ok, j: j };
+        });
+      })
+      .then(function (x) {
+        if (x.ok && x.j && x.j.success && x.j.data && x.j.data.file_url) return x.j.data.file_url;
+        throw new Error((x.j && x.j.message) || '업로드 실패');
+      });
+  }
+
+  var HP_SLIDES_MAX = 12;
+
+  function updateHeroSlideRowPreview(row) {
+    if (!row) return;
+    var urlIn = row.querySelector('.hp-hero-slide-img-url');
+    var prev = row.querySelector('.hp-hero-slide-preview-img');
+    var ph = row.querySelector('.hp-hero-slide-preview-ph');
+    var u = urlIn && urlIn.value ? urlIn.value.trim() : '';
+    if (prev) {
+      if (u) {
+        prev.src = u;
+        prev.style.display = 'block';
+        if (ph) ph.style.display = 'none';
+      } else {
+        prev.removeAttribute('src');
+        prev.style.display = 'none';
+        if (ph) ph.style.display = 'flex';
+      }
+    }
+  }
+
+  function buildHeroSlideRowEl(data) {
+    data = data || {};
+    var row = document.createElement('div');
+    row.className = 'hp-hero-slide-row';
+    row.innerHTML =
+      '<div class="hp-hero-slide-preview">' +
+      '<img class="hp-hero-slide-preview-img" alt="" style="display:none;" />' +
+      '<span class="hp-hero-slide-preview-ph">미리보기</span>' +
+      '</div>' +
+      '<div class="hp-hero-slide-fields">' +
+      '<label class="hp-hero-slide-label"><span>이미지 URL</span><input type="text" class="request-input hp-hero-slide-img-url" placeholder="https://…" /></label>' +
+      '<div class="hp-hero-slide-upload-wrap">' +
+      '<input type="file" class="hp-hero-slide-file" accept="image/*" style="display:none;" />' +
+      '<button type="button" class="refresh-btn hp-hero-slide-upload-btn">📤 Cloudinary 업로드</button>' +
+      '</div>' +
+      '<label class="hp-hero-slide-label"><span>버튼 문구</span><input type="text" class="request-input hp-hero-slide-btn-label" placeholder="예: 회사 소개" /></label>' +
+      '<label class="hp-hero-slide-label"><span>이동 URL</span><input type="text" class="request-input hp-hero-slide-link" placeholder="비우면 링크 없음 · #quote 가능" /></label>' +
+      '</div>' +
+      '<button type="button" class="hp-hero-slide-row-remove" title="이 줄 삭제">✕</button>';
+
+    var imgUrl = row.querySelector('.hp-hero-slide-img-url');
+    var lab = row.querySelector('.hp-hero-slide-btn-label');
+    var link = row.querySelector('.hp-hero-slide-link');
+    if (imgUrl) imgUrl.value = String(data.image_url || '').trim();
+    if (lab) lab.value = String(data.button_label || '').trim();
+    if (link) link.value = String(data.link_url || '').trim();
+    updateHeroSlideRowPreview(row);
+    if (imgUrl) {
+      imgUrl.addEventListener('input', function () {
+        updateHeroSlideRowPreview(row);
+      });
+    }
+    return row;
+  }
+
+  function heroSlidesRowCount() {
+    var ed = document.getElementById('hpHeroSlidesEditor');
+    return ed ? ed.querySelectorAll('.hp-hero-slide-row').length : 0;
+  }
+
+  function refreshHeroSlideAddButtonState() {
+    var b = document.getElementById('hpHeroSlideAddBtn');
+    if (!b) return;
+    b.disabled = heroSlidesRowCount() >= HP_SLIDES_MAX;
+  }
+
+  function renderHeroSlidesEditor(slides) {
+    var wrap = document.getElementById('hpHeroSlidesEditor');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    var list = slides && slides.length ? slides.slice(0, HP_SLIDES_MAX) : [{}];
+    list.forEach(function (s) {
+      wrap.appendChild(buildHeroSlideRowEl(s));
+    });
+    refreshHeroSlideAddButtonState();
+  }
+
+  function getHeroSlidesFromEditor() {
+    var wrap = document.getElementById('hpHeroSlidesEditor');
+    var out = [];
+    if (!wrap) return out;
+    wrap.querySelectorAll('.hp-hero-slide-row').forEach(function (row) {
+      var img = row.querySelector('.hp-hero-slide-img-url');
+      var lab = row.querySelector('.hp-hero-slide-btn-label');
+      var link = row.querySelector('.hp-hero-slide-link');
+      var image_url = img && img.value ? img.value.trim() : '';
+      if (!image_url) return;
+      out.push({
+        image_url: image_url,
+        button_label: (lab && lab.value ? lab.value.trim() : '') || '자세히 보기',
+        link_url: link && link.value ? link.value.trim() : ''
+      });
+    });
+    return out.slice(0, HP_SLIDES_MAX);
+  }
+
   function val(id) {
     var el = document.getElementById(id);
     return el ? el.value : '';
@@ -744,7 +1356,9 @@
       partner_logos: [],
       youtube_section_title: val('hpAdYoutubeSecTitle'),
       youtube_section_lead: val('hpAdYoutubeSecLead'),
-      youtube_items: parseYoutubeLines(val('hpAdYoutubeLines'))
+      youtube_items: parseYoutubeLines(val('hpAdYoutubeLines')),
+      hero_slides: getHeroSlidesFromEditor(),
+      service_cards: getServiceCardsFromEditor()
     };
   }
 
@@ -781,6 +1395,8 @@
     set('hpAdYoutubeSecTitle', config.youtube_section_title);
     set('hpAdYoutubeSecLead', config.youtube_section_lead);
     set('hpAdYoutubeLines', youtubeLinesFromConfig(config.youtube_items));
+    renderHeroSlidesEditor(config.hero_slides || []);
+    renderServiceCardsEditor(config.service_cards || []);
     (config.features || []).forEach(function (f, i) {
       if (i > 3) return;
       set('hpAdFeat' + i + 'Icon', f.icon);
@@ -790,6 +1406,7 @@
   }
 
   function adminLoad(apiBase) {
+    _hpPortalUploadApiBase = apiBase != null ? String(apiBase).replace(/\/$/, '') : '';
     var msg = document.getElementById('hpAdMessage');
     if (msg) msg.textContent = '불러오는 중…';
     var base = (apiBase || '').replace(/\/$/, '');
@@ -809,6 +1426,7 @@
   }
 
   function adminSave(apiBase) {
+    _hpPortalUploadApiBase = apiBase != null ? String(apiBase).replace(/\/$/, '') : '';
     var msg = document.getElementById('hpAdMessage');
     var base = (apiBase || '').replace(/\/$/, '');
     var body = JSON.stringify({ config: collectAdminForm() });
@@ -836,6 +1454,212 @@
         if (msg) msg.textContent = '오류: ' + (e.message || String(e));
       });
   }
+
+  var _hpAdminPortalTabsBound = false;
+  function bindHomepageAdminPortalTabs() {
+    if (_hpAdminPortalTabsBound) return;
+    var tabRoot = document.getElementById('homepageSettingsTab');
+    if (!tabRoot) return;
+    _hpAdminPortalTabsBound = true;
+
+    var edInit = document.getElementById('hpHeroSlidesEditor');
+    if (edInit && !edInit.querySelector('.hp-hero-slide-row')) {
+      renderHeroSlidesEditor([]);
+    }
+    var scInit = document.getElementById('hpServiceCardsEditor');
+    if (scInit && !scInit.querySelector('.hp-svc-card-editor-row')) {
+      renderServiceCardsEditor([]);
+    }
+
+    tabRoot.addEventListener('click', function (e) {
+      var bodyBtn = e.target.closest('[data-hp-body-panel]');
+      if (bodyBtn && bodyBtn.tagName === 'BUTTON') {
+        var bid = bodyBtn.getAttribute('data-hp-body-panel');
+        if (bid) {
+          tabRoot.querySelectorAll('.hp-admin-body-tab[data-hp-body-panel]').forEach(function (b) {
+            var on = b === bodyBtn;
+            b.classList.toggle('hp-admin-body-tab--active', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+          });
+          ['hpBodyPanelSlides', 'hpBodyPanelHeadline', 'hpBodyPanelBanner', 'hpBodyPanelMid', 'hpBodyPanelFeatures', 'hpBodyPanelQuote'].forEach(function (pid) {
+            var p = document.getElementById(pid);
+            if (p) p.hidden = pid !== bid;
+          });
+        }
+        return;
+      }
+
+      if (e.target.closest('#hpLogoCloudUploadBtn')) {
+        var li = document.getElementById('hpLogoCloudUploadInput');
+        if (li) li.click();
+        return;
+      }
+      if (e.target.closest('#hpBannerCloudUploadBtn')) {
+        var bi = document.getElementById('hpBannerCloudUploadInput');
+        if (bi) bi.click();
+        return;
+      }
+
+      if (e.target.closest('#hpHeroSlideAddBtn')) {
+        var ed = document.getElementById('hpHeroSlidesEditor');
+        if (!ed) return;
+        if (heroSlidesRowCount() >= HP_SLIDES_MAX) {
+          window.alert('슬라이드는 최대 ' + HP_SLIDES_MAX + '개까지입니다.');
+          return;
+        }
+        ed.appendChild(buildHeroSlideRowEl({}));
+        refreshHeroSlideAddButtonState();
+        return;
+      }
+
+      var uploadSlide = e.target.closest('.hp-hero-slide-upload-btn');
+      if (uploadSlide) {
+        var row = uploadSlide.closest('.hp-hero-slide-row');
+        var fin = row && row.querySelector('.hp-hero-slide-file');
+        if (fin) fin.click();
+        return;
+      }
+
+      var rem = e.target.closest('.hp-hero-slide-row-remove');
+      if (rem) {
+        var rowR = rem.closest('.hp-hero-slide-row');
+        if (rowR && rowR.parentNode) rowR.parentNode.removeChild(rowR);
+        var ed2 = document.getElementById('hpHeroSlidesEditor');
+        if (ed2 && heroSlidesRowCount() === 0) ed2.appendChild(buildHeroSlideRowEl({}));
+        refreshHeroSlideAddButtonState();
+        return;
+      }
+
+      if (e.target.closest('#hpServiceCardAddBtn')) {
+        var sce = document.getElementById('hpServiceCardsEditor');
+        if (!sce) return;
+        if (serviceCardRowCount() >= HP_SVC_CARD_MAX) {
+          window.alert('서비스 카드는 최대 ' + HP_SVC_CARD_MAX + '개까지입니다.');
+          return;
+        }
+        sce.appendChild(buildServiceCardRowEl({}));
+        refreshServiceCardAddBtn();
+        return;
+      }
+
+      var svcUp = e.target.closest('.hp-svc-card-upload-btn');
+      if (svcUp) {
+        var srow = svcUp.closest('.hp-svc-card-editor-row');
+        var sfin = srow && srow.querySelector('.hp-svc-card-file');
+        if (sfin) sfin.click();
+        return;
+      }
+
+      var svcRem = e.target.closest('.hp-svc-card-editor-remove');
+      if (svcRem) {
+        var srowR = svcRem.closest('.hp-svc-card-editor-row');
+        if (srowR && srowR.parentNode) srowR.parentNode.removeChild(srowR);
+        var sce2 = document.getElementById('hpServiceCardsEditor');
+        if (sce2 && serviceCardRowCount() === 0) sce2.appendChild(buildServiceCardRowEl({}));
+        refreshServiceCardAddBtn();
+        return;
+      }
+
+      var btn = e.target.closest('[data-hp-portal-panel]');
+      if (!btn || btn.tagName !== 'BUTTON') return;
+      var id = btn.getAttribute('data-hp-portal-panel');
+      if (!id) return;
+      tabRoot.querySelectorAll('.hp-admin-portal-tab[data-hp-portal-panel]').forEach(function (b) {
+        var on = b === btn;
+        b.classList.toggle('hp-admin-portal-tab--active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      ['hpPanelNav', 'hpPanelFooter', 'hpPanelBody'].forEach(function (pid) {
+        var p = document.getElementById(pid);
+        if (p) p.hidden = pid !== id;
+      });
+    });
+
+    tabRoot.addEventListener('change', function (e) {
+      var t = e.target;
+      if (!t || t.tagName !== 'INPUT' || t.type !== 'file') return;
+      var apiBase = _hpPortalUploadApiBase;
+      function resetInput() {
+        t.value = '';
+      }
+      var file = t.files && t.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        window.alert('이미지 파일만 업로드할 수 있습니다.');
+        resetInput();
+        return;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        window.alert('이미지는 8MB 이하여야 합니다.');
+        resetInput();
+        return;
+      }
+
+      if (t.id === 'hpLogoCloudUploadInput') {
+        uploadHomepagePortalImage(apiBase, file)
+          .then(function (url) {
+            var el = document.getElementById('hpAdLogoUrl');
+            if (el) el.value = url;
+          })
+          .catch(function (err) {
+            window.alert(err.message || String(err));
+          })
+          .finally(resetInput);
+        return;
+      }
+
+      if (t.id === 'hpBannerCloudUploadInput') {
+        uploadHomepagePortalImage(apiBase, file)
+          .then(function (url) {
+            var ta = document.getElementById('hpAdBannerUrls');
+            if (!ta) return;
+            var lines = ta.value.trim() ? ta.value.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean) : [];
+            if (lines.length >= 20) {
+              window.alert('배너는 최대 20장까지입니다.');
+              return;
+            }
+            lines.push(url);
+            ta.value = lines.join('\n');
+          })
+          .catch(function (err) {
+            window.alert(err.message || String(err));
+          })
+          .finally(resetInput);
+        return;
+      }
+
+      if (t.classList.contains('hp-hero-slide-file')) {
+        var row = t.closest('.hp-hero-slide-row');
+        uploadHomepagePortalImage(apiBase, file)
+          .then(function (url) {
+            var inp = row && row.querySelector('.hp-hero-slide-img-url');
+            if (inp) inp.value = url;
+            updateHeroSlideRowPreview(row);
+          })
+          .catch(function (err) {
+            window.alert(err.message || String(err));
+          })
+          .finally(resetInput);
+        return;
+      }
+
+      if (t.classList.contains('hp-svc-card-file')) {
+        var srow = t.closest('.hp-svc-card-editor-row');
+        uploadHomepagePortalImage(apiBase, file)
+          .then(function (url) {
+            var inp2 = srow && srow.querySelector('.hp-svc-card-img-url');
+            if (inp2) inp2.value = url;
+            updateSvcCardRowPreview(srow);
+          })
+          .catch(function (err) {
+            window.alert(err.message || String(err));
+          })
+          .finally(resetInput);
+      }
+    });
+  }
+
+  bindHomepageAdminPortalTabs();
 
   global.HomepagePortal = {
     applyLoginLayout: applyLoginLayout,

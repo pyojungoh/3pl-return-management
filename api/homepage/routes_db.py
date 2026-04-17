@@ -6,6 +6,8 @@ from urllib.parse import unquote
 
 from flask import Blueprint, request, jsonify
 
+from api.uploads.cloudinary_upload import upload_to_cloudinary
+
 from api.database.models import (
     get_company_by_username,
     get_homepage_portal_config_merged,
@@ -37,8 +39,8 @@ ALLOWED_KEYS = frozenset({
     'cta_label', 'cta_url', 'browser_tab_title',
     'meta_description', 'footer_copyright', 'footer_seo_block',
     'quote_section_title', 'quote_section_subtitle', 'inquiry_email',
-    'service_section_title', 'service_section_lead',
-    'banner_images', 'partner_section_title', 'partner_section_lead',
+    'service_section_title', 'service_section_lead', 'service_cards',
+    'banner_images', 'hero_slides', 'partner_section_title', 'partner_section_lead',
     'partner_logos', 'youtube_section_title', 'youtube_section_lead', 'youtube_items',
 })
 
@@ -96,6 +98,22 @@ def _sanitize_config(raw):
             out[k] = _clip(v, 200)
         elif k == 'service_section_lead':
             out[k] = _clip(v, 800)
+        elif k == 'service_cards':
+            if not isinstance(v, list):
+                continue
+            cards = []
+            for item in v[:8]:
+                if not isinstance(item, dict):
+                    continue
+                title = _clip(item.get('title'), 120)
+                if not title:
+                    continue
+                cards.append({
+                    'image_url': _clip(item.get('image_url'), 800),
+                    'title': title,
+                    'body': _clip(item.get('body'), 1200),
+                })
+            out[k] = cards
         elif k == 'partner_section_title':
             out[k] = _clip(v, 200)
         elif k == 'partner_section_lead':
@@ -132,6 +150,22 @@ def _sanitize_config(raw):
                     continue
                 yt.append({'video_id': vid, 'title': _clip(item.get('title'), 200)})
             out[k] = yt
+        elif k == 'hero_slides':
+            if not isinstance(v, list):
+                continue
+            slides = []
+            for item in v[:12]:
+                if not isinstance(item, dict):
+                    continue
+                img = _clip(item.get('image_url'), 800)
+                if not img:
+                    continue
+                slides.append({
+                    'image_url': img,
+                    'button_label': _clip(item.get('button_label'), 80) or '자세히 보기',
+                    'link_url': _clip(item.get('link_url'), 800),
+                })
+            out[k] = slides
         else:
             out[k] = _clip(v, 2000)
     try:
@@ -154,6 +188,55 @@ def get_config():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@homepage_bp.route('/upload-image', methods=['POST'])
+def upload_portal_image():
+    """관리자만: Cloudinary `homepage_portal` 폴더에 이미지 업로드 (슬라이드·배너·로고 등)."""
+    actor = _verify_admin_actor()
+    if not actor:
+        return jsonify({'success': False, 'message': '관리자만 업로드할 수 있습니다.'}), 403
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '파일이 없습니다.'}), 400
+    file = request.files['file']
+    if not file or not file.filename:
+        return jsonify({'success': False, 'message': '파일명이 없습니다.'}), 400
+    mime = (getattr(file, 'mimetype', None) or getattr(file, 'content_type', None) or '').lower()
+    if not mime.startswith('image/'):
+        return jsonify({'success': False, 'message': '이미지 파일만 업로드할 수 있습니다.'}), 400
+    size = 0
+    try:
+        pos = file.tell()
+    except Exception:
+        pos = 0
+    try:
+        file.seek(0, 2)
+        size = file.tell()
+        file.seek(0)
+    except Exception:
+        try:
+            file.seek(pos)
+        except Exception:
+            pass
+        size = 0
+    max_bytes = 8 * 1024 * 1024
+    if size and size > max_bytes:
+        return jsonify({'success': False, 'message': '이미지는 8MB 이하여야 합니다.'}), 400
+    try:
+        upload_result = upload_to_cloudinary(file, folder='homepage_portal')
+    except Exception as e:
+        print(f'[homepage] upload-image 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'업로드 실패: {e}'}), 500
+    url = (upload_result or {}).get('secure_url') or (upload_result or {}).get('url')
+    if not url:
+        return jsonify({'success': False, 'message': '업로드 응답에 URL이 없습니다.'}), 500
+    return jsonify({
+        'success': True,
+        'data': {'file_url': url},
+        'message': '업로드되었습니다.',
+    })
 
 
 @homepage_bp.route('/config', methods=['PUT'])

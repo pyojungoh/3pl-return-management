@@ -887,123 +887,192 @@ body.hp-portal-page {
   line-height: 1.6;
 }
 
-/* ----- 서비스 소개 (고정 7카드 + 일러스트) ----- */
-.hp-svc-grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(18px, 2.5vw, 26px);
+/* ----- 서비스 소개 (원형 궤도 캐러셀) ----- */
+.hp-svc-carousel-root {
+  position: relative;
+  margin: 8px auto 0;
+  max-width: 1080px;
+  min-height: min(640px, 92vw);
+  overflow-x: clip;
+  overflow-y: visible;
+  --hp-svc-rx: 38%;
+  --hp-svc-ry: 26%;
 }
 
-@media (max-width: 1024px) {
-  .hp-svc-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.hp-svc-carousel-stage {
+  position: relative;
+  width: 100%;
+  min-height: min(640px, 92vw);
+  isolation: isolate;
+  overflow: visible;
 }
 
-@media (max-width: 560px) {
-  .hp-svc-grid {
-    grid-template-columns: 1fr;
-  }
+.hp-svc-carousel-track {
+  position: absolute;
+  inset: 0;
+  perspective: 1100px;
 }
 
-.hp-svc-card {
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--hp-radius-lg);
+.hp-svc-orbit-card {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: min(300px, 86vw);
+  max-width: 100%;
+  transform: translate(-50%, -50%);
+  border-radius: 22px;
   overflow: hidden;
   background: var(--hp-card);
-  border: 1px solid var(--hp-line);
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
-  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.2s ease;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow:
+    0 4px 6px rgba(15, 23, 42, 0.04),
+    0 18px 48px rgba(15, 23, 42, 0.1);
+  will-change: transform, opacity, filter;
+  transition: box-shadow 0.35s ease;
 }
 
-.hp-svc-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.12);
-  border-color: rgba(255, 107, 53, 0.28);
+.hp-svc-orbit-card--front {
+  box-shadow:
+    0 8px 12px rgba(255, 107, 53, 0.12),
+    0 28px 64px rgba(15, 23, 42, 0.16);
+  border-color: rgba(255, 107, 53, 0.35);
 }
 
-.hp-svc-card-visual {
+.hp-svc-orbit-card-media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: linear-gradient(135deg, #ff6b35 0%, #ea580c 45%, #312e81 100%);
+}
+
+.hp-svc-orbit-card-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hp-svc-orbit-card-ph {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 118px;
-  padding: 20px 16px;
-  position: relative;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.hp-svc-card-visual::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35), transparent 55%);
-  pointer-events: none;
+.hp-svc-orbit-card-text {
+  padding: 16px 18px 18px;
 }
 
-.hp-svc-svg {
-  position: relative;
-  z-index: 1;
-  filter: drop-shadow(0 6px 14px rgba(15, 23, 42, 0.18));
-}
-
-.hp-svc-card--warehouse .hp-svc-card-visual {
-  background: linear-gradient(135deg, #ff6b35 0%, #ea580c 48%, #f97316 100%);
-}
-
-.hp-svc-card--solution .hp-svc-card-visual {
-  background: linear-gradient(135deg, #334155 0%, #1e3a5f 50%, #2563eb 100%);
-}
-
-.hp-svc-card--trust .hp-svc-card-visual {
-  background: linear-gradient(135deg, #0d9488 0%, #0f766e 45%, #14b8a6 100%);
-}
-
-.hp-svc-card--invoice .hp-svc-card-visual {
-  background: linear-gradient(135deg, #5b21b6 0%, #6d28d9 40%, #7c3aed 100%);
-}
-
-.hp-svc-card--speed .hp-svc-card-visual {
-  background: linear-gradient(135deg, #e11d48 0%, #f97316 55%, #fbbf24 100%);
-}
-
-.hp-svc-card--barcode .hp-svc-card-visual {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
-}
-
-.hp-svc-card--qr .hp-svc-card-visual {
-  background: linear-gradient(135deg, #312e81 0%, #3730a3 45%, #4f46e5 100%);
-}
-
-.hp-svc-card-body {
-  padding: 20px 22px 24px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.hp-svc-card-title {
-  margin: 0;
-  font-size: clamp(1rem, 2.1vw, 1.12rem);
+.hp-svc-orbit-card-title {
+  margin: 0 0 8px;
+  font-size: clamp(0.98rem, 2vw, 1.08rem);
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--hp-ink);
   line-height: 1.35;
 }
 
-.hp-svc-card-desc {
+.hp-svc-orbit-card-body {
   margin: 0;
-  font-size: 14px;
-  line-height: 1.65;
+  font-size: 13px;
+  line-height: 1.6;
   color: var(--hp-muted);
+  white-space: pre-line;
+  word-break: keep-all;
 }
 
-.hp-svc-card-desc strong {
-  color: #0f172a;
+.hp-svc-carousel-static {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+  padding: 8px 0 0;
+}
+
+.hp-svc-carousel-static .hp-svc-orbit-card {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: auto;
+  transform: none !important;
+  opacity: 1 !important;
+  filter: none !important;
+  pointer-events: auto !important;
+}
+
+.hp-service-cards-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hp-svc-card-editor-row {
+  display: grid;
+  grid-template-columns: 100px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #ffe0c2;
+  background: #fffef9;
+}
+
+@media (max-width: 720px) {
+  .hp-svc-card-editor-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hp-svc-card-editor-preview {
+  width: 100px;
+  height: 75px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #e2e8f0;
+  position: relative;
+}
+
+.hp-svc-card-editor-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hp-svc-card-editor-preview-ph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
   font-weight: 700;
+  color: #64748b;
+}
+
+.hp-svc-card-editor-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hp-svc-card-editor-remove {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.hp-svc-card-editor-remove:hover {
+  background: #fef2f2;
 }
 
 .hp-card-grid {
@@ -1077,9 +1146,39 @@ body.hp-portal-page {
   position: relative;
 }
 
-/* 랜딩: 티저(큰 버튼만) / 견적 전용 #quote: 상세 패널 */
+/* 랜딩: 소개 카피 + 티저(포인트·CTA) / 견적 전용: 소개 + 폼 */
 .login-section.hp-site:not(.hp-view-quote-only) #quote .hp-quote-layout {
   display: block;
+}
+
+.hp-quote-intro-wrap {
+  position: relative;
+  z-index: 1;
+}
+
+.login-section.hp-site:not(.hp-view-quote-only) #quote .hp-quote-intro-wrap {
+  text-align: center;
+  padding: clamp(8px, 2vw, 16px) 16px 0;
+  max-width: 52rem;
+  margin: 0 auto;
+}
+
+.login-section.hp-site:not(.hp-view-quote-only) #quote .hp-quote-intro-wrap::after {
+  content: '';
+  display: block;
+  height: 1px;
+  width: min(360px, 85%);
+  margin: clamp(14px, 3vw, 22px) auto 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 107, 53, 0.55), transparent);
+}
+
+.login-section.hp-site:not(.hp-view-quote-only) #quote .hp-quote-title {
+  font-size: clamp(1.85rem, 4.2vw, 2.5rem);
+}
+
+.login-section.hp-site:not(.hp-view-quote-only) #quote .hp-quote-desc {
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .login-section.hp-site:not(.hp-view-quote-only) #quote .hp-quote-teaser {
@@ -1088,7 +1187,89 @@ body.hp-portal-page {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: clamp(28px, 5vw, 52px) 16px;
+  padding: clamp(20px, 4vw, 40px) 16px clamp(32px, 6vw, 56px);
+  gap: 0;
+}
+
+.hp-quote-teaser-tagline {
+  font-size: clamp(1.05rem, 2.2vw, 1.22rem);
+  font-weight: 600;
+  color: #f1f5f9;
+  line-height: 1.55;
+  max-width: 28rem;
+  margin: 0 0 1.1rem;
+  word-break: keep-all;
+}
+
+.hp-quote-teaser-tagline strong {
+  color: #fed7aa;
+  font-weight: 800;
+}
+
+.hp-quote-teaser-points {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+  max-width: 26rem;
+  width: 100%;
+}
+
+.hp-quote-teaser-points li {
+  position: relative;
+  padding: 10px 14px 10px 40px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #cbd5e1;
+  line-height: 1.45;
+  text-align: left;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  word-break: keep-all;
+}
+
+.hp-quote-teaser-points li strong {
+  color: #fff;
+  font-weight: 800;
+}
+
+.hp-quote-teaser-points li::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--hp-accent), #ea580c);
+  box-shadow: 0 2px 10px rgba(255, 107, 53, 0.35);
+}
+
+.hp-quote-teaser-points li::after {
+  content: '';
+  position: absolute;
+  left: 17px;
+  top: 50%;
+  width: 5px;
+  height: 9px;
+  margin-top: -6px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.hp-quote-teaser-note {
+  margin: 1rem 0 0;
+  max-width: 26rem;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #64748b;
+  word-break: keep-all;
 }
 
 .login-section.hp-site:not(.hp-view-quote-only) #quote .hp-quote-full-only {
@@ -1100,16 +1281,8 @@ body.hp-portal-page {
 }
 
 .hp-quote-detail {
-  display: grid;
-  grid-template-columns: 1fr minmax(300px, 520px);
-  gap: clamp(28px, 5vw, 48px);
-  align-items: start;
-}
-
-@media (max-width: 900px) {
-  .hp-quote-detail {
-    grid-template-columns: 1fr;
-  }
+  display: block;
+  width: 100%;
 }
 
 .hp-quote-impact-cta {
@@ -1296,40 +1469,45 @@ html.hp-view-quote-only {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: stretch;
-  padding: clamp(20px, 4vw, 48px) 0 clamp(28px, 5vw, 56px);
+  padding: clamp(16px, 3vh, 28px) 0 clamp(28px, 5vw, 56px);
   scroll-margin-top: 0;
 }
 
 .login-section.hp-site.hp-view-quote-only #quote .hp-quote-layout {
   display: block;
   flex: 0 1 auto;
-  max-width: 720px;
+  max-width: min(720px, 100%);
   margin: 0 auto;
   width: 100%;
 }
 
-.login-section.hp-site.hp-view-quote-only #quote .hp-quote-detail {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 22px;
-  align-items: start;
+.login-section.hp-site.hp-view-quote-only #quote .hp-quote-intro-wrap {
+  margin-bottom: clamp(12px, 2.5vw, 22px);
 }
 
-@media (min-width: 901px) {
-  .login-section.hp-site.hp-view-quote-only #quote .hp-quote-detail {
-    grid-template-columns: 1fr minmax(300px, 520px);
-  }
-
-  .login-section.hp-site.hp-view-quote-only #quote .hp-quote-intro {
-    text-align: left;
-  }
+/* 견적 전용: 소개 문구는 상단·전체 너비, 폼은 그 아래 */
+.login-section.hp-site.hp-view-quote-only #quote .hp-quote-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: clamp(20px, 3vw, 28px);
+  width: 100%;
+  min-width: 0;
 }
 
 .login-section.hp-site.hp-view-quote-only #quote .hp-quote-intro {
-  text-align: center;
-  max-width: none;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.login-section.hp-site.hp-view-quote-only #quote .hp-quote-card {
+  width: 100%;
+  min-width: 0;
 }
 
 .hp-nav-item.hp-nav-cta.hp-nav-quote-active {
@@ -1510,4 +1688,302 @@ body.hp-modal-open {
   border-radius: 12px;
   padding: 14px;
   background: #fffef9;
+}
+
+.hp-admin-portal-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #fff8f0;
+  border: 1px solid #ffe0c2;
+}
+
+.hp-admin-portal-tab {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-weight: 600;
+  font-size: 14px;
+  color: #636e72;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.hp-admin-portal-tab:hover {
+  background: rgba(255, 255, 255, 0.85);
+  color: #2d3436;
+}
+
+.hp-admin-portal-tab--active {
+  background: #fff;
+  color: #ff6b35;
+  border-color: #ffd4b8;
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.12);
+}
+
+.hp-admin-portal-panel[hidden] {
+  display: none !important;
+}
+
+.hp-admin-body-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 6px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.hp-admin-body-tab {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-weight: 600;
+  font-size: 12px;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.hp-admin-body-tab:hover {
+  background: #fff;
+  color: #334155;
+}
+
+.hp-admin-body-tab--active {
+  background: #fff;
+  color: #ea580c;
+  border-color: #fed7aa;
+  box-shadow: 0 1px 4px rgba(234, 88, 12, 0.12);
+}
+
+.hp-admin-body-panel[hidden] {
+  display: none !important;
+}
+
+.hp-hero-slides-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hp-hero-slide-row {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #ffe0c2;
+  background: #fffef9;
+}
+
+@media (max-width: 720px) {
+  .hp-hero-slide-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hp-hero-slide-preview {
+  width: 120px;
+  height: 68px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #e2e8f0;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.hp-hero-slide-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hp-hero-slide-preview-ph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.hp-hero-slide-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hp-hero-slide-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.hp-hero-slide-label span {
+  font-size: 12px;
+}
+
+.hp-hero-slide-upload-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hp-hero-slide-upload-btn {
+  font-size: 13px;
+  padding: 8px 14px;
+}
+
+.hp-hero-slide-row-remove {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  justify-self: end;
+}
+
+.hp-hero-slide-row-remove:hover {
+  background: #fef2f2;
+}
+
+/* 히어로 상단 슬라이더 (Integrated 3PL 키커 위) */
+.hp-hero-slider {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 20px;
+}
+
+.hp-hero-slider-viewport {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--hp-line);
+  background: #f1f5f9;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+}
+
+.hp-hero-slider-track {
+  display: flex;
+  transition: transform 0.5s ease;
+  will-change: transform;
+}
+
+.hp-hero-slide {
+  position: relative;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  max-height: min(52vh, 420px);
+}
+
+.hp-hero-slide-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hp-hero-slide-cta {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 12px 22px;
+  font-size: 14px;
+  white-space: nowrap;
+  max-width: calc(100% - 32px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35);
+}
+
+.hp-hero-slide-cta.hp-btn-solid:not(a) {
+  pointer-events: none;
+  opacity: 0.92;
+}
+
+.hp-hero-slider-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--hp-ink);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
+  transition: background 0.15s, transform 0.15s;
+}
+
+.hp-hero-slider-arrow:hover:not(:disabled) {
+  background: #fff;
+  transform: translateY(-50%) scale(1.05);
+}
+
+.hp-hero-slider-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.hp-hero-slider-arrow--prev {
+  left: 10px;
+}
+
+.hp-hero-slider-arrow--next {
+  right: 10px;
+}
+
+.hp-hero-slider-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 72px;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.hp-hero-slider-dots .hp-hero-slider-dot {
+  pointer-events: auto;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.hp-hero-slider-dots .hp-hero-slider-dot--active {
+  background: #fff;
+  transform: scale(1.25);
+  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.55);
 }
