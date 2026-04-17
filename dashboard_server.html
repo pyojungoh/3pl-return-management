@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" id="hpMetaDescription" content="3PL 반품·출고·스케줄·CS 통합 관리 포털">
   <title>JJAY 3PL 종합 물류 - 통합 관리 시스템</title>
   <!-- 파비콘 -->
   <link rel="icon" type="image/png" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
@@ -795,9 +796,10 @@
     #scheduleCalendarTabBtn { order: 3; }
     #boardTabBtn { order: 4; }
     #popupTabBtn { order: 5; }
-    #registerTabBtn { order: 6; }
-    #salesSettlementTabBtn { order: 7; }
-    #invoiceTabBtn { order: 8; }
+    #homepageSettingsTabBtn { order: 6; }
+    #registerTabBtn { order: 7; }
+    #salesSettlementTabBtn { order: 8; }
+    #invoiceTabBtn { order: 9; }
     
     .tab-btn.active {
       background: linear-gradient(135deg, #ff6b35 0%, #feca57 100%);
@@ -1887,55 +1889,333 @@
       box-shadow: 0 6px 20px rgba(255, 152, 0, 0.2) !important;
     }
   </style>
+  <link rel="stylesheet" href="/static/css/homepage_portal.css">
 </head>
 <body>
-  <div class="container">
-    <!-- 로그인 섹션 -->
-    <div id="loginSection" class="login-section">
-      <div class="login-form">
-        <!-- 로고 영역 -->
-        <div class="login-logo">
-          <img id="loginLogo" src="" alt="JJAY 로고" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'font-size:48px; font-weight:800; color:white;\'>JJ</div>';">
-        </div>
-        
-        <h1>JJAY 3PL 종합 물류</h1>
-        <p class="subtitle">통합 관리 시스템</p>
-        
-        <div class="input-group">
-          <i>👤</i>
-          <input type="text" id="username" placeholder="아이디" autocomplete="username">
-        </div>
-        
-        <div class="input-group">
-          <i>🔒</i>
-          <input type="password" id="password" placeholder="비밀번호" autocomplete="current-password">
-        </div>
-        
-        <div class="remember-forgot">
-          <label>
-            <input type="checkbox" id="rememberMe">
-            <span>로그인 상태 유지</span>
-          </label>
-          <a href="#" onclick="alert('관리자에게 문의하세요.'); return false;">비밀번호 찾기</a>
-        </div>
-        
-        <button id="loginBtn" type="button" onclick="doLogin(); return false;">로그인</button>
-        <div id="loginMessage"></div>
-        
-        <!-- 버전 및 만든이 정보 -->
-        <div class="footer-info">
-          <div class="version-info">
-            <span class="version-text">v4.0</span>
+  <!-- 로그인 전 홈페이지형 화면 (container 밖 — 전체 너비, static/js/homepage_portal.js) -->
+  <div id="loginSection" class="login-section hp-site">
+    <header class="hp-header">
+      <div class="hp-header-inner hp-container-wide">
+        <a href="#hpIntroAnchor" class="hp-brand" id="hpNavBrandLink" aria-label="홈(소개)으로 이동">
+          <img id="hpNavLogo" class="hp-brand-logo" src="" alt="" width="44" height="44" decoding="async" onerror="this.style.visibility='hidden'">
+          <span id="hpNavBrandText" class="hp-brand-text">JJAY 3PL</span>
+        </a>
+
+        <details class="hp-mobile-nav" id="hpMobileNav">
+          <summary class="hp-burger" aria-label="메뉴">
+            <span></span><span></span><span></span>
+          </summary>
+          <nav class="hp-mobile-sheet" aria-label="모바일 메뉴">
+            <a href="#hpIntroAnchor" class="hp-mobile-sheet-link">소개</a>
+            <a href="#hpServicesAnchor" class="hp-mobile-sheet-link">서비스</a>
+            <a href="#quote" class="hp-mobile-sheet-link">견적요청</a>
+            <button type="button" class="hp-mobile-sheet-login" data-hp-open-login>로그인</button>
+            <p class="hp-mobile-login-hint" role="presentation" aria-hidden="true">
+              <span class="hp-login-hint-arrows hp-login-hint-arrows--sm">
+                <span class="hp-login-hint-arr">‹</span>
+                <span class="hp-login-hint-arr">‹</span>
+                <span class="hp-login-hint-arr">‹</span>
+              </span>
+              <span class="hp-mobile-login-hint-text">고객사 솔루션으로 로그인</span>
+            </p>
+          </nav>
+        </details>
+
+        <nav class="hp-desktop-nav" aria-label="주요 메뉴">
+          <a href="#hpIntroAnchor" class="hp-nav-item">소개</a>
+          <a href="#hpServicesAnchor" class="hp-nav-item">서비스</a>
+          <a href="#quote" class="hp-nav-item hp-nav-cta" id="hpNavQuoteLink">견적요청</a>
+        </nav>
+
+        <div class="hp-header-cta">
+          <button type="button" id="hpBtnOpenLogin" class="hp-btn-login">로그인</button>
+          <div class="hp-login-hint" role="presentation" aria-hidden="true">
+            <span class="hp-login-hint-arrows">
+              <span class="hp-login-hint-arr">‹</span>
+              <span class="hp-login-hint-arr">‹</span>
+              <span class="hp-login-hint-arr">‹</span>
+            </span>
+            <span class="hp-login-hint-label">고객사 솔루션으로 로그인</span>
           </div>
-          <div class="creator-credit">
-            <div class="creator-line"></div>
-            <span class="creator-text">Made with ❤️ by <strong>Pyojungoh</strong></span>
-            <div class="creator-line"></div>
+        </div>
+      </div>
+    </header>
+
+    <main class="hp-main" id="hpMainContent">
+      <span id="hpNoticeAnchor" class="hp-skip-anchor"></span>
+      <div id="hpNoticeBar" class="hp-notice-banner" style="display: none;" role="status"></div>
+
+      <section id="hpBannerAnchor" class="hp-marquee-wrap" aria-label="이미지 배너">
+        <div id="hpMarqueeRoot" class="hp-marquee-root" style="display: none;">
+          <div class="hp-marquee-edge hp-marquee-edge-l" aria-hidden="true"></div>
+          <div class="hp-marquee-viewport">
+            <div id="hpMarqueeTrack" class="hp-marquee-track"></div>
+          </div>
+          <div class="hp-marquee-edge hp-marquee-edge-r" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <section id="hpIntroAnchor" class="hp-hero" aria-label="소개">
+        <div class="hp-hero-glow" aria-hidden="true"></div>
+        <div class="hp-container-wide hp-hero-layout">
+          <div class="hp-hero-copy">
+            <p class="hp-hero-kicker">Integrated 3PL</p>
+            <h1 id="hpHeroTitle" class="hp-hero-title">JJAY 3PL 종합 물류</h1>
+            <p id="hpHeroSubtitle" class="hp-hero-desc">화주사·관리자가 같은 포털에서 로그인하면 권한에 맞는 업무 화면으로 이동합니다.</p>
+            <div class="hp-hero-btns">
+              <a id="hpCtaBtn" class="hp-btn-solid hp-btn-lg" href="#" target="_blank" rel="noopener noreferrer" style="display: none;"></a>
+              <a href="#quote" class="hp-btn-line hp-btn-lg">견적 요청하기</a>
+            </div>
+          </div>
+          <div class="hp-hero-art" aria-hidden="true">
+            <div class="hp-hero-blob hp-hero-blob-a"></div>
+            <div class="hp-hero-blob hp-hero-blob-b"></div>
+            <div class="hp-hero-mock">
+              <span class="hp-mock-line"></span>
+              <span class="hp-mock-line hp-mock-short"></span>
+              <span class="hp-mock-line"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="hpPartnersAnchor" class="hp-partners-block hp-quote-ticker-section">
+        <div class="hp-container-wide">
+          <header class="hp-sec-head-split">
+            <div>
+              <span class="hp-sec-label">Live</span>
+              <h2 id="hpPartnerTitle" class="hp-sec-title hp-align-left">실시간 비교견적 흐름</h2>
+              <p id="hpPartnerLead" class="hp-sec-lead hp-align-left">지금 이 순간에도 여러 화주사가 단가·조건을 비교하고 있습니다.</p>
+            </div>
+          </header>
+          <div class="hp-quote-ticker-shell" role="region" aria-label="비교 견적 안내">
+            <div class="hp-quote-ticker-viewport">
+              <div id="hpQuoteTickerTrack" class="hp-quote-ticker-track" aria-hidden="true"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="hpServicesAnchor" class="hp-services" aria-labelledby="hpServicesHeading">
+        <div class="hp-container-wide">
+          <header class="hp-sec-header">
+            <span class="hp-sec-label">Service</span>
+            <h2 id="hpServicesHeading" class="hp-sec-title">3PL 서비스 소개</h2>
+            <p id="hpServicesLead" class="hp-sec-lead">연결 창고·자체 솔루션·정산·출고 품질까지, 화주사 운영에 필요한 요소를 한곳에서 제안합니다.</p>
+          </header>
+          <div class="hp-svc-grid" role="list" aria-label="서비스 강점">
+            <article class="hp-svc-card hp-svc-card--warehouse" role="listitem">
+              <div class="hp-svc-card-visual" aria-hidden="true">
+                <svg class="hp-svc-svg" viewBox="0 0 72 72" width="72" height="72" focusable="false">
+                  <rect x="8" y="40" width="14" height="24" rx="2" fill="#fff" opacity=".95"/>
+                  <rect x="26" y="32" width="14" height="32" rx="2" fill="#fff" opacity=".88"/>
+                  <rect x="44" y="36" width="14" height="28" rx="2" fill="#fff" opacity=".95"/>
+                  <rect x="30" y="38" width="6" height="10" rx="1" fill="rgba(15,23,42,.25)"/>
+                  <rect x="11" y="44" width="3" height="3" rx="0.5" fill="rgba(15,23,42,.2)"/>
+                  <rect x="48" y="44" width="3" height="3" rx="0.5" fill="rgba(15,23,42,.2)"/>
+                </svg>
+              </div>
+              <div class="hp-svc-card-body">
+                <h3 class="hp-svc-card-title">넓은 연결 창고 · 3단 적재</h3>
+                <p class="hp-svc-card-desc">4동을 이어 사용하는 넓고 쾌적한 창고 환경이며, <strong>3단 적재</strong>가 가능해 보관 효율을 높입니다.</p>
+              </div>
+            </article>
+            <article class="hp-svc-card hp-svc-card--solution" role="listitem">
+              <div class="hp-svc-card-visual" aria-hidden="true">
+                <svg class="hp-svc-svg" viewBox="0 0 72 72" width="72" height="72" focusable="false">
+                  <path d="M18 22h36c3 0 6 2.5 6 6v18c0 3.5-2.5 6-6 6H30l-12 12V40c-5 0-8-3-8-8v-4c0-3.5 3-6 6-6z" fill="#fff" opacity=".95"/>
+                  <circle cx="36" cy="32" r="6" fill="rgba(15,23,42,.15)"/>
+                  <path d="M33 32l3 3 6-6" fill="none" stroke="rgba(15,23,42,.45)" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="hp-svc-card-body">
+                <h3 class="hp-svc-card-title">자체 솔루션 · C/S·반품 가시화</h3>
+                <p class="hp-svc-card-desc"><strong>자체 개발 솔루션</strong>으로 화주사의 가장 큰 고민인 빠른 C/S 처리와, 상세한 <strong>반품 내역 확인</strong>을 지원합니다.</p>
+              </div>
+            </article>
+            <article class="hp-svc-card hp-svc-card--trust" role="listitem">
+              <div class="hp-svc-card-visual" aria-hidden="true">
+                <svg class="hp-svc-svg" viewBox="0 0 72 72" width="72" height="72" focusable="false">
+                  <path d="M36 12 L56 20 V38c0 14-10 24-20 28-10-4-20-14-20-28V20Z" fill="#fff" opacity=".95"/>
+                  <path d="M28 34l6 6 12-14" fill="none" stroke="rgba(15,23,42,.5)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="hp-svc-card-body">
+                <h3 class="hp-svc-card-title">반품·누락 투명 보상</h3>
+                <p class="hp-svc-card-desc">솔루션으로 반품·누락을 명확히 기록하고, 규정에 따른 <strong>투명한 보상</strong> 체계를 운영합니다.</p>
+              </div>
+            </article>
+            <article class="hp-svc-card hp-svc-card--invoice" role="listitem">
+              <div class="hp-svc-card-visual" aria-hidden="true">
+                <svg class="hp-svc-svg" viewBox="0 0 72 72" width="72" height="72" focusable="false">
+                  <rect x="20" y="14" width="32" height="44" rx="3" fill="#fff" opacity=".95"/>
+                  <rect x="26" y="22" width="20" height="3" rx="1" fill="rgba(15,23,42,.2)"/>
+                  <rect x="26" y="30" width="16" height="3" rx="1" fill="rgba(15,23,42,.15)"/>
+                  <rect x="26" y="38" width="20" height="3" rx="1" fill="rgba(15,23,42,.15)"/>
+                  <rect x="40" y="48" width="10" height="8" rx="1" fill="rgba(255,107,53,.35)"/>
+                  <circle cx="30" cy="52" r="3" fill="rgba(15,23,42,.2)"/>
+                </svg>
+              </div>
+              <div class="hp-svc-card-body">
+                <h3 class="hp-svc-card-title">꼼꼼한 정산서 · 미리보기·사진</h3>
+                <p class="hp-svc-card-desc">세밀한 정산 내역과 함께 <strong>미리보기</strong>, 증빙 <strong>사진</strong> 등을 연계해 숫자와 현장을 동시에 확인할 수 있습니다.</p>
+              </div>
+            </article>
+            <article class="hp-svc-card hp-svc-card--speed" role="listitem">
+              <div class="hp-svc-card-visual" aria-hidden="true">
+                <svg class="hp-svc-svg" viewBox="0 0 72 72" width="72" height="72" focusable="false">
+                  <path d="M40 10 L52 38h12L34 62 30 40H16z" fill="#fff" opacity=".95"/>
+                  <path d="M34 44l4-10" fill="none" stroke="rgba(15,23,42,.25)" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="hp-svc-card-body">
+                <h3 class="hp-svc-card-title">당일 100% 출고</h3>
+                <p class="hp-svc-card-desc">일일 출고 목표를 <strong>당일 내 100%</strong> 완료하도록 프로세스를 설계·운영합니다.</p>
+              </div>
+            </article>
+            <article class="hp-svc-card hp-svc-card--barcode" role="listitem">
+              <div class="hp-svc-card-visual" aria-hidden="true">
+                <svg class="hp-svc-svg" viewBox="0 0 72 72" width="72" height="72" focusable="false">
+                  <g fill="#fff" opacity=".95">
+                    <rect x="14" y="22" width="3" height="28" rx="1"/>
+                    <rect x="20" y="22" width="2" height="28" rx="0.5"/>
+                    <rect x="25" y="22" width="4" height="28" rx="1"/>
+                    <rect x="32" y="22" width="2" height="28"/>
+                    <rect x="37" y="22" width="3" height="28" rx="0.5"/>
+                    <rect x="43" y="22" width="5" height="28" rx="1"/>
+                    <rect x="51" y="22" width="2" height="28"/>
+                    <rect x="56" y="22" width="4" height="28" rx="1"/>
+                  </g>
+                  <rect x="22" y="14" width="28" height="4" rx="1" fill="rgba(255,255,255,.35)"/>
+                </svg>
+              </div>
+              <div class="hp-svc-card-body">
+                <h3 class="hp-svc-card-title">전 직원 바코드 · 오배송 0% 지향</h3>
+                <p class="hp-svc-card-desc">전 직원 <strong>바코드 스캔</strong>으로 피킹·패킹 전 과정을 검증해, 오배송을 구조적으로 줄입니다.</p>
+              </div>
+            </article>
+            <article class="hp-svc-card hp-svc-card--qr" role="listitem">
+              <div class="hp-svc-card-visual" aria-hidden="true">
+                <svg class="hp-svc-svg" viewBox="0 0 72 72" width="72" height="72" focusable="false">
+                  <path fill="#fff" opacity=".95" d="M12 12h18v18H12V12zm4 4v10h10V16H16zm40-4h18v18H56V12zm4 4v10h10V16H60zM12 42h18v18H12V42zm4 4v10h10V46H16z"/>
+                  <rect x="36" y="36" width="8" height="8" fill="#fff" opacity=".75"/>
+                  <rect x="48" y="36" width="6" height="6" fill="#fff" opacity=".55"/>
+                  <rect x="36" y="48" width="6" height="6" fill="#fff" opacity=".55"/>
+                  <rect x="48" y="48" width="10" height="10" fill="#fff" opacity=".4"/>
+                </svg>
+              </div>
+              <div class="hp-svc-card-body">
+                <h3 class="hp-svc-card-title">QR 파레트 · 입·출고 전산</h3>
+                <p class="hp-svc-card-desc">보관 파레트 전용 <strong>자체 개발 QR 전산</strong>으로 입고·출고를 실시간 추적합니다.</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="hpYoutubeAnchor" class="hp-youtube-block">
+        <div class="hp-container-wide">
+          <header class="hp-sec-header">
+            <span class="hp-sec-label">Media</span>
+            <h2 id="hpYoutubeTitle" class="hp-sec-title">영상으로 보는 서비스</h2>
+            <p id="hpYoutubeLead" class="hp-sec-lead">물류 현장과 시스템을 영상에서 만나 보세요.</p>
+          </header>
+          <div id="hpYoutubeGrid" class="hp-youtube-grid"></div>
+          <p id="hpYoutubeEmpty" class="hp-empty-hint" style="display: none;">홈페이지 설정에서 유튜브 영상 ID를 등록하면 이 영역에 표시됩니다.</p>
+        </div>
+      </section>
+
+      <section id="quote" class="hp-quote" aria-label="견적 및 서비스 문의">
+        <div class="hp-quote-pattern" aria-hidden="true"></div>
+        <div class="hp-container-wide hp-quote-layout">
+          <div class="hp-quote-teaser hp-quote-landing-only">
+            <a href="#quote" class="hp-quote-impact-cta">견적 요청하기</a>
+          </div>
+          <div class="hp-quote-detail hp-quote-full-only">
+          <div class="hp-quote-intro">
+            <span class="hp-sec-label hp-quote-label">Contact</span>
+            <h2 id="hpQuoteTitle" class="hp-quote-title">견적 · 서비스 문의</h2>
+            <p id="hpQuoteSubtitle" class="hp-quote-desc">도입 규모와 희망 일정을 남겨 주시면 담당자가 빠르게 연락드립니다.</p>
+          </div>
+          <form id="hpQuoteForm" class="hp-quote-card" autocomplete="on" novalidate>
+            <label class="hp-f-label"><span>회사명 <span class="hp-f-req" aria-hidden="true">*</span></span><input type="text" id="hpQCompany" name="company" class="hp-f-input" placeholder="법인 또는 브랜드명" required autocomplete="organization"></label>
+            <label class="hp-f-label"><span>담당자 성함 <span class="hp-f-req" aria-hidden="true">*</span></span><input type="text" id="hpQName" name="contact_name" class="hp-f-input" placeholder="실무 담당자 이름" required autocomplete="name"></label>
+            <label class="hp-f-label"><span>전화번호 <span class="hp-f-req" aria-hidden="true">*</span></span><input type="tel" id="hpQPhone" name="phone" class="hp-f-input" placeholder="휴대폰 또는 유선" required autocomplete="tel"></label>
+            <label class="hp-f-label"><span>이메일 <span class="hp-f-req" aria-hidden="true">*</span></span><input type="email" id="hpQEmail" name="email" class="hp-f-input" placeholder="name@company.com" required autocomplete="email"></label>
+            <label class="hp-f-label"><span>제품</span><input type="text" id="hpQProduct" name="product" class="hp-f-input" placeholder="취급 제품·품목 요약"></label>
+            <label class="hp-f-label"><span>월 출고량</span><input type="text" id="hpQMonthlyOut" name="monthly_out" class="hp-f-input" placeholder="예: 월 3,000건 내외"></label>
+            <label class="hp-f-label"><span>보관 파레트수</span><input type="text" id="hpQPallets" name="pallets" class="hp-f-input" placeholder="예: 약 120파레트"></label>
+            <label class="hp-f-label"><span>SKU 종류</span><input type="text" id="hpQSku" name="sku" class="hp-f-input" placeholder="예: 약 450종"></label>
+            <label class="hp-f-label hp-f-full"><span>문의 내용</span><textarea id="hpQMemo" name="memo" class="hp-f-input hp-f-textarea" rows="4" placeholder="희망 일정, 특이사항, 문의 사항을 자유롭게 적어 주세요."></textarea></label>
+            <div class="hp-f-check-row hp-f-full">
+              <input type="checkbox" id="hpQPrivacy" name="privacy" value="1" required>
+              <label for="hpQPrivacy" class="hp-f-check-label">개인정보 수집·이용에 동의합니다. <span class="hp-f-req">(필수)</span> — 견적 회신 및 상담 목적으로 연락드립니다.</label>
+            </div>
+            <button type="submit" class="hp-quote-submit">견적요청보내기</button>
+            <p class="hp-quote-hint" id="hpQuoteMailHint">문의 메일은 관리자가 홈페이지 설정에서 등록합니다.</p>
+          </form>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer id="hpCompanyFooter" class="hp-footer">
+      <div class="hp-container-wide hp-footer-grid">
+        <p class="hp-footer-jump">
+          <a href="#hpIntroAnchor">맨 위로</a>
+          <span aria-hidden="true"> · </span>
+          <a href="#quote">견적요청</a>
+        </p>
+        <p class="hp-footer-company-line"><strong id="hpFooterCompany">JJAY 3PL</strong></p>
+        <p id="hpFooterLine2" class="hp-footer-muted" style="display: none;"></p>
+        <p id="hpFooterTel" class="hp-footer-muted" style="display: none;"></p>
+        <div id="hpFooterSeoBlock" class="hp-footer-seo-block"></div>
+        <p id="hpFooterCopyright" class="hp-footer-copyright"></p>
+      </div>
+    </footer>
+
+    <div id="hpLoginModal" class="hp-modal hp-modal-hidden" aria-hidden="true">
+      <div class="hp-modal-backdrop" id="hpLoginModalBackdrop" tabindex="-1"></div>
+      <div class="hp-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="hpLoginCardTitle">
+        <button type="button" class="hp-modal-close" id="hpLoginModalClose" aria-label="닫기">×</button>
+        <div class="login-form hp-modal-login-form">
+          <div class="login-logo">
+            <img id="loginLogo" src="" alt="로고" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'font-size:48px; font-weight:800; color:#ff6b35;\'>JJ</div>';">
+          </div>
+          <h2 id="hpLoginCardTitle" class="hp-login-card-title">로그인</h2>
+          <div class="input-group">
+            <i>👤</i>
+            <input type="text" id="username" placeholder="아이디" autocomplete="username">
+          </div>
+          <div class="input-group">
+            <i>🔒</i>
+            <input type="password" id="password" placeholder="비밀번호" autocomplete="current-password">
+          </div>
+          <div class="remember-forgot">
+            <label>
+              <input type="checkbox" id="rememberMe">
+              <span>로그인 상태 유지</span>
+            </label>
+            <a href="#" onclick="alert('관리자에게 문의하세요.'); return false;">비밀번호 찾기</a>
+          </div>
+          <button id="loginBtn" type="button" onclick="doLogin(); return false;">로그인</button>
+          <div id="loginMessage"></div>
+          <div class="footer-info">
+            <div class="version-info">
+              <span class="version-text">v4.0</span>
+            </div>
+            <div class="creator-credit">
+              <div class="creator-line"></div>
+              <span class="creator-text">Made with ❤️ by <strong>Pyojungoh</strong></span>
+              <div class="creator-line"></div>
+            </div>
           </div>
         </div>
       </div>
     </div>
-    
+  </div>
+
+  <div class="container">
     <!-- 대시보드 섹션 -->
     <div id="dashboardSection" class="dashboard-section">
       <!-- 헤더 -->
@@ -2032,6 +2312,7 @@
           <button type="button" class="tab-btn admin-only-tab" id="registerTabBtn" onclick="switchAdminTab('register')" style="display: none;">🏢 화주사 등록</button>
           <button type="button" class="tab-btn admin-only-tab" id="salesSettlementTabBtn" onclick="switchAdminTab('salesSettlement')" style="display: none;">📈 매출정산</button>
           <button type="button" class="tab-btn admin-only-tab" id="invoiceTabBtn" onclick="switchAdminTab('invoice')" style="display: none;">📄 거래명세서</button>
+          <button type="button" class="tab-btn admin-only-tab" id="homepageSettingsTabBtn" onclick="switchAdminTab('homepageSettings')" style="display: none;">🏠 홈페이지 설정</button>
         </div>
       </div>
       
@@ -3227,6 +3508,174 @@
         </div>
       </div>
       <!-- 팝업 관리 탭 끝 -->
+      <!-- 홈페이지(로그인 포털) 설정 탭 -->
+      <div id="homepageSettingsTab" class="tab-content hidden">
+        <div style="background: #ffffff; padding: 24px; border-radius: 14px; border: 2px solid #ffeaa7; max-width: 960px;">
+          <h3 style="margin: 0 0 8px; color: #ff6b35; font-weight: 700;">🏠 홈페이지 설정</h3>
+          <p class="hp-admin-hint">비로그인 사용자에게 보이는 첫 화면(상단 메뉴·본문·하단 회사·SEO·로그인 모달)을 수정합니다. 저장 후 로그아웃하면 바로 반영됩니다.</p>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button type="button" class="refresh-btn" onclick="window.HomepagePortal &amp;&amp; HomepagePortal.adminLoad(typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '')">🔄 불러오기</button>
+            <button type="button" class="save-btn" onclick="window.HomepagePortal &amp;&amp; HomepagePortal.adminSave(typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '')">💾 저장</button>
+          </div>
+          <div id="hpAdMessage" style="margin-bottom: 12px; font-size: 14px; color: #2d3436;"></div>
+          <div class="hp-admin-grid">
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">히어로 제목</label>
+              <input type="text" id="hpAdHeroTitle" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">로그인 카드 제목</label>
+              <input type="text" id="hpAdLoginCardTitle" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">히어로 부제목</label>
+              <textarea id="hpAdHeroSubtitle" class="request-input" rows="2" style="width: 100%; min-height: auto;"></textarea>
+            </div>
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">서비스 섹션 제목</label>
+              <input type="text" id="hpAdServiceTitle" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">서비스 섹션 부제</label>
+              <input type="text" id="hpAdServiceLead" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">브라우저 탭 제목 (선택)</label>
+              <input type="text" id="hpAdBrowserTabTitle" class="request-input" style="width: 100%; min-height: auto;" placeholder="비우면: 히어로 제목 + 「 — 통합 포털」">
+              <span style="font-size: 12px; color: #636e72;">로그인 화면에서만 적용됩니다. 대시보드로 들어가면 기본 탭 제목으로 돌아갑니다.</span>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">공지 문구</label>
+              <input type="text" id="hpAdNoticeText" class="request-input" style="width: 100%; min-height: auto;">
+              <label style="margin-top: 8px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="hpAdNoticeVisible"> 공지 표시
+              </label>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">로고 이미지 URL</label>
+              <input type="text" id="hpAdLogoUrl" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">메타 description (검색 스니펫, 권장 80~160자)</label>
+              <textarea id="hpAdMetaDescription" class="request-input" rows="2" style="width: 100%; min-height: auto;" placeholder="네이버·구글 검색 결과에 노출되는 요약 문구"></textarea>
+            </div>
+          </div>
+          <h4 style="margin: 22px 0 10px; color: #2d3436;">배너 · 견적 흐름 · 유튜브</h4>
+          <p style="font-size: 12px; color: #636e72; margin: -4px 0 12px;">메인은 배너 → 소개(히어로) → 비교견적 티커 → 서비스 소개 → 유튜브 → 견적 순으로 표시됩니다.</p>
+          <div class="hp-admin-grid">
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">배너 이미지 URL (한 줄에 하나, 최대 20장)</label>
+              <textarea id="hpAdBannerUrls" class="request-input" rows="4" style="width: 100%; min-height: auto;" placeholder="https://...jpg"></textarea>
+            </div>
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">견적 흐름 섹션 제목</label>
+              <input type="text" id="hpAdPartnerSecTitle" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">유튜브 섹션 제목</label>
+              <input type="text" id="hpAdYoutubeSecTitle" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">견적 흐름 섹션 부제</label>
+              <textarea id="hpAdPartnerSecLead" class="request-input" rows="2" style="width: 100%; min-height: auto;"></textarea>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">유튜브 섹션 부제</label>
+              <textarea id="hpAdYoutubeSecLead" class="request-input" rows="2" style="width: 100%; min-height: auto;"></textarea>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">유튜브 (한 줄에 <code>영상ID|제목</code> 또는 <code>전체URL|제목</code>, 최대 12개)</label>
+              <textarea id="hpAdYoutubeLines" class="request-input" rows="4" style="width: 100%; min-height: auto;" placeholder="dQw4w9WgXcQ|소개 영상"></textarea>
+            </div>
+          </div>
+          <h4 style="margin: 22px 0 10px; color: #2d3436;">기능 카드 (최대 4개)</h4>
+          <div class="hp-admin-grid">
+            <div class="hp-admin-feature-block" data-feat-idx="0">
+              <strong style="display: block; margin-bottom: 8px; color: #2d3436;">기능 카드 1</strong>
+              <label style="font-weight: 600; font-size: 13px;">아이콘</label>
+              <input type="text" id="hpAdFeat0Icon" class="request-input" style="width: 100%; min-height: auto; margin-bottom: 8px;">
+              <label style="font-weight: 600; font-size: 13px;">제목</label>
+              <input type="text" id="hpAdFeat0Title" class="request-input" style="width: 100%; min-height: auto; margin-bottom: 8px;">
+              <label style="font-weight: 600; font-size: 13px;">설명</label>
+              <input type="text" id="hpAdFeat0Desc" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div class="hp-admin-feature-block">
+              <strong style="display: block; margin-bottom: 8px; color: #2d3436;">기능 카드 2</strong>
+              <label style="font-weight: 600; font-size: 13px;">아이콘</label>
+              <input type="text" id="hpAdFeat1Icon" class="request-input" style="width: 100%; min-height: auto; margin-bottom: 8px;">
+              <label style="font-weight: 600; font-size: 13px;">제목</label>
+              <input type="text" id="hpAdFeat1Title" class="request-input" style="width: 100%; min-height: auto; margin-bottom: 8px;">
+              <label style="font-weight: 600; font-size: 13px;">설명</label>
+              <input type="text" id="hpAdFeat1Desc" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div class="hp-admin-feature-block">
+              <strong style="display: block; margin-bottom: 8px; color: #2d3436;">기능 카드 3</strong>
+              <label style="font-weight: 600; font-size: 13px;">아이콘</label>
+              <input type="text" id="hpAdFeat2Icon" class="request-input" style="width: 100%; min-height: auto; margin-bottom: 8px;">
+              <label style="font-weight: 600; font-size: 13px;">제목</label>
+              <input type="text" id="hpAdFeat2Title" class="request-input" style="width: 100%; min-height: auto; margin-bottom: 8px;">
+              <label style="font-weight: 600; font-size: 13px;">설명</label>
+              <input type="text" id="hpAdFeat2Desc" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div class="hp-admin-feature-block">
+              <strong style="display: block; margin-bottom: 8px; color: #2d3436;">기능 카드 4</strong>
+              <label style="font-weight: 600; font-size: 13px;">아이콘</label>
+              <input type="text" id="hpAdFeat3Icon" class="request-input" style="width: 100%; min-height: auto; margin-bottom: 8px;">
+              <label style="font-weight: 600; font-size: 13px;">제목</label>
+              <input type="text" id="hpAdFeat3Title" class="request-input" style="width: 100%; min-height: auto; margin-bottom: 8px;">
+              <label style="font-weight: 600; font-size: 13px;">설명</label>
+              <input type="text" id="hpAdFeat3Desc" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+          </div>
+          <h4 style="margin: 22px 0 10px; color: #2d3436;">푸터 · CTA</h4>
+          <div class="hp-admin-grid">
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">회사/서비스명</label>
+              <input type="text" id="hpAdFooterCompany" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">부가 한 줄 (선택)</label>
+              <input type="text" id="hpAdFooterLine2" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">문의 전화 (선택)</label>
+              <input type="text" id="hpAdFooterTel" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">카피라이트 (한 줄)</label>
+              <input type="text" id="hpAdFooterCopyright" class="request-input" style="width: 100%; min-height: auto;" placeholder="예: © 2026 상호명. All rights reserved.">
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">하단 사업자·법적 정보 (여러 줄, 검색·신뢰용)</label>
+              <textarea id="hpAdFooterSeoBlock" class="request-input" rows="5" style="width: 100%; min-height: auto;" placeholder="상호, 대표자명, 사업자등록번호, 주소, 통신판매업 신고번호, 고객센터 등"></textarea>
+            </div>
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">CTA 버튼 문구 (선택)</label>
+              <input type="text" id="hpAdCtaLabel" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">CTA 링크 URL (선택)</label>
+              <input type="text" id="hpAdCtaUrl" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+          </div>
+          <h4 style="margin: 22px 0 10px; color: #2d3436;">견적요청 영역</h4>
+          <div class="hp-admin-grid">
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">견적 섹션 제목</label>
+              <input type="text" id="hpAdQuoteTitle" class="request-input" style="width: 100%; min-height: auto;">
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">견적 섹션 부제목</label>
+              <textarea id="hpAdQuoteSubtitle" class="request-input" rows="2" style="width: 100%; min-height: auto;"></textarea>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label style="font-weight: 600; display: block; margin-bottom: 6px;">견적 메일 수신 주소 (mailto용)</label>
+              <input type="email" id="hpAdInquiryEmail" class="request-input" style="width: 100%; min-height: auto;" placeholder="예: sales@company.com">
+              <span style="font-size: 12px; color: #636e72;">입력 시 견적 폼이 메일 클라이언트로 전송됩니다. 비우면 안내 문구만 표시됩니다.</span>
+            </div>
+          </div>
+        </div>
+      </div>
       <!-- 화주사 등록 탭 -->
       <div id="registerTab" class="tab-content hidden">
         <!-- 화주사 등록 접이식 버튼 -->
@@ -3655,15 +4104,29 @@
       
       document.getElementById('dashboardSection').style.display = 'none';
       document.getElementById('loginSection').style.display = 'flex';
+      document.body.classList.add('hp-portal-page');
       document.getElementById('username').value = '';
       document.getElementById('password').value = '';
       document.getElementById('loginMessage').innerHTML = '';
+      if (window.HomepagePortal && typeof HomepagePortal.closeLoginModal === 'function') {
+        HomepagePortal.closeLoginModal();
+      }
+      if (window.HomepagePortal && typeof HomepagePortal.initLoginPage === 'function' && typeof API_BASE_URL !== 'undefined') {
+        HomepagePortal.initLoginPage(API_BASE_URL);
+      }
     }
     
     // 대시보드 표시
     function showDashboard() {
       document.getElementById('loginSection').style.display = 'none';
       document.getElementById('dashboardSection').style.display = 'block';
+      document.body.classList.remove('hp-portal-page');
+      if (window.HomepagePortal && typeof HomepagePortal.closeLoginModal === 'function') {
+        HomepagePortal.closeLoginModal();
+      }
+      if (window.HomepagePortal && typeof HomepagePortal.restoreAppDocumentTitle === 'function') {
+        HomepagePortal.restoreAppDocumentTitle();
+      }
       
       // 관리자 여부 확인 (대소문자 무시, 공백 제거)
       const roleNormalized = (currentRole || '').toString().trim();
@@ -3721,6 +4184,10 @@
       if (invoiceTabBtn) {
         invoiceTabBtn.style.display = isAdmin ? 'inline-block' : 'none';
       }
+      const homepageSettingsTabBtn = document.getElementById('homepageSettingsTabBtn');
+      if (homepageSettingsTabBtn) {
+        homepageSettingsTabBtn.style.display = isAdmin ? 'inline-block' : 'none';
+      }
       
       // 관리자가 아니면 반품 내역 탭만 표시 (switchMenu에서 처리하므로 여기서는 제거)
       if (!isAdmin) {
@@ -3728,7 +4195,7 @@
       } else {
         // 관리자면 저장된 탭 정보 확인 (F5 새로고침 시 현재 탭 유지)
         const savedTab = localStorage.getItem('activeAdminTab');
-        const validTabs = ['returns', 'cs', 'scheduleCalendar', 'board', 'popup', 'specialWorks', 'pallets', 'settlements', 'register', 'salesSettlement', 'invoice'];
+        const validTabs = ['returns', 'cs', 'scheduleCalendar', 'board', 'popup', 'homepageSettings', 'specialWorks', 'pallets', 'settlements', 'register', 'salesSettlement', 'invoice'];
         const isJjay = (currentUsername || '').toString().trim().toLowerCase() === 'jjay';
         let activeTab = savedTab && validTabs.includes(savedTab) ? savedTab : 'returns';
         if (activeTab === 'salesSettlement' && !isJjay) activeTab = 'returns';
@@ -6366,7 +6833,7 @@
       }
       
       // 관리자 탭만 명시적으로 숨기기 (화주사 모드 탭에 영향 주지 않도록)
-      const adminTabIds = ['returnsTab', 'csTab', 'specialWorksTab', 'palletsTab', 'settlementsTab', 'scheduleCalendarTab', 'boardTab', 'boardCategoryTab', 'popupTab', 'registerTab', 'salesSettlementTab', 'invoiceTab'];
+      const adminTabIds = ['returnsTab', 'csTab', 'specialWorksTab', 'palletsTab', 'settlementsTab', 'scheduleCalendarTab', 'boardTab', 'boardCategoryTab', 'popupTab', 'homepageSettingsTab', 'registerTab', 'salesSettlementTab', 'invoiceTab'];
       adminTabIds.forEach(tabId => {
         const tab = document.getElementById(tabId);
         if (tab) {
@@ -6545,6 +7012,15 @@
         // 배너 목록 로드
         if (typeof hbLoadBanners === 'function') {
           hbLoadBanners();
+        }
+      } else if (tabName === 'homepageSettings') {
+        const homepageSettingsTab = document.getElementById('homepageSettingsTab');
+        if (homepageSettingsTab) {
+          homepageSettingsTab.classList.remove('hidden');
+          homepageSettingsTab.style.display = 'block';
+        }
+        if (window.HomepagePortal && typeof HomepagePortal.adminLoad === 'function' && typeof API_BASE_URL !== 'undefined') {
+          HomepagePortal.adminLoad(API_BASE_URL);
         }
       } else if (tabName === 'register') {
         const registerTab = document.getElementById('registerTab');
@@ -15842,13 +16318,10 @@
       document.getElementById('loginSection').style.display = 'flex';
       document.getElementById('dashboardSection').style.display = 'none';
       
-      // 로고 URL 설정 (Cloudinary)
-      const logoUrl = 'https://res.cloudinary.com/dokk81rjh/image/upload/v1762922695/logo_srff9i.png';
-      const fallbackLogoUrl = '/static/logo.png'; // 로컬 파일 경로 (백업)
-      const loginLogo = document.getElementById('loginLogo');
-      if (loginLogo) {
-        loginLogo.src = logoUrl || fallbackLogoUrl;
+      if (window.HomepagePortal && typeof HomepagePortal.initLoginPage === 'function') {
+        HomepagePortal.initLoginPage(typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '');
       }
+      document.body.classList.add('hp-portal-page');
       
       // 엔터키 이벤트
       document.getElementById('username').addEventListener('keydown', function(e) {
@@ -15898,5 +16371,6 @@
       
     });
   </script>
+  <script src="/static/js/homepage_portal.js"></script>
 </body>
 </html>

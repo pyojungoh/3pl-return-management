@@ -36,7 +36,14 @@ app.config['JSON_AS_ASCII'] = False  # 한글 지원
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # 데이터베이스 초기화
-from api.database.models import init_db, get_company_by_username, create_company, fix_missing_return_ids, ensure_pallet_table_columns
+from api.database.models import (
+    init_db,
+    get_company_by_username,
+    create_company,
+    fix_missing_return_ids,
+    ensure_pallet_table_columns,
+    ensure_homepage_portal_table,
+)
 
 # NOTE:
 # - Vercel(Serverless)에서는 import 시점에 예외가 발생하면 함수 자체가 크래시하여 사이트 접속이 불가해집니다.
@@ -68,6 +75,11 @@ def ensure_db_ready():
         ensure_pallet_table_columns()
     except Exception as e:
         print(f"[경고] pallets 확장 컬럼 보강 중 오류 (무시 가능): {e}")
+    
+    try:
+        ensure_homepage_portal_table()
+    except Exception as e:
+        print(f"[경고] homepage_portal_settings 테이블 보강 중 오류 (무시 가능): {e}")
     
     # 기존 반품 데이터에 ID가 없는 경우 ID 생성
     if DB_READY:
@@ -120,6 +132,7 @@ from api.pallets.routes import pallets_bp
 from api.settlements.routes_db import settlements_bp
 from api.sales_settlement.routes_db import sales_settlement_bp
 from api.invoice.routes_db import invoice_bp
+from api.homepage.routes_db import homepage_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(returns_bp)
@@ -142,6 +155,8 @@ print("[앱 시작] 정산 관리 시스템 Blueprint 등록 완료")
 print("[앱 시작] 매출정산(jjay 전용) Blueprint 등록 완료")
 app.register_blueprint(invoice_bp)
 print("[앱 시작] 거래명세서(관리자 전용) Blueprint 등록 완료")
+app.register_blueprint(homepage_bp)
+print("[앱 시작] 홈페이지(로그인 포털) 설정 Blueprint 등록 완료")
 
 # C/S 알림 스케줄러 시작
 print("[정보] [앱 시작] C/S 알림 스케줄러 시작 시도...")

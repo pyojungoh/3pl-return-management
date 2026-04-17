@@ -3,8 +3,10 @@ PostgreSQL 데이터베이스 모델 (Neon Postgres)
 DATABASE_URL 환경 변수가 있으면 PostgreSQL 사용, 없으면 SQLite 사용 (호환성)
 """
 import os
+import json
+import copy
 from datetime import datetime
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple, Any
 
 # 데이터베이스 연결 문자열
 DATABASE_URL = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
@@ -6265,3 +6267,244 @@ def delete_schedule_type(type_id: int) -> bool:
             return False
         finally:
             conn.close()
+
+
+# ========== 로그인 포털(홈) 화면 설정 (단일 행 테이블) ==========
+
+HOMEPAGE_PORTAL_DEFAULT: Dict[str, Any] = {
+    'hero_title': 'JJAY 3PL 종합 물류',
+    'hero_subtitle': '화주사·관리자가 같은 포털에서 로그인하면 권한에 맞는 업무 화면으로 이동합니다.',
+    'notice_text': '',
+    'notice_visible': False,
+    'login_card_title': '로그인',
+    'logo_url': 'https://res.cloudinary.com/dokk81rjh/image/upload/v1762922695/logo_srff9i.png',
+    'features': [
+        {'icon': '📦', 'title': '반품·출고', 'desc': '통합 반품 처리와 진행 현황'},
+        {'icon': '📅', 'title': '스케줄', 'desc': '입·출고 일정 사전 등록'},
+        {'icon': '📞', 'title': 'C/S', 'desc': '문의 접수와 답변 관리'},
+        {'icon': '🏢', 'title': '화주·관리', 'desc': '계정 권한에 따른 화면 자동 분기'},
+    ],
+    'footer_company': 'JJAY 3PL',
+    'footer_line2': '',
+    'footer_tel': '',
+    'cta_label': '',
+    'cta_url': '',
+    'browser_tab_title': '',
+    'meta_description': '3PL 반품·출고·스케줄·CS 통합 관리 포털입니다.',
+    'footer_copyright': '© JJAY 3PL. All rights reserved.',
+    'footer_seo_block': '상호·대표·사업자등록번호·주소·통신판매업 신고 등 검색 노출용 정보를 이 영역에 입력하세요.',
+    'quote_section_title': '견적 · 서비스 문의',
+    'quote_section_subtitle': '도입 규모와 희망 일정을 남겨 주시면 담당자가 빠르게 연락드립니다.',
+    'inquiry_email': '',
+    'service_section_title': '3PL 서비스 소개',
+    'service_section_lead': '연결 창고·자체 솔루션·정산·출고 품질까지, 화주사 운영에 필요한 요소를 한곳에서 제안합니다.',
+    'banner_images': [],
+    'partner_section_title': '실시간 비교견적 흐름',
+    'partner_section_lead': '지금 이 순간에도 여러 화주사가 단가·조건을 비교하고 있습니다.',
+    'partner_logos': [],
+    'youtube_section_title': '영상으로 보는 서비스',
+    'youtube_section_lead': '물류 현장과 시스템을 영상에서 만나 보세요.',
+    'youtube_items': [],
+}
+
+
+def _merge_homepage_portal_dict(data: Optional[Dict]) -> Dict[str, Any]:
+    out = copy.deepcopy(HOMEPAGE_PORTAL_DEFAULT)
+    if not data or not isinstance(data, dict):
+        return out
+    for k, v in data.items():
+        if k == 'features' and isinstance(v, list):
+            feats = []
+            for item in v[:4]:
+                if isinstance(item, dict):
+                    feats.append({
+                        'icon': str(item.get('icon', '') or '')[:12],
+                        'title': str(item.get('title', '') or '')[:80],
+                        'desc': str(item.get('desc', '') or '')[:200],
+                    })
+            if feats:
+                out['features'] = feats
+        elif k == 'banner_images' and isinstance(v, list):
+            imgs = []
+            for u in v[:24]:
+                if isinstance(u, str) and str(u).strip():
+                    imgs.append(str(u).strip()[:800])
+            out[k] = imgs[:20]
+        elif k == 'partner_logos' and isinstance(v, list):
+            pl = []
+            for item in v[:30]:
+                if not isinstance(item, dict):
+                    continue
+                url = str(item.get('image_url', '') or '').strip()[:800]
+                if not url:
+                    continue
+                pl.append({
+                    'image_url': url,
+                    'label': str(item.get('label', '') or '')[:120],
+                })
+                if len(pl) >= 24:
+                    break
+            out[k] = pl
+        elif k == 'youtube_items' and isinstance(v, list):
+            yt = []
+            for item in v[:15]:
+                if not isinstance(item, dict):
+                    continue
+                vid = str(item.get('video_id', '') or '').strip()[:20]
+                if not vid or len(vid) != 11:
+                    continue
+                yt.append({
+                    'video_id': vid,
+                    'title': str(item.get('title', '') or '')[:200],
+                })
+                if len(yt) >= 12:
+                    break
+            out[k] = yt
+        elif k == 'notice_visible':
+            out[k] = bool(v)
+        elif k in out:
+            if k == 'logo_url' and isinstance(v, str) and not str(v).strip():
+                continue
+            out[k] = v
+    return out
+
+
+def ensure_homepage_portal_table():
+    """homepage_portal_settings 테이블 생성 및 기본 행 삽입."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    default_json = json.dumps(HOMEPAGE_PORTAL_DEFAULT, ensure_ascii=False)
+    try:
+        if USE_POSTGRESQL:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS homepage_portal_settings (
+                    id INTEGER PRIMARY KEY,
+                    config_json TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_by TEXT
+                )
+            ''')
+            cursor.execute(
+                'SELECT 1 FROM homepage_portal_settings WHERE id = 1 LIMIT 1'
+            )
+            if not cursor.fetchone():
+                cursor.execute(
+                    '''INSERT INTO homepage_portal_settings (id, config_json, updated_by)
+                       VALUES (1, %s, NULL)''',
+                    (default_json,),
+                )
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS homepage_portal_settings (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    config_json TEXT NOT NULL,
+                    updated_at TEXT DEFAULT (datetime('now')),
+                    updated_by TEXT
+                )
+            ''')
+            cursor.execute(
+                'SELECT 1 FROM homepage_portal_settings WHERE id = 1 LIMIT 1'
+            )
+            if not cursor.fetchone():
+                cursor.execute(
+                    '''INSERT INTO homepage_portal_settings (id, config_json, updated_by)
+                       VALUES (1, ?, NULL)''',
+                    (default_json,),
+                )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def _homepage_load_raw_dict() -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            'SELECT config_json FROM homepage_portal_settings WHERE id = 1 LIMIT 1'
+        )
+        row = cursor.fetchone()
+        if not row:
+            return {}
+        if USE_POSTGRESQL:
+            raw = row[0]
+        else:
+            raw = row['config_json'] if hasattr(row, 'keys') else row[0]
+        if isinstance(raw, dict):
+            return raw
+        if not raw:
+            return {}
+        return json.loads(raw)
+    except Exception as e:
+        print(f'[homepage_portal_settings] 조회 오류: {e}')
+        return {}
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_homepage_portal_config_merged() -> Dict[str, Any]:
+    """DB + 기본값 병합 결과 (항상 완전한 dict)."""
+    try:
+        stored = _homepage_load_raw_dict()
+        return _merge_homepage_portal_dict(stored)
+    except Exception:
+        return copy.deepcopy(HOMEPAGE_PORTAL_DEFAULT)
+
+
+def set_homepage_portal_config(partial: Dict[str, Any], editor_username: str) -> Dict[str, Any]:
+    """
+    partial에 포함된 키만 덮어쓰고 저장. 반환값은 병합 완료본.
+    """
+    stored = _homepage_load_raw_dict()
+    merged = _merge_homepage_portal_dict(stored)
+    for k, v in (partial or {}).items():
+        if k == 'features' and isinstance(v, list):
+            merged['features'] = _merge_homepage_portal_dict({'features': v})['features']
+        elif k == 'notice_visible':
+            merged[k] = bool(v)
+        elif k in merged:
+            merged[k] = v
+    merged = _merge_homepage_portal_dict(merged)
+    blob = json.dumps(merged, ensure_ascii=False)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if USE_POSTGRESQL:
+            cursor.execute(
+                '''UPDATE homepage_portal_settings
+                   SET config_json = %s, updated_at = CURRENT_TIMESTAMP, updated_by = %s
+                   WHERE id = 1''',
+                (blob, editor_username or None),
+            )
+            if cursor.rowcount == 0:
+                cursor.execute(
+                    '''INSERT INTO homepage_portal_settings (id, config_json, updated_by)
+                       VALUES (1, %s, %s)''',
+                    (blob, editor_username or None),
+                )
+        else:
+            cursor.execute(
+                '''UPDATE homepage_portal_settings
+                   SET config_json = ?, updated_at = datetime('now'), updated_by = ?
+                   WHERE id = 1''',
+                (blob, editor_username or None),
+            )
+            if cursor.rowcount == 0:
+                cursor.execute(
+                    '''INSERT INTO homepage_portal_settings (id, config_json, updated_by)
+                       VALUES (1, ?, ?)''',
+                    (blob, editor_username or None),
+                )
+        conn.commit()
+        return merged
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
