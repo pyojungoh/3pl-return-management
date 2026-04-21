@@ -372,6 +372,318 @@
       color: #636e72;
     }
     
+    /* 정산 상세 모달 — 서류형 레이아웃 (관리자·화주사 공통) */
+    .st-detail-modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: rgba(45, 52, 54, 0.45);
+      backdrop-filter: blur(3px);
+      overflow-y: auto;
+      padding: 24px 16px 40px;
+      box-sizing: border-box;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .st-detail-modal-backdrop.st-detail-modal-open {
+      display: flex;
+    }
+    .st-detail-modal-panel {
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+      background: #f5f7fa;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18), 0 0 1px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+    .st-detail-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #2d3436 0%, #636e72 100%);
+      color: #fff;
+    }
+    .st-detail-modal-title {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .st-detail-modal-close {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: background 0.15s ease;
+    }
+    .st-detail-modal-close:hover {
+      background: rgba(255, 107, 53, 0.9);
+    }
+    .st-detail-modal-body {
+      padding: 0 20px 20px;
+      max-height: min(72vh, 640px);
+      overflow-y: auto;
+    }
+    .st-detail-modal-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+      padding: 14px 20px 18px;
+      background: #eceff2;
+      border-top: 1px solid #dfe6e9;
+    }
+    .st-detail-doc {
+      background: #fff;
+      border: 1px solid #dfe4ea;
+      border-radius: 4px;
+      margin-top: 18px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+    }
+    .st-detail-doc-banner {
+      text-align: center;
+      padding: 22px 16px 18px;
+      border-bottom: 3px double #2d3436;
+      background: linear-gradient(180deg, #fafbfc 0%, #fff 100%);
+    }
+    .st-detail-doc-title-ko {
+      font-size: 20px;
+      font-weight: 800;
+      color: #2d3436;
+      letter-spacing: 0.12em;
+      margin: 0 0 6px 0;
+    }
+    .st-detail-doc-title-en {
+      font-size: 11px;
+      color: #636e72;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin: 0;
+    }
+    .st-detail-doc-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border-bottom: 1px solid #dfe4ea;
+      font-size: 13px;
+    }
+    @media (max-width: 520px) {
+      .st-detail-doc-meta {
+        grid-template-columns: 1fr;
+      }
+    }
+    .st-detail-doc-meta-cell {
+      padding: 12px 16px;
+      border-right: 1px solid #eef1f4;
+      border-bottom: 1px solid #eef1f4;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .st-detail-doc-meta-cell:nth-child(2n) {
+      border-right: none;
+    }
+    .st-detail-doc-meta-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #636e72;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .st-detail-doc-meta-value {
+      font-size: 15px;
+      font-weight: 600;
+      color: #2d3436;
+      word-break: break-word;
+    }
+    .st-detail-doc-meta-cell--full {
+      grid-column: 1 / -1;
+      border-right: none;
+    }
+    .st-detail-badge {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #fff3e0;
+      color: #d35400;
+      border: 1px solid #ffe0b2;
+    }
+    .st-detail-badge--done {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border-color: #c8e6c9;
+    }
+    .st-detail-badge--wait {
+      background: #eceff1;
+      color: #546e7a;
+      border-color: #cfd8dc;
+    }
+    .st-detail-line-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .st-detail-line-table thead th {
+      background: #f1f3f5;
+      color: #495057;
+      font-weight: 700;
+      text-align: center;
+      padding: 10px 8px;
+      border-bottom: 2px solid #2d3436;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+    .st-detail-line-table thead th.st-detail-th-amt {
+      text-align: right;
+    }
+    .st-detail-line-table tbody td {
+      padding: 11px 10px;
+      border-bottom: 1px solid #e9ecef;
+      vertical-align: middle;
+    }
+    .st-detail-line-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .st-detail-td-label {
+      color: #2d3436;
+      font-weight: 600;
+      width: 28%;
+      background: #fafbfc;
+      border-right: 1px solid #e9ecef;
+    }
+    .st-detail-col-amt {
+      width: 26%;
+      text-align: right !important;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: #2d3436;
+    }
+    .st-detail-td-note {
+      text-align: left;
+      color: #636e72;
+      font-size: 13px;
+    }
+    .st-detail-amt--deduct {
+      color: #c0392b !important;
+    }
+    .st-detail-note-dash {
+      color: #adb5bd;
+    }
+    .st-detail-file-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .st-detail-file-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .st-detail-file-btn:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+    }
+    .st-detail-file-btn--view {
+      background: #e3f2fd;
+      color: #1565c0;
+      border-color: #bbdefb;
+    }
+    .st-detail-file-btn--dl {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border-color: #c8e6c9;
+    }
+    .st-detail-error-counts {
+      display: block;
+      margin-top: 6px;
+      font-size: 12px;
+      color: #856404;
+      font-weight: 500;
+    }
+    .st-detail-totals {
+      border-top: 2px solid #2d3436;
+      background: #fafbfc;
+      padding: 14px 16px 16px;
+    }
+    .st-detail-total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px dashed #dee2e6;
+      font-size: 14px;
+    }
+    .st-detail-total-row:last-child {
+      border-bottom: none;
+      padding-top: 12px;
+      margin-top: 4px;
+      border-top: 2px solid #2d3436;
+    }
+    .st-detail-total-row span:first-child {
+      color: #495057;
+      font-weight: 600;
+    }
+    .st-detail-total-row span:last-child {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      color: #2d3436;
+    }
+    .st-detail-total-row--grand span:last-child {
+      font-size: 20px;
+      color: #ff6b35;
+    }
+    .st-detail-total-row--vat span:last-child {
+      color: #1565c0;
+    }
+    .st-detail-memo-box {
+      margin: 0 16px 16px;
+      padding: 12px 14px;
+      background: #fffef6;
+      border: 1px solid #ffeaa7;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #495057;
+      line-height: 1.55;
+    }
+    .st-detail-memo-label {
+      font-weight: 700;
+      color: #d35400;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .st-detail-doc-footnote {
+      text-align: center;
+      font-size: 11px;
+      color: #adb5bd;
+      padding: 10px 12px 14px;
+      border-top: 1px solid #e9ecef;
+    }
+    
     .st-subnav-btn {
       padding: 10px 18px;
       font-size: 14px;
@@ -674,17 +986,17 @@
     </div>
   </div>
 
-  <!-- 정산 상세 모달 -->
-  <div id="stSettlementDetailModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; overflow-y: auto;">
-    <div style="max-width: 900px; margin: 50px auto; background: white; border-radius: 14px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-        <h2 style="margin: 0; color: #ff6b35; font-weight: 700;">정산 상세</h2>
-        <button onclick="stCloseDetailModal()" style="background: #e17055; color: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 18px;">×</button>
+  <!-- 정산 상세 모달 (관리자·화주사 동일 UI) -->
+  <div id="stSettlementDetailModal" class="st-detail-modal-backdrop" onclick="if (event.target === this) stCloseDetailModal()">
+    <div class="st-detail-modal-panel" onclick="event.stopPropagation()">
+      <div class="st-detail-modal-header">
+        <h2 class="st-detail-modal-title">정산 상세</h2>
+        <button type="button" class="st-detail-modal-close" onclick="stCloseDetailModal()" aria-label="닫기">×</button>
       </div>
-      <div id="stSettlementDetailContent"></div>
-      <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: flex-end;">
-        <button class="st-btn" onclick="stShowStatementPreview()">👁️ 명세서 미리보기</button>
-        <button class="st-btn-secondary" onclick="stCloseDetailModal()">닫기</button>
+      <div id="stSettlementDetailContent" class="st-detail-modal-body"></div>
+      <div class="st-detail-modal-footer">
+        <button type="button" class="st-btn" onclick="stShowStatementPreview()">명세서 미리보기</button>
+        <button type="button" class="st-btn-secondary" onclick="stCloseDetailModal()">닫기</button>
       </div>
     </div>
   </div>
@@ -2348,6 +2660,42 @@
       stCalculateTotal();
     }
 
+    function stDetailEscapeHtml(text) {
+      if (text == null || text === '') return '';
+      const d = document.createElement('div');
+      d.textContent = String(text);
+      return d.innerHTML;
+    }
+    
+    function stDetailEscapeAttr(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;');
+    }
+    
+    function stDetailFmtWon(n) {
+      return (Number(n) || 0).toLocaleString() + '원';
+    }
+    
+    function stDetailFileNote(url) {
+      if (!url) return '<span class="st-detail-note-dash">—</span>';
+      const h = stDetailEscapeAttr(url);
+      return '<div class="st-detail-file-btns">' +
+        '<a href="' + h + '" target="_blank" rel="noopener noreferrer" class="st-detail-file-btn st-detail-file-btn--view">미리보기</a>' +
+        '<a href="' + h + '" target="_blank" rel="noopener noreferrer" download class="st-detail-file-btn st-detail-file-btn--dl">다운로드</a>' +
+        '</div>';
+    }
+    
+    function stDetailSimpleRow(label, amount) {
+      return '<tr><td class="st-detail-td-label">' + stDetailEscapeHtml(label) + '</td><td class="st-detail-col-amt">' + stDetailFmtWon(amount) + '</td><td class="st-detail-td-note"><span class="st-detail-note-dash">—</span></td></tr>';
+    }
+    
+    function stDetailFileRow(label, amount, fileUrl) {
+      return '<tr><td class="st-detail-td-label">' + stDetailEscapeHtml(label) + '</td><td class="st-detail-col-amt">' + stDetailFmtWon(amount) + '</td><td class="st-detail-td-note">' + stDetailFileNote(fileUrl) + '</td></tr>';
+    }
+    
     // 정산 상세 보기
     function stShowSettlementDetail(settlementId) {
       fetch(`/api/settlements/${settlementId}`, {
@@ -2364,102 +2712,73 @@
             const tax = Math.floor(totalAmount * 0.1); // 세금 (부가세 10%)
             const finalAmount = totalAmount + tax; // 결제금액 (총액 + 세금)
             
-            let content = `
-              <div class="st-settlement-detail">
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">화주사</div>
-                  <div class="st-settlement-detail-value">${settlement.company_name || ''}</div>
-                </div>
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">정산년월</div>
-                  <div class="st-settlement-detail-value">${settlement.settlement_year_month || ''}</div>
-                </div>
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">작업비</div>
-                  <div class="st-settlement-detail-value" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <span>${(settlement.work_fee || 0).toLocaleString()}원</span>
-                    ${settlement.work_fee_file_url ? `
-                      <div style="display: flex; gap: 10px;">
-                        <a href="${settlement.work_fee_file_url}" target="_blank" class="st-file-link" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">👁️ 미리보기</a>
-                        <a href="${settlement.work_fee_file_url}" target="_blank" class="st-file-link" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">📥 다운로드</a>
-                      </div>
-                    ` : ''}
-                  </div>
-                </div>
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">입출고비</div>
-                  <div class="st-settlement-detail-value" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <span>${(settlement.inout_fee || 0).toLocaleString()}원</span>
-                    ${settlement.inout_fee_file_url ? `
-                      <div style="display: flex; gap: 10px;">
-                        <a href="${settlement.inout_fee_file_url}" target="_blank" class="st-file-link" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">👁️ 미리보기</a>
-                        <a href="${settlement.inout_fee_file_url}" target="_blank" class="st-file-link" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">📥 다운로드</a>
-                      </div>
-                    ` : ''}
-                  </div>
-                </div>
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">택배비</div>
-                  <div class="st-settlement-detail-value" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <span>${(settlement.shipping_fee || 0).toLocaleString()}원</span>
-                    ${settlement.shipping_fee_file_url ? `
-                      <div style="display: flex; gap: 10px;">
-                        <a href="${settlement.shipping_fee_file_url}" target="_blank" class="st-file-link" style="padding: 4px 8px; background: #74b9ff; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">👁️ 미리보기</a>
-                        <a href="${settlement.shipping_fee_file_url}" target="_blank" class="st-file-link" download style="padding: 4px 8px; background: #00b894; color: white; border-radius: 4px; text-decoration: none; font-size: 13px;">📥 다운로드</a>
-                      </div>
-                    ` : ''}
-                  </div>
-                </div>
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">착불 택배비</div>
-                  <div class="st-settlement-detail-value">${(settlement.collect_on_delivery_fee || 0).toLocaleString()}원</div>
-                </div>
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">반품비</div>
-                  <div class="st-settlement-detail-value">${(settlement.return_fee || 0).toLocaleString()}원</div>
-                </div>
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">보관료</div>
-                  <div class="st-settlement-detail-value">${(settlement.storage_fee || 0).toLocaleString()}원</div>
-                </div>
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">특수작업</div>
-                  <div class="st-settlement-detail-value">${(settlement.special_work_fee || 0).toLocaleString()}원</div>
-                </div>
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">오배송/누락 차감</div>
-                  <div class="st-settlement-detail-value" style="color: #e74c3c;">
-                    -${(settlement.error_deduction || 0).toLocaleString()}원
-                    <div id="stDetailErrorCounts" style="margin-top: 4px; font-size: 12px; color: #856404;"></div>
-                  </div>
-                </div>
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">총액</div>
-                  <div class="st-settlement-detail-value" style="font-weight: 700; font-size: 18px; color: #2d3436;">${totalAmount.toLocaleString()}원</div>
-                </div>
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">부가세</div>
-                  <div class="st-settlement-detail-value" style="font-weight: 600; color: #0984e3;">${tax.toLocaleString()}원</div>
-                </div>
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">결제금액</div>
-                  <div class="st-settlement-detail-value" style="font-weight: 700; font-size: 18px; color: #ff6b35;">${finalAmount.toLocaleString()}원</div>
-                </div>
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">상태</div>
-                  <div class="st-settlement-detail-value">${settlement.status || '대기'}</div>
-                </div>
-                ${settlement.memo ? `
-                <div class="st-settlement-detail-row">
-                  <div class="st-settlement-detail-label">비고</div>
-                  <div class="st-settlement-detail-value">${settlement.memo}</div>
-                </div>
-                ` : ''}
-              </div>
-            `;
+            const statusRaw = (settlement.status || '대기').toString();
+            const statusHtml = stDetailEscapeHtml(statusRaw);
+            const statusLower = statusRaw.toLowerCase();
+            let badgeClass = 'st-detail-badge st-detail-badge--wait';
+            if (statusRaw.indexOf('완료') !== -1 || statusLower.indexOf('complete') !== -1 || statusLower.indexOf('paid') !== -1) {
+              badgeClass = 'st-detail-badge st-detail-badge--done';
+            }
+            
+            const memoBlock = settlement.memo
+              ? '<div class="st-detail-memo-box"><div class="st-detail-memo-label">비고</div>' + stDetailEscapeHtml(settlement.memo) + '</div>'
+              : '';
+            
+            const errDed = settlement.error_deduction || 0;
+            const deductAmtCell = errDed > 0
+              ? ('<td class="st-detail-col-amt st-detail-amt--deduct">-' + (Number(errDed) || 0).toLocaleString() + '원</td>')
+              : ('<td class="st-detail-col-amt">' + stDetailFmtWon(0) + '</td>');
+            const deductRow =
+              '<tr>' +
+              '<td class="st-detail-td-label">' + stDetailEscapeHtml('오배송·누락 차감') + '</td>' +
+              deductAmtCell +
+              '<td class="st-detail-td-note"><span id="stDetailErrorCounts" class="st-detail-error-counts"></span></td>' +
+              '</tr>';
+            
+            let content =
+              '<div class="st-detail-doc">' +
+              '<div class="st-detail-doc-banner">' +
+              '<p class="st-detail-doc-title-ko">정 산 명 세</p>' +
+              '<p class="st-detail-doc-title-en">Settlement statement</p>' +
+              '</div>' +
+              '<div class="st-detail-doc-meta">' +
+              '<div class="st-detail-doc-meta-cell">' +
+              '<span class="st-detail-doc-meta-label">화주사 (Consignor)</span>' +
+              '<span class="st-detail-doc-meta-value">' + stDetailEscapeHtml(settlement.company_name || '') + '</span>' +
+              '</div>' +
+              '<div class="st-detail-doc-meta-cell">' +
+              '<span class="st-detail-doc-meta-label">정산년월 (Period)</span>' +
+              '<span class="st-detail-doc-meta-value">' + stDetailEscapeHtml(settlement.settlement_year_month || '') + '</span>' +
+              '</div>' +
+              '<div class="st-detail-doc-meta-cell st-detail-doc-meta-cell--full">' +
+              '<span class="st-detail-doc-meta-label">처리 상태</span>' +
+              '<span class="' + badgeClass + '">' + statusHtml + '</span>' +
+              '</div>' +
+              '</div>' +
+              '<table class="st-detail-line-table">' +
+              '<thead><tr><th>항목</th><th class="st-detail-col-amt st-detail-th-amt">금액</th><th>비고 (첨부)</th></tr></thead>' +
+              '<tbody>' +
+              stDetailFileRow('작업비', settlement.work_fee, settlement.work_fee_file_url) +
+              stDetailFileRow('입출고비', settlement.inout_fee, settlement.inout_fee_file_url) +
+              stDetailFileRow('택배비', settlement.shipping_fee, settlement.shipping_fee_file_url) +
+              stDetailSimpleRow('착불 택배비', settlement.collect_on_delivery_fee) +
+              stDetailSimpleRow('반품비', settlement.return_fee) +
+              stDetailSimpleRow('보관료', settlement.storage_fee) +
+              stDetailSimpleRow('특수작업', settlement.special_work_fee) +
+              deductRow +
+              '</tbody></table>' +
+              '<div class="st-detail-totals">' +
+              '<div class="st-detail-total-row"><span>공급가액 (합계)</span><span>' + totalAmount.toLocaleString() + '원</span></div>' +
+              '<div class="st-detail-total-row st-detail-total-row--vat"><span>부가세 (10%)</span><span>' + tax.toLocaleString() + '원</span></div>' +
+              '<div class="st-detail-total-row st-detail-total-row--grand"><span>결제금액 (VAT 포함)</span><span>' + finalAmount.toLocaleString() + '원</span></div>' +
+              '</div>' +
+              memoBlock +
+              '<p class="st-detail-doc-footnote">본 명세는 시스템 산출 내역이며, 세금계산서 등 증빙은 별도 정책에 따릅니다.</p>' +
+              '</div>';
             
             document.getElementById('stSettlementDetailContent').innerHTML = content;
-            document.getElementById('stSettlementDetailModal').style.display = 'block';
+            const detailModal = document.getElementById('stSettlementDetailModal');
+            if (detailModal) detailModal.classList.add('st-detail-modal-open');
             stCurrentSettlementId = settlementId;
             
             // 오배송/누락 건수 로드
@@ -2643,7 +2962,8 @@
 
     // 상세 모달 닫기
     function stCloseDetailModal() {
-      document.getElementById('stSettlementDetailModal').style.display = 'none';
+      const detailModal = document.getElementById('stSettlementDetailModal');
+      if (detailModal) detailModal.classList.remove('st-detail-modal-open');
       stCurrentSettlementId = null;
     }
 
