@@ -1025,6 +1025,59 @@
       box-shadow: 0 6px 16px rgba(255, 107, 53, 0.35);
       background: linear-gradient(135deg, #ff5722 0%, #ffb74d 100%);
     }
+
+    .returns-consignor-monthly-summary {
+      display: none;
+      margin-top: -6px;
+      margin-bottom: 14px;
+      padding: 12px 14px;
+      background: linear-gradient(135deg, #ffffff 0%, #fffef8 100%);
+      border-radius: 12px;
+      border: 1px solid #ffeaa7;
+      box-shadow: 0 3px 10px rgba(255, 152, 0, 0.08);
+    }
+
+    .returns-consignor-summary-title {
+      margin: 0 0 10px 0;
+      color: #ff6b35;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .returns-consignor-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: 10px;
+    }
+
+    .returns-consignor-summary-item {
+      background: #fff;
+      border: 1px solid #ffeaa7;
+      border-radius: 10px;
+      padding: 10px 8px;
+      text-align: center;
+    }
+
+    .returns-consignor-summary-label {
+      font-size: 11px;
+      color: #636e72;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .returns-consignor-summary-value {
+      font-size: 18px;
+      color: #2d3436;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    @media (max-width: 820px) {
+      .returns-consignor-summary-grid {
+        grid-template-columns: 1fr;
+      }
+    }
     
     .stats {
       background: #ffffff;
@@ -2383,6 +2436,25 @@
       <!-- 착불 택배비 요약 (통계 박스 아래, 작게 표시) -->
       <div id="returnsCollectOnDeliverySummary" style="display: none; margin-top: -8px; margin-bottom: 12px; padding: 8px 12px; background: #fffef9; border-radius: 10px; border: 1px solid #ffeaa7; font-size: 12px; color: #636e72;">
         <!-- 관리자: 화주사별 착불택배비 | 화주사: 한 줄 요약 -->
+      </div>
+
+      <!-- 화주사 전용: 반품관리 당월 요약 -->
+      <div id="returnsConsignorMonthlySummary" class="returns-consignor-monthly-summary">
+        <p id="returnsConsignorSummaryTitle" class="returns-consignor-summary-title">📌 당월 반품 요약</p>
+        <div class="returns-consignor-summary-grid">
+          <div class="returns-consignor-summary-item">
+            <div class="returns-consignor-summary-label">반품건수</div>
+            <div id="returnsConsignorMonthlyCount" class="returns-consignor-summary-value">0건</div>
+          </div>
+          <div class="returns-consignor-summary-item">
+            <div class="returns-consignor-summary-label">반품비용</div>
+            <div id="returnsConsignorMonthlyReturnFee" class="returns-consignor-summary-value">0원</div>
+          </div>
+          <div class="returns-consignor-summary-item">
+            <div class="returns-consignor-summary-label">착불택배비</div>
+            <div id="returnsConsignorMonthlyCollectFee" class="returns-consignor-summary-value">0원</div>
+          </div>
+        </div>
       </div>
       
       <!-- 테이블 -->
@@ -5152,6 +5224,9 @@
       if (typeof updateCollectOnDeliverySummary === 'function') {
         updateCollectOnDeliverySummary(data);
       }
+      if (typeof updateConsignorMonthlySummary === 'function') {
+        updateConsignorMonthlySummary(data);
+      }
     }
     
     // 착불 배송비 파싱: "착불 5000" -> { isCollect: true, amount: 5000 }, "착불" -> { isCollect: true, amount: 0 }
@@ -5202,6 +5277,45 @@
       }
     }
     window.updateCollectOnDeliverySummary = updateCollectOnDeliverySummary;
+
+    // 화주사 전용: 반품관리 당월(조회월) 요약
+    function updateConsignorMonthlySummary(data) {
+      const wrap = document.getElementById('returnsConsignorMonthlySummary');
+      if (!wrap) return;
+
+      const isAdmin = (currentRole || '').toString().trim() === '관리자';
+      if (isAdmin) {
+        wrap.style.display = 'none';
+        return;
+      }
+
+      const monthEl = document.getElementById('monthSelect');
+      const selectedMonth = monthEl ? (monthEl.value || '').toString().trim() : '';
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const isCurrentMonth = selectedMonth ? (selectedMonth === currentMonth) : true;
+
+      const summaryTitleEl = document.getElementById('returnsConsignorSummaryTitle');
+      const countEl = document.getElementById('returnsConsignorMonthlyCount');
+      const returnFeeEl = document.getElementById('returnsConsignorMonthlyReturnFee');
+      const collectFeeEl = document.getElementById('returnsConsignorMonthlyCollectFee');
+      if (!summaryTitleEl || !countEl || !returnFeeEl || !collectFeeEl) return;
+
+      const rows = Array.isArray(data) ? data : [];
+      const returnCount = rows.length;
+      const returnFee = returnCount * 500; // 반품비 규칙: 건당 500원
+      const collectStats = computeCollectOnDeliveryStats(rows);
+      const collectTotal = collectStats.totalAmount || 0;
+
+      summaryTitleEl.textContent = isCurrentMonth
+        ? '📌 당월 반품 요약'
+        : `📌 ${selectedMonth || '조회월'} 반품 요약`;
+      countEl.textContent = `${returnCount.toLocaleString()}건`;
+      returnFeeEl.textContent = `${returnFee.toLocaleString()}원`;
+      collectFeeEl.textContent = `${collectTotal.toLocaleString()}원`;
+      wrap.style.display = 'block';
+    }
+    window.updateConsignorMonthlySummary = updateConsignorMonthlySummary;
     
     // 요청사항 저장
     function saveRequest(dataIndex, rowIndex) {
