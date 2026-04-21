@@ -607,6 +607,199 @@
       overflow-x: auto;
       overflow-y: auto;
     }
+    
+    /* 작업 목록 사진 열: 칸 너비 고정, 썸네일은 작게 줄여 전부 표시 */
+    .sw-table td.sw-photo-col {
+      max-width: 220px;
+      width: 220px;
+      vertical-align: middle;
+      text-align: center;
+      box-sizing: border-box;
+    }
+    .sw-photo-cell-wrap {
+      max-width: 210px;
+      margin: 0 auto;
+      cursor: pointer;
+      outline: none;
+    }
+    .sw-photo-cell-wrap:focus-visible {
+      box-shadow: 0 0 0 2px #ff6b35;
+      border-radius: 8px;
+    }
+    .sw-photo-cell-inner {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      justify-content: center;
+      align-items: center;
+      max-width: 100%;
+    }
+    .sw-photo-thumb-inline {
+      width: clamp(28px, 9vw, 40px);
+      height: clamp(28px, 9vw, 40px);
+      object-fit: cover;
+      border-radius: 6px;
+      border: 2px solid #ffeaa7;
+      flex-shrink: 0;
+      display: block;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .sw-photo-cell-wrap:hover .sw-photo-thumb-inline {
+      border-color: #ffb347;
+    }
+    .sw-photo-thumb-inline:hover {
+      transform: scale(1.06);
+      border-color: #ff6b35;
+    }
+    
+    /* 사진 갤러리 모달 */
+    .sw-gallery-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10050;
+      display: none;
+      padding: 12px;
+      box-sizing: border-box;
+      pointer-events: none;
+    }
+    .sw-gallery-modal.sw-gallery-open {
+      display: block;
+    }
+    .sw-gallery-modal.sw-gallery-open .sw-gallery-backdrop,
+    .sw-gallery-modal.sw-gallery-open .sw-gallery-dialog {
+      pointer-events: auto;
+    }
+    .sw-gallery-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      cursor: pointer;
+    }
+    .sw-gallery-dialog {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1;
+      background: #2d3436;
+      border-radius: 14px;
+      padding: 12px 16px 16px;
+      max-width: min(900px, 98vw);
+      max-height: 94vh;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+      border: 2px solid #636e72;
+    }
+    .sw-gallery-close {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 3;
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 107, 53, 0.95);
+      color: #fff;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .sw-gallery-close:hover {
+      background: #ff6b35;
+    }
+    .sw-gallery-main-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 180px;
+      max-height: min(68vh, 620px);
+      margin-top: 28px;
+    }
+    .sw-gallery-main-img {
+      max-width: min(760px, 76vw);
+      max-height: min(62vh, 560px);
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      border-radius: 8px;
+      background: #000;
+    }
+    .sw-gallery-arrow {
+      flex-shrink: 0;
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.14);
+      color: #fff;
+      font-size: 26px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 0 2px 0;
+      transition: background 0.15s ease;
+    }
+    .sw-gallery-arrow:hover {
+      background: rgba(255, 107, 53, 0.9);
+    }
+    .sw-gallery-counter {
+      text-align: center;
+      color: #dfe6e9;
+      font-size: 14px;
+      margin: 8px 0 4px;
+    }
+    .sw-gallery-strip {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 8px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      max-width: min(860px, 92vw);
+      padding: 10px 4px 4px;
+      justify-content: flex-start;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    .sw-gallery-strip::-webkit-scrollbar {
+      height: 6px;
+    }
+    .sw-gallery-strip::-webkit-scrollbar-thumb {
+      background: #636e72;
+      border-radius: 3px;
+    }
+    .sw-gallery-strip-item {
+      flex: 0 0 auto;
+      width: 56px;
+      height: 56px;
+      padding: 0;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      background: #636e72;
+    }
+    .sw-gallery-strip-item.active {
+      border-color: #ff6b35;
+      box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.35);
+    }
+    .sw-gallery-strip-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -772,6 +965,21 @@
           </table>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- 작업 목록 사진 갤러리 (좌우 이동 + 하단 썸네일) -->
+  <div id="swPhotoGalleryModal" class="sw-gallery-modal" aria-modal="true" role="dialog" aria-label="사진 보기">
+    <div class="sw-gallery-backdrop" onclick="swGalleryClose()"></div>
+    <div class="sw-gallery-dialog" onclick="event.stopPropagation()">
+      <button type="button" class="sw-gallery-close" onclick="swGalleryClose()" aria-label="닫기">×</button>
+      <div class="sw-gallery-main-wrap">
+        <button type="button" class="sw-gallery-arrow sw-gallery-prev" onclick="swGalleryPrev()" aria-label="이전 사진">◀</button>
+        <img id="swGalleryMainImg" class="sw-gallery-main-img" src="" alt="선택된 사진">
+        <button type="button" class="sw-gallery-arrow sw-gallery-next" onclick="swGalleryNext()" aria-label="다음 사진">▶</button>
+      </div>
+      <div id="swGalleryCounter" class="sw-gallery-counter"></div>
+      <div id="swGalleryStrip" class="sw-gallery-strip"></div>
     </div>
   </div>
 
@@ -1127,6 +1335,143 @@
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+    
+    /** 작업 목록 셀에 넣을 사진 URL 배열을 data 속성용 base64(UTF-8)로 인코딩 */
+    function swEncodePhotoListForDataAttr(photos) {
+      try {
+        const json = JSON.stringify(photos);
+        const bytes = new TextEncoder().encode(json);
+        let bin = '';
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin);
+      } catch (e) {
+        return '';
+      }
+    }
+    
+    function swDecodePhotoListFromDataAttr(b64) {
+      if (!b64) return [];
+      try {
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const json = new TextDecoder().decode(bytes);
+        const arr = JSON.parse(json);
+        return Array.isArray(arr) ? arr.filter(function (u) { return typeof u === 'string' && u.trim(); }) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+    
+    /** 작업 목록 테이블용: 작은 썸네일로 전부 표시(칸 너비 고정), 클릭 시 갤러리 */
+    function swBuildPhotoCellHtml(photos) {
+      if (!photos || !photos.length) {
+        return '<span style="color: #999;">사진 없음</span>';
+      }
+      const encoded = swEncodePhotoListForDataAttr(photos);
+      const imgs = photos.map(function (url, i) {
+        return '<img src="' + swEscapeHtml(url) + '" class="sw-photo-thumb-inline" alt="" loading="lazy" data-sw-thumb-idx="' + i + '">';
+      }).join('');
+      return '<div class="sw-photo-cell-wrap" data-sw-photos="' + encoded + '" onclick="swPhotoCellClick(event)" onkeydown="swPhotoCellKeydown(event)" tabindex="0" title="클릭하여 크게 보기">' +
+        '<div class="sw-photo-cell-inner">' + imgs + '</div></div>';
+    }
+    
+    function swPhotoCellKeydown(event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        swPhotoCellClick(event);
+      }
+    }
+    
+    function swPhotoCellClick(event) {
+      const wrap = event.currentTarget;
+      if (!wrap || !wrap.getAttribute) return;
+      const photos = swDecodePhotoListFromDataAttr(wrap.getAttribute('data-sw-photos'));
+      if (!photos.length) return;
+      let idx = 0;
+      const img = event.target.closest('img[data-sw-thumb-idx]');
+      if (img) {
+        const parsed = parseInt(img.getAttribute('data-sw-thumb-idx'), 10);
+        if (!isNaN(parsed)) idx = parsed;
+      }
+      swOpenPhotoGallery(photos, idx);
+    }
+    
+    var swGalleryPhotos = [];
+    var swGalleryIndex = 0;
+    
+    function swOpenPhotoGallery(photos, startIndex) {
+      if (!photos || !photos.length) return;
+      swGalleryPhotos = photos.slice();
+      swGalleryIndex = Math.max(0, Math.min(startIndex || 0, swGalleryPhotos.length - 1));
+      var modal = document.getElementById('swPhotoGalleryModal');
+      if (!modal) return;
+      modal.classList.add('sw-gallery-open');
+      document.addEventListener('keydown', swGalleryOnKeyDown);
+      swGalleryRender();
+    }
+    
+    function swGalleryClose() {
+      var modal = document.getElementById('swPhotoGalleryModal');
+      if (modal) modal.classList.remove('sw-gallery-open');
+      document.removeEventListener('keydown', swGalleryOnKeyDown);
+      var main = document.getElementById('swGalleryMainImg');
+      if (main) main.removeAttribute('src');
+    }
+    
+    function swGalleryOnKeyDown(e) {
+      var modal = document.getElementById('swPhotoGalleryModal');
+      if (!modal || !modal.classList.contains('sw-gallery-open')) return;
+      if (e.key === 'Escape') swGalleryClose();
+      else if (e.key === 'ArrowLeft') swGalleryPrev();
+      else if (e.key === 'ArrowRight') swGalleryNext();
+    }
+    
+    function swGalleryPrev() {
+      if (swGalleryPhotos.length <= 1) return;
+      swGalleryIndex = (swGalleryIndex - 1 + swGalleryPhotos.length) % swGalleryPhotos.length;
+      swGalleryRender();
+    }
+    
+    function swGalleryNext() {
+      if (swGalleryPhotos.length <= 1) return;
+      swGalleryIndex = (swGalleryIndex + 1) % swGalleryPhotos.length;
+      swGalleryRender();
+    }
+    
+    function swGalleryGoTo(i) {
+      if (i < 0 || i >= swGalleryPhotos.length) return;
+      swGalleryIndex = i;
+      swGalleryRender();
+    }
+    
+    function swGalleryRender() {
+      var main = document.getElementById('swGalleryMainImg');
+      var counter = document.getElementById('swGalleryCounter');
+      var strip = document.getElementById('swGalleryStrip');
+      if (!main || !counter || !strip) return;
+      var url = swGalleryPhotos[swGalleryIndex];
+      main.src = url || '';
+      counter.textContent = (swGalleryPhotos.length ? (swGalleryIndex + 1) + ' / ' + swGalleryPhotos.length : '');
+      strip.innerHTML = swGalleryPhotos.map(function (u, i) {
+        var active = i === swGalleryIndex ? ' active' : '';
+        return '<button type="button" class="sw-gallery-strip-item' + active + '" onclick="swGalleryGoTo(' + i + ')" aria-label="사진 ' + (i + 1) + '">' +
+          '<img src="' + swEscapeHtml(u) + '" alt="">' +
+          '</button>';
+      }).join('');
+      var activeBtn = strip.querySelector('.sw-gallery-strip-item.active');
+      if (activeBtn && typeof activeBtn.scrollIntoView === 'function') {
+        activeBtn.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+      }
+      var modal = document.getElementById('swPhotoGalleryModal');
+      if (modal) {
+        var prev = modal.querySelector('.sw-gallery-prev');
+        var next = modal.querySelector('.sw-gallery-next');
+        var hideNav = swGalleryPhotos.length <= 1;
+        if (prev) prev.style.visibility = hideNav ? 'hidden' : 'visible';
+        if (next) next.style.visibility = hideNav ? 'hidden' : 'visible';
+      }
     }
     
     // 숫자 포맷팅 함수
@@ -2160,10 +2505,7 @@
       // 순번: 오래된 작업이 1번, 최신 작업이 마지막 번호
       const html = groupedArray.map((group, index) => {
         const photos = group.photo_links ? group.photo_links.split(',').map(url => url.trim()).filter(url => url) : [];
-        const photoThumbnails = photos.slice(0, 3).map(url => 
-          `<img src="${swEscapeHtml(url)}" class="sw-photo-thumbnail" onclick="swViewPhoto('${swEscapeHtml(url)}')" alt="사진" style="cursor: pointer; margin-right: 5px;">`
-        ).join('');
-        const morePhotos = photos.length > 3 ? `<span style="margin-left: 5px; color: #636e72;">+${photos.length - 3}</span>` : '';
+        const photoCellHtml = swBuildPhotoCellHtml(photos);
         
         // 순번 계산: 오래된 작업이 1번이 되도록 역순
         const rowNumber = groupedArray.length - index;
@@ -2198,7 +2540,7 @@
             <td>${quantitiesHtml}</td>
             <td style="text-align: left; padding-left: 12px;">${unitPricesHtml}</td>
             <td style="font-weight: 600; color: #ff6b35;">${swFormatNumber(Math.round(group.totalAllPrice))}원</td>
-            <td>${photoThumbnails || '<span style="color: #999;">사진 없음</span>'}${morePhotos}</td>
+            <td class="sw-photo-col">${photoCellHtml}</td>
             <td class="sw-memo-cell">
               <span>${swEscapeHtml(memoDisplay)}</span>
               ${memoText ? `<div class="sw-memo-tooltip">${swEscapeHtml(memoText)}</div>` : ''}
@@ -3319,10 +3661,7 @@
       // 순번: 오래된 작업이 1번, 최신 작업이 마지막 번호
       const html = groupedArray.map((group, index) => {
         const photos = group.photo_links ? group.photo_links.split(',').map(url => url.trim()).filter(url => url) : [];
-        const photoThumbnails = photos.slice(0, 3).map(url => 
-          `<img src="${swEscapeHtml(url)}" class="sw-photo-thumbnail" onclick="swViewPhoto('${swEscapeHtml(url)}')" alt="사진" style="cursor: pointer; margin-right: 5px;">`
-        ).join('');
-        const morePhotos = photos.length > 3 ? `<span style="margin-left: 5px; color: #636e72;">+${photos.length - 3}</span>` : '';
+        const photoCellHtml = swBuildPhotoCellHtml(photos);
         
         // 순번 계산: 오래된 작업이 1번이 되도록 역순
         const rowNumber = groupedArray.length - index;
@@ -3352,7 +3691,7 @@
             <td>${quantitiesHtml}</td>
             <td style="text-align: left; padding-left: 12px;">${unitPricesHtml}</td>
             <td style="font-weight: 600; color: #ff6b35;">${swFormatNumber(Math.round(group.totalAllPrice))}원</td>
-            <td>${photoThumbnails || '<span style="color: #999;">사진 없음</span>'}${morePhotos}</td>
+            <td class="sw-photo-col">${photoCellHtml}</td>
             <td class="sw-memo-cell">
               <span>${swEscapeHtml(memoDisplay)}</span>
               ${memoText ? `<div class="sw-memo-tooltip">${swEscapeHtml(memoText)}</div>` : ''}
@@ -3369,10 +3708,11 @@
     
     
     /**
-     * 사진 보기 (공통)
+     * 사진 보기 (공통) — 단일 URL도 갤러리로 열기
      */
     function swViewPhoto(url) {
-      window.open(url, '_blank');
+      if (!url) return;
+      swOpenPhotoGallery([url], 0);
     }
     
     // window에 노출 (외부에서 호출 가능하도록)
