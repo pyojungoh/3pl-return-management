@@ -20,9 +20,9 @@ COMPANY_INFO = {
 
 # 입금 계좌 정보
 BANK_INFO = {
-    'bank': 'KB국민은행',
+    'bank': '국민은행',
     'account_number': '910601-01-494700',
-    'account_holder': '이정민(제이제이)'
+    'account_holder': '이정민(제이제이)',
 }
 
 
@@ -255,6 +255,16 @@ def create_settlement_statement(settlement_data):
     ws[f'B{row}'].font = content_font
     ws[f'A{row}'].border = border_style
     ws[f'B{row}'].border = border_style
+    row += 2
+    
+    notice = (
+        '※ 입금 시 입금자명을 위 공급받는자 상호(회사명)과 동일하게 입력해 주세요. '
+        '그래야 입금 확인 및 정산 처리가 더 빠릅니다.'
+    )
+    ws.merge_cells(f'A{row}:F{row}')
+    ws[f'A{row}'] = notice
+    ws[f'A{row}'].font = Font(name='맑은 고딕', size=10, bold=False, color='C65911')
+    ws[f'A{row}'].alignment = left_align
     row += 2
     
     # 비고

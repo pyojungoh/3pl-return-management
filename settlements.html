@@ -684,6 +684,84 @@
       border-top: 1px solid #e9ecef;
     }
     
+    .st-detail-bank-section {
+      margin: 16px 16px 0;
+      padding-bottom: 4px;
+    }
+    .st-detail-bank-head {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      color: #2d3436;
+      margin: 0 0 10px 0;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #2d3436;
+    }
+    .st-detail-bank-card {
+      background: linear-gradient(160deg, #fafcfd 0%, #eef2f6 100%);
+      border: 1px solid #cfd8dc;
+      border-radius: 10px;
+      padding: 4px 16px;
+      margin-bottom: 12px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+    .st-detail-bank-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      padding: 11px 0;
+      border-bottom: 1px solid #dfe6e9;
+      font-size: 14px;
+    }
+    .st-detail-bank-row:last-child {
+      border-bottom: none;
+    }
+    .st-detail-bank-lbl {
+      flex: 0 0 auto;
+      font-weight: 700;
+      color: #546e7a;
+      font-size: 12px;
+      min-width: 4.2em;
+    }
+    .st-detail-bank-val {
+      text-align: right;
+      font-weight: 600;
+      color: #1e272e;
+      word-break: break-all;
+    }
+    .st-detail-bank-account {
+      font-family: ui-monospace, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+    .st-detail-bank-notice {
+      background: linear-gradient(180deg, #fffbf0 0%, #fff8e6 100%);
+      border: 1px solid #ffe082;
+      border-left: 4px solid #ff9800;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #37474f;
+    }
+    .st-detail-bank-notice .st-detail-bank-notice-title {
+      display: block;
+      font-size: 12px;
+      font-weight: 800;
+      color: #e65100;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+    }
+    .st-detail-bank-notice .st-detail-bank-em {
+      font-style: normal;
+      font-weight: 800;
+      color: #0d47a1;
+      padding: 0 2px;
+      border-bottom: 2px solid #90caf9;
+    }
+    
     .st-subnav-btn {
       padding: 10px 18px;
       font-size: 14px;
@@ -2720,6 +2798,23 @@
               badgeClass = 'st-detail-badge st-detail-badge--done';
             }
             
+            const companyEsc = stDetailEscapeHtml(settlement.company_name || '');
+            const bankNoticeBody = companyEsc
+              ? ('입금 시 <strong>입금자명</strong>을 <strong>회사명(화주사 상호)</strong>과 동일하게 적어 주세요. 이번 정산 상호 예: <span class="st-detail-bank-em">' + companyEsc + '</span> · 동일하게 입금해 주시면 입금 확인 및 처리가 더 빠릅니다.')
+              : ('입금 시 <strong>입금자명</strong>을 <strong>회사명(화주사 상호)</strong>으로 입력해 주세요. 상호와 다르면 확인이 지연될 수 있습니다.');
+            const bankBlock =
+              '<div class="st-detail-bank-section">' +
+              '<p class="st-detail-bank-head">입금 계좌</p>' +
+              '<div class="st-detail-bank-card">' +
+              '<div class="st-detail-bank-row"><span class="st-detail-bank-lbl">은행</span><span class="st-detail-bank-val">국민은행</span></div>' +
+              '<div class="st-detail-bank-row"><span class="st-detail-bank-lbl">계좌번호</span><span class="st-detail-bank-val st-detail-bank-account">910601-01-494700</span></div>' +
+              '<div class="st-detail-bank-row"><span class="st-detail-bank-lbl">예금주</span><span class="st-detail-bank-val">이정민(제이제이)</span></div>' +
+              '</div>' +
+              '<div class="st-detail-bank-notice">' +
+              '<span class="st-detail-bank-notice-title">입금 안내</span>' +
+              bankNoticeBody +
+              '</div></div>';
+            
             const memoBlock = settlement.memo
               ? '<div class="st-detail-memo-box"><div class="st-detail-memo-label">비고</div>' + stDetailEscapeHtml(settlement.memo) + '</div>'
               : '';
@@ -2772,6 +2867,7 @@
               '<div class="st-detail-total-row st-detail-total-row--vat"><span>부가세 (10%)</span><span>' + tax.toLocaleString() + '원</span></div>' +
               '<div class="st-detail-total-row st-detail-total-row--grand"><span>결제금액 (VAT 포함)</span><span>' + finalAmount.toLocaleString() + '원</span></div>' +
               '</div>' +
+              bankBlock +
               memoBlock +
               '<p class="st-detail-doc-footnote">본 명세는 시스템 산출 내역이며, 세금계산서 등 증빙은 별도 정책에 따릅니다.</p>' +
               '</div>';
