@@ -692,10 +692,20 @@ body.mop-body {
 .mop-list--sw {
   flex: 1;
   min-height: 120px;
+  /* 작업 등록 버튼(.mop-sw-bar)과 동일하게 뷰포트 폭에 맞춤 (C/S 목록은 max-width 유지) */
+  max-width: none;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  box-sizing: border-box;
 }
 
 .mop-sw-card {
+  box-sizing: border-box;
+  display: block;
   width: 100%;
+  min-width: 0;
+  align-self: stretch;
   text-align: left;
   padding: 0.45rem 0.55rem;
   margin-bottom: 0.35rem;
@@ -710,8 +720,9 @@ body.mop-body {
   -webkit-tap-highlight-color: transparent;
 }
 
-button.mop-sw-card {
-  display: block;
+article.mop-sw-card {
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .mop-sw-card__row1 {
