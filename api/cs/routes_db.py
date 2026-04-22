@@ -430,6 +430,73 @@ def update_customer_name(cs_id: int, customer_name: str) -> bool:
             conn.close()
 
 
+def fetch_cs_issue_type_for_request(cs_id: int):
+    """접수 건이 있으면 issue_type(빈 문자열 가능), 없으면 None."""
+    conn = get_db_connection()
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('SELECT issue_type FROM customer_service WHERE id = %s', (cs_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return (row[0] or '').strip()
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('SELECT issue_type FROM customer_service WHERE id = ?', (cs_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return (row[0] or '').strip()
+        finally:
+            conn.close()
+
+
+def update_cs_request_issue_type(cs_id: int, issue_type: str) -> bool:
+    """C/S 접수 건의 종류(issue_type) 변경 (관리자용)"""
+    issue_type = (issue_type or '').strip()
+    if not issue_type or len(issue_type) > 200:
+        return False
+    updated_at = get_kst_now()
+    conn = get_db_connection()
+    if USE_POSTGRESQL:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE customer_service
+                SET issue_type = %s, updated_at = %s
+                WHERE id = %s
+            ''', (issue_type, updated_at, cs_id))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ C/S 종류 업데이트 오류: {e}")
+            conn.rollback()
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    else:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                UPDATE customer_service
+                SET issue_type = ?, updated_at = ?
+                WHERE id = ?
+            ''', (issue_type, updated_at, cs_id))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ C/S 종류 업데이트 오류: {e}")
+            return False
+        finally:
+            conn.close()
+
+
 def update_cs_last_notification(cs_id: int, notification_time: datetime = None) -> bool:
     """C/S 마지막 알림 시간 업데이트 (반복 알림용, Vercel 서버리스에서 DB에 저장)
     PostgreSQL: DB의 NOW() 사용 (타임존 변환 문제 완전 회피)
@@ -843,6 +910,64 @@ def update_cs_status_route(cs_id):
         return jsonify({
             'success': False,
             'message': f'C/S 상태 업데이트 중 오류: {str(e)}'
+        }), 500
+
+
+@cs_bp.route('/<int:cs_id>/issue-type', methods=['PUT'])
+def update_cs_request_issue_type_route(cs_id):
+    """C/S 접수 건의 종류 변경 (관리자용)"""
+    try:
+        role = request.args.get('role', '').strip()
+        if role != '관리자':
+            return jsonify({
+                'success': False,
+                'message': '관리자만 C/S 종류를 변경할 수 있습니다.'
+            }), 403
+
+        data = request.get_json() or {}
+        issue_type = (data.get('issue_type') or '').strip()
+        if not issue_type or len(issue_type) > 200:
+            return jsonify({
+                'success': False,
+                'message': 'C/S 종류를 선택하거나 입력해 주세요.'
+            }), 400
+
+        prev = fetch_cs_issue_type_for_request(cs_id)
+        if prev is None:
+            return jsonify({
+                'success': False,
+                'message': 'C/S 접수를 찾을 수 없습니다.'
+            }), 404
+
+        types = get_cs_issue_types()
+        active_names = {
+            t['name'].strip()
+            for t in types
+            if t.get('name') and t.get('is_active', True) is not False
+        }
+        if active_names and issue_type not in active_names and issue_type != prev:
+            return jsonify({
+                'success': False,
+                'message': '활성화된 C/S 종류만 선택할 수 있습니다.'
+            }), 400
+
+        success = update_cs_request_issue_type(cs_id, issue_type)
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'C/S 종류가 변경되었습니다.'
+            })
+        return jsonify({
+            'success': False,
+            'message': 'C/S 종류 변경에 실패했습니다.'
+        }), 500
+    except Exception as e:
+        print(f'❌ C/S 종류 변경 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'C/S 종류 변경 중 오류: {str(e)}'
         }), 500
 
 
