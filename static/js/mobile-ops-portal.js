@@ -480,7 +480,7 @@
 
   function setFilter(f) {
     state.filter = f;
-    var map = [['mopChipAll', 'all'], ['mopChipPending', 'pending'], ['mopChipHold', 'hold'], ['mopChipDone', 'completed']];
+    var map = [['mopChipAll', 'all'], ['mopChipPending', 'pending'], ['mopChipDone', 'completed'], ['mopChipHold', 'hold']];
     map.forEach(function (pair) {
       var el = $(pair[0]);
       if (el) el.classList.toggle('mop-chip--on', f === pair[1]);
