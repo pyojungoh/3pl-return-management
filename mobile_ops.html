@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
   <link rel="apple-touch-icon" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
   <link rel="apple-touch-icon" sizes="180x180" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
-  <link rel="stylesheet" href="/static/css/mobile-ops-portal.css?v=mop20260425">
+  <link rel="stylesheet" href="/static/css/mobile-ops-portal.css?v=mop20260426">
 </head>
 <body class="mop-body">
   <!-- 로그인: 대시보드와 동일 localStorage 키 사용 -->
@@ -117,9 +117,13 @@
         <div id="mopSwFormRows"></div>
         <button type="button" id="mopSwAddRow" class="mop-btn mop-btn--ghost mop-btn--add-sw-row">작업 줄 추가</button>
         <div class="mop-sw-grand-total" id="mopSwFormGrandTotal">총합계 <strong>0</strong>원</div>
-        <label class="mop-sheet__label" for="mopSwFormPhotos">사진</label>
-        <button type="button" class="mop-btn mop-btn--ghost mop-btn--photo-pick" id="mopSwPhotoPick">카메라·앨범에서 추가</button>
-        <input type="file" id="mopSwFormPhotos" class="mop-hidden" accept="image/*" capture="environment" multiple>
+        <p class="mop-sheet__label">사진</p>
+        <div class="mop-sw-photo-actions" role="group" aria-label="사진 추가">
+          <button type="button" class="mop-btn mop-btn--ghost mop-btn--sw-photo" id="mopSwPhotoCamera">카메라 촬영</button>
+          <button type="button" class="mop-btn mop-btn--ghost mop-btn--sw-photo" id="mopSwPhotoAlbum">앨범 (여러 장)</button>
+        </div>
+        <input type="file" id="mopSwFormPhotosCamera" class="mop-hidden" accept="image/*" capture="environment">
+        <input type="file" id="mopSwFormPhotosAlbum" class="mop-hidden" accept="image/*" multiple>
         <div id="mopSwPhotoPreview" class="mop-sw-photo-preview"></div>
         <label class="mop-sheet__label" for="mopSwFormMemo">메모</label>
         <textarea id="mopSwFormMemo" class="mop-input mop-textarea" rows="2" placeholder="선택"></textarea>
@@ -140,6 +144,6 @@
 
   <div id="mopToast" class="mop-toast" role="status" aria-live="polite"></div>
 
-  <script src="/static/js/mobile-ops-portal.js?v=mop20260425" defer></script>
+  <script src="/static/js/mobile-ops-portal.js?v=mop20260426" defer></script>
 </body>
 </html>

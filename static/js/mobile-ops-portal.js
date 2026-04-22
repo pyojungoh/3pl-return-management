@@ -231,8 +231,10 @@
     state.swModalPhotos = [];
     var pv = $('mopSwPhotoPreview');
     if (pv) pv.innerHTML = '';
-    var fi = $('mopSwFormPhotos');
-    if (fi) fi.value = '';
+    var fc = $('mopSwFormPhotosCamera');
+    var fa = $('mopSwFormPhotosAlbum');
+    if (fc) fc.value = '';
+    if (fa) fa.value = '';
   }
 
   function compressImageFile(file, maxW, maxH, quality) {
@@ -1308,10 +1310,14 @@
     $('mopSwModalBackdrop') && $('mopSwModalBackdrop').addEventListener('click', function (ev) {
       if (ev.target.id === 'mopSwModalBackdrop') closeSwModal();
     });
-    $('mopSwPhotoPick') && $('mopSwPhotoPick').addEventListener('click', function () {
-      $('mopSwFormPhotos') && $('mopSwFormPhotos').click();
+    $('mopSwPhotoCamera') && $('mopSwPhotoCamera').addEventListener('click', function () {
+      $('mopSwFormPhotosCamera') && $('mopSwFormPhotosCamera').click();
     });
-    $('mopSwFormPhotos') && $('mopSwFormPhotos').addEventListener('change', handleMopSwPhotoInputChange);
+    $('mopSwPhotoAlbum') && $('mopSwPhotoAlbum').addEventListener('click', function () {
+      $('mopSwFormPhotosAlbum') && $('mopSwFormPhotosAlbum').click();
+    });
+    $('mopSwFormPhotosCamera') && $('mopSwFormPhotosCamera').addEventListener('change', handleMopSwPhotoInputChange);
+    $('mopSwFormPhotosAlbum') && $('mopSwFormPhotosAlbum').addEventListener('change', handleMopSwPhotoInputChange);
     $('mopSwAddRow') && $('mopSwAddRow').addEventListener('click', function () {
       addSwFormRow();
       recalcSwLineAndGrand();
