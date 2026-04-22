@@ -24,6 +24,13 @@
         <label for="mopPass">비밀번호</label>
         <input id="mopPass" name="password" class="mop-input" type="password" autocomplete="current-password" required>
       </div>
+      <div class="mop-field mop-field--check">
+        <label class="mop-check-label" for="mopRemember">
+          <input type="checkbox" id="mopRemember" name="remember">
+          <span>자동 로그인</span>
+        </label>
+        <p class="mop-check-hint">이 기기 브라우저에만 저장됩니다. 공용 기기에서는 사용하지 마세요.</p>
+      </div>
       <button type="submit" class="mop-btn mop-btn--primary">로그인</button>
     </form>
     <div id="mopLoginMsg" class="mop-msg" role="status"></div>

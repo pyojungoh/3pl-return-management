@@ -131,6 +131,38 @@ body.mop-body {
   color: var(--mop-accent2);
 }
 
+.mop-field--check {
+  margin-bottom: 1rem;
+}
+
+.mop-check-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: var(--mop-fs-small);
+  color: var(--mop-text);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.mop-check-label input[type="checkbox"] {
+  width: clamp(18px, 5vw, 22px);
+  height: clamp(18px, 5vw, 22px);
+  margin-top: 0.1rem;
+  flex-shrink: 0;
+  accent-color: var(--mop-accent);
+  cursor: pointer;
+}
+
+.mop-check-hint {
+  margin: 0.35rem 0 0;
+  padding-left: calc(clamp(18px, 5vw, 22px) + 0.5rem);
+  font-size: clamp(0.65rem, 2.8vw, 0.75rem);
+  color: var(--mop-muted);
+  line-height: 1.35;
+}
+
 /* 앱 레이아웃 */
 .mop-header {
   display: flex;

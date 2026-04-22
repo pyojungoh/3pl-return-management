@@ -19,6 +19,7 @@ alwaysApply: false
 ## 인증·API 계약
 
 - 로그인 성공 후 `localStorage` 키는 대시보드와 동일: `client_company`, `client_username`, `client_role`, `client_loginTime`.
+- **자동 로그인** 체크 시 이 페이지 전용 키도 사용: `mop_auto_login`, `mop_saved_username`, `mop_saved_password` (기기 로컬 평문 저장 — 공용 기기 비권장). 로그아웃은 `client_*`만 지우고 `mop_*`는 유지해 다음 접속 시 자동 로그인한다. 해제는 체크 해제 후 다시 로그인하거나 저장값을 지운다.
 - C/S 목록: `GET /api/cs/?company=&month=&role=`
 - 월 목록: `GET /api/cs/available-months?...`
 - 관리자 화주사 필터: `GET /api/auth/companies`

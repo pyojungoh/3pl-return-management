@@ -12,6 +12,62 @@
     loginTime: 'client_loginTime'
   };
 
+  /** 모바일 ops 전용 — 자동 로그인(기기 로컬 저장, 공용 PC 비권장) */
+  var LS_AUTO = {
+    remember: 'mop_auto_login',
+    savedUser: 'mop_saved_username',
+    savedPass: 'mop_saved_password'
+  };
+
+  function clearAutoLoginStorage() {
+    try {
+      localStorage.removeItem(LS_AUTO.remember);
+      localStorage.removeItem(LS_AUTO.savedUser);
+      localStorage.removeItem(LS_AUTO.savedPass);
+    } catch (e) { /* ignore */ }
+  }
+
+  function saveAutoLoginIfChecked(username, password) {
+    var chk = $('mopRemember');
+    try {
+      if (chk && chk.checked) {
+        localStorage.setItem(LS_AUTO.remember, '1');
+        localStorage.setItem(LS_AUTO.savedUser, username);
+        localStorage.setItem(LS_AUTO.savedPass, password);
+      } else {
+        clearAutoLoginStorage();
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function syncRememberCheckbox() {
+    var chk = $('mopRemember');
+    if (!chk) return;
+    try {
+      chk.checked = localStorage.getItem(LS_AUTO.remember) === '1';
+      var su = localStorage.getItem(LS_AUTO.savedUser);
+      if (su && $('mopUser')) $('mopUser').value = su;
+    } catch (e) { /* ignore */ }
+  }
+
+  function getSavedCredentials() {
+    try {
+      if (localStorage.getItem(LS_AUTO.remember) !== '1') return null;
+      var u = localStorage.getItem(LS_AUTO.savedUser);
+      var p = localStorage.getItem(LS_AUTO.savedPass);
+      if (u && p) return { username: u, password: p };
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+
+  function performLogin(username, password) {
+    return fetch(state.apiBase + '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username, password: password })
+    }).then(function (r) { return r.json(); });
+  }
+
   function getApiBase() {
     var origin = global.location.origin || '';
     var protocol = global.location.protocol || '';
@@ -160,23 +216,52 @@
       if (msg) { msg.textContent = '아이디와 비밀번호를 입력해 주세요.'; msg.className = 'mop-msg mop-msg--err'; }
       return;
     }
-    fetch(state.apiBase + '/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u, password: p })
-    })
-      .then(function (r) { return r.json(); })
+    if (msg) { msg.textContent = '로그인 중…'; msg.className = 'mop-msg'; }
+    performLogin(u, p)
       .then(function (result) {
         if (result.success) {
           persistAuth(result);
+          saveAutoLoginIfChecked(u, p);
           if (msg) { msg.textContent = ''; msg.className = 'mop-msg'; }
           showApp();
         } else {
+          clearAutoLoginStorage();
+          if ($('mopRemember')) $('mopRemember').checked = false;
           if (msg) { msg.textContent = result.message || '로그인 실패'; msg.className = 'mop-msg mop-msg--err'; }
         }
       })
       .catch(function (err) {
         if (msg) { msg.textContent = '오류: ' + (err.message || ''); msg.className = 'mop-msg mop-msg--err'; }
+      });
+  }
+
+  function tryAutoLoginFromSaved() {
+    var cred = getSavedCredentials();
+    if (!cred) return Promise.resolve(false);
+    var msg = $('mopLoginMsg');
+    if (msg) { msg.textContent = '저장된 계정으로 로그인 중…'; msg.className = 'mop-msg'; }
+    return performLogin(cred.username, cred.password)
+      .then(function (result) {
+        if (result.success) {
+          persistAuth(result);
+          if (msg) { msg.textContent = ''; msg.className = 'mop-msg'; }
+          showApp();
+          return true;
+        }
+        clearAutoLoginStorage();
+        if (msg) {
+          msg.textContent = '자동 로그인에 실패했습니다. 비밀번호를 확인해 주세요.';
+          msg.className = 'mop-msg mop-msg--err';
+        }
+        syncRememberCheckbox();
+        return false;
+      })
+      .catch(function () {
+        if (msg) {
+          msg.textContent = '자동 로그인 중 네트워크 오류가 났습니다.';
+          msg.className = 'mop-msg mop-msg--err';
+        }
+        return false;
       });
   }
 
@@ -516,9 +601,14 @@
     readLocalAuth();
     if (state.company && state.username && state.role) {
       showApp();
-    } else {
-      showLogin();
+      return;
     }
+    tryAutoLoginFromSaved().then(function (ok) {
+      if (!ok) {
+        showLogin();
+        syncRememberCheckbox();
+      }
+    });
   }
 
   global.MobileOpsPortal = {
