@@ -309,6 +309,66 @@ body.mop-body {
   border: 1px solid transparent;
 }
 
+/* C/S 종류 배지 (리스트에서 크게·색 구분) */
+.mop-type {
+  display: inline-block;
+  padding: 0.28rem 0.65rem;
+  border-radius: 8px;
+  font-size: clamp(0.82rem, 3.9vw, 1rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  border: 1px solid transparent;
+  vertical-align: middle;
+}
+
+.mop-type--inline {
+  font-size: clamp(0.78rem, 3.5vw, 0.92rem);
+  padding: 0.22rem 0.55rem;
+}
+
+.mop-type--missing {
+  color: #f39c12;
+  background: rgba(243, 156, 18, 0.2);
+  border-color: rgba(243, 156, 18, 0.55);
+}
+
+.mop-type--wrong {
+  color: #ff7675;
+  background: rgba(231, 76, 60, 0.22);
+  border-color: rgba(231, 76, 60, 0.55);
+}
+
+.mop-type--exchange {
+  color: #74b9ff;
+  background: rgba(52, 152, 219, 0.22);
+  border-color: rgba(52, 152, 219, 0.55);
+}
+
+.mop-type--return {
+  color: #dfe6e9;
+  background: rgba(155, 89, 182, 0.35);
+  border-color: rgba(155, 89, 182, 0.65);
+}
+
+.mop-type--cancel {
+  color: #fab1a0;
+  background: rgba(149, 165, 166, 0.28);
+  border-color: rgba(149, 165, 166, 0.55);
+}
+
+.mop-type--other {
+  color: #55efc4;
+  background: rgba(26, 188, 156, 0.2);
+  border-color: rgba(26, 188, 156, 0.5);
+}
+
+.mop-type--default {
+  color: #dfe6e9;
+  background: rgba(136, 152, 170, 0.28);
+  border-color: rgba(136, 152, 170, 0.45);
+}
+
 .mop-badge--접수 {
   color: var(--mop-warn);
   border-color: rgba(243, 156, 18, 0.5);

@@ -57,6 +57,20 @@
     return 'mop-badge--접수';
   }
 
+  /** C/S 종류(누락·오배송 등) — 리스트·시트 배지용 클래스 */
+  function issueTypeBadgeClass(issueType) {
+    var t = (issueType || '').trim();
+    var map = {
+      누락: 'mop-type--missing',
+      오배송: 'mop-type--wrong',
+      교환: 'mop-type--exchange',
+      반품: 'mop-type--return',
+      취소: 'mop-type--cancel',
+      기타: 'mop-type--other'
+    };
+    return 'mop-type ' + (map[t] || 'mop-type--default');
+  }
+
   var state = {
     apiBase: getApiBase(),
     company: '',
@@ -309,7 +323,7 @@
       return (
         '<button type="button" class="mop-card" data-csid="' + Number(cs.id) + '">' +
         '<div class="mop-card__row">' +
-        '<span class="mop-badge">' + type + '</span>' +
+        '<span class="' + issueTypeBadgeClass(cs.issue_type) + '">' + type + '</span>' +
         '<span class="mop-badge ' + statusClass(st) + '">' + escapeHtml(st) + '</span>' +
         '</div>' +
         '<div class="mop-card__meta">' + comp + ' · ' + dt + '</div>' +
@@ -357,7 +371,7 @@
     body.innerHTML =
       '<h2>접수 #' + escapeHtml(String(cs.id)) + '</h2>' +
       '<div class="mop-sheet__block"><span class="mop-sheet__label">화주사</span>' + escapeHtml(cs.company_name || '') + '</div>' +
-      '<div class="mop-sheet__block"><span class="mop-sheet__label">종류</span>' + escapeHtml(cs.issue_type || '-') + '</div>' +
+      '<div class="mop-sheet__block"><span class="mop-sheet__label">종류</span> <span class="' + issueTypeBadgeClass(cs.issue_type) + ' mop-type--inline">' + escapeHtml(cs.issue_type || '-') + '</span></div>' +
       '<div class="mop-sheet__block"><span class="mop-sheet__label">상태</span>' + escapeHtml(st) + '</div>' +
       '<div class="mop-sheet__block"><span class="mop-sheet__label">일시</span>' + escapeHtml(formatCsDate(cs)) + '</div>' +
       '<div class="mop-sheet__block"><span class="mop-sheet__label">관리번호</span>' + escapeHtml(cs.management_number || '-') + '</div>' +
