@@ -113,6 +113,13 @@
     return 'mop-badge--접수';
   }
 
+  /** 카드 우측 상태 라벨 (접수 → 대기중) */
+  function statusLabel(st) {
+    var s = (st || '').trim() || '접수';
+    if (s === '접수') return '대기중';
+    return s;
+  }
+
   /** C/S 종류(누락·오배송 등) — 리스트·시트 배지용 클래스 */
   function issueTypeBadgeClass(issueType) {
     var t = (issueType || '').trim();
@@ -405,13 +412,25 @@
       var comp = escapeHtml(cs.company_name || '');
       var dt = escapeHtml(formatCsDate(cs));
       var snip = escapeHtml((cs.content || '').slice(0, 200));
+      var mgmt = (cs.management_number || '').trim();
+      var gen = (cs.generated_management_number || '').trim();
+      var numRaw = mgmt || gen || '';
+      var metaParts = [];
+      if (numRaw) metaParts.push(escapeHtml(numRaw));
+      if (comp) metaParts.push(comp);
+      if (dt) metaParts.push(dt);
+      var metaLine = metaParts.join(' · ');
       return (
         '<button type="button" class="mop-card" data-csid="' + Number(cs.id) + '">' +
         '<div class="mop-card__row">' +
+        '<div class="mop-card__row-left">' +
         '<span class="' + issueTypeBadgeClass(cs.issue_type) + '">' + type + '</span>' +
-        '<span class="mop-badge ' + statusClass(st) + '">' + escapeHtml(st) + '</span>' +
         '</div>' +
-        '<div class="mop-card__meta">' + comp + ' · ' + dt + '</div>' +
+        '<div class="mop-card__status">' +
+        '<span class="mop-badge ' + statusClass(st) + '">' + escapeHtml(statusLabel(st)) + '</span>' +
+        '</div>' +
+        '</div>' +
+        '<div class="mop-card__meta">' + metaLine + '</div>' +
         (snip ? '<div class="mop-card__text">' + snip + '</div>' : '') +
         '</button>'
       );

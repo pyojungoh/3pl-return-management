@@ -326,10 +326,30 @@ body.mop-body {
 
 .mop-card__row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem 0.5rem;
-  margin-bottom: 0.35rem;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.mop-card__row-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.mop-card__status {
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.mop-card__status .mop-badge {
+  display: inline-block;
+  padding: 0.22rem 0.55rem;
+  border-radius: 8px;
+  font-size: clamp(0.72rem, 3.1vw, 0.85rem);
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .mop-badge {
