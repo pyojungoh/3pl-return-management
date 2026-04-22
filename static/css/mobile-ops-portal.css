@@ -327,6 +327,12 @@ body.mop-body {
   background: rgba(231, 76, 60, 0.12);
 }
 
+.mop-badge--보류 {
+  color: #a29bfe;
+  border-color: rgba(108, 92, 231, 0.5);
+  background: rgba(108, 92, 231, 0.15);
+}
+
 .mop-card__meta {
   font-size: var(--mop-fs-small);
   color: var(--mop-muted);

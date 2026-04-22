@@ -161,7 +161,7 @@ def send_cs_notifications(notification_type='all'):
             if not cs_id:
                 continue
             
-            # 상태 확인 (처리완료/처리불가면 스킵)
+            # 상태 확인 (텔레그램 반복 알림은 '접수'만 대상 — 보류·처리완료·처리불가 제외)
             status = cs.get('status', '접수')
             if status not in ['접수']:
                 continue
@@ -219,7 +219,7 @@ def send_cs_notifications(notification_type='all'):
             if not cs_id:
                 continue
             
-            # 상태 확인 (처리완료/처리불가면 스킵)
+            # 상태 확인 ('접수'만 반복 알림 — 보류 등은 제외)
             status = cs.get('status', '접수')
             if status not in ['접수']:
                 continue

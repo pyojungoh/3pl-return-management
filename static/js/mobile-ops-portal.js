@@ -53,6 +53,7 @@
   function statusClass(st) {
     if (st === '처리완료') return 'mop-badge--완료';
     if (st === '처리불가') return 'mop-badge--불가';
+    if (st === '보류') return 'mop-badge--보류';
     return 'mop-badge--접수';
   }
 
@@ -282,6 +283,9 @@
     if (state.filter === 'pending') {
       return arr.filter(function (c) { return c.status === '접수'; });
     }
+    if (state.filter === 'hold') {
+      return arr.filter(function (c) { return c.status === '보류'; });
+    }
     if (state.filter === 'completed') {
       return arr.filter(function (c) { return c.status === '처리완료' || c.status === '처리불가'; });
     }
@@ -342,6 +346,7 @@
     var isAdmin = state.role === '관리자';
     var adminBtns = isAdmin
       ? '<div class="mop-sheet__actions">' +
+        '<button type="button" class="mop-btn mop-btn--muted" id="mopActHold" style="background:linear-gradient(135deg,#a29bfe 0%,#6c5ce7 100%);color:#fff;border:none">보류</button>' +
         '<button type="button" class="mop-btn mop-btn--success" id="mopActComplete">처리완료</button>' +
         '<button type="button" class="mop-btn mop-btn--danger" id="mopActImpossible">처리불가</button>' +
         '<label class="mop-sheet__label" style="margin-top:0.5rem">C/S 종류 변경</label>' +
@@ -365,6 +370,7 @@
     var closeBtn = $('mopSheetClose');
     if (closeBtn) closeBtn.addEventListener('click', closeSheet);
     if (isAdmin) {
+      $('mopActHold') && $('mopActHold').addEventListener('click', function () { actStatus(id, '보류'); });
       $('mopActComplete') && $('mopActComplete').addEventListener('click', function () { actStatus(id, '처리완료'); });
       $('mopActImpossible') && $('mopActImpossible').addEventListener('click', function () { actStatus(id, '처리불가'); });
       $('mopActIssueType') && $('mopActIssueType').addEventListener('click', function () { actIssueType(id); });
@@ -407,7 +413,8 @@
   }
 
   function actStatus(id, status) {
-    var msg = global.prompt((status === '처리완료' ? '처리완료' : '처리불가') + ' — 관리자 메시지 (선택)', '');
+    var title = status === '처리완료' ? '처리완료' : (status === '처리불가' ? '처리불가' : '보류');
+    var msg = global.prompt(title + ' — 메모 (선택)', '');
     if (msg === null) return;
     fetch(state.apiBase + '/api/cs/' + id + '/status', {
       method: 'PUT',
@@ -459,11 +466,10 @@
 
   function setFilter(f) {
     state.filter = f;
-    ['mopChipAll', 'mopChipPending', 'mopChipDone'].forEach(function (id, i) {
-      var el = $(id);
-      if (!el) return;
-      var on = (f === 'all' && i === 0) || (f === 'pending' && i === 1) || (f === 'completed' && i === 2);
-      el.classList.toggle('mop-chip--on', on);
+    var map = [['mopChipAll', 'all'], ['mopChipPending', 'pending'], ['mopChipHold', 'hold'], ['mopChipDone', 'completed']];
+    map.forEach(function (pair) {
+      var el = $(pair[0]);
+      if (el) el.classList.toggle('mop-chip--on', f === pair[1]);
     });
     renderList();
   }
@@ -483,6 +489,7 @@
 
     $('mopChipAll') && $('mopChipAll').addEventListener('click', function () { setFilter('all'); });
     $('mopChipPending') && $('mopChipPending').addEventListener('click', function () { setFilter('pending'); });
+    $('mopChipHold') && $('mopChipHold').addEventListener('click', function () { setFilter('hold'); });
     $('mopChipDone') && $('mopChipDone').addEventListener('click', function () { setFilter('completed'); });
 
     $('mopSheetBackdrop') && $('mopSheetBackdrop').addEventListener('click', function (ev) {

@@ -242,6 +242,16 @@ def update_cs_status(cs_id: int, status: str, admin_message: str = None, process
                 ''', (status, admin_message, updated_at, cs_id))
                 conn.commit()
                 return cursor.rowcount > 0
+            if status == '보류':
+                # 확인 후 처리 예정: 반복 텔레그램 대상 제외(status≠접수) + 타이머 리셋
+                cursor.execute('''
+                    UPDATE customer_service
+                    SET status = %s, admin_message = %s, processor = %s, processed_at = NULL,
+                        last_notification_at = NULL, updated_at = %s
+                    WHERE id = %s
+                ''', (status, admin_message, processor, updated_at, cs_id))
+                conn.commit()
+                return cursor.rowcount > 0
             if admin_message and processor:
                 cursor.execute('''
                     UPDATE customer_service
@@ -284,6 +294,15 @@ def update_cs_status(cs_id: int, status: str, admin_message: str = None, process
                     SET status = ?, admin_message = ?, processor = NULL, processed_at = NULL, updated_at = ?
                     WHERE id = ?
                 ''', (status, admin_message, updated_at, cs_id))
+                conn.commit()
+                return cursor.rowcount > 0
+            if status == '보류':
+                cursor.execute('''
+                    UPDATE customer_service
+                    SET status = ?, admin_message = ?, processor = ?, processed_at = NULL,
+                        last_notification_at = NULL, updated_at = ?
+                    WHERE id = ?
+                ''', (status, admin_message, processor, updated_at, cs_id))
                 conn.commit()
                 return cursor.rowcount > 0
             if admin_message and processor:
@@ -877,17 +896,17 @@ def get_available_months():
 
 @cs_bp.route('/<int:cs_id>/status', methods=['PUT'])
 def update_cs_status_route(cs_id):
-    """C/S 접수 상태 업데이트 (관리자용 - 접수/처리완료/처리불가)"""
+    """C/S 접수 상태 업데이트 (관리자용 - 접수/보류/처리완료/처리불가)"""
     try:
         data = request.get_json()
         status = data.get('status', '').strip()
         admin_message = data.get('admin_message', '').strip() if data.get('admin_message') else None
         processor = data.get('processor', '').strip() if data.get('processor') else None
         
-        if not status or status not in ['접수', '처리완료', '처리불가']:
+        if not status or status not in ['접수', '보류', '처리완료', '처리불가']:
             return jsonify({
                 'success': False,
-                'message': '상태는 접수, 처리완료, 처리불가 중 하나여야 합니다.'
+                'message': '상태는 접수, 보류, 처리완료, 처리불가 중 하나여야 합니다.'
             }), 400
         
         success = update_cs_status(cs_id, status, admin_message, processor)
@@ -1160,11 +1179,16 @@ def resend_cs_notification(cs_id):
             finally:
                 conn.close()
         
-        # 처리완료 상태면 알림 전송하지 않음
-        if cs_data.get('status') == '처리완료' or cs_data.get('status') == '처리불가':
+        st = cs_data.get('status') or ''
+        if st == '처리완료' or st == '처리불가':
             return jsonify({
                 'success': False,
                 'message': '처리완료된 C/S는 재요청할 수 없습니다.'
+            }), 400
+        if st == '보류':
+            return jsonify({
+                'success': False,
+                'message': '보류 중인 C/S는 재요청할 수 없습니다. 관리자 확인 후 처리해 주세요.'
             }), 400
         
         # 텔레그램 알림 메시지 생성

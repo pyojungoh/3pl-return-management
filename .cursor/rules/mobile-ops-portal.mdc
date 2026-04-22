@@ -26,6 +26,10 @@ alwaysApply: false
 - 종류 변경: `PUT /api/cs/:id/issue-type?role=관리자`
 - `API_BASE`는 `dashboard_server.html`의 `resolveApiBaseUrl`과 동일 규칙(파일 미리보기 시 `127.0.0.1:5000`).
 
+## C/S 상태
+
+- 관리자 시트에서 **보류** 가능 (`PUT /api/cs/:id/status`, `status: 보류`). 보류 시 DB에서 `last_notification_at`이 비워져 **미처리 텔레그램 반복 알림이 멈춘다** (스케줄러는 `접수`만 대상).
+
 ## 탭 · QR 이동
 
 - **QR 스캔** 탭은 `<a href="/qr-photo">` 로 이동한다. (`qr_photo_return.html` — QR-mobile 인식 품질 룰 적용 페이지)
