@@ -1,0 +1,37 @@
+---
+description: 모바일 작업 포털 (관리자 C/S + QR 링크)
+globs: mobile_ops.html,static/js/mobile-ops-portal.js,static/css/mobile-ops-portal.css
+alwaysApply: false
+---
+
+# 모바일 작업 포털 (`mobile_ops.html`)
+
+관리자·화주사가 **모바일에서 C/S를 위주로** 볼 때 사용하는 경량 페이지. **가로로 긴 테이블은 쓰지 않는다** — 카드형 세로 목록만 유지한다.
+
+## 파일 역할 (모듈 분리)
+
+| 파일 | 역할 |
+|------|------|
+| `mobile_ops.html` | 뼈대·탭·로그인 폼·시트 컨테이너만. 비즈니스 로직 넣지 않는다. |
+| `static/css/mobile-ops-portal.css` | 타이포·간격·다크 테마·터치 최소 높이. **글자 크기는 `clamp()` / CSS 변수**로 뷰포트에 맞춘다. |
+| `static/js/mobile-ops-portal.js` | API 호출·목록·시트·로그인. 전역은 `MobileOpsPortal` 하나로 묶는다. |
+
+## 인증·API 계약
+
+- 로그인 성공 후 `localStorage` 키는 대시보드와 동일: `client_company`, `client_username`, `client_role`, `client_loginTime`.
+- C/S 목록: `GET /api/cs/?company=&month=&role=`
+- 월 목록: `GET /api/cs/available-months?...`
+- 관리자 화주사 필터: `GET /api/auth/companies`
+- 상태 변경: `PUT /api/cs/:id/status`
+- 종류 변경: `PUT /api/cs/:id/issue-type?role=관리자`
+- `API_BASE`는 `dashboard_server.html`의 `resolveApiBaseUrl`과 동일 규칙(파일 미리보기 시 `127.0.0.1:5000`).
+
+## 탭 · QR 이동
+
+- **QR 스캔** 탭은 `<a href="/qr-photo">` 로 이동한다. (`qr_photo_return.html` — QR-mobile 인식 품질 룰 적용 페이지)
+- **`qr_photo_return.html`의 스캔 파이프라인을 수정할 때는** `.cursor/rules/qr-mobile-recognition-quality.mdc` 를 따른다. 모바일 포털에서는 스캔 코드를 복제하지 않는다.
+
+## UX 제약
+
+- 목록은 **카드 + 세로 스크롤**만. PC용처럼 좌우 스크롤 테이블 금지.
+- 상세는 **바텀 시트**로; 관리자에게만 처리완료·처리불가·종류 저장 노출.

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1419">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>모바일 작업 · C/S</title>
+  <link rel="icon" type="image/png" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
+  <link rel="stylesheet" href="/static/css/mobile-ops-portal.css">
+</head>
+<body class="mop-body">
+  <!-- 로그인: 대시보드와 동일 localStorage 키 사용 -->
+  <section id="mopLogin" class="mop-login">
+    <h1>모바일 작업</h1>
+    <p>관리자·화주사 계정으로 로그인합니다. C/S를 빠르게 확인합니다.</p>
+    <form id="mopLoginForm" autocomplete="on">
+      <div class="mop-field">
+        <label for="mopUser">아이디</label>
+        <input id="mopUser" name="username" class="mop-input" type="text" autocomplete="username" required>
+      </div>
+      <div class="mop-field">
+        <label for="mopPass">비밀번호</label>
+        <input id="mopPass" name="password" class="mop-input" type="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="mop-btn mop-btn--primary">로그인</button>
+    </form>
+    <div id="mopLoginMsg" class="mop-msg" role="status"></div>
+  </section>
+
+  <div id="mopApp" class="mop-hidden">
+    <header class="mop-header">
+      <div>
+        <h1 class="mop-header__title">C/S 관리</h1>
+        <p id="mopHeaderSub" class="mop-header__sub"></p>
+      </div>
+      <div class="mop-header__actions">
+        <button type="button" id="mopRefresh" class="mop-icon-btn" title="새로고침">새로고침</button>
+        <button type="button" id="mopLogout" class="mop-icon-btn" title="로그아웃">나가기</button>
+      </div>
+    </header>
+
+    <nav class="mop-tabs" aria-label="주 메뉴">
+      <button type="button" class="mop-tab mop-tab--active" aria-current="page">C/S 관리</button>
+      <a href="/qr-photo" class="mop-tab mop-tab--link">QR 스캔</a>
+    </nav>
+
+    <div class="mop-toolbar">
+      <div class="mop-toolbar__row">
+        <select id="mopMonth" class="mop-select" aria-label="조회 월"></select>
+      </div>
+      <div id="mopCompanyWrap" class="mop-toolbar__row mop-hidden">
+        <select id="mopCompany" class="mop-select" aria-label="화주사 필터"></select>
+      </div>
+    </div>
+
+    <div class="mop-chips" role="toolbar" aria-label="상태 필터">
+      <button type="button" id="mopChipAll" class="mop-chip mop-chip--on">전체</button>
+      <button type="button" id="mopChipPending" class="mop-chip">미처리</button>
+      <button type="button" id="mopChipDone" class="mop-chip">완료·불가</button>
+    </div>
+
+    <div id="mopCsList" class="mop-list" role="list"></div>
+    <p class="mop-footer-link"><a href="/">PC 대시보드로 이동</a></p>
+  </div>
+
+  <div id="mopSheetBackdrop" class="mop-sheet-backdrop mop-hidden" role="presentation">
+    <div class="mop-sheet" role="dialog" aria-modal="true" onclick="event.stopPropagation();">
+      <div id="mopSheetBody"></div>
+    </div>
+  </div>
+
+  <div id="mopToast" class="mop-toast" role="status" aria-live="polite"></div>
+
+  <script src="/static/js/mobile-ops-portal.js" defer></script>
+</body>
+</html>

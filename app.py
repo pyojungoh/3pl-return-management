@@ -329,6 +329,18 @@ def qr_photo():
         return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
 
 
+@app.route('/mobile-ops')
+@app.route('/mobile_ops.html')
+def mobile_ops():
+    """모바일 작업 포털 (C/S 조회·관리 + QR 스캔 이동)"""
+    try:
+        return send_file('mobile_ops.html')
+    except FileNotFoundError:
+        return '<h1>모바일 작업 페이지를 찾을 수 없습니다.</h1><p>mobile_ops.html 파일이 필요합니다.</p>', 404
+    except Exception as e:
+        return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
+
+
 # 정적 파일 제공
 @app.route('/static/<path:filename>')
 def serve_static(filename):
