@@ -12,11 +12,11 @@
   <meta name="apple-mobile-web-app-title" content="Mobile">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Mobile</title>
-  <link rel="manifest" href="/static/manifest-mobile.json?v=mop20260422">
+  <link rel="manifest" href="/static/manifest-mobile.json?v=mop20260423">
   <link rel="icon" type="image/png" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
   <link rel="apple-touch-icon" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
   <link rel="apple-touch-icon" sizes="180x180" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
-  <link rel="stylesheet" href="/static/css/mobile-ops-portal.css?v=mop20260422">
+  <link rel="stylesheet" href="/static/css/mobile-ops-portal.css?v=mop20260423">
 </head>
 <body class="mop-body">
   <!-- 로그인: 대시보드와 동일 localStorage 키 사용 -->
@@ -110,18 +110,13 @@
         <select id="mopSwFormCompany" class="mop-select mop-select--full"></select>
         <label class="mop-sheet__label" for="mopSwFormDate">작업일</label>
         <input type="date" id="mopSwFormDate" class="mop-input">
-        <label class="mop-sheet__label" for="mopSwFormType">작업 종류</label>
-        <select id="mopSwFormType" class="mop-select mop-select--full"></select>
-        <div class="mop-sw-form-row">
-          <div>
-            <label class="mop-sheet__label" for="mopSwFormQty">수량</label>
-            <input type="number" id="mopSwFormQty" class="mop-input" min="1" step="1" value="1">
-          </div>
-          <div>
-            <label class="mop-sheet__label" for="mopSwFormPrice">단가</label>
-            <input type="number" id="mopSwFormPrice" class="mop-input" min="0" step="1" value="0">
-          </div>
+        <p class="mop-sheet__label mop-sw-lines-label">작업 내역 <span class="mop-sw-lines-hint">(종류·수량·단가·금액)</span></p>
+        <div class="mop-sw-lines-head" aria-hidden="true">
+          <span>작업종류</span><span>수량</span><span>단가</span><span>금액</span>
         </div>
+        <div id="mopSwFormRows"></div>
+        <button type="button" id="mopSwAddRow" class="mop-btn mop-btn--ghost mop-btn--add-sw-row">작업 줄 추가</button>
+        <div class="mop-sw-grand-total" id="mopSwFormGrandTotal">총합계 <strong>0</strong>원</div>
         <label class="mop-sheet__label" for="mopSwFormPhotos">사진</label>
         <button type="button" class="mop-btn mop-btn--ghost mop-btn--photo-pick" id="mopSwPhotoPick">카메라·앨범에서 추가</button>
         <input type="file" id="mopSwFormPhotos" class="mop-hidden" accept="image/*" capture="environment" multiple>
@@ -133,8 +128,18 @@
     </div>
   </div>
 
+  <div id="mopSwDetailBackdrop" class="mop-modal-backdrop mop-modal-backdrop--detail mop-hidden" role="presentation">
+    <div class="mop-modal" role="dialog" aria-modal="true" aria-labelledby="mopSwDetailTitle" onclick="event.stopPropagation();">
+      <div class="mop-modal__head">
+        <h2 class="mop-modal__title" id="mopSwDetailTitle">특수작업</h2>
+        <button type="button" class="mop-sheet__close" id="mopSwDetailClose" aria-label="닫기">×</button>
+      </div>
+      <div id="mopSwDetailBody" class="mop-modal__body mop-modal__body--detail"></div>
+    </div>
+  </div>
+
   <div id="mopToast" class="mop-toast" role="status" aria-live="polite"></div>
 
-  <script src="/static/js/mobile-ops-portal.js?v=mop20260422" defer></script>
+  <script src="/static/js/mobile-ops-portal.js?v=mop20260423" defer></script>
 </body>
 </html>

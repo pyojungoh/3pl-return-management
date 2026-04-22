@@ -348,47 +348,121 @@
     dst.selectedIndex = 0;
   }
 
-  function mopSwSyncPriceFromType() {
-    var sel = $('mopSwFormType');
-    var price = $('mopSwFormPrice');
-    if (!sel || !price || !sel.selectedOptions.length) return;
-    var opt = sel.selectedOptions[0];
-    var dp = opt.getAttribute('data-default-price');
-    if (dp !== null && dp !== '' && !isNaN(Number(dp))) price.value = String(Math.round(Number(dp)));
-  }
-
-  function fillSwModalTypeSelect() {
-    var sel = $('mopSwFormType');
-    if (!sel) return Promise.resolve();
-    sel.innerHTML = '<option value="">불러오는 중…</option>';
+  function fetchSwWorkTypes() {
     return fetch(state.apiBase + '/api/special-works/types', {
       headers: authHeaders(),
       credentials: 'include'
     })
       .then(function (r) { return r.json(); })
       .then(function (res) {
-        sel.innerHTML = '';
-        var list = (res.success && res.data) ? res.data : [];
-        state.swWorkTypes = list.slice();
-        list.forEach(function (t) {
-          var o = document.createElement('option');
-          o.value = String(t.id);
-          o.textContent = t.name || '';
-          o.setAttribute('data-default-price', String(t.default_unit_price != null ? t.default_unit_price : ''));
-          sel.appendChild(o);
-        });
-        if (!list.length) {
-          var x = document.createElement('option');
-          x.value = '';
-          x.textContent = '등록된 종류 없음';
-          sel.appendChild(x);
-        } else {
-          mopSwSyncPriceFromType();
-        }
+        state.swWorkTypes = (res.success && res.data) ? res.data.slice() : [];
+        return state.swWorkTypes;
       })
       .catch(function () {
-        sel.innerHTML = '<option value="">종류 로드 실패</option>';
+        state.swWorkTypes = [];
+        return state.swWorkTypes;
       });
+  }
+
+  function mopSwLineSyncPriceFromType(selectEl) {
+    var row = selectEl && selectEl.closest && selectEl.closest('.mop-sw-line');
+    if (!row) return;
+    var price = row.querySelector('.mop-sw-line-price');
+    var opt = selectEl.selectedOptions && selectEl.selectedOptions[0];
+    if (!price || !opt) return;
+    var dp = opt.getAttribute('data-default-price');
+    if (dp !== null && dp !== '' && !isNaN(Number(dp))) price.value = String(Math.round(Number(dp)));
+    recalcSwLineAndGrand();
+  }
+
+  function updateSwLineRemoveVisibility() {
+    var host = $('mopSwFormRows');
+    if (!host) return;
+    var lines = host.querySelectorAll('.mop-sw-line');
+    var multi = lines.length > 1;
+    lines.forEach(function (line) {
+      var rm = line.querySelector('.mop-sw-line-remove');
+      if (rm) rm.classList.toggle('mop-hidden', !multi);
+    });
+  }
+
+  function recalcSwLineAndGrand() {
+    var host = $('mopSwFormRows');
+    var sum = 0;
+    if (!host) return;
+    host.querySelectorAll('.mop-sw-line').forEach(function (line) {
+      var qEl = line.querySelector('.mop-sw-line-qty');
+      var pEl = line.querySelector('.mop-sw-line-price');
+      var am = line.querySelector('.mop-sw-line-amt');
+      var q = parseFloat(qEl && qEl.value) || 0;
+      var p = parseFloat(pEl && pEl.value) || 0;
+      var lineTot = Math.round(q * p);
+      sum += lineTot;
+      if (am) am.textContent = lineTot.toLocaleString('ko-KR') + '원';
+    });
+    var gt = $('mopSwFormGrandTotal');
+    if (gt) gt.innerHTML = '총합계 <strong>' + sum.toLocaleString('ko-KR') + '</strong>원';
+  }
+
+  function addSwFormRow() {
+    var host = $('mopSwFormRows');
+    if (!host || !state.swWorkTypes.length) return;
+    var opts = state.swWorkTypes.map(function (t) {
+      var id = Number(t.id);
+      var dp = t.default_unit_price != null && t.default_unit_price !== undefined ? String(t.default_unit_price) : '';
+      return '<option value="' + id + '" data-default-price="' + dp.replace(/"/g, '') + '">' + escapeHtml(t.name || '') + '</option>';
+    }).join('');
+    var div = document.createElement('div');
+    div.className = 'mop-sw-line';
+    div.innerHTML =
+      '<div class="mop-sw-line__inner">' +
+      '<div class="mop-sw-line__grid">' +
+      '<select class="mop-select mop-sw-line-type">' + opts + '</select>' +
+      '<input type="number" class="mop-input mop-sw-line-qty" min="1" step="1" value="1" inputmode="decimal">' +
+      '<input type="number" class="mop-input mop-sw-line-price" min="0" step="1" value="0" inputmode="decimal">' +
+      '<div class="mop-sw-line-amt">0원</div></div>' +
+      '<button type="button" class="mop-sw-line-remove mop-hidden" aria-label="이 줄 삭제">×</button></div>';
+    host.appendChild(div);
+    var ts = div.querySelector('.mop-sw-line-type');
+    if (ts) mopSwLineSyncPriceFromType(ts);
+    else recalcSwLineAndGrand();
+    updateSwLineRemoveVisibility();
+  }
+
+  function initSwFormRows() {
+    var host = $('mopSwFormRows');
+    if (!host) return;
+    host.innerHTML = '';
+    addSwFormRow();
+  }
+
+  function bindSwFormRowsDelegation() {
+    var host = $('mopSwFormRows');
+    if (!host || host._mopSwBound) return;
+    host._mopSwBound = true;
+    host.addEventListener('change', function (ev) {
+      var t = ev.target;
+      if (t.classList && t.classList.contains('mop-sw-line-type')) mopSwLineSyncPriceFromType(t);
+      else recalcSwLineAndGrand();
+    });
+    host.addEventListener('input', function (ev) {
+      if (ev.target.classList && (ev.target.classList.contains('mop-sw-line-qty') || ev.target.classList.contains('mop-sw-line-price'))) {
+        recalcSwLineAndGrand();
+      }
+    });
+    host.addEventListener('click', function (ev) {
+      var rm = ev.target.closest && ev.target.closest('.mop-sw-line-remove');
+      if (!rm) return;
+      var line = rm.closest('.mop-sw-line');
+      var n = host.querySelectorAll('.mop-sw-line').length;
+      if (n <= 1) {
+        toast('최소 1줄이 필요합니다.', true);
+        return;
+      }
+      if (line) line.remove();
+      updateSwLineRemoveVisibility();
+      recalcSwLineAndGrand();
+    });
   }
 
   function openSwModal() {
@@ -396,22 +470,92 @@
       toast('관리자만 등록할 수 있습니다.', true);
       return;
     }
+    closeSwDetailModal();
     fillSwModalCompanySelect();
-    return fillSwModalTypeSelect().then(function () {
+    bindSwFormRowsDelegation();
+    return fetchSwWorkTypes().then(function (types) {
+      if (!types.length) {
+        toast('등록된 작업 종류가 없습니다. PC 대시보드에서 먼저 등록해 주세요.', true);
+        return;
+      }
       var d = $('mopSwFormDate');
       if (d) {
         var t = new Date();
         d.value = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
       }
-      var q = $('mopSwFormQty');
-      if (q) q.value = '1';
       var me = $('mopSwFormMemo');
       if (me) me.value = '';
       state.swModalPhotos = [];
       renderMopSwPhotoPreview();
+      initSwFormRows();
+      recalcSwLineAndGrand();
       var bd = $('mopSwModalBackdrop');
       if (bd) bd.classList.remove('mop-hidden');
     });
+  }
+
+  function closeSwDetailModal() {
+    var b = $('mopSwDetailBackdrop');
+    if (b) b.classList.add('mop-hidden');
+  }
+
+  function swDetailDtdd(label, val) {
+    var v = val != null && val !== '' ? String(val) : '-';
+    return '<dt>' + escapeHtml(label) + '</dt><dd>' + escapeHtml(v) + '</dd>';
+  }
+
+  function openSwDetail(workId) {
+    if (!workId || isNaN(workId)) return;
+    closeSwModal();
+    var body = $('mopSwDetailBody');
+    var title = $('mopSwDetailTitle');
+    var bd = $('mopSwDetailBackdrop');
+    if (body) body.innerHTML = '<div class="mop-empty">불러오는 중…</div>';
+    if (bd) bd.classList.remove('mop-hidden');
+    fetch(state.apiBase + '/api/special-works/works/' + workId, {
+      headers: authHeaders(),
+      credentials: 'include'
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res.success || !res.data) {
+          if (body) body.innerHTML = '<div class="mop-empty">' + escapeHtml(res.message || '불러올 수 없습니다.') + '</div>';
+          return;
+        }
+        var d = res.data;
+        if (title) title.textContent = '특수작업 #' + d.id;
+        var qty = d.quantity != null ? String(d.quantity) : '-';
+        var up = d.unit_price != null ? Number(d.unit_price).toLocaleString('ko-KR') + '원' : '-';
+        var tp = d.total_price != null ? Number(d.total_price).toLocaleString('ko-KR') + '원' : '-';
+        var photos = parseSwPhotoUrls(d.photo_links);
+        var photoHtml = '';
+        if (photos.length) {
+          photoHtml = '<div class="mop-sw-detail-photos">' + photos.map(function (u) {
+            return '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(u) + '" alt="" loading="lazy"></a>';
+          }).join('') + '</div>';
+        }
+        var memoBlock = d.memo
+          ? '<div class="mop-sw-detail-memo"><span class="mop-sheet__label">메모</span><p>' + escapeHtml(d.memo) + '</p></div>'
+          : '';
+        var meta = (d.created_at || '').toString().slice(0, 19).replace('T', ' ');
+        if (body) {
+          body.innerHTML =
+            '<dl class="mop-sw-detail-dl">' +
+            swDetailDtdd('화주사', d.company_name) +
+            swDetailDtdd('작업일', d.work_date) +
+            swDetailDtdd('작업 종류', d.work_type_name) +
+            swDetailDtdd('수량', qty) +
+            swDetailDtdd('단가', up) +
+            swDetailDtdd('금액', tp) +
+            '</dl>' +
+            memoBlock +
+            photoHtml +
+            (meta ? '<p class="mop-sw-detail-meta">등록 ' + escapeHtml(meta) + '</p>' : '');
+        }
+      })
+      .catch(function () {
+        if (body) body.innerHTML = '<div class="mop-empty">네트워크 오류</div>';
+      });
   }
 
   function loadSwWorks() {
@@ -472,7 +616,7 @@
         return '<img class="mop-sw-card__thumb" src="' + escapeHtml(u) + '" alt="" loading="lazy">';
       }).join('');
       return (
-        '<article class="mop-sw-card" tabindex="0">' +
+        '<button type="button" class="mop-sw-card" data-work-id="' + Number(w.id) + '">' +
         '<div class="mop-sw-card__row1">' +
         '<span class="mop-sw-card__date">' + escapeHtml(wdShort) + '</span>' +
         '<span class="mop-sw-card__type">' + type + '</span>' +
@@ -480,7 +624,7 @@
         '</div>' +
         '<div class="mop-sw-card__row2">' + comp + (memo ? ' · ' + memo : '') + '</div>' +
         (thumbs ? '<div class="mop-sw-card__photos">' + thumbs + '</div>' : '') +
-        '</article>'
+        '</button>'
       );
     }).join('');
   }
@@ -488,35 +632,47 @@
   function submitSwModal() {
     var btn = $('mopSwFormSubmit');
     var companySel = $('mopSwFormCompany');
-    var typeSel = $('mopSwFormType');
     var dateEl = $('mopSwFormDate');
-    var qtyEl = $('mopSwFormQty');
-    var priceEl = $('mopSwFormPrice');
     var memoEl = $('mopSwFormMemo');
+    var host = $('mopSwFormRows');
     var companyName = (companySel && companySel.value || '').trim();
-    var workTypeId = typeSel && typeSel.value ? parseInt(typeSel.value, 10) : NaN;
     var workDate = (dateEl && dateEl.value || '').trim();
-    var quantity = qtyEl ? parseFloat(qtyEl.value) : NaN;
-    var unitPrice = priceEl ? parseFloat(priceEl.value) : NaN;
     var memo = (memoEl && memoEl.value || '').trim();
     if (!companyName) {
       toast('화주사를 선택해 주세요.', true);
-      return;
-    }
-    if (!workTypeId) {
-      toast('작업 종류를 선택해 주세요.', true);
       return;
     }
     if (!workDate) {
       toast('작업일을 선택해 주세요.', true);
       return;
     }
-    if (!(quantity > 0)) {
-      toast('수량은 1 이상이어야 합니다.', true);
-      return;
+    if (!host) return;
+    var workEntries = [];
+    var lines = host.querySelectorAll('.mop-sw-line');
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var typeSel = line.querySelector('.mop-sw-line-type');
+      var qtyEl = line.querySelector('.mop-sw-line-qty');
+      var priceEl = line.querySelector('.mop-sw-line-price');
+      var tid = typeSel && typeSel.value ? parseInt(typeSel.value, 10) : NaN;
+      var quantity = qtyEl ? parseFloat(qtyEl.value) : NaN;
+      var unitPrice = priceEl ? parseFloat(priceEl.value) : NaN;
+      if (!tid) {
+        toast('모든 줄에서 작업 종류를 선택해 주세요.', true);
+        return;
+      }
+      if (!(quantity > 0)) {
+        toast('수량은 1 이상이어야 합니다.', true);
+        return;
+      }
+      if (isNaN(unitPrice) || unitPrice < 0) {
+        toast('단가를 확인해 주세요.', true);
+        return;
+      }
+      workEntries.push({ work_type_id: tid, quantity: quantity, unit_price: unitPrice });
     }
-    if (isNaN(unitPrice) || unitPrice < 0) {
-      toast('단가를 확인해 주세요.', true);
+    if (!workEntries.length) {
+      toast('작업 줄을 추가해 주세요.', true);
       return;
     }
     if (btn) btn.disabled = true;
@@ -541,16 +697,14 @@
     }
     chain
       .then(function () {
-        return fetch(state.apiBase + '/api/special-works/works', {
+        return fetch(state.apiBase + '/api/special-works/works/batch', {
           method: 'POST',
           credentials: 'include',
           headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
           body: JSON.stringify({
             company_name: companyName,
-            work_type_id: workTypeId,
             work_date: workDate,
-            quantity: quantity,
-            unit_price: unitPrice,
+            work_entries: workEntries,
             photo_links: photoLinksFinal,
             memo: memo
           })
@@ -559,7 +713,7 @@
       .then(function (r) { return r.json(); })
       .then(function (res) {
         if (res.success) {
-          toast('작업이 등록되었습니다.');
+          toast(workEntries.length + '건이 등록되었습니다.');
           closeSwModal();
           loadSwWorks();
         } else {
@@ -703,6 +857,7 @@
   function doLogout() {
     clearAuth();
     closeSwModal();
+    closeSwDetailModal();
     closeSheet();
     showLogin();
   }
@@ -1093,8 +1248,22 @@
       $('mopSwFormPhotos') && $('mopSwFormPhotos').click();
     });
     $('mopSwFormPhotos') && $('mopSwFormPhotos').addEventListener('change', handleMopSwPhotoInputChange);
-    $('mopSwFormType') && $('mopSwFormType').addEventListener('change', mopSwSyncPriceFromType);
+    $('mopSwAddRow') && $('mopSwAddRow').addEventListener('click', function () {
+      addSwFormRow();
+      recalcSwLineAndGrand();
+    });
     $('mopSwFormSubmit') && $('mopSwFormSubmit').addEventListener('click', submitSwModal);
+
+    $('mopSwList') && $('mopSwList').addEventListener('click', function (ev) {
+      var card = ev.target.closest && ev.target.closest('.mop-sw-card');
+      if (!card) return;
+      var wid = card.getAttribute('data-work-id');
+      if (wid) openSwDetail(parseInt(wid, 10));
+    });
+    $('mopSwDetailClose') && $('mopSwDetailClose').addEventListener('click', closeSwDetailModal);
+    $('mopSwDetailBackdrop') && $('mopSwDetailBackdrop').addEventListener('click', function (ev) {
+      if (ev.target.id === 'mopSwDetailBackdrop') closeSwDetailModal();
+    });
 
     $('mopMonth') && $('mopMonth').addEventListener('change', function () {
       state.month = $('mopMonth').value;
