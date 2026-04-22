@@ -504,50 +504,111 @@
     return '<dt>' + escapeHtml(label) + '</dt><dd>' + escapeHtml(v) + '</dd>';
   }
 
-  function openSwDetail(workId) {
-    if (!workId || isNaN(workId)) return;
+  /** 배치 등록 시 동일 created_at·화주사·일자·메모·사진으로 묶인 행들을 한 건으로 본다. */
+  function swGroupKey(w) {
+    var memo = (w.memo != null ? String(w.memo) : '').trim();
+    var photo = (w.photo_links != null ? String(w.photo_links) : '').trim();
+    var ca = (w.created_at || '').toString().replace('T', ' ').slice(0, 19);
+    return [
+      String(w.company_name || '').trim(),
+      String(w.work_date || '').toString().slice(0, 10),
+      memo,
+      photo,
+      ca
+    ].join('\x1e');
+  }
+
+  function groupSwListForDisplay(rows) {
+    var map = Object.create(null);
+    rows.forEach(function (w) {
+      var k = swGroupKey(w);
+      if (!map[k]) map[k] = [];
+      map[k].push(w);
+    });
+    return Object.keys(map).map(function (k) {
+      var items = map[k];
+      items.sort(function (a, b) { return Number(a.id) - Number(b.id); });
+      var total = 0;
+      items.forEach(function (x) {
+        total += Math.round(Number(x.total_price) || 0);
+      });
+      var names = items.map(function (x) { return (x.work_type_name || '').trim(); }).filter(Boolean);
+      var summary = names.length <= 1 ? (names[0] || '-') : (names[0] + ' 외 ' + (names.length - 1) + '종');
+      var ids = items.map(function (x) { return Number(x.id); });
+      return { items: items, ids: ids, total: total, summary: summary, rep: items[0] };
+    }).sort(function (ga, gb) {
+      var aMax = Math.max.apply(null, ga.ids);
+      var bMax = Math.max.apply(null, gb.ids);
+      return bMax - aMax;
+    });
+  }
+
+  function openSwDetailByIds(idsStr) {
+    var ids = idsStr.split(',').map(function (x) { return parseInt(x.trim(), 10); }).filter(function (n) { return !isNaN(n); });
+    if (!ids.length) return;
     closeSwModal();
     var body = $('mopSwDetailBody');
     var title = $('mopSwDetailTitle');
     var bd = $('mopSwDetailBackdrop');
     if (body) body.innerHTML = '<div class="mop-empty">불러오는 중…</div>';
     if (bd) bd.classList.remove('mop-hidden');
-    fetch(state.apiBase + '/api/special-works/works/' + workId, {
-      headers: authHeaders(),
-      credentials: 'include'
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (res) {
-        if (!res.success || !res.data) {
-          if (body) body.innerHTML = '<div class="mop-empty">' + escapeHtml(res.message || '불러올 수 없습니다.') + '</div>';
+    Promise.all(ids.map(function (id) {
+      return fetch(state.apiBase + '/api/special-works/works/' + id, {
+        headers: authHeaders(),
+        credentials: 'include'
+      }).then(function (r) { return r.json(); });
+    }))
+      .then(function (results) {
+        var bad = results.filter(function (r) { return !r.success || !r.data; });
+        if (bad.length) {
+          if (body) body.innerHTML = '<div class="mop-empty">' + escapeHtml(bad[0].message || '불러올 수 없습니다.') + '</div>';
           return;
         }
-        var d = res.data;
-        if (title) title.textContent = '특수작업 #' + d.id;
-        var qty = d.quantity != null ? String(d.quantity) : '-';
-        var up = d.unit_price != null ? Number(d.unit_price).toLocaleString('ko-KR') + '원' : '-';
-        var tp = d.total_price != null ? Number(d.total_price).toLocaleString('ko-KR') + '원' : '-';
-        var photos = parseSwPhotoUrls(d.photo_links);
+        var lines = results.map(function (r) { return r.data; });
+        lines.sort(function (a, b) { return Number(a.id) - Number(b.id); });
+        var d0 = lines[0];
+        var sum = lines.reduce(function (s, d) { return s + Math.round(Number(d.total_price) || 0); }, 0);
+        if (title) title.textContent = lines.length > 1 ? ('특수작업 · ' + lines.length + '종') : ('특수작업 #' + d0.id);
+        var photos = parseSwPhotoUrls(d0.photo_links);
         var photoHtml = '';
         if (photos.length) {
           photoHtml = '<div class="mop-sw-detail-photos">' + photos.map(function (u) {
             return '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(u) + '" alt="" loading="lazy"></a>';
           }).join('') + '</div>';
         }
-        var memoBlock = d.memo
-          ? '<div class="mop-sw-detail-memo"><span class="mop-sheet__label">메모</span><p>' + escapeHtml(d.memo) + '</p></div>'
+        var memoBlock = d0.memo
+          ? '<div class="mop-sw-detail-memo"><span class="mop-sheet__label">메모</span><p>' + escapeHtml(d0.memo) + '</p></div>'
           : '';
-        var meta = (d.created_at || '').toString().slice(0, 19).replace('T', ' ');
+        var meta = (d0.created_at || '').toString().slice(0, 19).replace('T', ' ');
+        var tableRows = lines.map(function (d) {
+          var qty = d.quantity != null ? String(d.quantity) : '-';
+          var up = d.unit_price != null ? Number(d.unit_price).toLocaleString('ko-KR') + '원' : '-';
+          var tp = d.total_price != null ? Number(d.total_price).toLocaleString('ko-KR') + '원' : '-';
+          return (
+            '<tr>' +
+            '<td>' + escapeHtml(d.work_type_name || '-') + '</td>' +
+            '<td class="mop-sw-detail-table__num">' + escapeHtml(qty) + '</td>' +
+            '<td class="mop-sw-detail-table__num">' + escapeHtml(up) + '</td>' +
+            '<td class="mop-sw-detail-table__num">' + escapeHtml(tp) + '</td>' +
+            '</tr>'
+          );
+        }).join('');
+        var linesBlock =
+          '<div class="mop-sw-detail-lines-wrap">' +
+          '<p class="mop-sheet__label mop-sw-detail-lines-label">작업 내역</p>' +
+          '<table class="mop-sw-detail-table">' +
+          '<thead><tr><th>작업종류</th><th>수량</th><th>단가</th><th>금액</th></tr></thead>' +
+          '<tbody>' + tableRows + '</tbody>' +
+          '</table>' +
+          '<p class="mop-sw-detail-total">합계 <strong>' + sum.toLocaleString('ko-KR') + '</strong>원</p>' +
+          '</div>';
         if (body) {
           body.innerHTML =
             '<dl class="mop-sw-detail-dl">' +
-            swDetailDtdd('화주사', d.company_name) +
-            swDetailDtdd('작업일', d.work_date) +
-            swDetailDtdd('작업 종류', d.work_type_name) +
-            swDetailDtdd('수량', qty) +
-            swDetailDtdd('단가', up) +
-            swDetailDtdd('금액', tp) +
+            swDetailDtdd('화주사', d0.company_name) +
+            swDetailDtdd('작업일', d0.work_date) +
             '</dl>' +
+            linesBlock +
             memoBlock +
             photoHtml +
             (meta ? '<p class="mop-sw-detail-meta">등록 ' + escapeHtml(meta) + '</p>' : '');
@@ -599,30 +660,33 @@
       listEl.innerHTML = '<div class="mop-empty">해당 기간 특수작업이 없습니다.</div>';
       return;
     }
-    var sorted = rows.slice().sort(function (a, b) {
-      var c = String(b.work_date || '').localeCompare(String(a.work_date || ''));
-      if (c !== 0) return c;
-      return String(b.created_at || '').localeCompare(String(a.created_at || ''));
-    });
-    listEl.innerHTML = sorted.map(function (w) {
+    var groups = groupSwListForDisplay(rows);
+    listEl.innerHTML = groups.map(function (g) {
+      var w = g.rep;
       var wd = (w.work_date || '').toString().slice(0, 10);
       var wdShort = wd.length >= 10 ? wd.slice(5).replace('-', '/') : wd;
-      var type = escapeHtml(w.work_type_name || '-');
+      var type = escapeHtml(g.summary);
       var comp = escapeHtml(w.company_name || '');
-      var amt = (w.total_price != null ? Math.round(Number(w.total_price)) : 0).toLocaleString('ko-KR');
+      var amt = g.total.toLocaleString('ko-KR');
       var memo = escapeHtml((w.memo || '').replace(/\s+/g, ' ').trim().slice(0, 80));
       var photos = parseSwPhotoUrls(w.photo_links);
       var thumbs = photos.slice(0, 4).map(function (u) {
         return '<img class="mop-sw-card__thumb" src="' + escapeHtml(u) + '" alt="" loading="lazy">';
       }).join('');
+      var subMeta = '';
+      if (g.items.length > 1) {
+        subMeta = escapeHtml(String(g.items.length)) + '종';
+      }
+      var row2 = comp + (subMeta ? ' · ' + subMeta : '') + (memo ? ' · ' + memo : '');
+      var idsStr = g.ids.join(',');
       return (
-        '<button type="button" class="mop-sw-card" data-work-id="' + Number(w.id) + '">' +
+        '<button type="button" class="mop-sw-card" data-sw-ids="' + idsStr + '">' +
         '<div class="mop-sw-card__row1">' +
         '<span class="mop-sw-card__date">' + escapeHtml(wdShort) + '</span>' +
         '<span class="mop-sw-card__type">' + type + '</span>' +
         '<span class="mop-sw-card__amt">' + escapeHtml(amt) + '원</span>' +
         '</div>' +
-        '<div class="mop-sw-card__row2">' + comp + (memo ? ' · ' + memo : '') + '</div>' +
+        '<div class="mop-sw-card__row2">' + row2 + '</div>' +
         (thumbs ? '<div class="mop-sw-card__photos">' + thumbs + '</div>' : '') +
         '</button>'
       );
@@ -1257,8 +1321,8 @@
     $('mopSwList') && $('mopSwList').addEventListener('click', function (ev) {
       var card = ev.target.closest && ev.target.closest('.mop-sw-card');
       if (!card) return;
-      var wid = card.getAttribute('data-work-id');
-      if (wid) openSwDetail(parseInt(wid, 10));
+      var idsStr = card.getAttribute('data-sw-ids');
+      if (idsStr) openSwDetailByIds(idsStr);
     });
     $('mopSwDetailClose') && $('mopSwDetailClose').addEventListener('click', closeSwDetailModal);
     $('mopSwDetailBackdrop') && $('mopSwDetailBackdrop').addEventListener('click', function (ev) {

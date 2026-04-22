@@ -1007,6 +1007,58 @@ button.mop-sw-card {
   color: var(--mop-muted);
 }
 
+.mop-sw-detail-lines-wrap {
+  margin-top: 0.35rem;
+}
+
+.mop-sw-detail-lines-label {
+  margin-bottom: 0.25rem !important;
+}
+
+.mop-sw-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: clamp(0.62rem, 2.5vw, 0.75rem);
+  border: 1px solid var(--mop-border);
+  border-radius: calc(var(--mop-radius) - 2px);
+  overflow: hidden;
+}
+
+.mop-sw-detail-table th,
+.mop-sw-detail-table td {
+  padding: 0.35rem 0.3rem;
+  text-align: left;
+  border-bottom: 1px solid var(--mop-border);
+  vertical-align: top;
+}
+
+.mop-sw-detail-table th {
+  background: var(--mop-card);
+  color: var(--mop-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mop-sw-detail-table tr:last-child td {
+  border-bottom: none;
+}
+
+.mop-sw-detail-table__num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.mop-sw-detail-total {
+  margin: 0.5rem 0 0;
+  text-align: right;
+  font-size: clamp(0.88rem, 3.2vw, 1rem);
+  font-weight: 600;
+}
+
+.mop-sw-detail-total strong {
+  color: var(--mop-accent);
+}
+
 .mop-btn--photo-pick {
   width: 100%;
   margin-top: 0;
