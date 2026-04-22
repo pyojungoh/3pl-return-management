@@ -1070,6 +1070,25 @@ article.mop-sw-card {
   color: var(--mop-accent);
 }
 
+.mop-sw-detail-edit {
+  margin-top: 1rem;
+}
+
+.mop-sw-detail-edit__hr {
+  border: none;
+  border-top: 1px solid var(--mop-border);
+  margin: 0 0 1rem;
+}
+
+.mop-sw-detail-edit .mop-sheet__label {
+  margin-top: 0.65rem;
+}
+
+.mop-sw-detail-edit .mop-btn--primary {
+  width: 100%;
+  margin-top: 0.75rem;
+}
+
 .mop-sw-photo-actions {
   display: flex;
   flex-wrap: wrap;

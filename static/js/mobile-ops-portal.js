@@ -146,7 +146,10 @@
     mopPane: 'cs',
     swList: [],
     swWorkTypes: [],
-    swModalPhotos: []
+    swModalPhotos: [],
+    swDetailIds: [],
+    swDetailLines: [],
+    swDetailEditPhotos: []
   };
 
   function $(id) {
@@ -195,6 +198,45 @@
       return '';
     }).filter(Boolean);
     return urls.join(',');
+  }
+
+  /** data URL 배열 업로드 → 콤마 구분 URL 문자열(빈 문자열 가능) */
+  function uploadSwImageDataUrls(imageDataUrls, trackingNumber) {
+    if (!imageDataUrls || !imageDataUrls.length) return Promise.resolve('');
+    return fetch(state.apiBase + '/api/uploads/upload-images', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ images: imageDataUrls, trackingNumber: trackingNumber })
+    }).then(function (r) {
+      if (r.status === 413) throw new Error('사진 용량이 너무 큽니다.');
+      return r.json();
+    }).then(function (up) {
+      if (!up.success) throw new Error(up.message || '사진 업로드 실패');
+      if (up.photoLinks) return parseUploadPhotoLinksString(up.photoLinks);
+      if (up.urls && up.urls.length) return up.urls.join(',');
+      return '';
+    });
+  }
+
+  function swPhotoUrlsUnionFromLines(lines) {
+    var set = Object.create(null);
+    (lines || []).forEach(function (d) {
+      parseSwPhotoUrls(d.photo_links).forEach(function (u) { set[u] = 1; });
+    });
+    return Object.keys(set);
+  }
+
+  function mergeCommaPhotoUrls(a, b) {
+    var set = Object.create(null);
+    function add(s) {
+      String(s || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean).forEach(function (u) {
+        set[u] = 1;
+      });
+    }
+    add(a);
+    add(b);
+    return Object.keys(set).join(',');
   }
 
   function setMopPane(pane) {
@@ -325,6 +367,127 @@
         });
     }
     next();
+  }
+
+  function renderSwDetailNewPhotoPreview() {
+    var pv = $('mopSwDetailNewPhotoPreview');
+    if (!pv) return;
+    pv.innerHTML = state.swDetailEditPhotos.map(function (photo, index) {
+      return (
+        '<div class="mop-sw-photo-thumb-wrap">' +
+        '<img src="' + photo.url + '" alt="">' +
+        '<button type="button" class="mop-sw-photo-remove" data-mop-sw-detail-idx="' + index + '" aria-label="삭제">×</button>' +
+        '</div>'
+      );
+    }).join('');
+    pv.querySelectorAll('.mop-sw-photo-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var i = parseInt(btn.getAttribute('data-mop-sw-detail-idx'), 10);
+        if (!isNaN(i)) {
+          state.swDetailEditPhotos.splice(i, 1);
+          renderSwDetailNewPhotoPreview();
+        }
+      });
+    });
+  }
+
+  function handleMopSwDetailPhotoInputChange(ev) {
+    var files = Array.from((ev.target && ev.target.files) || []);
+    var i = 0;
+    function next() {
+      if (i >= files.length) {
+        if (ev.target) ev.target.value = '';
+        renderSwDetailNewPhotoPreview();
+        return;
+      }
+      var file = files[i];
+      i += 1;
+      if (!file.type || file.type.indexOf('image/') !== 0) {
+        next();
+        return;
+      }
+      compressImageFile(file)
+        .then(function (url) {
+          state.swDetailEditPhotos.push({ url: url });
+          next();
+        })
+        .catch(function () {
+          var reader = new FileReader();
+          reader.onload = function (e) {
+            state.swDetailEditPhotos.push({ url: e.target.result });
+            next();
+          };
+          reader.onerror = next;
+          reader.readAsDataURL(file);
+        });
+    }
+    next();
+  }
+
+  function bindSwDetailEditAfterRender() {
+    var sv = $('mopSwDetailSave');
+    if (sv) sv.addEventListener('click', function (e) {
+      e.preventDefault();
+      saveSwDetailEdit();
+    });
+    var pc = $('mopSwDetailPickCamera');
+    if (pc) pc.addEventListener('click', function () {
+      $('mopSwDetailPhotosCamera') && $('mopSwDetailPhotosCamera').click();
+    });
+    var pa = $('mopSwDetailPickAlbum');
+    if (pa) pa.addEventListener('click', function () {
+      $('mopSwDetailPhotosAlbum') && $('mopSwDetailPhotosAlbum').click();
+    });
+  }
+
+  function saveSwDetailEdit() {
+    var ids = state.swDetailIds || [];
+    var lines = state.swDetailLines || [];
+    if (!ids.length || state.role !== '관리자') return;
+    var btn = $('mopSwDetailSave');
+    var memoEl = $('mopSwDetailMemoInput');
+    var newMemo = memoEl ? String(memoEl.value || '') : '';
+    var existingUnion = swPhotoUrlsUnionFromLines(lines).join(',');
+    var hadNewPhotos = state.swDetailEditPhotos.length > 0;
+    var imgs = state.swDetailEditPhotos.map(function (p) { return p.url; });
+    var track = 'special_mop_detail_' + String(state.username || 'u').replace(/[^a-zA-Z0-9가-힣_]/g, '_') + '_' + Date.now();
+    if (btn) btn.disabled = true;
+    var p = hadNewPhotos
+      ? uploadSwImageDataUrls(imgs, track).then(function (uploaded) {
+          return mergeCommaPhotoUrls(existingUnion, uploaded);
+        })
+      : Promise.resolve(existingUnion);
+    p.then(function (mergedLinks) {
+      var body = { memo: newMemo };
+      if (hadNewPhotos) body.photo_links = mergedLinks;
+      return Promise.all(ids.map(function (id) {
+        return fetch(state.apiBase + '/api/special-works/works/' + id, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+          body: JSON.stringify(body)
+        }).then(function (r) { return r.json(); });
+      }));
+    })
+      .then(function (results) {
+        if (results.every(function (r) { return r.success; })) {
+          toast('저장되었습니다.');
+          var reopen = ids.join(',');
+          closeSwDetailModal();
+          loadSwWorks().then(function () {
+            if (reopen) openSwDetailByIds(reopen);
+          });
+        } else {
+          var msg = results.filter(function (r) { return !r.success; }).map(function (r) { return r.message; }).join(', ');
+          toast(msg || '저장 실패', true);
+        }
+      })
+      .catch(function (e) {
+        toast(e.message || '오류', true);
+      })
+      .finally(function () {
+        if (btn) btn.disabled = false;
+      });
   }
 
   function fillSwModalCompanySelect() {
@@ -499,6 +662,13 @@
   function closeSwDetailModal() {
     var b = $('mopSwDetailBackdrop');
     if (b) b.classList.add('mop-hidden');
+    state.swDetailIds = [];
+    state.swDetailLines = [];
+    state.swDetailEditPhotos = [];
+    var fc = $('mopSwDetailPhotosCamera');
+    var fa = $('mopSwDetailPhotosAlbum');
+    if (fc) fc.value = '';
+    if (fa) fa.value = '';
   }
 
   function swDetailDtdd(label, val) {
@@ -548,6 +718,9 @@
   function openSwDetailByIds(idsStr) {
     var ids = idsStr.split(',').map(function (x) { return parseInt(x.trim(), 10); }).filter(function (n) { return !isNaN(n); });
     if (!ids.length) return;
+    state.swDetailEditPhotos = [];
+    state.swDetailIds = [];
+    state.swDetailLines = [];
     closeSwModal();
     var body = $('mopSwDetailBody');
     var title = $('mopSwDetailTitle');
@@ -563,15 +736,19 @@
       .then(function (results) {
         var bad = results.filter(function (r) { return !r.success || !r.data; });
         if (bad.length) {
+          state.swDetailIds = [];
+          state.swDetailLines = [];
           if (body) body.innerHTML = '<div class="mop-empty">' + escapeHtml(bad[0].message || '불러올 수 없습니다.') + '</div>';
           return;
         }
         var lines = results.map(function (r) { return r.data; });
         lines.sort(function (a, b) { return Number(a.id) - Number(b.id); });
+        state.swDetailIds = ids.slice();
+        state.swDetailLines = lines.slice();
         var d0 = lines[0];
         var sum = lines.reduce(function (s, d) { return s + Math.round(Number(d.total_price) || 0); }, 0);
         if (title) title.textContent = lines.length > 1 ? ('특수작업 · ' + lines.length + '종') : ('특수작업 #' + d0.id);
-        var photos = parseSwPhotoUrls(d0.photo_links);
+        var photos = swPhotoUrlsUnionFromLines(lines);
         var photoHtml = '';
         if (photos.length) {
           photoHtml = '<div class="mop-sw-detail-photos">' + photos.map(function (u) {
@@ -604,6 +781,22 @@
           '</table>' +
           '<p class="mop-sw-detail-total">합계 <strong>' + sum.toLocaleString('ko-KR') + '</strong>원</p>' +
           '</div>';
+        var editBlock = '';
+        if (state.role === '관리자') {
+          editBlock =
+            '<div class="mop-sw-detail-edit" id="mopSwDetailEdit">' +
+            '<hr class="mop-sw-detail-edit__hr">' +
+            '<p class="mop-sheet__label">메모 수정</p>' +
+            '<textarea id="mopSwDetailMemoInput" class="mop-input mop-textarea" rows="3" placeholder="메모"></textarea>' +
+            '<p class="mop-sheet__label">사진 추가 (저장 시 같은 건의 모든 줄에 반영)</p>' +
+            '<div class="mop-sw-photo-actions">' +
+            '<button type="button" class="mop-btn mop-btn--ghost mop-btn--sw-photo" id="mopSwDetailPickCamera">카메라</button>' +
+            '<button type="button" class="mop-btn mop-btn--ghost mop-btn--sw-photo" id="mopSwDetailPickAlbum">앨범</button>' +
+            '</div>' +
+            '<div id="mopSwDetailNewPhotoPreview" class="mop-sw-photo-preview"></div>' +
+            '<button type="button" class="mop-btn mop-btn--primary" id="mopSwDetailSave">저장</button>' +
+            '</div>';
+        }
         if (body) {
           body.innerHTML =
             '<dl class="mop-sw-detail-dl">' +
@@ -613,10 +806,19 @@
             linesBlock +
             memoBlock +
             photoHtml +
-            (meta ? '<p class="mop-sw-detail-meta">등록 ' + escapeHtml(meta) + '</p>' : '');
+            (meta ? '<p class="mop-sw-detail-meta">등록 ' + escapeHtml(meta) + '</p>' : '') +
+            editBlock;
+        }
+        if (state.role === '관리자') {
+          var mi = $('mopSwDetailMemoInput');
+          if (mi) mi.value = d0.memo != null ? String(d0.memo) : '';
+          bindSwDetailEditAfterRender();
+          renderSwDetailNewPhotoPreview();
         }
       })
       .catch(function () {
+        state.swDetailIds = [];
+        state.swDetailLines = [];
         if (body) body.innerHTML = '<div class="mop-empty">네트워크 오류</div>';
       });
   }
@@ -743,24 +945,11 @@
     }
     if (btn) btn.disabled = true;
     var photoLinksFinal = '';
-    var chain = Promise.resolve();
-    if (state.swModalPhotos.length) {
-      var imgs = state.swModalPhotos.map(function (p) { return p.url; });
-      var track = 'special_mop_' + companyName.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now();
-      chain = fetch(state.apiBase + '/api/uploads/upload-images', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ images: imgs, trackingNumber: track })
-      }).then(function (r) {
-        if (r.status === 413) throw new Error('사진 용량이 너무 큽니다.');
-        return r.json();
-      }).then(function (up) {
-        if (!up.success) throw new Error(up.message || '사진 업로드 실패');
-        if (up.photoLinks) photoLinksFinal = parseUploadPhotoLinksString(up.photoLinks);
-        else if (up.urls && up.urls.length) photoLinksFinal = up.urls.join(',');
-      });
-    }
+    var imgs = state.swModalPhotos.map(function (p) { return p.url; });
+    var track = 'special_mop_' + companyName.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now();
+    var chain = state.swModalPhotos.length
+      ? uploadSwImageDataUrls(imgs, track).then(function (s) { photoLinksFinal = s || ''; })
+      : Promise.resolve();
     chain
       .then(function () {
         return fetch(state.apiBase + '/api/special-works/works/batch', {
@@ -1318,6 +1507,8 @@
     });
     $('mopSwFormPhotosCamera') && $('mopSwFormPhotosCamera').addEventListener('change', handleMopSwPhotoInputChange);
     $('mopSwFormPhotosAlbum') && $('mopSwFormPhotosAlbum').addEventListener('change', handleMopSwPhotoInputChange);
+    $('mopSwDetailPhotosCamera') && $('mopSwDetailPhotosCamera').addEventListener('change', handleMopSwDetailPhotoInputChange);
+    $('mopSwDetailPhotosAlbum') && $('mopSwDetailPhotosAlbum').addEventListener('change', handleMopSwDetailPhotoInputChange);
     $('mopSwAddRow') && $('mopSwAddRow').addEventListener('click', function () {
       addSwFormRow();
       recalcSwLineAndGrand();
