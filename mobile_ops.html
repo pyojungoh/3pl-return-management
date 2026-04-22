@@ -44,7 +44,7 @@
   <div id="mopApp" class="mop-hidden">
     <header class="mop-header">
       <div>
-        <h1 class="mop-header__title">C/S 관리</h1>
+        <h1 class="mop-header__title" id="mopHeaderTitle">C/S</h1>
         <p id="mopHeaderSub" class="mop-header__sub"></p>
       </div>
       <div class="mop-header__actions">
@@ -52,11 +52,6 @@
         <button type="button" id="mopLogout" class="mop-icon-btn" title="로그아웃">나가기</button>
       </div>
     </header>
-
-    <nav class="mop-tabs" aria-label="주 메뉴">
-      <button type="button" class="mop-tab mop-tab--active" aria-current="page">C/S 관리</button>
-      <a href="/qr-photo" class="mop-tab mop-tab--link">QR 스캔</a>
-    </nav>
 
     <div class="mop-toolbar">
       <div class="mop-toolbar__row">
@@ -67,20 +62,69 @@
       </div>
     </div>
 
-    <div class="mop-chips" role="toolbar" aria-label="상태 필터">
-      <button type="button" id="mopChipAll" class="mop-chip mop-chip--on">전체</button>
-      <button type="button" id="mopChipPending" class="mop-chip">미처리</button>
-      <button type="button" id="mopChipDone" class="mop-chip">완료·불가</button>
-      <button type="button" id="mopChipHold" class="mop-chip">보류</button>
+    <nav class="mop-tabs" aria-label="주 메뉴">
+      <button type="button" class="mop-tab mop-tab--active" id="mopTabCs" data-mop-pane="cs" aria-current="page">C/S</button>
+      <button type="button" class="mop-tab" id="mopTabSw" data-mop-pane="sw">특수작업</button>
+      <a href="/qr-photo" class="mop-tab mop-tab--link">QR</a>
+    </nav>
+
+    <div id="mopPaneCs" class="mop-pane">
+      <div class="mop-chips" role="toolbar" aria-label="상태 필터">
+        <button type="button" id="mopChipAll" class="mop-chip mop-chip--on">전체</button>
+        <button type="button" id="mopChipPending" class="mop-chip">미처리</button>
+        <button type="button" id="mopChipDone" class="mop-chip">완료·불가</button>
+        <button type="button" id="mopChipHold" class="mop-chip">보류</button>
+      </div>
+      <div id="mopCsList" class="mop-list" role="list"></div>
     </div>
 
-    <div id="mopCsList" class="mop-list" role="list"></div>
+    <div id="mopPaneSw" class="mop-pane mop-hidden">
+      <div class="mop-sw-bar">
+        <button type="button" id="mopSwRegisterBtn" class="mop-btn mop-btn--primary mop-btn--sw-register mop-hidden">작업 등록</button>
+      </div>
+      <div id="mopSwList" class="mop-list mop-list--sw" role="list"></div>
+    </div>
+
     <p class="mop-footer-link"><a href="/">PC 대시보드로 이동</a></p>
   </div>
 
   <div id="mopSheetBackdrop" class="mop-sheet-backdrop mop-hidden" role="presentation">
     <div class="mop-sheet" role="dialog" aria-modal="true" onclick="event.stopPropagation();">
       <div id="mopSheetBody"></div>
+    </div>
+  </div>
+
+  <div id="mopSwModalBackdrop" class="mop-modal-backdrop mop-hidden" role="presentation">
+    <div class="mop-modal" role="dialog" aria-modal="true" aria-labelledby="mopSwModalTitle" onclick="event.stopPropagation();">
+      <div class="mop-modal__head">
+        <h2 class="mop-modal__title" id="mopSwModalTitle">작업 등록</h2>
+        <button type="button" class="mop-sheet__close" id="mopSwModalClose" aria-label="닫기">×</button>
+      </div>
+      <div class="mop-modal__body">
+        <label class="mop-sheet__label" for="mopSwFormCompany">화주사</label>
+        <select id="mopSwFormCompany" class="mop-select mop-select--full"></select>
+        <label class="mop-sheet__label" for="mopSwFormDate">작업일</label>
+        <input type="date" id="mopSwFormDate" class="mop-input">
+        <label class="mop-sheet__label" for="mopSwFormType">작업 종류</label>
+        <select id="mopSwFormType" class="mop-select mop-select--full"></select>
+        <div class="mop-sw-form-row">
+          <div>
+            <label class="mop-sheet__label" for="mopSwFormQty">수량</label>
+            <input type="number" id="mopSwFormQty" class="mop-input" min="1" step="1" value="1">
+          </div>
+          <div>
+            <label class="mop-sheet__label" for="mopSwFormPrice">단가</label>
+            <input type="number" id="mopSwFormPrice" class="mop-input" min="0" step="1" value="0">
+          </div>
+        </div>
+        <label class="mop-sheet__label" for="mopSwFormPhotos">사진</label>
+        <button type="button" class="mop-btn mop-btn--ghost mop-btn--photo-pick" id="mopSwPhotoPick">카메라·앨범에서 추가</button>
+        <input type="file" id="mopSwFormPhotos" class="mop-hidden" accept="image/*" capture="environment" multiple>
+        <div id="mopSwPhotoPreview" class="mop-sw-photo-preview"></div>
+        <label class="mop-sheet__label" for="mopSwFormMemo">메모</label>
+        <textarea id="mopSwFormMemo" class="mop-input mop-textarea" rows="2" placeholder="선택"></textarea>
+        <button type="button" class="mop-btn mop-btn--primary" id="mopSwFormSubmit">등록하기</button>
+      </div>
     </div>
   </div>
 

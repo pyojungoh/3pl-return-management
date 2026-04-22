@@ -21,6 +21,7 @@
   --mop-fs-title: clamp(1rem, 4.2vw, 1.2rem);
   --mop-fs-tab: clamp(0.82rem, 3.4vw, 0.95rem);
   --mop-touch: clamp(44px, 12vw, 52px);
+  --mop-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   color-scheme: dark;
 }
 
@@ -646,4 +647,219 @@ body.mop-body {
   color: var(--mop-muted);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* 탭별 패널 */
+.mop-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mop-pane > .mop-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mop-pane > .mop-chips {
+  flex-shrink: 0;
+}
+
+#mopApp {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* 특수작업 */
+.mop-sw-bar {
+  padding: 0 var(--mop-space) var(--mop-space);
+}
+
+.mop-btn--sw-register {
+  width: 100%;
+}
+
+.mop-list--sw {
+  flex: 1;
+  min-height: 120px;
+}
+
+.mop-sw-card {
+  width: 100%;
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+  margin-bottom: 0.35rem;
+  border-radius: calc(var(--mop-radius) - 2px);
+  border: 1px solid var(--mop-border);
+  background: var(--mop-card);
+  color: var(--mop-text);
+  font-size: clamp(0.68rem, 2.8vw, 0.8rem);
+  line-height: 1.35;
+}
+
+.mop-sw-card__row1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+}
+
+.mop-sw-card__date {
+  font-weight: 700;
+  color: var(--mop-accent2);
+  white-space: nowrap;
+}
+
+.mop-sw-card__type {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mop-sw-card__amt {
+  font-weight: 700;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.mop-sw-card__row2 {
+  margin-top: 0.15rem;
+  color: var(--mop-muted);
+  font-size: clamp(0.62rem, 2.5vw, 0.72rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mop-sw-card__photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.3rem;
+}
+
+.mop-sw-card__thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--mop-border);
+}
+
+/* 등록 모달 */
+.mop-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 220;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+.mop-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: min(92dvh, 900px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--mop-surface);
+  border-radius: var(--mop-radius) var(--mop-radius) 0 0;
+  border: 1px solid var(--mop-border);
+  border-bottom: none;
+  box-shadow: var(--mop-shadow);
+}
+
+.mop-modal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: var(--mop-space);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--mop-border);
+  flex-shrink: 0;
+}
+
+.mop-modal__title {
+  margin: 0;
+  font-size: var(--mop-fs-title);
+  flex: 1;
+  min-width: 0;
+}
+
+.mop-modal__body {
+  padding: var(--mop-space);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-bottom: calc(var(--mop-space) + env(safe-area-inset-bottom));
+}
+
+.mop-sw-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.mop-btn--photo-pick {
+  width: 100%;
+  margin-top: 0;
+}
+
+.mop-textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.mop-sw-photo-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.mop-sw-photo-thumb-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+
+.mop-sw-photo-thumb-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--mop-border);
+}
+
+.mop-sw-photo-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: var(--mop-danger);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }

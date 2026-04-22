@@ -1,6 +1,6 @@
 /**
- * 모바일 작업 포털 — C/S 조회·간단 관리 (mobile_ops.html)
- * API·localStorage 키는 대시보드(dashboard_server.html)와 동일 계약을 따른다.
+ * 모바일 작업 포털 — C/S 조회·관리, 특수작업 목록·등록(관리자) (mobile_ops.html)
+ * API·localStorage 키는 대시보드와 동일. 특수작업 API는 X-User-Role / X-User-Name / X-Company-Name 헤더를 사용한다.
  */
 (function (global) {
   'use strict';
@@ -142,11 +142,436 @@
     csList: [],
     filter: 'all',
     month: '',
-    selectedId: null
+    selectedId: null,
+    mopPane: 'cs',
+    swList: [],
+    swWorkTypes: [],
+    swModalPhotos: []
   };
 
   function $(id) {
     return document.getElementById(id);
+  }
+
+  function authHeaders() {
+    function enc(v) {
+      return encodeURIComponent((v == null ? '' : String(v)).trim());
+    }
+    return {
+      'X-User-Role': enc(state.role || '화주사'),
+      'X-User-Name': enc(state.username || ''),
+      'X-Company-Name': enc(state.company || '')
+    };
+  }
+
+  function monthKoreanToRange(label) {
+    var m = /^(\d{4})년(\d{2})월$/.exec(String(label || '').trim());
+    if (!m) return { start: '', end: '' };
+    var y = m[1];
+    var mo = m[2];
+    var im = parseInt(mo, 10);
+    var iy = parseInt(y, 10);
+    var last = new Date(iy, im, 0).getDate();
+    return {
+      start: y + '-' + mo + '-01',
+      end: y + '-' + mo + '-' + String(last).padStart(2, '0')
+    };
+  }
+
+  function parseSwPhotoUrls(photoLinks) {
+    var s = (photoLinks || '').trim();
+    if (!s) return [];
+    return s.split(',').map(function (x) { return x.trim(); }).filter(function (u) {
+      return /^https?:\/\//i.test(u);
+    });
+  }
+
+  function parseUploadPhotoLinksString(photoLinksRaw) {
+    if (!photoLinksRaw) return '';
+    var lines = String(photoLinksRaw).split('\n').filter(function (line) { return line.trim(); });
+    var urls = lines.map(function (line) {
+      var idx = line.indexOf(':');
+      if (idx >= 0) return line.slice(idx + 1).trim();
+      return '';
+    }).filter(Boolean);
+    return urls.join(',');
+  }
+
+  function setMopPane(pane) {
+    state.mopPane = pane;
+    var tCs = $('mopTabCs');
+    var tSw = $('mopTabSw');
+    var pCs = $('mopPaneCs');
+    var pSw = $('mopPaneSw');
+    var ht = $('mopHeaderTitle');
+    if (tCs) {
+      tCs.classList.toggle('mop-tab--active', pane === 'cs');
+      tCs.setAttribute('aria-current', pane === 'cs' ? 'page' : 'false');
+    }
+    if (tSw) {
+      tSw.classList.toggle('mop-tab--active', pane === 'sw');
+      tSw.setAttribute('aria-current', pane === 'sw' ? 'page' : 'false');
+    }
+    if (pCs) pCs.classList.toggle('mop-hidden', pane !== 'cs');
+    if (pSw) pSw.classList.toggle('mop-hidden', pane !== 'sw');
+    if (ht) ht.textContent = pane === 'sw' ? '특수작업' : 'C/S';
+    if (pane === 'sw') loadSwWorks();
+  }
+
+  function updateSwRegisterBtn() {
+    var b = $('mopSwRegisterBtn');
+    if (!b) return;
+    if (state.role === '관리자') b.classList.remove('mop-hidden');
+    else b.classList.add('mop-hidden');
+  }
+
+  function closeSwModal() {
+    var bd = $('mopSwModalBackdrop');
+    if (bd) bd.classList.add('mop-hidden');
+    state.swModalPhotos = [];
+    var pv = $('mopSwPhotoPreview');
+    if (pv) pv.innerHTML = '';
+    var fi = $('mopSwFormPhotos');
+    if (fi) fi.value = '';
+  }
+
+  function compressImageFile(file, maxW, maxH, quality) {
+    maxW = maxW || 1920;
+    maxH = maxH || 1920;
+    quality = quality == null ? 0.82 : quality;
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var img = new Image();
+        img.onload = function () {
+          var w = img.width;
+          var h = img.height;
+          if (w > h) {
+            if (w > maxW) {
+              h = (h * maxW) / w;
+              w = maxW;
+            }
+          } else if (h > maxH) {
+            w = (w * maxH) / h;
+            h = maxH;
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function renderMopSwPhotoPreview() {
+    var pv = $('mopSwPhotoPreview');
+    if (!pv) return;
+    pv.innerHTML = state.swModalPhotos.map(function (photo, index) {
+      return (
+        '<div class="mop-sw-photo-thumb-wrap">' +
+        '<img src="' + photo.url + '" alt="">' +
+        '<button type="button" class="mop-sw-photo-remove" data-mop-sw-idx="' + index + '" aria-label="삭제">×</button>' +
+        '</div>'
+      );
+    }).join('');
+    pv.querySelectorAll('.mop-sw-photo-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var i = parseInt(btn.getAttribute('data-mop-sw-idx'), 10);
+        if (!isNaN(i)) {
+          state.swModalPhotos.splice(i, 1);
+          renderMopSwPhotoPreview();
+        }
+      });
+    });
+  }
+
+  function handleMopSwPhotoInputChange(ev) {
+    var files = Array.from((ev.target && ev.target.files) || []);
+    var i = 0;
+    function next() {
+      if (i >= files.length) {
+        if (ev.target) ev.target.value = '';
+        renderMopSwPhotoPreview();
+        return;
+      }
+      var file = files[i];
+      i += 1;
+      if (!file.type || file.type.indexOf('image/') !== 0) {
+        next();
+        return;
+      }
+      compressImageFile(file)
+        .then(function (url) {
+          state.swModalPhotos.push({ url: url });
+          next();
+        })
+        .catch(function () {
+          var reader = new FileReader();
+          reader.onload = function (e) {
+            state.swModalPhotos.push({ url: e.target.result });
+            next();
+          };
+          reader.onerror = next;
+          reader.readAsDataURL(file);
+        });
+    }
+    next();
+  }
+
+  function fillSwModalCompanySelect() {
+    var dst = $('mopSwFormCompany');
+    var src = $('mopCompany');
+    if (!dst || !src) return;
+    dst.innerHTML = '';
+    for (var j = 0; j < src.options.length; j++) {
+      var o = src.options[j];
+      if (!o.value) continue;
+      var n = document.createElement('option');
+      n.value = o.value;
+      n.textContent = o.textContent;
+      dst.appendChild(n);
+    }
+    if (!dst.options.length) {
+      var ph = document.createElement('option');
+      ph.value = '';
+      ph.textContent = '화주사 없음';
+      dst.appendChild(ph);
+      return;
+    }
+    dst.selectedIndex = 0;
+  }
+
+  function mopSwSyncPriceFromType() {
+    var sel = $('mopSwFormType');
+    var price = $('mopSwFormPrice');
+    if (!sel || !price || !sel.selectedOptions.length) return;
+    var opt = sel.selectedOptions[0];
+    var dp = opt.getAttribute('data-default-price');
+    if (dp !== null && dp !== '' && !isNaN(Number(dp))) price.value = String(Math.round(Number(dp)));
+  }
+
+  function fillSwModalTypeSelect() {
+    var sel = $('mopSwFormType');
+    if (!sel) return Promise.resolve();
+    sel.innerHTML = '<option value="">불러오는 중…</option>';
+    return fetch(state.apiBase + '/api/special-works/types', {
+      headers: authHeaders(),
+      credentials: 'include'
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        sel.innerHTML = '';
+        var list = (res.success && res.data) ? res.data : [];
+        state.swWorkTypes = list.slice();
+        list.forEach(function (t) {
+          var o = document.createElement('option');
+          o.value = String(t.id);
+          o.textContent = t.name || '';
+          o.setAttribute('data-default-price', String(t.default_unit_price != null ? t.default_unit_price : ''));
+          sel.appendChild(o);
+        });
+        if (!list.length) {
+          var x = document.createElement('option');
+          x.value = '';
+          x.textContent = '등록된 종류 없음';
+          sel.appendChild(x);
+        } else {
+          mopSwSyncPriceFromType();
+        }
+      })
+      .catch(function () {
+        sel.innerHTML = '<option value="">종류 로드 실패</option>';
+      });
+  }
+
+  function openSwModal() {
+    if (state.role !== '관리자') {
+      toast('관리자만 등록할 수 있습니다.', true);
+      return;
+    }
+    fillSwModalCompanySelect();
+    return fillSwModalTypeSelect().then(function () {
+      var d = $('mopSwFormDate');
+      if (d) {
+        var t = new Date();
+        d.value = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+      }
+      var q = $('mopSwFormQty');
+      if (q) q.value = '1';
+      var me = $('mopSwFormMemo');
+      if (me) me.value = '';
+      state.swModalPhotos = [];
+      renderMopSwPhotoPreview();
+      var bd = $('mopSwModalBackdrop');
+      if (bd) bd.classList.remove('mop-hidden');
+    });
+  }
+
+  function loadSwWorks() {
+    var listEl = $('mopSwList');
+    if (!listEl) return Promise.resolve();
+    listEl.innerHTML = '<div class="mop-empty">불러오는 중…</div>';
+    state.month = ($('mopMonth') && $('mopMonth').value) || state.month;
+    var range = monthKoreanToRange(state.month);
+    var q = [];
+    if (range.start) q.push('start_date=' + encodeURIComponent(range.start));
+    if (range.end) q.push('end_date=' + encodeURIComponent(range.end));
+    if (state.role === '관리자') {
+      var cf = companyFilterForApi();
+      if (cf) q.push('company_name=' + encodeURIComponent(cf));
+    }
+    var url = state.apiBase + '/api/special-works/works?' + q.join('&');
+    return fetch(url, { headers: authHeaders(), credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (result) {
+        if (result.success) {
+          state.swList = result.data || [];
+          renderSwList();
+        } else {
+          state.swList = [];
+          listEl.innerHTML = '<div class="mop-empty">' + escapeHtml(result.message || '목록을 불러올 수 없습니다.') + '</div>';
+          toast(result.message || '특수작업 목록 실패', true);
+        }
+      })
+      .catch(function () {
+        state.swList = [];
+        listEl.innerHTML = '<div class="mop-empty">네트워크 오류</div>';
+        toast('네트워크 오류', true);
+      });
+  }
+
+  function renderSwList() {
+    var listEl = $('mopSwList');
+    if (!listEl) return;
+    var rows = state.swList || [];
+    if (!rows.length) {
+      listEl.innerHTML = '<div class="mop-empty">해당 기간 특수작업이 없습니다.</div>';
+      return;
+    }
+    var sorted = rows.slice().sort(function (a, b) {
+      var c = String(b.work_date || '').localeCompare(String(a.work_date || ''));
+      if (c !== 0) return c;
+      return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+    });
+    listEl.innerHTML = sorted.map(function (w) {
+      var wd = (w.work_date || '').toString().slice(0, 10);
+      var wdShort = wd.length >= 10 ? wd.slice(5).replace('-', '/') : wd;
+      var type = escapeHtml(w.work_type_name || '-');
+      var comp = escapeHtml(w.company_name || '');
+      var amt = (w.total_price != null ? Math.round(Number(w.total_price)) : 0).toLocaleString('ko-KR');
+      var memo = escapeHtml((w.memo || '').replace(/\s+/g, ' ').trim().slice(0, 80));
+      var photos = parseSwPhotoUrls(w.photo_links);
+      var thumbs = photos.slice(0, 4).map(function (u) {
+        return '<img class="mop-sw-card__thumb" src="' + escapeHtml(u) + '" alt="" loading="lazy">';
+      }).join('');
+      return (
+        '<article class="mop-sw-card" tabindex="0">' +
+        '<div class="mop-sw-card__row1">' +
+        '<span class="mop-sw-card__date">' + escapeHtml(wdShort) + '</span>' +
+        '<span class="mop-sw-card__type">' + type + '</span>' +
+        '<span class="mop-sw-card__amt">' + escapeHtml(amt) + '원</span>' +
+        '</div>' +
+        '<div class="mop-sw-card__row2">' + comp + (memo ? ' · ' + memo : '') + '</div>' +
+        (thumbs ? '<div class="mop-sw-card__photos">' + thumbs + '</div>' : '') +
+        '</article>'
+      );
+    }).join('');
+  }
+
+  function submitSwModal() {
+    var btn = $('mopSwFormSubmit');
+    var companySel = $('mopSwFormCompany');
+    var typeSel = $('mopSwFormType');
+    var dateEl = $('mopSwFormDate');
+    var qtyEl = $('mopSwFormQty');
+    var priceEl = $('mopSwFormPrice');
+    var memoEl = $('mopSwFormMemo');
+    var companyName = (companySel && companySel.value || '').trim();
+    var workTypeId = typeSel && typeSel.value ? parseInt(typeSel.value, 10) : NaN;
+    var workDate = (dateEl && dateEl.value || '').trim();
+    var quantity = qtyEl ? parseFloat(qtyEl.value) : NaN;
+    var unitPrice = priceEl ? parseFloat(priceEl.value) : NaN;
+    var memo = (memoEl && memoEl.value || '').trim();
+    if (!companyName) {
+      toast('화주사를 선택해 주세요.', true);
+      return;
+    }
+    if (!workTypeId) {
+      toast('작업 종류를 선택해 주세요.', true);
+      return;
+    }
+    if (!workDate) {
+      toast('작업일을 선택해 주세요.', true);
+      return;
+    }
+    if (!(quantity > 0)) {
+      toast('수량은 1 이상이어야 합니다.', true);
+      return;
+    }
+    if (isNaN(unitPrice) || unitPrice < 0) {
+      toast('단가를 확인해 주세요.', true);
+      return;
+    }
+    if (btn) btn.disabled = true;
+    var photoLinksFinal = '';
+    var chain = Promise.resolve();
+    if (state.swModalPhotos.length) {
+      var imgs = state.swModalPhotos.map(function (p) { return p.url; });
+      var track = 'special_mop_' + companyName.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now();
+      chain = fetch(state.apiBase + '/api/uploads/upload-images', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images: imgs, trackingNumber: track })
+      }).then(function (r) {
+        if (r.status === 413) throw new Error('사진 용량이 너무 큽니다.');
+        return r.json();
+      }).then(function (up) {
+        if (!up.success) throw new Error(up.message || '사진 업로드 실패');
+        if (up.photoLinks) photoLinksFinal = parseUploadPhotoLinksString(up.photoLinks);
+        else if (up.urls && up.urls.length) photoLinksFinal = up.urls.join(',');
+      });
+    }
+    chain
+      .then(function () {
+        return fetch(state.apiBase + '/api/special-works/works', {
+          method: 'POST',
+          credentials: 'include',
+          headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+          body: JSON.stringify({
+            company_name: companyName,
+            work_type_id: workTypeId,
+            work_date: workDate,
+            quantity: quantity,
+            unit_price: unitPrice,
+            photo_links: photoLinksFinal,
+            memo: memo
+          })
+        });
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res.success) {
+          toast('작업이 등록되었습니다.');
+          closeSwModal();
+          loadSwWorks();
+        } else {
+          toast(res.message || '등록 실패', true);
+        }
+      })
+      .catch(function (e) {
+        toast(e.message || '오류', true);
+      })
+      .finally(function () {
+        if (btn) btn.disabled = false;
+      });
   }
 
   function toast(msg, isErr) {
@@ -208,6 +633,9 @@
     if (sub) {
       sub.textContent = state.company + (state.role === '관리자' ? ' · 관리자' : '') + ' (' + state.username + ')';
     }
+    state.mopPane = 'cs';
+    setMopPane('cs');
+    updateSwRegisterBtn();
     loadCompaniesIfAdmin();
     loadMonths().then(function () {
       return loadCs();
@@ -274,6 +702,7 @@
 
   function doLogout() {
     clearAuth();
+    closeSwModal();
     closeSheet();
     showLogin();
   }
@@ -647,13 +1076,35 @@
     if (form) form.addEventListener('submit', doLogin);
 
     $('mopLogout') && $('mopLogout').addEventListener('click', doLogout);
-    $('mopRefresh') && $('mopRefresh').addEventListener('click', function () { loadCs(); });
+    $('mopRefresh') && $('mopRefresh').addEventListener('click', function () {
+      if (state.mopPane === 'sw') loadSwWorks();
+      else loadCs();
+    });
+
+    $('mopTabCs') && $('mopTabCs').addEventListener('click', function () { setMopPane('cs'); });
+    $('mopTabSw') && $('mopTabSw').addEventListener('click', function () { setMopPane('sw'); });
+
+    $('mopSwRegisterBtn') && $('mopSwRegisterBtn').addEventListener('click', function () { openSwModal(); });
+    $('mopSwModalClose') && $('mopSwModalClose').addEventListener('click', closeSwModal);
+    $('mopSwModalBackdrop') && $('mopSwModalBackdrop').addEventListener('click', function (ev) {
+      if (ev.target.id === 'mopSwModalBackdrop') closeSwModal();
+    });
+    $('mopSwPhotoPick') && $('mopSwPhotoPick').addEventListener('click', function () {
+      $('mopSwFormPhotos') && $('mopSwFormPhotos').click();
+    });
+    $('mopSwFormPhotos') && $('mopSwFormPhotos').addEventListener('change', handleMopSwPhotoInputChange);
+    $('mopSwFormType') && $('mopSwFormType').addEventListener('change', mopSwSyncPriceFromType);
+    $('mopSwFormSubmit') && $('mopSwFormSubmit').addEventListener('click', submitSwModal);
 
     $('mopMonth') && $('mopMonth').addEventListener('change', function () {
       state.month = $('mopMonth').value;
-      loadCs();
+      if (state.mopPane === 'sw') loadSwWorks();
+      else loadCs();
     });
-    $('mopCompany') && $('mopCompany').addEventListener('change', function () { loadCs(); });
+    $('mopCompany') && $('mopCompany').addEventListener('change', function () {
+      if (state.mopPane === 'sw') loadSwWorks();
+      else loadCs();
+    });
 
     $('mopChipAll') && $('mopChipAll').addEventListener('click', function () { setFilter('all'); });
     $('mopChipPending') && $('mopChipPending').addEventListener('click', function () { setFilter('pending'); });
@@ -683,7 +1134,8 @@
   global.MobileOpsPortal = {
     init: init,
     getApiBase: getApiBase,
-    refreshCs: loadCs
+    refreshCs: loadCs,
+    refreshSw: loadSwWorks
   };
 
   if (document.readyState === 'loading') {
