@@ -329,10 +329,12 @@ def qr_photo():
         return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
 
 
+@app.route('/mobile')
+@app.route('/mobile/')
 @app.route('/mobile-ops')
 @app.route('/mobile_ops.html')
 def mobile_ops():
-    """모바일 작업 포털 (C/S 조회·관리 + QR 스캔 이동)"""
+    """모바일 C/S 포털. 권장 URL: /mobile (C/S 조회·관리 + QR 스캔 이동)"""
     try:
         return send_file('mobile_ops.html')
     except FileNotFoundError:
