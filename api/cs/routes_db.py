@@ -234,6 +234,14 @@ def update_cs_status(cs_id: int, status: str, admin_message: str = None, process
     if USE_POSTGRESQL:
         cursor = conn.cursor()
         try:
+            if status == '접수':
+                cursor.execute('''
+                    UPDATE customer_service
+                    SET status = %s, admin_message = %s, processor = NULL, processed_at = NULL, updated_at = %s
+                    WHERE id = %s
+                ''', (status, admin_message, updated_at, cs_id))
+                conn.commit()
+                return cursor.rowcount > 0
             if admin_message and processor:
                 cursor.execute('''
                     UPDATE customer_service
@@ -270,6 +278,14 @@ def update_cs_status(cs_id: int, status: str, admin_message: str = None, process
     else:
         cursor = conn.cursor()
         try:
+            if status == '접수':
+                cursor.execute('''
+                    UPDATE customer_service
+                    SET status = ?, admin_message = ?, processor = NULL, processed_at = NULL, updated_at = ?
+                    WHERE id = ?
+                ''', (status, admin_message, updated_at, cs_id))
+                conn.commit()
+                return cursor.rowcount > 0
             if admin_message and processor:
                 cursor.execute('''
                     UPDATE customer_service
@@ -794,17 +810,17 @@ def get_available_months():
 
 @cs_bp.route('/<int:cs_id>/status', methods=['PUT'])
 def update_cs_status_route(cs_id):
-    """C/S 접수 상태 업데이트 (관리자용 - 처리완료/처리불가)"""
+    """C/S 접수 상태 업데이트 (관리자용 - 접수/처리완료/처리불가)"""
     try:
         data = request.get_json()
         status = data.get('status', '').strip()
         admin_message = data.get('admin_message', '').strip() if data.get('admin_message') else None
         processor = data.get('processor', '').strip() if data.get('processor') else None
         
-        if not status or status not in ['처리완료', '처리불가']:
+        if not status or status not in ['접수', '처리완료', '처리불가']:
             return jsonify({
                 'success': False,
-                'message': '상태는 처리완료 또는 처리불가여야 합니다.'
+                'message': '상태는 접수, 처리완료, 처리불가 중 하나여야 합니다.'
             }), 400
         
         success = update_cs_status(cs_id, status, admin_message, processor)
