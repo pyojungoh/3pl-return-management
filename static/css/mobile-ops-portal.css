@@ -491,12 +491,48 @@ body.mop-body {
   border: 1px solid var(--mop-border);
   border-bottom: none;
   padding: var(--mop-space);
+  padding-top: calc(var(--mop-space) + 0.15rem);
   padding-bottom: calc(var(--mop-space) + env(safe-area-inset-bottom));
 }
 
-.mop-sheet h2 {
+.mop-sheet__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.mop-sheet__title {
   font-size: var(--mop-fs-title);
-  margin: 0 0 0.75rem;
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.mop-sheet__close {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--mop-border);
+  background: var(--mop-card);
+  color: var(--mop-text);
+  font-size: 1.35rem;
+  line-height: 1;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.mop-sheet__close:active {
+  opacity: 0.88;
 }
 
 .mop-sheet__block {
@@ -517,6 +553,43 @@ body.mop-body {
   flex-direction: column;
   gap: 0.45rem;
   margin-top: 0.75rem;
+}
+
+.mop-sheet__actions--row {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+}
+
+.mop-sheet__actions--row .mop-btn--sheet-row {
+  width: auto;
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+  font-size: clamp(0.68rem, 2.6vw, 0.8rem);
+}
+
+.mop-sheet__btn-hold {
+  background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+  color: #fff;
+  border: none;
+}
+
+.mop-sheet__issue-edit,
+.mop-sheet__gen-edit {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.mop-select--full {
+  width: 100%;
+}
+
+.mop-btn--sheet-block {
+  width: 100%;
 }
 
 .mop-btn--success {

@@ -463,26 +463,38 @@
     if (!body) return;
     var isAdmin = state.role === '관리자';
     var adminBtns = isAdmin
-      ? '<div class="mop-sheet__actions">' +
-        '<button type="button" class="mop-btn mop-btn--muted" id="mopActHold" style="background:linear-gradient(135deg,#a29bfe 0%,#6c5ce7 100%);color:#fff;border:none">보류</button>' +
-        '<button type="button" class="mop-btn mop-btn--success" id="mopActComplete">처리완료</button>' +
-        '<button type="button" class="mop-btn mop-btn--danger" id="mopActImpossible">처리불가</button>' +
-        '<label class="mop-sheet__label" style="margin-top:0.5rem">C/S 종류 변경</label>' +
-        '<select id="mopSheetIssueType" class="mop-select" style="width:100%"></select>' +
-        '<button type="button" class="mop-btn mop-btn--primary" id="mopActIssueType">종류 저장</button>' +
+      ? '<div class="mop-sheet__actions mop-sheet__actions--row">' +
+        '<button type="button" class="mop-btn mop-btn--sheet-row mop-sheet__btn-hold" id="mopActHold">보류</button>' +
+        '<button type="button" class="mop-btn mop-btn--sheet-row mop-btn--success" id="mopActComplete">처리완료</button>' +
+        '<button type="button" class="mop-btn mop-btn--sheet-row mop-btn--danger" id="mopActImpossible">처리불가</button>' +
+        '</div>' +
+        '<div class="mop-sheet__gen-edit">' +
+        '<label class="mop-sheet__label" for="mopSheetGenMgmt">생성된 관리번호</label>' +
+        '<input type="text" id="mopSheetGenMgmt" class="mop-input" autocomplete="off" placeholder="물류 등에서 발급된 번호">' +
+        '<label class="mop-sheet__label" for="mopSheetCustomerName">고객명 (선택)</label>' +
+        '<input type="text" id="mopSheetCustomerName" class="mop-input" autocomplete="name" placeholder="고객명">' +
+        '<button type="button" class="mop-btn mop-btn--primary mop-btn--sheet-block" id="mopActSaveGenMgmt">관리번호·고객명 저장</button>' +
+        '</div>' +
+        '<div class="mop-sheet__issue-edit">' +
+        '<label class="mop-sheet__label" for="mopSheetIssueType">C/S 종류 변경</label>' +
+        '<select id="mopSheetIssueType" class="mop-select mop-select--full"></select>' +
+        '<button type="button" class="mop-btn mop-btn--primary mop-btn--sheet-block" id="mopActIssueType">종류 저장</button>' +
         '</div>'
       : '';
     body.innerHTML =
-      '<h2>접수 #' + escapeHtml(String(cs.id)) + '</h2>' +
+      '<div class="mop-sheet__head">' +
+      '<h2 class="mop-sheet__title">접수 #' + escapeHtml(String(cs.id)) + '</h2>' +
+      '<button type="button" class="mop-sheet__close" id="mopSheetClose" aria-label="닫기">×</button>' +
+      '</div>' +
       '<div class="mop-sheet__block"><span class="mop-sheet__label">화주사</span>' + escapeHtml(cs.company_name || '') + '</div>' +
       '<div class="mop-sheet__block"><span class="mop-sheet__label">종류</span> <span class="' + issueTypeBadgeClass(cs.issue_type) + ' mop-type--inline">' + escapeHtml(cs.issue_type || '-') + '</span></div>' +
       '<div class="mop-sheet__block"><span class="mop-sheet__label">상태</span>' + escapeHtml(st) + '</div>' +
       '<div class="mop-sheet__block"><span class="mop-sheet__label">일시</span>' + escapeHtml(formatCsDate(cs)) + '</div>' +
-      '<div class="mop-sheet__block"><span class="mop-sheet__label">관리번호</span>' + escapeHtml(cs.management_number || '-') + '</div>' +
+      '<div class="mop-sheet__block"><span class="mop-sheet__label">접수 관리번호</span>' + escapeHtml((cs.management_number || '').trim() || '-') + '</div>' +
+      '<div class="mop-sheet__block"><span class="mop-sheet__label">생성된 관리번호</span>' + escapeHtml((cs.generated_management_number || '').trim() || '-') + '</div>' +
       '<div class="mop-sheet__block"><span class="mop-sheet__label">내용</span>' + escapeHtml(cs.content || '') + '</div>' +
       (cs.admin_message ? '<div class="mop-sheet__block"><span class="mop-sheet__label">관리자 메시지</span>' + escapeHtml(cs.admin_message) + '</div>' : '') +
-      adminBtns +
-      '<button type="button" class="mop-btn mop-btn--muted" id="mopSheetClose" style="margin-top:0.75rem">닫기</button>';
+      adminBtns;
 
     $('mopSheetBackdrop') && $('mopSheetBackdrop').classList.remove('mop-hidden');
     var closeBtn = $('mopSheetClose');
@@ -491,7 +503,12 @@
       $('mopActHold') && $('mopActHold').addEventListener('click', function () { actStatus(id, '보류'); });
       $('mopActComplete') && $('mopActComplete').addEventListener('click', function () { actStatus(id, '처리완료'); });
       $('mopActImpossible') && $('mopActImpossible').addEventListener('click', function () { actStatus(id, '처리불가'); });
+      $('mopActSaveGenMgmt') && $('mopActSaveGenMgmt').addEventListener('click', function () { actSaveGenMgmt(id); });
       $('mopActIssueType') && $('mopActIssueType').addEventListener('click', function () { actIssueType(id); });
+      var genInp = $('mopSheetGenMgmt');
+      if (genInp) genInp.value = (cs.generated_management_number || '').trim();
+      var custInp = $('mopSheetCustomerName');
+      if (custInp) custInp.value = (cs.customer_name || '').trim();
       fillIssueTypeSelect(cs.issue_type || '');
     }
   }
@@ -552,6 +569,39 @@
         } else {
           toast(result.message || '실패', true);
         }
+      })
+      .catch(function (e) { toast(e.message || '오류', true); });
+  }
+
+  function actSaveGenMgmt(id) {
+    var genInp = $('mopSheetGenMgmt');
+    var custInp = $('mopSheetCustomerName');
+    var genVal = (genInp && genInp.value || '').trim();
+    var custVal = (custInp && custInp.value || '').trim();
+    var base = state.apiBase + '/api/cs/' + id;
+    Promise.all([
+      fetch(base + '/generated-management-number', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generated_management_number: genVal || null })
+      }),
+      fetch(base + '/customer-name', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_name: custVal || null })
+      })
+    ])
+      .then(function (responses) { return Promise.all(responses.map(function (r) { return r.json(); })); })
+      .then(function (results) {
+        var ok = results.every(function (r) { return r.success; });
+        if (ok) {
+          toast('관리번호·고객명이 저장되었습니다.');
+          return loadCs().then(function () {
+            if (state.selectedId === id) openSheet(id);
+          });
+        }
+        var errMsg = results.filter(function (r) { return !r.success; }).map(function (r) { return r.message; }).join(', ');
+        toast(errMsg || '저장 실패', true);
       })
       .catch(function (e) { toast(e.message || '오류', true); });
   }
