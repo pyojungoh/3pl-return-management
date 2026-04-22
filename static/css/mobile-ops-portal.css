@@ -164,7 +164,15 @@ body.mop-body {
   line-height: 1.35;
 }
 
-/* 앱 레이아웃 */
+/* 앱 레이아웃 — 헤더+탭 한 덩어리로 상단 고정 */
+.mop-app-top {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--mop-surface);
+}
+
 .mop-header {
   display: flex;
   align-items: center;
@@ -172,10 +180,7 @@ body.mop-body {
   gap: var(--mop-space);
   padding: var(--mop-space);
   background: var(--mop-surface);
-  border-bottom: 1px solid var(--mop-border);
-  position: sticky;
-  top: 0;
-  z-index: 50;
+  border-bottom: none;
 }
 
 .mop-header__title {
@@ -210,9 +215,10 @@ body.mop-body {
   padding: 0 0.5rem;
 }
 
-/* 탭 */
+/* 탭 (헤더 바로 아래) */
 .mop-tabs {
   display: flex;
+  flex-shrink: 0;
   background: var(--mop-surface);
   border-bottom: 1px solid var(--mop-border);
 }

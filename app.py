@@ -2,7 +2,7 @@
 3PL 반품 관리 및 화주사 관리 시스템 서버
 버전: v4.0 (PostgreSQL/Neon 데이터베이스 기반)
 """
-from flask import Flask, render_template, send_from_directory, send_file, request, jsonify
+from flask import Flask, render_template, send_from_directory, send_file, request, jsonify, redirect, make_response
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
@@ -329,18 +329,32 @@ def qr_photo():
         return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
 
 
+def _mobile_portal_html_response():
+    """jjaysolution.com/mobile — HTML이 CDN·브라우저에 오래 캐시되지 않도록."""
+    resp = make_response(send_file('mobile_ops.html'))
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
+
 @app.route('/mobile')
 @app.route('/mobile/')
-@app.route('/mobile-ops')
-@app.route('/mobile_ops.html')
-def mobile_ops():
-    """모바일 C/S 포털. 권장 URL: /mobile (C/S 조회·관리 + QR 스캔 이동)"""
+def mobile_portal():
+    """모바일 포털 (C/S·특수작업·QR 링크). 권장 주소: /mobile"""
     try:
-        return send_file('mobile_ops.html')
+        return _mobile_portal_html_response()
     except FileNotFoundError:
-        return '<h1>모바일 작업 페이지를 찾을 수 없습니다.</h1><p>mobile_ops.html 파일이 필요합니다.</p>', 404
+        return '<h1>모바일 페이지를 찾을 수 없습니다.</h1><p>mobile_ops.html 파일이 필요합니다.</p>', 404
     except Exception as e:
         return f'<h1>오류 발생</h1><p>{str(e)}</p>', 500
+
+
+@app.route('/mobile-ops')
+@app.route('/mobile_ops.html')
+def mobile_portal_legacy_redirect():
+    """구 주소는 /mobile 로 고정 (캐시된 북마크도 최신 경로로)."""
+    return redirect('/mobile', code=301)
 
 
 # 정적 파일 제공
@@ -349,7 +363,13 @@ def serve_static(filename):
     """정적 파일 제공"""
     static_dir = os.path.join(os.path.dirname(__file__), 'static')
     if os.path.exists(static_dir):
-        return send_from_directory('static', filename)
+        resp = make_response(send_from_directory('static', filename))
+        # 모바일 포털 전용 — 배포 후에도 항상 최신 JS/CSS가 적용되도록
+        if filename in ('css/mobile-ops-portal.css', 'js/mobile-ops-portal.js', 'manifest-mobile.json'):
+            resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            resp.headers['Pragma'] = 'no-cache'
+            resp.headers['Expires'] = '0'
+        return resp
     return {'error': '파일을 찾을 수 없습니다.'}, 404
 
 

@@ -3,17 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0f1419">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Mobile">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Mobile</title>
-  <link rel="manifest" href="/static/manifest-mobile.json">
+  <link rel="manifest" href="/static/manifest-mobile.json?v=mop20260422">
   <link rel="icon" type="image/png" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
   <link rel="apple-touch-icon" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
   <link rel="apple-touch-icon" sizes="180x180" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
-  <link rel="stylesheet" href="/static/css/mobile-ops-portal.css">
+  <link rel="stylesheet" href="/static/css/mobile-ops-portal.css?v=mop20260422">
 </head>
 <body class="mop-body">
   <!-- 로그인: 대시보드와 동일 localStorage 키 사용 -->
@@ -42,16 +45,24 @@
   </section>
 
   <div id="mopApp" class="mop-hidden">
-    <header class="mop-header">
-      <div>
-        <h1 class="mop-header__title" id="mopHeaderTitle">C/S</h1>
-        <p id="mopHeaderSub" class="mop-header__sub"></p>
-      </div>
-      <div class="mop-header__actions">
-        <button type="button" id="mopRefresh" class="mop-icon-btn" title="새로고침">새로고침</button>
-        <button type="button" id="mopLogout" class="mop-icon-btn" title="로그아웃">나가기</button>
-      </div>
-    </header>
+    <div class="mop-app-top">
+      <header class="mop-header">
+        <div>
+          <h1 class="mop-header__title" id="mopHeaderTitle">C/S</h1>
+          <p id="mopHeaderSub" class="mop-header__sub"></p>
+        </div>
+        <div class="mop-header__actions">
+          <button type="button" id="mopRefresh" class="mop-icon-btn" title="새로고침">새로고침</button>
+          <button type="button" id="mopLogout" class="mop-icon-btn" title="로그아웃">나가기</button>
+        </div>
+      </header>
+
+      <nav class="mop-tabs" aria-label="주 메뉴">
+        <button type="button" class="mop-tab mop-tab--active" id="mopTabCs" data-mop-pane="cs" aria-current="page">C/S</button>
+        <button type="button" class="mop-tab" id="mopTabSw" data-mop-pane="sw">특수작업</button>
+        <a href="/qr-photo" class="mop-tab mop-tab--link">QR</a>
+      </nav>
+    </div>
 
     <div class="mop-toolbar">
       <div class="mop-toolbar__row">
@@ -61,12 +72,6 @@
         <select id="mopCompany" class="mop-select" aria-label="화주사 필터"></select>
       </div>
     </div>
-
-    <nav class="mop-tabs" aria-label="주 메뉴">
-      <button type="button" class="mop-tab mop-tab--active" id="mopTabCs" data-mop-pane="cs" aria-current="page">C/S</button>
-      <button type="button" class="mop-tab" id="mopTabSw" data-mop-pane="sw">특수작업</button>
-      <a href="/qr-photo" class="mop-tab mop-tab--link">QR</a>
-    </nav>
 
     <div id="mopPaneCs" class="mop-pane">
       <div class="mop-chips" role="toolbar" aria-label="상태 필터">
@@ -130,6 +135,6 @@
 
   <div id="mopToast" class="mop-toast" role="status" aria-live="polite"></div>
 
-  <script src="/static/js/mobile-ops-portal.js" defer></script>
+  <script src="/static/js/mobile-ops-portal.js?v=mop20260422" defer></script>
 </body>
 </html>

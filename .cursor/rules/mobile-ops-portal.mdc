@@ -4,7 +4,7 @@ globs: mobile_ops.html,static/js/mobile-ops-portal.js,static/css/mobile-ops-port
 alwaysApply: false
 ---
 
-# 모바일 C/S 포털 (`mobile_ops.html`, URL 권장: `/mobile`)
+# 모바일 C/S 포털 (`mobile_ops.html`, 공식 URL: `/mobile` — `/mobile-ops`·`mobile_ops.html`은 301로 `/mobile` 리다이렉트)
 
 관리자·화주사가 **모바일에서 C/S를 위주로** 볼 때 사용하는 경량 페이지. **가로로 긴 테이블은 쓰지 않는다** — 카드형 세로 목록만 유지한다.
 
