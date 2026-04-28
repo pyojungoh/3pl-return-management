@@ -950,6 +950,122 @@
       font-weight: 800;
       color: #636e72;
     }
+    .pal-map-column-scroll {
+      overflow: auto;
+      max-height: 72vh;
+      border: 1px solid #dfe6e9;
+      border-radius: 12px;
+      background: #fff;
+    }
+    .pal-map-zoom-head {
+      display: grid;
+      grid-template-columns: 60px 52px repeat(3, minmax(170px, 1fr));
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: #ffffff;
+      border-bottom: 2px solid #dee2e6;
+    }
+    .pal-map-zoom-head-cell {
+      padding: 10px 8px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      color: #ff6b35;
+      background: #fff9e6;
+      border-right: 1px solid #eceff1;
+    }
+    .pal-map-zoom-head-cell:last-child {
+      border-right: none;
+    }
+    .pal-map-zoom-slot-group {
+      display: grid;
+      grid-template-columns: 60px 52px repeat(3, minmax(170px, 1fr));
+      grid-template-rows: repeat(2, minmax(72px, auto));
+      border-bottom: 1px solid #eef1f3;
+    }
+    .pal-map-zoom-slot-no {
+      grid-row: 1 / span 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 800;
+      color: #636e72;
+      background: #f8f9fa;
+      border-right: 1px solid #eceff1;
+    }
+    .pal-map-zoom-pos {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #636e72;
+      background: #fafbfc;
+      border-right: 1px solid #eceff1;
+      border-bottom: 1px solid #eceff1;
+    }
+    .pal-map-zoom-pos.pos-2 {
+      border-bottom: none;
+    }
+    .pal-map-zoom-cell {
+      border: none;
+      border-right: 1px solid #eceff1;
+      border-bottom: 1px solid #eceff1;
+      padding: 6px 8px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-height: 72px;
+    }
+    .pal-map-zoom-cell.floor-3 {
+      background: #f5fbff;
+    }
+    .pal-map-zoom-cell.floor-2 {
+      background: #fff7fb;
+    }
+    .pal-map-zoom-cell.floor-1 {
+      background: #f8fff6;
+    }
+    .pal-map-zoom-cell.pos-2 {
+      border-bottom: none;
+    }
+    .pal-map-zoom-cell:last-child {
+      border-right: none;
+    }
+    .pal-map-zoom-cell-selected {
+      outline: 3px solid #ff6b35;
+      outline-offset: -3px;
+      z-index: 1;
+    }
+    .pal-map-zoom-code {
+      font-size: 10px;
+      color: #7f8c8d;
+      line-height: 1.2;
+    }
+    .pal-map-zoom-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #2d3436;
+      line-height: 1.25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pal-map-zoom-sub {
+      font-size: 10px;
+      color: #636e72;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pal-map-zoom-empty {
+      opacity: 0.7;
+    }
     .pal-map-column-root {
       margin-top: 8px;
     }
@@ -2084,6 +2200,14 @@
         'D-14-3-2'
       ]);
     }
+    if (typeof palMapPassageCodes === 'undefined') {
+      var palMapPassageCodes = new Set([
+        'B-5-1-2',
+        'B-10-1-1',
+        'C-5-1-2',
+        'C-10-1-1'
+      ]);
+    }
 
     function palNormalizeSectionCode(raw) {
       if (raw == null || raw === undefined) return null;
@@ -2097,6 +2221,11 @@
     function palIsBlockedSectionCode(code) {
       var n = palNormalizeSectionCode(code);
       return !!(n && palMapBlockedCodes.has(n));
+    }
+
+    function palIsPassageSectionCode(code) {
+      var n = palNormalizeSectionCode(code);
+      return !!(n && palMapPassageCodes.has(n));
     }
 
     function palFormatInboundWhen(p) {
@@ -2127,7 +2256,13 @@
       var halfClass = slotNum === 1 ? 'pal-map-slot-1' : 'pal-map-slot-2';
       var sel = selected ? ' pal-map-slot-selected' : '';
       if (blocked) {
-        return '<button type="button" class="pal-map-slot ' + halfClass + ' pal-map-slot-blocked" disabled aria-label="통로(사용불가)" data-code="' + code + '"><span class="pal-map-slot-pass">통로</span></button>';
+        var isPassage = palIsPassageSectionCode(code);
+        var blockedLabel = isPassage ? '통로' : 'X';
+        var blockedAria = isPassage ? '통로(선택불가)' : '사용불가';
+        var blockedInner = isPassage
+          ? '<span class="pal-map-slot-pass">통로</span>'
+          : '<span class="pal-map-slot-x">X</span>';
+        return '<button type="button" class="pal-map-slot ' + halfClass + ' pal-map-slot-blocked" disabled aria-label="' + blockedAria + '" data-code="' + code + '" title="' + blockedLabel + '">' + blockedInner + '</button>';
       }
       if (mode === 'overview') {
         var used = (cnt || 0) > 0;
@@ -2238,28 +2373,66 @@
       var container = document.getElementById('palSectionMapColumnGrid');
       if (!container) return;
       var letter = palMapFocusedLetter;
-      var html = '<div class="pal-map-detail-groups">';
-      html += '<div class="pal-map-detail-group"><h5 class="pal-map-detail-group-title">상단 구역 (1~7)</h5>';
+      var floorsLeftToRight = [1, 2, 3];
+      var html = '<div class="pal-map-column-scroll">';
+      html += '<div class="pal-map-zoom-head">';
+      html += '<div class="pal-map-zoom-head-cell">칸</div>';
+      html += '<div class="pal-map-zoom-head-cell">자리</div>';
+      floorsLeftToRight.forEach(function (f) {
+        html += '<div class="pal-map-zoom-head-cell">' + f + '층</div>';
+      });
       html += '</div>';
-      html += '<div class="pal-map-detail-group"><h5 class="pal-map-detail-group-title">하단 구역 (8~14)</h5>';
-      html += '</div>';
-      html += '<div class="pal-map-detail-group"><h5 class="pal-map-detail-group-title">끝 구역 (15)</h5>';
-      html += '</div>';
+      for (var slot = 1; slot <= 15; slot++) {
+        html += '<div class="pal-map-zoom-slot-group">';
+        html += '<div class="pal-map-zoom-slot-no">' + slot + '</div>';
+        [1, 2].forEach(function (pos) {
+          html += '<div class="pal-map-zoom-pos pos-' + pos + '">' + pos + '번</div>';
+          floorsLeftToRight.forEach(function (floor) {
+            var code = letter + '-' + slot + '-' + floor + '-' + pos;
+            var blocked = palIsBlockedSectionCode(code);
+            var isPassage = blocked && palIsPassageSectionCode(code);
+            var selected = palMapSelectedCode === code;
+            var meta = palMapMetaIndex[code];
+            var used = !!(palMapCountIndex[code] || 0);
+            var cls = 'pal-map-zoom-cell floor-' + floor + ' pos-' + pos + (selected ? ' pal-map-zoom-cell-selected' : '');
+            html += '<button type="button" class="' + cls + '"' + (blocked ? ' disabled' : ' data-code="' + code + '"') + '>';
+            if (blocked) {
+              if (isPassage) {
+                html += '<span class="pal-map-slot-pass">통로</span>';
+              } else {
+                html += '<span class="pal-map-slot-x">X</span>';
+              }
+              html += '<span class="pal-map-zoom-code">' + code + '</span>';
+            } else {
+              html += '<span class="pal-map-zoom-code">' + code + '</span>';
+              if (used && meta) {
+                html += '<span class="pal-map-zoom-title">' + palEscapeHtml(meta.product_name || '품목명 없음') + '</span>';
+                var sub = '';
+                if (meta.in_date) sub += String(meta.in_date).slice(5, 10);
+                if (meta.notes) {
+                  if (sub) sub += ' · ';
+                  sub += String(meta.notes).slice(0, 12);
+                }
+                if (sub) html += '<span class="pal-map-zoom-sub">' + palEscapeHtml(sub) + '</span>';
+              } else {
+                html += '<span class="pal-map-zoom-sub pal-map-zoom-empty">미사용</span>';
+              }
+            }
+            html += '</button>';
+          });
+        });
+        html += '</div>';
+      }
       html += '</div>';
       container.innerHTML = html;
-      var groups = container.querySelectorAll('.pal-map-detail-group');
-      if (groups[0]) {
-        groups[0].insertAdjacentHTML('beforeend', '<div id="palSectionMapColumnGridTop"></div>');
-        palBuildMapGrid('palSectionMapColumnGridTop', [letter], 'detail', 1, 7);
-      }
-      if (groups[1]) {
-        groups[1].insertAdjacentHTML('beforeend', '<div id="palSectionMapColumnGridBottom"></div>');
-        palBuildMapGrid('palSectionMapColumnGridBottom', [letter], 'detail', 8, 14);
-      }
-      if (groups[2]) {
-        groups[2].insertAdjacentHTML('beforeend', '<div id="palSectionMapColumnGridTail"></div>');
-        palBuildMapGrid('palSectionMapColumnGridTail', [letter], 'detail', 15, 15);
-      }
+      container.querySelectorAll('.pal-map-zoom-cell[data-code]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          palMapSelectedCode = btn.getAttribute('data-code');
+          var cel = document.getElementById('palMapSelectedCode');
+          if (cel) cel.textContent = palMapSelectedCode;
+          palBuildColumnView();
+        });
+      });
       palRenderColumnProductList();
     }
 
