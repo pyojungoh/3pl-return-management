@@ -703,11 +703,11 @@
       padding-bottom: 6px;
     }
     .pal-section-map-grid {
-      min-width: 760px;
+      min-width: 860px;
     }
     .pal-map-grid-inner {
       display: grid;
-      grid-template-columns: 46px repeat(15, minmax(34px, 1fr));
+      grid-template-columns: 46px repeat(15, minmax(34px, 1fr)) minmax(92px, auto);
       gap: 7px 8px;
       align-items: stretch;
       direction: ltr;
@@ -727,6 +727,26 @@
       color: #ff6b35;
       font-size: 12px;
       position: relative;
+    }
+    .pal-map-floor-colhead {
+      font-weight: 700;
+      text-align: center;
+      padding: 8px 6px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #f5f9fc 0%, #e8f4fc 100%);
+      border: 2px solid #b3d9f2;
+      color: #0984e3;
+      font-size: 11px;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      letter-spacing: 0.02em;
+    }
+    .pal-map-floor-col-spacer {
+      border-left: 1px dashed #cfd8dc;
+      min-height: 8px;
+      align-self: stretch;
     }
     .pal-map-bc-divider {
       grid-column: 1 / -1;
@@ -761,7 +781,7 @@
     }
     .pal-map-tier {
       display: grid;
-      grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 3px;
       align-items: stretch;
       min-height: 34px;
@@ -770,19 +790,6 @@
       padding-top: 5px;
       margin-top: 2px;
       border-top: 1px dashed #cfd8dc;
-    }
-    .pal-map-floor-badge {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      font-weight: 800;
-      color: #455a64;
-      background: #eceff1;
-      border-radius: 6px;
-      border: 1px solid #cfd8dc;
-      user-select: none;
-      line-height: 1.1;
     }
     .pal-map-slot {
       border: none;
@@ -808,6 +815,19 @@
     }
     .pal-map-slot:hover {
       filter: brightness(0.97);
+    }
+    .pal-map-slot-blocked,
+    .pal-map-slot-blocked:hover {
+      background: #eceff1 !important;
+      color: #b0b7bf;
+      filter: none;
+      cursor: not-allowed;
+    }
+    .pal-map-slot-x {
+      font-size: 12px;
+      font-weight: 900;
+      color: #d63031;
+      line-height: 1;
     }
     .pal-map-slot-selected {
       outline: 3px solid #ff6b35;
@@ -1236,7 +1256,7 @@
         <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 8px;">🗺️ 창고 섹션 맵</h2>
         <p style="margin: 0 0 18px 0; color: #636e72; font-size: 14px; line-height: 1.5;">
           <strong>가로</strong>가 칸 번호 <strong>1~15</strong>(왼쪽이 작업장에 가까운 쪽). <strong>세로</strong> 열 순서는 <strong>맨 위가 A열 → 그 아래 B열 → 그 아래 C열 → 맨 아래 D열</strong>(B와 C 사이 점선은 등 맞춤 구간).
-          각 칸은 <strong>위→아래로 3층·2층·1층</strong>으로 나뉘며, 층마다 <strong>1</strong>=작업장 쪽 반칸·<strong>2</strong>=그 옆 반칸입니다. 코드 예: <code style="background:#f1f3f5;padding:2px 6px;border-radius:4px;">A-1-3-1</code>
+          각 칸은 <strong>위→아래로 3층·2층·1층</strong>(층 순서는 맵 <strong>오른쪽</strong> 안내 줄 참고), 층마다 <strong>1</strong>=작업장 쪽 반칸·<strong>2</strong>=그 옆 반칸입니다. 코드 예: <code style="background:#f1f3f5;padding:2px 6px;border-radius:4px;">A-1-3-1</code>
         </p>
 
         <div class="pal-map-toolbar">
@@ -1259,9 +1279,10 @@
 
         <div class="pal-map-legend">
           <span><strong>열 순서</strong>: 위 <strong>A</strong> · <strong>B</strong> · <strong>C</strong> · 아래 <strong>D</strong></span>
-          <span>칸 안 <strong>위→아래</strong> 숫자 배지 = <strong>3층·2층·1층</strong></span>
+          <span>층 순서 안내는 맵 <strong>오른쪽</strong> 한 줄 (<strong>1층 · 2층 · 3층</strong>), 칸 안은 위→아래 <strong>3층·2층·1층</strong></span>
           <span><i class="pal-leg-slot1"></i> 층 안 <strong>1</strong> (작업장 쪽)</span>
           <span><i class="pal-leg-slot2"></i> 층 안 <strong>2</strong></span>
+          <span><strong style="color:#d63031;">X</strong> 사용불가 위치</span>
           <span id="palMapCountHint">보관중 파레트 기준으로 <code>rack_section_code</code>가 위치 코드와 일치하면 칸 안 버튼에 건수가 표시됩니다.</span>
         </div>
       </div>
@@ -1833,6 +1854,21 @@
     if (typeof palMapCountIndex === 'undefined') {
       var palMapCountIndex = {};
     }
+    if (typeof palMapBlockedCodes === 'undefined') {
+      var palMapBlockedCodes = new Set([
+        'A-2-3-1',
+        'A-5-3-2',
+        'A-7-3-1',
+        'A-11-3-1',
+        'A-13-3-1',
+        'A-14-3-1',
+        'D-5-3-2',
+        'D-9-3-1',
+        'D-11-3-1',
+        'D-13-3-1',
+        'D-14-3-2'
+      ]);
+    }
 
     function palNormalizeSectionCode(raw) {
       if (raw == null || raw === undefined) return null;
@@ -1841,6 +1877,11 @@
       const m = s.match(/^([A-D])-(\d{1,2})-(\d)-([12])$/);
       if (!m) return null;
       return m[1] + '-' + parseInt(m[2], 10) + '-' + m[3] + '-' + m[4];
+    }
+
+    function palIsBlockedSectionCode(code) {
+      var n = palNormalizeSectionCode(code);
+      return !!(n && palMapBlockedCodes.has(n));
     }
 
     function palBuildSectionMapGrid() {
@@ -1854,6 +1895,7 @@
       for (var s = 1; s <= 15; s++) {
         html += '<div class="pal-map-slothead">' + s + '</div>';
       }
+      html += '<div class="pal-map-floor-colhead" title="각 칸 안은 위에서 아래로 3층·2층·1층 순서입니다.">1층 · 2층 · 3층</div>';
       lettersTopToBottom.forEach(function (c) {
         html += '<div class="pal-map-rowlabel" data-col="' + c + '">' + c + '</div>';
         for (var r = 1; r <= 15; r++) {
@@ -1862,24 +1904,34 @@
             var floor = floorsOrder[ti];
             var code1 = c + '-' + r + '-' + floor + '-1';
             var code2 = c + '-' + r + '-' + floor + '-2';
-            var cnt1 = palMapCountIndex[code1];
-            var cnt2 = palMapCountIndex[code2];
+            var blocked1 = palIsBlockedSectionCode(code1);
+            var blocked2 = palIsBlockedSectionCode(code2);
+            var cnt1 = blocked1 ? 0 : palMapCountIndex[code1];
+            var cnt2 = blocked2 ? 0 : palMapCountIndex[code2];
             var sel1 = palMapSelectedCode === code1 ? ' pal-map-slot-selected' : '';
             var sel2 = palMapSelectedCode === code2 ? ' pal-map-slot-selected' : '';
-            html += '<div class="pal-map-tier" title="' + floor + '층">';
-            html += '<span class="pal-map-floor-badge">' + floor + '</span>';
-            html += '<button type="button" class="pal-map-slot pal-map-slot-1' + sel1 + '" data-code="' + code1 + '">';
-            html += '<span class="pal-map-slot-num">1</span>';
-            if (cnt1) html += '<span class="pal-map-slot-cnt">' + cnt1 + '</span>';
+            html += '<div class="pal-map-tier">';
+            html += '<button type="button" class="pal-map-slot pal-map-slot-1' + (blocked1 ? ' pal-map-slot-blocked' : '') + sel1 + '" data-code="' + code1 + '"' + (blocked1 ? ' disabled' : '') + '>';
+            if (blocked1) {
+              html += '<span class="pal-map-slot-x">X</span>';
+            } else {
+              html += '<span class="pal-map-slot-num">1</span>';
+              if (cnt1) html += '<span class="pal-map-slot-cnt">' + cnt1 + '</span>';
+            }
             html += '</button>';
-            html += '<button type="button" class="pal-map-slot pal-map-slot-2' + sel2 + '" data-code="' + code2 + '">';
-            html += '<span class="pal-map-slot-num">2</span>';
-            if (cnt2) html += '<span class="pal-map-slot-cnt">' + cnt2 + '</span>';
+            html += '<button type="button" class="pal-map-slot pal-map-slot-2' + (blocked2 ? ' pal-map-slot-blocked' : '') + sel2 + '" data-code="' + code2 + '"' + (blocked2 ? ' disabled' : '') + '>';
+            if (blocked2) {
+              html += '<span class="pal-map-slot-x">X</span>';
+            } else {
+              html += '<span class="pal-map-slot-num">2</span>';
+              if (cnt2) html += '<span class="pal-map-slot-cnt">' + cnt2 + '</span>';
+            }
             html += '</button>';
             html += '</div>';
           }
           html += '</div>';
         }
+        html += '<div class="pal-map-floor-col-spacer" aria-hidden="true"></div>';
         if (c === 'B') {
           html += '<div class="pal-map-bc-divider" aria-hidden="true"></div>';
         }
@@ -1908,15 +1960,17 @@
         palMapCountIndex = {};
         var n = 0;
         if (result.success && Array.isArray(result.data)) {
-          n = result.data.length;
+          n = 0;
           result.data.forEach(function (p) {
             var key = palNormalizeSectionCode(p.rack_section_code);
             if (!key) return;
+            if (palIsBlockedSectionCode(key)) return;
+            n += 1;
             palMapCountIndex[key] = (palMapCountIndex[key] || 0) + 1;
           });
         }
         if (hint) {
-          hint.textContent = '보관중 파레트 ' + n + '건 조회 · 셀 숫자는 rack_section_code가 위치 코드(';
+          hint.textContent = '보관중 파레트 ' + n + '건(사용불가 위치 제외) · 셀 숫자는 rack_section_code가 위치 코드(';
           hint.textContent += '열-칸-층-자리)와 일치한 건수입니다.';
         }
         palBuildSectionMapGrid();
