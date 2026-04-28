@@ -647,6 +647,211 @@
     .pal-modal-close:hover {
       background: #d63031;
     }
+
+    /* 창고 섹션 맵 */
+    .pal-map-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px 16px;
+      margin-bottom: 16px;
+      padding: 14px 16px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+    .pal-map-floor-tabs {
+      display: inline-flex;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid #ffeaa7;
+    }
+    .pal-map-floor-btn {
+      padding: 10px 18px;
+      border: none;
+      background: #fff;
+      font-weight: 600;
+      color: #636e72;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .pal-map-floor-btn:not(:last-child) {
+      border-right: 1px solid #ffeaa7;
+    }
+    .pal-map-floor-btn.active {
+      background: linear-gradient(135deg, #fff9e6 0%, #ffeaa7 100%);
+      color: #ff6b35;
+    }
+    .pal-map-selected-panel {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 14px;
+      color: #2d3436;
+    }
+    .pal-map-selected-panel strong {
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 15px;
+      color: #0984e3;
+      letter-spacing: 0.02em;
+    }
+    .pal-map-layout {
+      display: flex;
+      gap: 14px;
+      align-items: stretch;
+      margin-bottom: 14px;
+    }
+    .pal-map-work-strip {
+      flex: 0 0 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      background: linear-gradient(180deg, #74b9ff 0%, #0984e3 100%);
+      color: #fff;
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 4px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(9,132,227,0.35);
+      user-select: none;
+    }
+    .pal-map-grid-wrap {
+      flex: 1;
+      min-width: 0;
+      overflow-x: auto;
+      padding-bottom: 6px;
+    }
+    .pal-section-map-grid {
+      min-width: 520px;
+    }
+    .pal-map-grid-inner {
+      display: grid;
+      grid-template-columns: 46px repeat(4, minmax(68px, 1fr));
+      gap: 7px 10px;
+      align-items: stretch;
+    }
+    .pal-map-corner {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .pal-map-colhead {
+      font-weight: 800;
+      text-align: center;
+      padding: 10px 6px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #ffffff 0%, #fff9e6 100%);
+      border: 2px solid #ffeaa7;
+      color: #ff6b35;
+      font-size: 15px;
+      position: relative;
+    }
+    .pal-map-colhead[data-col="B"]::after {
+      content: '';
+      position: absolute;
+      right: -6px;
+      top: 20%;
+      bottom: 20%;
+      width: 0;
+      border-right: 2px dashed #b2bec3;
+      pointer-events: none;
+    }
+    .pal-map-rowlabel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: #636e72;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
+    }
+    .pal-map-cell {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
+      min-height: 44px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #dfe6e9;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .pal-map-slot {
+      border: none;
+      margin: 0;
+      padding: 4px 2px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      transition: filter 0.15s, outline 0.15s;
+      position: relative;
+      color: #2d3436;
+    }
+    .pal-map-slot-1 {
+      background: linear-gradient(180deg, #e3f2fd 0%, #bbdefb 100%);
+    }
+    .pal-map-slot-2 {
+      background: linear-gradient(180deg, #fce4ec 0%, #f8bbd0 100%);
+    }
+    .pal-map-slot:hover {
+      filter: brightness(0.97);
+    }
+    .pal-map-slot-selected {
+      outline: 3px solid #ff6b35;
+      outline-offset: -2px;
+      z-index: 1;
+    }
+    .pal-map-slot-num {
+      font-size: 12px;
+      opacity: 0.85;
+    }
+    .pal-map-slot-cnt {
+      font-size: 10px;
+      font-weight: 800;
+      background: rgba(255,255,255,0.85);
+      color: #d63031;
+      border-radius: 999px;
+      padding: 1px 6px;
+      line-height: 1.2;
+    }
+    .pal-map-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px 20px;
+      font-size: 13px;
+      color: #636e72;
+      padding: 12px 14px;
+      background: #fafbfc;
+      border-radius: 10px;
+      border: 1px dashed #dfe6e9;
+    }
+    .pal-map-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pal-leg-slot1, .pal-leg-slot2 {
+      width: 18px;
+      height: 14px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+    .pal-leg-slot1 {
+      background: linear-gradient(180deg, #e3f2fd 0%, #bbdefb 100%);
+      border: 1px solid #90caf9;
+    }
+    .pal-leg-slot2 {
+      background: linear-gradient(180deg, #fce4ec 0%, #f8bbd0 100%);
+      border: 1px solid #f48fb1;
+    }
   </style>
 </head>
 <body>
@@ -657,6 +862,7 @@
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('revenue')">📈 월별 수입 현황</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('inbound')">📦 파레트 관리</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('status')">📊 파레트 현황</button>
+      <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('sectionMap')">🗺️ 섹션 맵</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('collect')">🔄 아주·KPP 반납</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('fee')">💰 보관료 설정</button>
       <button class="pal-sub-menu-btn" onclick="palSwitchSubMenu('label')">🏷️ 라벨 출력</button>
@@ -1017,6 +1223,44 @@
               <button type="button" class="pal-btn" onclick="palConfirmBulkOutbound()">확인</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- 창고 섹션 맵 (A~D × 15칸 × 층 · 칸 내 1·2) -->
+      <div id="palPageSectionMap" class="pal-content-page pal-admin-only">
+        <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 8px;">🗺️ 창고 섹션 맵</h2>
+        <p style="margin: 0 0 18px 0; color: #636e72; font-size: 14px; line-height: 1.5;">
+          열 <strong>A~D</strong>(A=맨 왼쪽, D=맨 오른쪽, B·C는 등 맞춤), 칸 <strong>1~15</strong>, 층은 아래 탭으로 전환합니다.
+          각 칸의 <strong>1</strong>은 작업장 쪽 자리, <strong>2</strong>는 그 옆 자리입니다. 위치 코드 예: <code style="background:#f1f3f5;padding:2px 6px;border-radius:4px;">A-1-3-1</code>
+        </p>
+
+        <div class="pal-map-toolbar">
+          <div class="pal-map-floor-tabs" id="palMapFloorTabs" role="tablist">
+            <button type="button" class="pal-map-floor-btn active" data-floor="1" onclick="palMapSetFloor(1)" role="tab" aria-selected="true">1층</button>
+            <button type="button" class="pal-map-floor-btn" data-floor="2" onclick="palMapSetFloor(2)" role="tab" aria-selected="false">2층</button>
+            <button type="button" class="pal-map-floor-btn" data-floor="3" onclick="palMapSetFloor(3)" role="tab" aria-selected="false">3층</button>
+          </div>
+          <div class="pal-map-selected-panel">
+            <span>선택 위치</span>
+            <strong id="palMapSelectedCode">—</strong>
+            <button type="button" class="pal-btn pal-btn-secondary" onclick="palMapCopySelected()" style="padding:8px 14px;font-size:13px;">코드 복사</button>
+          </div>
+          <button type="button" class="pal-btn" onclick="palLoadSectionMapCounts()" style="padding:8px 14px;font-size:13px;background:#28a745;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+            보관중 집계 새로고침
+          </button>
+        </div>
+
+        <div class="pal-map-layout">
+          <div class="pal-map-work-strip" title="작업장이 이 방향(왼쪽)에 있다고 가정한 맵입니다.">작업장</div>
+          <div class="pal-map-grid-wrap">
+            <div id="palSectionMapGrid" class="pal-section-map-grid" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="pal-map-legend">
+          <span><i class="pal-leg-slot1"></i> 1번 자리 (작업장 쪽)</span>
+          <span><i class="pal-leg-slot2"></i> 2번 자리</span>
+          <span id="palMapCountHint">보관중 파레트 기준으로 <code>rack_section_code</code>가 위치 코드와 일치하면 셀에 건수가 표시됩니다.</span>
         </div>
       </div>
 
@@ -1575,6 +1819,151 @@
       } else if (menuId === 'revenue') {
         // 월별 수입 현황 페이지 초기화
         palLoadRevenueData();
+      } else if (menuId === 'sectionMap') {
+        palInitSectionMap();
+      }
+    }
+
+    /* ---- 창고 섹션 맵 (그리드 + 클릭 선택) ---- */
+    if (typeof palMapFloor === 'undefined') {
+      var palMapFloor = 1;
+    }
+    if (typeof palMapSelectedCode === 'undefined') {
+      var palMapSelectedCode = null;
+    }
+    if (typeof palMapCountIndex === 'undefined') {
+      var palMapCountIndex = {};
+    }
+
+    function palNormalizeSectionCode(raw) {
+      if (raw == null || raw === undefined) return null;
+      const s = String(raw).trim().toUpperCase().replace(/\s/g, '');
+      if (!s) return null;
+      const m = s.match(/^([A-D])-(\d{1,2})-(\d)-([12])$/);
+      if (!m) return null;
+      return m[1] + '-' + parseInt(m[2], 10) + '-' + m[3] + '-' + m[4];
+    }
+
+    function palMapSetFloor(n) {
+      palMapFloor = n;
+      palMapSelectedCode = null;
+      const codeEl = document.getElementById('palMapSelectedCode');
+      if (codeEl) codeEl.textContent = '—';
+      document.querySelectorAll('.pal-map-floor-btn').forEach(function (b) {
+        var f = parseInt(b.getAttribute('data-floor'), 10);
+        b.classList.toggle('active', f === n);
+        b.setAttribute('aria-selected', f === n ? 'true' : 'false');
+      });
+      palBuildSectionMapGrid();
+    }
+
+    function palBuildSectionMapGrid() {
+      var container = document.getElementById('palSectionMapGrid');
+      if (!container) return;
+      var floor = palMapFloor || 1;
+      var cols = ['A', 'B', 'C', 'D'];
+      var html = '<div class="pal-map-grid-inner">';
+      html += '<div class="pal-map-corner" aria-hidden="true"></div>';
+      cols.forEach(function (c) {
+        html += '<div class="pal-map-colhead" data-col="' + c + '">' + c + '</div>';
+      });
+      for (var r = 1; r <= 15; r++) {
+        html += '<div class="pal-map-rowlabel">' + r + '</div>';
+        cols.forEach(function (c) {
+          var code1 = c + '-' + r + '-' + floor + '-1';
+          var code2 = c + '-' + r + '-' + floor + '-2';
+          var cnt1 = palMapCountIndex[code1];
+          var cnt2 = palMapCountIndex[code2];
+          var sel1 = palMapSelectedCode === code1 ? ' pal-map-slot-selected' : '';
+          var sel2 = palMapSelectedCode === code2 ? ' pal-map-slot-selected' : '';
+          html += '<div class="pal-map-cell">';
+          html += '<button type="button" class="pal-map-slot pal-map-slot-1' + sel1 + '" data-code="' + code1 + '">';
+          html += '<span class="pal-map-slot-num">1</span>';
+          if (cnt1) html += '<span class="pal-map-slot-cnt">' + cnt1 + '</span>';
+          html += '</button>';
+          html += '<button type="button" class="pal-map-slot pal-map-slot-2' + sel2 + '" data-code="' + code2 + '">';
+          html += '<span class="pal-map-slot-num">2</span>';
+          if (cnt2) html += '<span class="pal-map-slot-cnt">' + cnt2 + '</span>';
+          html += '</button>';
+          html += '</div>';
+        });
+      }
+      html += '</div>';
+      container.innerHTML = html;
+      container.querySelectorAll('.pal-map-slot').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          palMapSelectedCode = btn.getAttribute('data-code');
+          var el = document.getElementById('palMapSelectedCode');
+          if (el) el.textContent = palMapSelectedCode;
+          palBuildSectionMapGrid();
+        });
+      });
+    }
+
+    async function palLoadSectionMapCounts() {
+      var hint = document.getElementById('palMapCountHint');
+      try {
+        var params = new URLSearchParams();
+        params.append('status', '입고됨');
+        var response = await fetch(PAL_API_BASE_URL + '/api/pallets/list?' + params.toString(), {
+          headers: palGetUserHeaders()
+        });
+        var result = await response.json();
+        palMapCountIndex = {};
+        var n = 0;
+        if (result.success && Array.isArray(result.data)) {
+          n = result.data.length;
+          result.data.forEach(function (p) {
+            var key = palNormalizeSectionCode(p.rack_section_code);
+            if (!key) return;
+            palMapCountIndex[key] = (palMapCountIndex[key] || 0) + 1;
+          });
+        }
+        if (hint) {
+          hint.textContent = '보관중 파레트 ' + n + '건 조회 · 셀 숫자는 rack_section_code가 위치 코드(';
+          hint.textContent += '열-칸-층-자리)와 일치한 건수입니다.';
+        }
+        palBuildSectionMapGrid();
+      } catch (e) {
+        console.warn('[PAL] 섹션 맵 집계 실패:', e);
+        if (hint) hint.textContent = '집계를 불러오지 못했습니다. 네트워크 또는 권한을 확인하세요.';
+      }
+    }
+
+    function palInitSectionMap() {
+      palMapFloor = 1;
+      palMapSelectedCode = null;
+      var codeEl = document.getElementById('palMapSelectedCode');
+      if (codeEl) codeEl.textContent = '—';
+      document.querySelectorAll('.pal-map-floor-btn').forEach(function (b) {
+        var f = parseInt(b.getAttribute('data-floor'), 10);
+        b.classList.toggle('active', f === 1);
+        b.setAttribute('aria-selected', f === 1 ? 'true' : 'false');
+      });
+      palBuildSectionMapGrid();
+      palLoadSectionMapCounts();
+    }
+
+    async function palMapCopySelected() {
+      if (!palMapSelectedCode) {
+        alert('맵에서 1 또는 2 자리를 클릭해 위치를 먼저 선택하세요.');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(palMapSelectedCode);
+        alert('복사되었습니다: ' + palMapSelectedCode);
+      } catch (e) {
+        try {
+          var ta = document.createElement('textarea');
+          ta.value = palMapSelectedCode;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          alert('복사되었습니다: ' + palMapSelectedCode);
+        } catch (e2) {
+          alert('복사에 실패했습니다. 코드: ' + palMapSelectedCode);
+        }
       }
     }
     
