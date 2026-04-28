@@ -660,28 +660,6 @@
       border-radius: 12px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.08);
     }
-    .pal-map-floor-tabs {
-      display: inline-flex;
-      border-radius: 10px;
-      overflow: hidden;
-      border: 2px solid #ffeaa7;
-    }
-    .pal-map-floor-btn {
-      padding: 10px 18px;
-      border: none;
-      background: #fff;
-      font-weight: 600;
-      color: #636e72;
-      cursor: pointer;
-      transition: background 0.2s, color 0.2s;
-    }
-    .pal-map-floor-btn:not(:last-child) {
-      border-right: 1px solid #ffeaa7;
-    }
-    .pal-map-floor-btn.active {
-      background: linear-gradient(135deg, #fff9e6 0%, #ffeaa7 100%);
-      color: #ff6b35;
-    }
     .pal-map-selected-panel {
       display: flex;
       align-items: center;
@@ -725,66 +703,93 @@
       padding-bottom: 6px;
     }
     .pal-section-map-grid {
-      min-width: 520px;
+      min-width: 760px;
     }
     .pal-map-grid-inner {
       display: grid;
-      grid-template-columns: 46px repeat(4, minmax(68px, 1fr));
-      gap: 7px 10px;
+      grid-template-columns: 46px repeat(15, minmax(34px, 1fr));
+      gap: 7px 8px;
       align-items: stretch;
+      direction: ltr;
+      unicode-bidi: isolate;
     }
     .pal-map-corner {
       grid-column: 1;
       grid-row: 1;
     }
-    .pal-map-colhead {
+    .pal-map-slothead {
       font-weight: 800;
       text-align: center;
-      padding: 10px 6px;
+      padding: 8px 4px;
       border-radius: 10px;
       background: linear-gradient(135deg, #ffffff 0%, #fff9e6 100%);
       border: 2px solid #ffeaa7;
       color: #ff6b35;
-      font-size: 15px;
+      font-size: 12px;
       position: relative;
     }
-    .pal-map-colhead[data-col="B"]::after {
-      content: '';
-      position: absolute;
-      right: -6px;
-      top: 20%;
-      bottom: 20%;
-      width: 0;
-      border-right: 2px dashed #b2bec3;
+    .pal-map-bc-divider {
+      grid-column: 1 / -1;
+      height: 0;
+      margin: 5px 0;
+      border: none;
+      border-bottom: 2px dashed #b2bec3;
       pointer-events: none;
     }
     .pal-map-rowlabel {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
-      font-weight: 700;
-      color: #636e72;
-      background: #f8f9fa;
+      font-size: 14px;
+      font-weight: 800;
+      color: #ff6b35;
+      background: linear-gradient(135deg, #f8f9fa 0%, #eef2f7 100%);
       border-radius: 8px;
-      border: 1px solid #e9ecef;
+      border: 2px solid #dfe6e9;
     }
     .pal-map-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 5px;
+      min-width: 0;
+      border-radius: 10px;
+      overflow: visible;
+      border: 1px solid #cfd8dc;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      background: linear-gradient(180deg, #fafcfd 0%, #f5f7f9 100%);
+    }
+    .pal-map-tier {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2px;
-      min-height: 44px;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid #dfe6e9;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr);
+      gap: 3px;
+      align-items: stretch;
+      min-height: 34px;
+    }
+    .pal-map-tier + .pal-map-tier {
+      padding-top: 5px;
+      margin-top: 2px;
+      border-top: 1px dashed #cfd8dc;
+    }
+    .pal-map-floor-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 800;
+      color: #455a64;
+      background: #eceff1;
+      border-radius: 6px;
+      border: 1px solid #cfd8dc;
+      user-select: none;
+      line-height: 1.1;
     }
     .pal-map-slot {
       border: none;
       margin: 0;
-      padding: 4px 2px;
+      padding: 3px 2px;
       cursor: pointer;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       display: flex;
       flex-direction: column;
@@ -810,8 +815,8 @@
       z-index: 1;
     }
     .pal-map-slot-num {
-      font-size: 12px;
-      opacity: 0.85;
+      font-size: 11px;
+      opacity: 0.88;
     }
     .pal-map-slot-cnt {
       font-size: 10px;
@@ -1230,16 +1235,11 @@
       <div id="palPageSectionMap" class="pal-content-page pal-admin-only">
         <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 8px;">🗺️ 창고 섹션 맵</h2>
         <p style="margin: 0 0 18px 0; color: #636e72; font-size: 14px; line-height: 1.5;">
-          열 <strong>A~D</strong>(A=맨 왼쪽, D=맨 오른쪽, B·C는 등 맞춤), 칸 <strong>1~15</strong>, 층은 아래 탭으로 전환합니다.
-          각 칸의 <strong>1</strong>은 작업장 쪽 자리, <strong>2</strong>는 그 옆 자리입니다. 위치 코드 예: <code style="background:#f1f3f5;padding:2px 6px;border-radius:4px;">A-1-3-1</code>
+          <strong>가로</strong>가 칸 번호 <strong>1~15</strong>(왼쪽이 작업장에 가까운 쪽). <strong>세로</strong> 열 순서는 <strong>맨 위가 A열 → 그 아래 B열 → 그 아래 C열 → 맨 아래 D열</strong>(B와 C 사이 점선은 등 맞춤 구간).
+          각 칸은 <strong>위→아래로 3층·2층·1층</strong>으로 나뉘며, 층마다 <strong>1</strong>=작업장 쪽 반칸·<strong>2</strong>=그 옆 반칸입니다. 코드 예: <code style="background:#f1f3f5;padding:2px 6px;border-radius:4px;">A-1-3-1</code>
         </p>
 
         <div class="pal-map-toolbar">
-          <div class="pal-map-floor-tabs" id="palMapFloorTabs" role="tablist">
-            <button type="button" class="pal-map-floor-btn active" data-floor="1" onclick="palMapSetFloor(1)" role="tab" aria-selected="true">1층</button>
-            <button type="button" class="pal-map-floor-btn" data-floor="2" onclick="palMapSetFloor(2)" role="tab" aria-selected="false">2층</button>
-            <button type="button" class="pal-map-floor-btn" data-floor="3" onclick="palMapSetFloor(3)" role="tab" aria-selected="false">3층</button>
-          </div>
           <div class="pal-map-selected-panel">
             <span>선택 위치</span>
             <strong id="palMapSelectedCode">—</strong>
@@ -1258,9 +1258,11 @@
         </div>
 
         <div class="pal-map-legend">
-          <span><i class="pal-leg-slot1"></i> 1번 자리 (작업장 쪽)</span>
-          <span><i class="pal-leg-slot2"></i> 2번 자리</span>
-          <span id="palMapCountHint">보관중 파레트 기준으로 <code>rack_section_code</code>가 위치 코드와 일치하면 셀에 건수가 표시됩니다.</span>
+          <span><strong>열 순서</strong>: 위 <strong>A</strong> · <strong>B</strong> · <strong>C</strong> · 아래 <strong>D</strong></span>
+          <span>칸 안 <strong>위→아래</strong> 숫자 배지 = <strong>3층·2층·1층</strong></span>
+          <span><i class="pal-leg-slot1"></i> 층 안 <strong>1</strong> (작업장 쪽)</span>
+          <span><i class="pal-leg-slot2"></i> 층 안 <strong>2</strong></span>
+          <span id="palMapCountHint">보관중 파레트 기준으로 <code>rack_section_code</code>가 위치 코드와 일치하면 칸 안 버튼에 건수가 표시됩니다.</span>
         </div>
       </div>
 
@@ -1825,9 +1827,6 @@
     }
 
     /* ---- 창고 섹션 맵 (그리드 + 클릭 선택) ---- */
-    if (typeof palMapFloor === 'undefined') {
-      var palMapFloor = 1;
-    }
     if (typeof palMapSelectedCode === 'undefined') {
       var palMapSelectedCode = null;
     }
@@ -1844,50 +1843,47 @@
       return m[1] + '-' + parseInt(m[2], 10) + '-' + m[3] + '-' + m[4];
     }
 
-    function palMapSetFloor(n) {
-      palMapFloor = n;
-      palMapSelectedCode = null;
-      const codeEl = document.getElementById('palMapSelectedCode');
-      if (codeEl) codeEl.textContent = '—';
-      document.querySelectorAll('.pal-map-floor-btn').forEach(function (b) {
-        var f = parseInt(b.getAttribute('data-floor'), 10);
-        b.classList.toggle('active', f === n);
-        b.setAttribute('aria-selected', f === n ? 'true' : 'false');
-      });
-      palBuildSectionMapGrid();
-    }
-
     function palBuildSectionMapGrid() {
       var container = document.getElementById('palSectionMapGrid');
       if (!container) return;
-      var floor = palMapFloor || 1;
-      var cols = ['A', 'B', 'C', 'D'];
-      var html = '<div class="pal-map-grid-inner">';
+      var floorsOrder = [3, 2, 1];
+      /* 창고 세로 방향: 화면 위부터 A열 → B → C → 맨 아래 D열 */
+      var lettersTopToBottom = ['A', 'B', 'C', 'D'];
+      var html = '<div class="pal-map-grid-inner" dir="ltr">';
       html += '<div class="pal-map-corner" aria-hidden="true"></div>';
-      cols.forEach(function (c) {
-        html += '<div class="pal-map-colhead" data-col="' + c + '">' + c + '</div>';
-      });
-      for (var r = 1; r <= 15; r++) {
-        html += '<div class="pal-map-rowlabel">' + r + '</div>';
-        cols.forEach(function (c) {
-          var code1 = c + '-' + r + '-' + floor + '-1';
-          var code2 = c + '-' + r + '-' + floor + '-2';
-          var cnt1 = palMapCountIndex[code1];
-          var cnt2 = palMapCountIndex[code2];
-          var sel1 = palMapSelectedCode === code1 ? ' pal-map-slot-selected' : '';
-          var sel2 = palMapSelectedCode === code2 ? ' pal-map-slot-selected' : '';
-          html += '<div class="pal-map-cell">';
-          html += '<button type="button" class="pal-map-slot pal-map-slot-1' + sel1 + '" data-code="' + code1 + '">';
-          html += '<span class="pal-map-slot-num">1</span>';
-          if (cnt1) html += '<span class="pal-map-slot-cnt">' + cnt1 + '</span>';
-          html += '</button>';
-          html += '<button type="button" class="pal-map-slot pal-map-slot-2' + sel2 + '" data-code="' + code2 + '">';
-          html += '<span class="pal-map-slot-num">2</span>';
-          if (cnt2) html += '<span class="pal-map-slot-cnt">' + cnt2 + '</span>';
-          html += '</button>';
-          html += '</div>';
-        });
+      for (var s = 1; s <= 15; s++) {
+        html += '<div class="pal-map-slothead">' + s + '</div>';
       }
+      lettersTopToBottom.forEach(function (c) {
+        html += '<div class="pal-map-rowlabel" data-col="' + c + '">' + c + '</div>';
+        for (var r = 1; r <= 15; r++) {
+          html += '<div class="pal-map-cell">';
+          for (var ti = 0; ti < floorsOrder.length; ti++) {
+            var floor = floorsOrder[ti];
+            var code1 = c + '-' + r + '-' + floor + '-1';
+            var code2 = c + '-' + r + '-' + floor + '-2';
+            var cnt1 = palMapCountIndex[code1];
+            var cnt2 = palMapCountIndex[code2];
+            var sel1 = palMapSelectedCode === code1 ? ' pal-map-slot-selected' : '';
+            var sel2 = palMapSelectedCode === code2 ? ' pal-map-slot-selected' : '';
+            html += '<div class="pal-map-tier" title="' + floor + '층">';
+            html += '<span class="pal-map-floor-badge">' + floor + '</span>';
+            html += '<button type="button" class="pal-map-slot pal-map-slot-1' + sel1 + '" data-code="' + code1 + '">';
+            html += '<span class="pal-map-slot-num">1</span>';
+            if (cnt1) html += '<span class="pal-map-slot-cnt">' + cnt1 + '</span>';
+            html += '</button>';
+            html += '<button type="button" class="pal-map-slot pal-map-slot-2' + sel2 + '" data-code="' + code2 + '">';
+            html += '<span class="pal-map-slot-num">2</span>';
+            if (cnt2) html += '<span class="pal-map-slot-cnt">' + cnt2 + '</span>';
+            html += '</button>';
+            html += '</div>';
+          }
+          html += '</div>';
+        }
+        if (c === 'B') {
+          html += '<div class="pal-map-bc-divider" aria-hidden="true"></div>';
+        }
+      });
       html += '</div>';
       container.innerHTML = html;
       container.querySelectorAll('.pal-map-slot').forEach(function (btn) {
@@ -1931,22 +1927,16 @@
     }
 
     function palInitSectionMap() {
-      palMapFloor = 1;
       palMapSelectedCode = null;
       var codeEl = document.getElementById('palMapSelectedCode');
       if (codeEl) codeEl.textContent = '—';
-      document.querySelectorAll('.pal-map-floor-btn').forEach(function (b) {
-        var f = parseInt(b.getAttribute('data-floor'), 10);
-        b.classList.toggle('active', f === 1);
-        b.setAttribute('aria-selected', f === 1 ? 'true' : 'false');
-      });
       palBuildSectionMapGrid();
       palLoadSectionMapCounts();
     }
 
     async function palMapCopySelected() {
       if (!palMapSelectedCode) {
-        alert('맵에서 1 또는 2 자리를 클릭해 위치를 먼저 선택하세요.');
+        alert('맵에서 칸 안의 층·자리(1 또는 2)를 클릭해 위치를 먼저 선택하세요.');
         return;
       }
       try {
