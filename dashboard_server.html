@@ -933,6 +933,165 @@
       border-top: 2px solid #ffeaa7;
     }
     
+    /* 화주사 목록 요약 + 상세 모달 */
+    .company-reg-table-wrap table {
+      width: 100%;
+      min-width: auto !important;
+      border-collapse: collapse;
+    }
+    .company-reg-table-wrap th,
+    .company-reg-table-wrap td {
+      padding: 12px 10px;
+      font-size: 13px;
+      border-bottom: 1px solid #eef2f7;
+    }
+    .company-summary-row {
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .company-summary-row:hover {
+      background: rgba(52, 152, 219, 0.07);
+    }
+    #adminListContent .company-summary-row:hover {
+      background: rgba(231, 76, 60, 0.06);
+    }
+    .company-detail-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10002;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .company-detail-modal.show {
+      display: flex;
+    }
+    .company-detail-modal__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.48);
+      backdrop-filter: blur(5px);
+    }
+    .company-detail-modal__panel {
+      position: relative;
+      background: #fff;
+      border-radius: 18px;
+      max-width: 560px;
+      width: 100%;
+      max-height: min(88vh, 720px);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 28px 56px rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(226, 232, 240, 0.95);
+    }
+    .company-detail-modal__head {
+      padding: 22px 24px 18px;
+      background: linear-gradient(135deg, #f8fafc 0%, #fff 100%);
+      border-bottom: 1px solid #e8ecf1;
+      flex-shrink: 0;
+    }
+    .company-detail-modal__head h3 {
+      margin: 0 0 6px;
+      font-size: 19px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+    .company-detail-modal__head p {
+      margin: 0;
+      font-size: 13px;
+      color: #64748b;
+    }
+    .company-detail-modal__body {
+      padding: 8px 0 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .cd-section {
+      padding: 0 24px;
+      margin-top: 18px;
+    }
+    .cd-section:first-of-type {
+      margin-top: 12px;
+    }
+    .cd-section-title {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      color: #94a3b8;
+      text-transform: uppercase;
+      margin: 0 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e8ecf1;
+    }
+    .cd-dl {
+      display: grid;
+      grid-template-columns: 118px 1fr;
+      gap: 10px 14px;
+      font-size: 14px;
+      margin: 0;
+      align-items: start;
+    }
+    .cd-dl dt {
+      margin: 0;
+      color: #64748b;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .cd-dl dd {
+      margin: 0;
+      color: #0f172a;
+      word-break: break-word;
+      line-height: 1.5;
+    }
+    .cd-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .cd-badge--admin {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+    .cd-badge--client {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+    .cd-badge--inactive {
+      background: #f1f5f9;
+      color: #64748b;
+    }
+    .cd-cert-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .cd-close-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: rgba(241, 245, 249, 0.95);
+      border-radius: 10px;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      color: #64748b;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .cd-close-btn:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    
     .admin-form .form-section h4 {
       margin: 0 0 18px;
       color: #636e72;
@@ -3833,28 +3992,21 @@
             <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
               <button class="refresh-btn" onclick="refreshCompaniesData()" style="padding: 8px 15px; font-size: 14px;">🔄 새로고침</button>
             </div>
-            <div class="table-scroll-wrapper">
-              <table style="min-width: 1200px;">
+            <div class="table-scroll-wrapper company-reg-table-wrap">
+              <table>
               <thead>
                 <tr style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white;">
-                  <th>화주사명</th>
-                  <th>아이디</th>
-                  <th>권한</th>
-                  <th>태그</th>
-                  <th>사업자번호</th>
-                  <th>사업자명</th>
-                  <th>주소</th>
-                  <th>전화번호</th>
-                  <th>이메일</th>
-                  <th>사업자 등록증</th>
-                  <th>최근 로그인</th>
-                  <th>등록일</th>
-                  <th>관리</th>
+                  <th style="text-align:left;">화주사명</th>
+                  <th style="text-align:center;">아이디</th>
+                  <th style="text-align:center;">권한</th>
+                  <th style="text-align:center;">최근 로그인</th>
+                  <th style="text-align:center;">등록일</th>
+                  <th style="text-align:center;">관리</th>
                 </tr>
               </thead>
               <tbody id="adminTableBody">
                 <tr>
-                  <td colspan="13" class="no-data">데이터를 불러오는 중...</td>
+                  <td colspan="6" class="no-data">데이터를 불러오는 중...</td>
                 </tr>
               </tbody>
               </table>
@@ -3871,28 +4023,21 @@
             </div>
             <button class="refresh-btn" onclick="refreshCompaniesData()" style="padding: 8px 15px; font-size: 14px;">🔄 새로고침</button>
           </div>
-          <div class="table-scroll-wrapper">
-            <table style="min-width: 1200px;">
+          <div class="table-scroll-wrapper company-reg-table-wrap">
+            <table>
             <thead>
               <tr style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white;">
-                <th>화주사명</th>
-                <th>아이디</th>
-                <th>권한</th>
-                <th>태그</th>
-                <th>사업자번호</th>
-                <th>사업자명</th>
-                <th>주소</th>
-                <th>전화번호</th>
-                <th>이메일</th>
-                <th>사업자 등록증</th>
-                <th>최근 로그인</th>
-                <th>등록일</th>
-                <th>관리</th>
+                <th style="text-align:left;">화주사명</th>
+                <th style="text-align:center;">아이디</th>
+                <th style="text-align:center;">권한</th>
+                <th style="text-align:center;">최근 로그인</th>
+                <th style="text-align:center;">등록일</th>
+                <th style="text-align:center;">관리</th>
               </tr>
             </thead>
             <tbody id="consignorTableBody">
               <tr>
-                <td colspan="13" class="no-data">데이터를 불러오는 중...</td>
+                <td colspan="6" class="no-data">데이터를 불러오는 중...</td>
               </tr>
             </tbody>
             </table>
@@ -3904,6 +4049,19 @@
   
   <!-- 메시지 -->
   <div id="message" class="message"></div>
+
+  <!-- 화주사·관리자 상세 모달 (목록 행 클릭 시) -->
+  <div id="companyDetailModal" class="company-detail-modal" aria-hidden="true">
+    <div class="company-detail-modal__backdrop" onclick="closeCompanyDetailModal()"></div>
+    <div class="company-detail-modal__panel" role="dialog" aria-labelledby="companyDetailTitle" onclick="event.stopPropagation()">
+      <button type="button" class="cd-close-btn" onclick="closeCompanyDetailModal()" aria-label="닫기">×</button>
+      <div class="company-detail-modal__head">
+        <h3 id="companyDetailTitle">상세 정보</h3>
+        <p id="companyDetailSubtitle"></p>
+      </div>
+      <div id="companyDetailBody" class="company-detail-modal__body"></div>
+    </div>
+  </div>
   
   <script>
     // API 기본 URL (서버 주소)
@@ -15802,6 +15960,106 @@
     // 전역으로 노출하여 언제든지 호출 가능하도록
     window.disableHeaderHover = disableHeaderHover;
     
+    /* ========== 화주사 상세 모달 (목록 행 클릭) ========== */
+    window.companyDetailCache = {};
+    function formatCompanyDetailDateTime(val) {
+      if (!val) return '—';
+      try {
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? '—' : d.toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
+      } catch (e) { return '—'; }
+    }
+    function formatCompanyDetailDateOnly(val) {
+      if (!val) return '—';
+      try {
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('ko-KR');
+      } catch (e) { return '—'; }
+    }
+    function viewCertificateFromDetail(companyId) {
+      const c = window.companyDetailCache && window.companyDetailCache[companyId];
+      if (c && c.business_certificate_url) {
+        closeCompanyDetailModal();
+        viewCertificate(companyId, c.business_certificate_url);
+      }
+    }
+    window.viewCertificateFromDetail = viewCertificateFromDetail;
+    function openCompanyDetailModal(companyId) {
+      const c = window.companyDetailCache && window.companyDetailCache[companyId];
+      if (!c) return;
+      const modal = document.getElementById('companyDetailModal');
+      const titleEl = document.getElementById('companyDetailTitle');
+      const subEl = document.getElementById('companyDetailSubtitle');
+      const bodyEl = document.getElementById('companyDetailBody');
+      if (!modal || !titleEl || !subEl || !bodyEl) return;
+      const isAdmin = (c.role === '관리자');
+      titleEl.textContent = (c.company_name || '').trim() || '상세 정보';
+      subEl.textContent = (isAdmin ? '관리자' : '화주사') + ' · 로그인 아이디 ' + (c.username || '—');
+      const badgeClass = isAdmin ? 'cd-badge cd-badge--admin' : 'cd-badge cd-badge--client';
+      const inactive = (c.is_active === false || c.is_active === 0);
+      const statusHtml = inactive
+        ? '<span class="cd-badge cd-badge--inactive">비활성</span>'
+        : '<span class="cd-badge" style="background:#dcfce7;color:#15803d;font-weight:700;">활성</span>';
+      bodyEl.innerHTML = `
+        <div class="cd-section">
+          <div class="cd-section-title">계정 요약</div>
+          <dl class="cd-dl">
+            <dt>아이디</dt><dd>${escapeHtml(c.username || '—')}</dd>
+            <dt>권한</dt><dd><span class="${badgeClass}">${escapeHtml(c.role || '—')}</span></dd>
+            ${!isAdmin ? `<dt>상태</dt><dd>${statusHtml}</dd>` : ''}
+            <dt>태그</dt><dd>${escapeHtml((c.search_keywords || '').trim() || '—')}</dd>
+            <dt>최근 로그인</dt><dd>${formatCompanyDetailDateTime(c.last_login)}</dd>
+            <dt>등록일</dt><dd>${formatCompanyDetailDateTime(c.created_at)}</dd>
+          </dl>
+        </div>
+        <div class="cd-section">
+          <div class="cd-section-title">사업자 정보</div>
+          <dl class="cd-dl">
+            <dt>사업자등록번호</dt><dd>${escapeHtml(c.business_number || '—')}</dd>
+            <dt>상호</dt><dd>${escapeHtml(c.business_name || '—')}</dd>
+            <dt>주소</dt><dd>${escapeHtml(c.business_address || '—')}</dd>
+            <dt>전화번호</dt><dd>${escapeHtml(c.business_tel || '—')}</dd>
+            <dt>이메일</dt><dd>${escapeHtml(c.business_email || '—')}</dd>
+          </dl>
+        </div>
+        <div class="cd-section">
+          <div class="cd-section-title">사업자 등록증</div>
+          <p style="margin:0 0 12px;font-size:13px;color:#64748b;line-height:1.5;">등록증 파일을 확인하거나 교체할 수 있습니다.</p>
+          ${c.business_certificate_url ? `
+            <div class="cd-cert-actions">
+              <button type="button" onclick="viewCertificateFromDetail(${c.id})" style="padding:8px 14px;background:#74b9ff;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">미리보기</button>
+              <button type="button" onclick="uploadCertificate(${c.id})" style="padding:8px 14px;background:#f39c12;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">파일 변경</button>
+              <button type="button" onclick="deleteCertificate(${c.id})" style="padding:8px 14px;background:#e74c3c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">삭제</button>
+            </div>` : `
+            <button type="button" onclick="uploadCertificate(${c.id})" style="padding:8px 14px;background:#64748b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">파일 업로드</button>`}
+        </div>
+      `;
+      if (window._companyDetailEscHandler) {
+        document.removeEventListener('keydown', window._companyDetailEscHandler);
+      }
+      window._companyDetailEscHandler = function(ev) {
+        if (ev.key === 'Escape') closeCompanyDetailModal();
+      };
+      document.addEventListener('keydown', window._companyDetailEscHandler);
+      modal.classList.add('show');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+    window.openCompanyDetailModal = openCompanyDetailModal;
+    function closeCompanyDetailModal() {
+      const modal = document.getElementById('companyDetailModal');
+      if (modal) {
+        modal.classList.remove('show');
+        modal.setAttribute('aria-hidden', 'true');
+      }
+      document.body.style.overflow = '';
+      if (window._companyDetailEscHandler) {
+        document.removeEventListener('keydown', window._companyDetailEscHandler);
+        window._companyDetailEscHandler = null;
+      }
+    }
+    window.closeCompanyDetailModal = closeCompanyDetailModal;
+    
     /* ========== 화주사 목록 불러오기 ========== */
     async function loadCompanies() {
       const adminTbody = document.getElementById('adminTableBody');
@@ -15811,22 +16069,24 @@
       
       if (!adminTbody || !consignorTbody) return;
       
-      adminTbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중...</td></tr>';
-      consignorTbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중...</td></tr>';
+      adminTbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터를 불러오는 중...</td></tr>';
+      consignorTbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터를 불러오는 중...</td></tr>';
       
       try {
         const response = await fetch('/api/auth/companies?include_inactive=1');
         const result = await response.json();
         
         if (result.success && result.companies) {
+          window.companyDetailCache = {};
+          result.companies.forEach(function(co) {
+            window.companyDetailCache[co.id] = co;
+          });
           const activeCompanies = result.companies.filter(c => c.is_active !== false && c.is_active !== 0);
           updateReturnCompanyOptionsList(activeCompanies, true);
           
-          // 관리자와 화주사 분리
           const admins = result.companies.filter(company => company.role === '관리자');
           const consignors = result.companies.filter(company => company.role !== '관리자');
           
-          // 통계 업데이트
           if (adminStatisticsSpan) {
             adminStatisticsSpan.textContent = `(${admins.length}명)`;
           }
@@ -15834,97 +16094,68 @@
             consignorStatisticsSpan.textContent = `(${consignors.length}명)`;
           }
           
-          // 관리자 테이블 렌더링
           adminTbody.innerHTML = '';
           if (admins.length === 0) {
-            adminTbody.innerHTML = '<tr><td colspan="13" class="no-data">등록된 관리자가 없습니다.</td></tr>';
+            adminTbody.innerHTML = '<tr><td colspan="6" class="no-data">등록된 관리자가 없습니다.</td></tr>';
           } else {
             admins.forEach(company => {
               const row = document.createElement('tr');
-              const createdDate = company.created_at ? new Date(company.created_at).toLocaleDateString('ko-KR') : '-';
-              const lastLogin = company.last_login ? new Date(company.last_login).toLocaleDateString('ko-KR') : '-';
+              row.className = 'company-summary-row';
+              const createdDate = formatCompanyDetailDateOnly(company.created_at);
+              const lastLogin = formatCompanyDetailDateOnly(company.last_login);
               const tags = company.search_keywords || '';
-              
               row.innerHTML = `
-                <td style="text-align: center;">${escapeHtml(company.company_name || '')}</td>
-                <td style="text-align: center;">${escapeHtml(company.username || '')}</td>
-                <td style="text-align: center;">
-                  <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #e74c3c; color: white;">
+                <td style="text-align:left;font-weight:600;">${escapeHtml(company.company_name || '')}</td>
+                <td style="text-align:center;">${escapeHtml(company.username || '')}</td>
+                <td style="text-align:center;">
+                  <span style="padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #fee2e2; color: #b91c1c;">
                     ${escapeHtml(company.role || '관리자')}
                   </span>
                 </td>
-                <td style="text-align: center;">${escapeHtml(tags)}</td>
-                <td style="text-align: center;">${escapeHtml(company.business_number || '-')}</td>
-                <td style="text-align: center;">${escapeHtml(company.business_name || '-')}</td>
-                <td style="text-align: center;">${escapeHtml(company.business_address || '-')}</td>
-                <td style="text-align: center;">${escapeHtml(company.business_tel || '-')}</td>
-                <td style="text-align: center;">${escapeHtml(company.business_email || '-')}</td>
-                <td style="text-align: center;">
-                  ${company.business_certificate_url ? 
-                    `<div style="display: inline-flex; gap: 2px; justify-content: center; align-items: center; white-space: nowrap;">
-                      <button onclick="viewCertificate(${company.id}, '${escapeHtml(company.business_certificate_url)}')" style="padding: 2px 6px; background: #74b9ff; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 10px; line-height: 1.2;">보기</button>
-                      <button onclick="uploadCertificate(${company.id})" style="padding: 2px 6px; background: #f39c12; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 10px; line-height: 1.2;">변경</button>
-                      <button onclick="deleteCertificate(${company.id})" style="padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 10px; line-height: 1.2;">삭제</button>
-                    </div>` : 
-                    `<button onclick="uploadCertificate(${company.id})" style="padding: 2px 6px; background: #95a5a6; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 10px; line-height: 1.2;">업로드</button>`
-                  }
-                </td>
-                <td style="text-align: center;">${lastLogin}</td>
-                <td style="text-align: center;">${createdDate}</td>
-                <td style="text-align: center; white-space: nowrap;">
-                  <div style="display: inline-flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                <td style="text-align:center;color:#475569;">${lastLogin}</td>
+                <td style="text-align:center;color:#475569;">${createdDate}</td>
+                <td style="text-align:center; white-space: nowrap;">
+                  <div style="display: inline-flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: wrap;">
                     <button onclick="openTagModal(${company.id}, '${escapeHtml(company.username)}', '${escapeHtml(company.company_name)}', '${escapeHtml(tags)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">태그</button>
                     <button onclick="changeCompanyPassword(${company.id}, '${escapeHtml(company.username)}')" style="padding: 4px 8px; background: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">비밀번호</button>
                     <button onclick="deleteCompany(${company.id}, '${escapeHtml(company.company_name)}')" style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">삭제</button>
                   </div>
                 </td>
               `;
+              row.addEventListener('click', function(e) {
+                if (e.target.closest('button')) return;
+                openCompanyDetailModal(company.id);
+              });
               adminTbody.appendChild(row);
             });
           }
           
-          // 화주사 테이블 렌더링
           consignorTbody.innerHTML = '';
           if (consignors.length === 0) {
-            consignorTbody.innerHTML = '<tr><td colspan="13" class="no-data">등록된 화주사가 없습니다.</td></tr>';
+            consignorTbody.innerHTML = '<tr><td colspan="6" class="no-data">등록된 화주사가 없습니다.</td></tr>';
           } else {
             consignors.forEach(company => {
               const row = document.createElement('tr');
-              const createdDate = company.created_at ? new Date(company.created_at).toLocaleDateString('ko-KR') : '-';
-              const lastLogin = company.last_login ? new Date(company.last_login).toLocaleDateString('ko-KR') : '-';
+              row.className = 'company-summary-row';
+              const createdDate = formatCompanyDetailDateOnly(company.created_at);
+              const lastLogin = formatCompanyDetailDateOnly(company.last_login);
               const tags = company.search_keywords || '';
-              
+              const inactiveMark = (company.is_active === false || company.is_active === 0) ? ' <span style="font-size:10px;color:#94a3b8;font-weight:600;">(비활성)</span>' : '';
               row.innerHTML = `
-                <td style="text-align: center;">${escapeHtml(company.company_name || '')}</td>
-                <td style="text-align: center;">${escapeHtml(company.username || '')}</td>
-                <td style="text-align: center;">
-                  <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #3498db; color: white;">
+                <td style="text-align:left;font-weight:600;">${escapeHtml(company.company_name || '')}${inactiveMark}</td>
+                <td style="text-align:center;">${escapeHtml(company.username || '')}</td>
+                <td style="text-align:center;">
+                  <span style="padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #dbeafe; color: #1d4ed8;">
                     ${escapeHtml(company.role || '화주사')}
                   </span>
                 </td>
-                <td style="text-align: center;">${escapeHtml(tags)}</td>
-                <td style="text-align: center;">${escapeHtml(company.business_number || '-')}</td>
-                <td style="text-align: center;">${escapeHtml(company.business_name || '-')}</td>
-                <td style="text-align: center;">${escapeHtml(company.business_address || '-')}</td>
-                <td style="text-align: center;">${escapeHtml(company.business_tel || '-')}</td>
-                <td style="text-align: center;">${escapeHtml(company.business_email || '-')}</td>
-                <td style="text-align: center;">
-                  ${company.business_certificate_url ? 
-                    `<div style="display: inline-flex; gap: 2px; justify-content: center; align-items: center; white-space: nowrap;">
-                      <button onclick="viewCertificate(${company.id}, '${escapeHtml(company.business_certificate_url)}')" style="padding: 2px 6px; background: #74b9ff; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 10px; line-height: 1.2;">보기</button>
-                      <button onclick="uploadCertificate(${company.id})" style="padding: 2px 6px; background: #f39c12; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 10px; line-height: 1.2;">변경</button>
-                      <button onclick="deleteCertificate(${company.id})" style="padding: 2px 6px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 10px; line-height: 1.2;">삭제</button>
-                    </div>` : 
-                    `<button onclick="uploadCertificate(${company.id})" style="padding: 2px 6px; background: #95a5a6; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 10px; line-height: 1.2;">업로드</button>`
-                  }
-                </td>
-                <td style="text-align: center;">${lastLogin}</td>
-                <td style="text-align: center;">${createdDate}</td>
-                <td style="text-align: center; white-space: nowrap;">
-                  <div style="display: inline-flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                <td style="text-align:center;color:#475569;">${lastLogin}</td>
+                <td style="text-align:center;color:#475569;">${createdDate}</td>
+                <td style="text-align:center; white-space: nowrap;">
+                  <div style="display: inline-flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: wrap;">
                     <button onclick="openTagModal(${company.id}, '${escapeHtml(company.username)}', '${escapeHtml(company.company_name)}', '${escapeHtml(tags)}')" style="padding: 4px 8px; background: #74b9ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">태그</button>
                     <button onclick="changeCompanyPassword(${company.id}, '${escapeHtml(company.username)}')" style="padding: 4px 8px; background: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">비밀번호</button>
-                    ${(company.is_active === false || company.is_active === 0) ? 
+                    ${(company.is_active === false || company.is_active === 0) ?
                       `<button data-company-name="${escapeHtml(company.company_name || '')}" data-restore="1" onclick="transferCompany(this)" style="padding: 4px 8px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">복구</button>` :
                       `<button data-company-name="${escapeHtml(company.company_name || '')}" onclick="transferCompany(this)" style="padding: 4px 8px; background: #9b59b6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; min-width: auto;">화주사 이전</button>`
                     }
@@ -15932,17 +16163,21 @@
                   </div>
                 </td>
               `;
+              row.addEventListener('click', function(e) {
+                if (e.target.closest('button')) return;
+                openCompanyDetailModal(company.id);
+              });
               consignorTbody.appendChild(row);
             });
           }
         } else {
-          adminTbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러올 수 없습니다.</td></tr>';
-          consignorTbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러올 수 없습니다.</td></tr>';
+          adminTbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터를 불러올 수 없습니다.</td></tr>';
+          consignorTbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터를 불러올 수 없습니다.</td></tr>';
         }
       } catch (error) {
         console.error('화주사 목록 로드 오류:', error);
-        adminTbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중 오류가 발생했습니다.</td></tr>';
-        consignorTbody.innerHTML = '<tr><td colspan="13" class="no-data">데이터를 불러오는 중 오류가 발생했습니다.</td></tr>';
+        adminTbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터를 불러오는 중 오류가 발생했습니다.</td></tr>';
+        consignorTbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터를 불러오는 중 오류가 발생했습니다.</td></tr>';
       }
     }
     window.loadCompanies = loadCompanies;
