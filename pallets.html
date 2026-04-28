@@ -703,12 +703,12 @@
       padding-bottom: 6px;
     }
     .pal-section-map-grid {
-      min-width: 860px;
+      min-width: 810px;
     }
     .pal-map-grid-inner {
       display: grid;
-      grid-template-columns: 46px repeat(15, minmax(34px, 1fr)) minmax(92px, auto);
-      gap: 7px 8px;
+      grid-template-columns: 46px repeat(15, minmax(34px, 1fr)) 42px;
+      gap: 7px 6px;
       align-items: stretch;
       direction: ltr;
       unicode-bidi: isolate;
@@ -732,12 +732,13 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 8px 6px;
-      border-radius: 10px;
-      border: 2px dashed #b3d9f2;
+      padding: 6px 1px;
+      min-width: 0;
+      border-radius: 8px;
+      border: 1px dashed #b3d9f2;
       background: #fafcfd;
       color: #546e7a;
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 800;
     }
     .pal-map-floor-rail {
@@ -747,16 +748,17 @@
       align-items: center;
       align-self: stretch;
       box-sizing: border-box;
-      padding: 10px 6px;
-      border-radius: 10px;
-      border: 2px solid #b3d9f2;
+      width: 100%;
+      padding: 6px 1px;
+      border-radius: 8px;
+      border: 1px solid #b3d9f2;
       background: linear-gradient(180deg, #f5f9fc 0%, #e8f4fc 100%);
       color: #0984e3;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 800;
     }
     .pal-map-floor-rail-step {
-      line-height: 1.25;
+      line-height: 1.15;
       white-space: nowrap;
     }
     .pal-map-bc-divider {
