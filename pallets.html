@@ -705,6 +705,9 @@
     .pal-section-map-grid {
       min-width: 810px;
     }
+    .pal-section-map-grid--zoom {
+      min-width: 480px;
+    }
     .pal-map-grid-inner {
       display: grid;
       grid-template-columns: 46px repeat(15, minmax(34px, 1fr)) 42px;
@@ -859,6 +862,90 @@
       border-radius: 999px;
       padding: 1px 6px;
       line-height: 1.2;
+    }
+    .pal-map-overview .pal-map-slot:not(.pal-map-slot-blocked) {
+      cursor: default;
+    }
+    .pal-map-slot-free {
+      background: #eceff1 !important;
+      color: #90a4ae;
+    }
+    .pal-map-slot-use {
+      background: linear-gradient(180deg, #c8e6c9 0%, #a5d6a7 100%) !important;
+      color: #2e7d32;
+    }
+    .pal-map-ov-dot {
+      font-size: 11px;
+      line-height: 1;
+    }
+    .pal-map-rowlabel--clk {
+      cursor: pointer;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .pal-map-rowlabel--clk:hover {
+      box-shadow: 0 2px 8px rgba(255,107,53,0.35);
+      transform: translateY(-1px);
+    }
+    .pal-map-grid-inner--detail .pal-map-tier {
+      min-height: 40px;
+    }
+    .pal-map-grid-inner--detail .pal-map-cell {
+      padding: 7px;
+    }
+    .pal-map-column-root {
+      margin-top: 8px;
+    }
+    .pal-map-column-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .pal-map-column-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 800;
+      color: #ff6b35;
+    }
+    .pal-map-product-panel {
+      margin-top: 20px;
+      padding: 16px 18px;
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #dfe6e9;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    }
+    .pal-map-product-panel h4 {
+      margin: 0 0 12px 0;
+      font-size: 15px;
+      color: #2d3436;
+    }
+    .pal-map-product-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .pal-map-product-table th,
+    .pal-map-product-table td {
+      padding: 10px 12px;
+      border: 1px solid #eceff1;
+      text-align: left;
+      vertical-align: top;
+    }
+    .pal-map-product-table th {
+      background: #f8f9fa;
+      font-weight: 700;
+      color: #636e72;
+      white-space: nowrap;
+    }
+    .pal-map-product-table tr:nth-child(even) td {
+      background: #fafbfc;
+    }
+    .pal-map-product-empty {
+      text-align: center;
+      color: #b2bec3;
+      padding: 20px !important;
     }
     .pal-map-legend {
       display: flex;
@@ -1268,35 +1355,76 @@
       <div id="palPageSectionMap" class="pal-content-page pal-admin-only">
         <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 8px;">🗺️ 창고 섹션 맵</h2>
         <p style="margin: 0 0 18px 0; color: #636e72; font-size: 14px; line-height: 1.5;">
-          <strong>가로</strong>가 칸 번호 <strong>1~15</strong>(왼쪽이 작업장에 가까운 쪽). <strong>세로</strong> 열 순서는 <strong>맨 위가 A열 → 그 아래 B열 → 그 아래 C열 → 맨 아래 D열</strong>(B와 C 사이 점선은 등 맞춤 구간).
-          각 칸은 <strong>위→아래로 3층·2층·1층</strong>(층 표시는 <strong>A~D 각 행 오른쪽</strong> 세로 안내 참고), 층마다 <strong>1</strong>=작업장 쪽 반칸·<strong>2</strong>=그 옆 반칸입니다. 코드 예: <code style="background:#f1f3f5;padding:2px 6px;border-radius:4px;">A-1-3-1</code>
+          <strong>전체 맵</strong>: 보관중인지 여부만 표시합니다. <strong>A~D 열 이름</strong>을 클릭하면 해당 열만 확대하고, 아래에 <strong>품목·입고일시·비고</strong> 목록이 나옵니다.
+          <strong>가로</strong> 칸 <strong>1~15</strong>(왼쪽이 작업장 쪽), <strong>세로</strong> <strong>A→B→C→D</strong> 열 순서입니다.
         </p>
 
-        <div class="pal-map-toolbar">
-          <div class="pal-map-selected-panel">
-            <span>선택 위치</span>
-            <strong id="palMapSelectedCode">—</strong>
-            <button type="button" class="pal-btn pal-btn-secondary" onclick="palMapCopySelected()" style="padding:8px 14px;font-size:13px;">코드 복사</button>
+        <div id="palMapOverviewRoot">
+          <div class="pal-map-toolbar">
+            <span style="font-size:13px;color:#636e72;">열(A~D)을 클릭하면 확대됩니다.</span>
+            <button type="button" class="pal-btn" onclick="palLoadSectionMapCounts()" style="padding:8px 14px;font-size:13px;background:#28a745;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+              보관중 데이터 새로고침
+            </button>
           </div>
-          <button type="button" class="pal-btn" onclick="palLoadSectionMapCounts()" style="padding:8px 14px;font-size:13px;background:#28a745;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
-            보관중 집계 새로고침
-          </button>
+
+          <div class="pal-map-layout">
+            <div class="pal-map-work-strip" title="작업장이 이 방향(왼쪽)에 있다고 가정한 맵입니다.">작업장</div>
+            <div class="pal-map-grid-wrap">
+              <div id="palSectionMapGrid" class="pal-section-map-grid" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <div class="pal-map-legend">
+            <span><strong>열 순서</strong>: 위 <strong>A</strong> · <strong>B</strong> · <strong>C</strong> · 아래 <strong>D</strong> — <strong>열 글자를 클릭</strong>해 확대</span>
+            <span><strong>●</strong> 사용중 · <strong>빈 칸</strong> 미사용</span>
+            <span><strong style="color:#d63031;">X</strong> 사용불가 위치</span>
+            <span id="palMapCountHint">보관중 파레트만 집계합니다(사용불가 코드 제외).</span>
+          </div>
         </div>
 
-        <div class="pal-map-layout">
-          <div class="pal-map-work-strip" title="작업장이 이 방향(왼쪽)에 있다고 가정한 맵입니다.">작업장</div>
-          <div class="pal-map-grid-wrap">
-            <div id="palSectionMapGrid" class="pal-section-map-grid" aria-live="polite"></div>
+        <div id="palMapColumnRoot" class="pal-map-column-root" style="display: none;">
+          <div class="pal-map-column-toolbar">
+            <button type="button" class="pal-btn pal-btn-secondary" onclick="palSectionMapBackToOverview()" style="padding:10px 16px;font-size:14px;font-weight:700;">← 전체 맵</button>
+            <h3 class="pal-map-column-title" id="palMapColumnTitle">열 상세</h3>
+            <div class="pal-map-selected-panel" style="margin-left: auto;">
+              <span>선택 위치</span>
+              <strong id="palMapSelectedCode">—</strong>
+              <button type="button" class="pal-btn pal-btn-secondary" onclick="palMapCopySelected()" style="padding:8px 14px;font-size:13px;">코드 복사</button>
+            </div>
+            <button type="button" class="pal-btn" onclick="palLoadSectionMapCounts()" style="padding:8px 14px;font-size:13px;background:#28a745;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+              보관중 데이터 새로고침
+            </button>
           </div>
-        </div>
 
-        <div class="pal-map-legend">
-          <span><strong>열 순서</strong>: 위 <strong>A</strong> · <strong>B</strong> · <strong>C</strong> · 아래 <strong>D</strong></span>
-          <span><strong>A~D 각 행</strong> 오른쪽에 <strong>3층 → 2층 → 1층</strong> 세로 표시 (칸 안 위→아래와 동일)</span>
-          <span><i class="pal-leg-slot1"></i> 층 안 <strong>1</strong> (작업장 쪽)</span>
-          <span><i class="pal-leg-slot2"></i> 층 안 <strong>2</strong></span>
-          <span><strong style="color:#d63031;">X</strong> 사용불가 위치</span>
-          <span id="palMapCountHint">보관중 파레트 기준으로 <code>rack_section_code</code>가 위치 코드와 일치하면 칸 안 버튼에 건수가 표시됩니다.</span>
+          <div class="pal-map-layout">
+            <div class="pal-map-work-strip" title="작업장이 이 방향(왼쪽)에 있다고 가정한 맵입니다.">작업장</div>
+            <div class="pal-map-grid-wrap">
+              <div id="palSectionMapColumnGrid" class="pal-section-map-grid pal-section-map-grid--zoom" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <div class="pal-map-product-panel">
+            <h4 id="palMapColumnProductHeading">해당 열 보관 목록</h4>
+            <div style="overflow-x: auto;">
+              <table class="pal-map-product-table" role="table">
+                <thead>
+                  <tr>
+                    <th>품목명</th>
+                    <th>입고일시</th>
+                    <th>비고</th>
+                  </tr>
+                </thead>
+                <tbody id="palMapColumnProductBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="pal-map-legend" style="margin-top: 16px;">
+            <span><i class="pal-leg-slot1"></i> 층 안 <strong>1</strong> (작업장 쪽)</span>
+            <span><i class="pal-leg-slot2"></i> 층 안 <strong>2</strong></span>
+            <span><strong>A~D 각 행</strong> 오른쪽에 <strong>3층 → 2층 → 1층</strong> 세로 안내</span>
+            <span><strong style="color:#d63031;">X</strong> 사용불가 위치</span>
+          </div>
         </div>
       </div>
 
@@ -1867,6 +1995,15 @@
     if (typeof palMapCountIndex === 'undefined') {
       var palMapCountIndex = {};
     }
+    if (typeof palMapInboundList === 'undefined') {
+      var palMapInboundList = [];
+    }
+    if (typeof palMapViewMode === 'undefined') {
+      var palMapViewMode = 'overview';
+    }
+    if (typeof palMapFocusedLetter === 'undefined') {
+      var palMapFocusedLetter = null;
+    }
     if (typeof palMapBlockedCodes === 'undefined') {
       var palMapBlockedCodes = new Set([
         'A-2-3-1',
@@ -1897,20 +2034,64 @@
       return !!(n && palMapBlockedCodes.has(n));
     }
 
-    function palBuildSectionMapGrid() {
-      var container = document.getElementById('palSectionMapGrid');
+    function palFormatInboundWhen(p) {
+      if (!p) return '—';
+      var timePart = '';
+      if (p.created_at) {
+        try {
+          var dt = new Date(p.created_at);
+          if (!isNaN(dt.getTime())) {
+            timePart = dt.toLocaleString('ko-KR', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: false
+            });
+          }
+        } catch (e) {}
+      }
+      if (timePart) return timePart;
+      if (p.in_date) return String(p.in_date).slice(0, 10) + ' (입고일)';
+      return '—';
+    }
+
+    function palHtmlMapSlot(code, slotNum, mode, cnt, blocked, selected) {
+      var halfClass = slotNum === 1 ? 'pal-map-slot-1' : 'pal-map-slot-2';
+      var sel = selected ? ' pal-map-slot-selected' : '';
+      if (blocked) {
+        return '<button type="button" class="pal-map-slot ' + halfClass + ' pal-map-slot-blocked" disabled aria-label="사용불가" data-code="' + code + '"><span class="pal-map-slot-x">X</span></button>';
+      }
+      if (mode === 'overview') {
+        var used = (cnt || 0) > 0;
+        var uclass = used ? 'pal-map-slot-use' : 'pal-map-slot-free';
+        var aria = used ? '사용중' : '미사용';
+        var inner = used ? '<span class="pal-map-ov-dot">●</span>' : '';
+        return '<button type="button" class="pal-map-slot ' + halfClass + ' ' + uclass + '" disabled aria-label="' + aria + '">' + inner + '</button>';
+      }
+      var h = '<button type="button" class="pal-map-slot ' + halfClass + sel + '" data-code="' + code + '">';
+      h += '<span class="pal-map-slot-num">' + slotNum + '</span>';
+      if (cnt) h += '<span class="pal-map-slot-cnt">' + cnt + '</span>';
+      h += '</button>';
+      return h;
+    }
+
+    function palBuildMapGrid(containerId, lettersTopToBottom, mode) {
+      var container = document.getElementById(containerId);
       if (!container) return;
       var floorsOrder = [3, 2, 1];
-      /* 창고 세로 방향: 화면 위부터 A열 → B → C → 맨 아래 D열 */
-      var lettersTopToBottom = ['A', 'B', 'C', 'D'];
-      var html = '<div class="pal-map-grid-inner" dir="ltr">';
+      var html = '<div class="pal-map-grid-inner' + (mode === 'detail' ? ' pal-map-grid-inner--detail' : ' pal-map-overview') + '" dir="ltr">';
       html += '<div class="pal-map-corner" aria-hidden="true"></div>';
       for (var s = 1; s <= 15; s++) {
         html += '<div class="pal-map-slothead">' + s + '</div>';
       }
       html += '<div class="pal-map-floor-colhead" aria-hidden="true">층</div>';
+      var hasFullBtoC = lettersTopToBottom.indexOf('B') >= 0 && lettersTopToBottom.indexOf('C') >= 0;
       lettersTopToBottom.forEach(function (c) {
-        html += '<div class="pal-map-rowlabel" data-col="' + c + '">' + c + '</div>';
+        html += '<div class="pal-map-rowlabel' + (mode === 'overview' ? ' pal-map-rowlabel--clk' : '') + '" data-col="' + c + '"' +
+          (mode === 'overview' ? ' role="button" tabindex="0" data-open-letter="' + c + '" title="' + c + '열 확대"' : '') + '>' + c + '</div>';
         for (var r = 1; r <= 15; r++) {
           html += '<div class="pal-map-cell">';
           for (var ti = 0; ti < floorsOrder.length; ti++) {
@@ -1919,50 +2100,118 @@
             var code2 = c + '-' + r + '-' + floor + '-2';
             var blocked1 = palIsBlockedSectionCode(code1);
             var blocked2 = palIsBlockedSectionCode(code2);
-            var cnt1 = blocked1 ? 0 : palMapCountIndex[code1];
-            var cnt2 = blocked2 ? 0 : palMapCountIndex[code2];
-            var sel1 = palMapSelectedCode === code1 ? ' pal-map-slot-selected' : '';
-            var sel2 = palMapSelectedCode === code2 ? ' pal-map-slot-selected' : '';
+            var cnt1 = blocked1 ? 0 : (palMapCountIndex[code1] || 0);
+            var cnt2 = blocked2 ? 0 : (palMapCountIndex[code2] || 0);
+            var sel1 = palMapSelectedCode === code1;
+            var sel2 = palMapSelectedCode === code2;
             html += '<div class="pal-map-tier">';
-            html += '<button type="button" class="pal-map-slot pal-map-slot-1' + (blocked1 ? ' pal-map-slot-blocked' : '') + sel1 + '" data-code="' + code1 + '"' + (blocked1 ? ' disabled' : '') + '>';
-            if (blocked1) {
-              html += '<span class="pal-map-slot-x">X</span>';
-            } else {
-              html += '<span class="pal-map-slot-num">1</span>';
-              if (cnt1) html += '<span class="pal-map-slot-cnt">' + cnt1 + '</span>';
-            }
-            html += '</button>';
-            html += '<button type="button" class="pal-map-slot pal-map-slot-2' + (blocked2 ? ' pal-map-slot-blocked' : '') + sel2 + '" data-code="' + code2 + '"' + (blocked2 ? ' disabled' : '') + '>';
-            if (blocked2) {
-              html += '<span class="pal-map-slot-x">X</span>';
-            } else {
-              html += '<span class="pal-map-slot-num">2</span>';
-              if (cnt2) html += '<span class="pal-map-slot-cnt">' + cnt2 + '</span>';
-            }
-            html += '</button>';
+            html += palHtmlMapSlot(code1, 1, mode, cnt1, blocked1, sel1);
+            html += palHtmlMapSlot(code2, 2, mode, cnt2, blocked2, sel2);
             html += '</div>';
           }
           html += '</div>';
         }
-        html += '<div class="pal-map-floor-rail" title="' + c + '열: 각 칸 안은 위에서 아래로 3층·2층·1층 순서입니다." aria-label="' + c + '열 층 표시">';
+        html += '<div class="pal-map-floor-rail" title="' + c + '열 층 순서 (위→아래 3층·2층·1층)" aria-label="' + c + '열 층 표시">';
         floorsOrder.forEach(function (floor) {
           html += '<span class="pal-map-floor-rail-step">' + floor + '층</span>';
         });
         html += '</div>';
-        if (c === 'B') {
+        if (c === 'B' && hasFullBtoC) {
           html += '<div class="pal-map-bc-divider" aria-hidden="true"></div>';
         }
       });
       html += '</div>';
       container.innerHTML = html;
-      container.querySelectorAll('.pal-map-slot').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          palMapSelectedCode = btn.getAttribute('data-code');
-          var el = document.getElementById('palMapSelectedCode');
-          if (el) el.textContent = palMapSelectedCode;
-          palBuildSectionMapGrid();
+
+      if (mode === 'overview') {
+        container.querySelectorAll('.pal-map-rowlabel--clk').forEach(function (el) {
+          el.addEventListener('click', function () {
+            palOpenSectionMapColumn(el.getAttribute('data-open-letter'));
+          });
+          el.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+              ev.preventDefault();
+              palOpenSectionMapColumn(el.getAttribute('data-open-letter'));
+            }
+          });
         });
+      } else {
+        container.querySelectorAll('.pal-map-slot[data-code]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            if (btn.disabled) return;
+            palMapSelectedCode = btn.getAttribute('data-code');
+            var cel = document.getElementById('palMapSelectedCode');
+            if (cel) cel.textContent = palMapSelectedCode;
+            palBuildColumnView();
+          });
+        });
+      }
+    }
+
+    function palBuildOverviewGrid() {
+      palBuildMapGrid('palSectionMapGrid', ['A', 'B', 'C', 'D'], 'overview');
+    }
+
+    function palBuildColumnView() {
+      if (!palMapFocusedLetter) return;
+      palBuildMapGrid('palSectionMapColumnGrid', [palMapFocusedLetter], 'detail');
+      palRenderColumnProductList();
+    }
+
+    function palOpenSectionMapColumn(letter) {
+      letter = (letter || '').toString().toUpperCase();
+      if (!/^[ABCD]$/.test(letter)) return;
+      palMapViewMode = 'column';
+      palMapFocusedLetter = letter;
+      palMapSelectedCode = null;
+      var ov = document.getElementById('palMapOverviewRoot');
+      var cr = document.getElementById('palMapColumnRoot');
+      if (ov) ov.style.display = 'none';
+      if (cr) cr.style.display = 'block';
+      var titleEl = document.getElementById('palMapColumnTitle');
+      if (titleEl) titleEl.textContent = letter + '열 확대';
+      var headEl = document.getElementById('palMapColumnProductHeading');
+      if (headEl) headEl.textContent = letter + '열 보관 목록 (위치 코드 ' + letter + '-…)';
+      var codeEl = document.getElementById('palMapSelectedCode');
+      if (codeEl) codeEl.textContent = '—';
+      palBuildColumnView();
+    }
+
+    function palSectionMapBackToOverview() {
+      palMapViewMode = 'overview';
+      palMapFocusedLetter = null;
+      palMapSelectedCode = null;
+      var ov = document.getElementById('palMapOverviewRoot');
+      var cr = document.getElementById('palMapColumnRoot');
+      if (ov) ov.style.display = 'block';
+      if (cr) cr.style.display = 'none';
+      var codeEl = document.getElementById('palMapSelectedCode');
+      if (codeEl) codeEl.textContent = '—';
+      palBuildOverviewGrid();
+    }
+
+    function palRenderColumnProductList() {
+      var letter = palMapFocusedLetter;
+      var tbody = document.getElementById('palMapColumnProductBody');
+      if (!tbody || !letter) return;
+      var rows = [];
+      palMapInboundList.forEach(function (p) {
+        var key = palNormalizeSectionCode(p.rack_section_code);
+        if (!key || key.charAt(0) !== letter) return;
+        rows.push(p);
       });
+      rows.sort(function (a, b) {
+        var ka = palNormalizeSectionCode(a.rack_section_code) || '';
+        var kb = palNormalizeSectionCode(b.rack_section_code) || '';
+        return ka.localeCompare(kb, 'en', { numeric: true });
+      });
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="pal-map-product-empty">이 열에 섹션 코드가 지정된 보관중 파레트가 없습니다.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(function (p) {
+        return '<tr><td>' + palEscapeHtml(p.product_name || '—') + '</td><td>' + palEscapeHtml(palFormatInboundWhen(p)) + '</td><td>' + palEscapeHtml((p.notes != null ? p.notes : '').toString()) + '</td></tr>';
+      }).join('');
     }
 
     async function palLoadSectionMapCounts() {
@@ -1975,10 +2224,10 @@
         });
         var result = await response.json();
         palMapCountIndex = {};
+        palMapInboundList = Array.isArray(result.data) ? result.data : [];
         var n = 0;
-        if (result.success && Array.isArray(result.data)) {
-          n = 0;
-          result.data.forEach(function (p) {
+        if (result.success && palMapInboundList.length) {
+          palMapInboundList.forEach(function (p) {
             var key = palNormalizeSectionCode(p.rack_section_code);
             if (!key) return;
             if (palIsBlockedSectionCode(key)) return;
@@ -1987,27 +2236,42 @@
           });
         }
         if (hint) {
-          hint.textContent = '보관중 파레트 ' + n + '건(사용불가 위치 제외) · 셀 숫자는 rack_section_code가 위치 코드(';
-          hint.textContent += '열-칸-층-자리)와 일치한 건수입니다.';
+          hint.textContent = '보관중 파레트 ' + n + '건(사용불가 위치 제외) · 전체 맵은 칸별 사용 여부만 표시합니다.';
         }
-        palBuildSectionMapGrid();
+        palRefreshSectionMapView();
       } catch (e) {
         console.warn('[PAL] 섹션 맵 집계 실패:', e);
         if (hint) hint.textContent = '집계를 불러오지 못했습니다. 네트워크 또는 권한을 확인하세요.';
+        palMapInboundList = [];
+        palMapCountIndex = {};
+        palRefreshSectionMapView();
+      }
+    }
+
+    function palRefreshSectionMapView() {
+      if (palMapViewMode === 'column' && palMapFocusedLetter) {
+        palBuildColumnView();
+      } else {
+        palBuildOverviewGrid();
       }
     }
 
     function palInitSectionMap() {
+      palMapViewMode = 'overview';
+      palMapFocusedLetter = null;
       palMapSelectedCode = null;
+      var ov = document.getElementById('palMapOverviewRoot');
+      var cr = document.getElementById('palMapColumnRoot');
+      if (ov) ov.style.display = 'block';
+      if (cr) cr.style.display = 'none';
       var codeEl = document.getElementById('palMapSelectedCode');
       if (codeEl) codeEl.textContent = '—';
-      palBuildSectionMapGrid();
       palLoadSectionMapCounts();
     }
 
     async function palMapCopySelected() {
       if (!palMapSelectedCode) {
-        alert('맵에서 칸 안의 층·자리(1 또는 2)를 클릭해 위치를 먼저 선택하세요.');
+        alert('열 확대 화면에서 칸 안의 층·자리(1 또는 2)를 클릭해 위치를 먼저 선택하세요.');
         return;
       }
       try {
