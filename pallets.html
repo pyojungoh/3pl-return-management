@@ -729,24 +729,35 @@
       position: relative;
     }
     .pal-map-floor-colhead {
-      font-weight: 700;
-      text-align: center;
-      padding: 8px 6px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #f5f9fc 0%, #e8f4fc 100%);
-      border: 2px solid #b3d9f2;
-      color: #0984e3;
-      font-size: 11px;
-      white-space: nowrap;
       display: flex;
       align-items: center;
       justify-content: center;
-      letter-spacing: 0.02em;
+      padding: 8px 6px;
+      border-radius: 10px;
+      border: 2px dashed #b3d9f2;
+      background: #fafcfd;
+      color: #546e7a;
+      font-size: 12px;
+      font-weight: 800;
     }
-    .pal-map-floor-col-spacer {
-      border-left: 1px dashed #cfd8dc;
-      min-height: 8px;
+    .pal-map-floor-rail {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
       align-self: stretch;
+      box-sizing: border-box;
+      padding: 10px 6px;
+      border-radius: 10px;
+      border: 2px solid #b3d9f2;
+      background: linear-gradient(180deg, #f5f9fc 0%, #e8f4fc 100%);
+      color: #0984e3;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .pal-map-floor-rail-step {
+      line-height: 1.25;
+      white-space: nowrap;
     }
     .pal-map-bc-divider {
       grid-column: 1 / -1;
@@ -1256,7 +1267,7 @@
         <h2 style="color: #ff6b35; font-weight: 700; margin-bottom: 8px;">🗺️ 창고 섹션 맵</h2>
         <p style="margin: 0 0 18px 0; color: #636e72; font-size: 14px; line-height: 1.5;">
           <strong>가로</strong>가 칸 번호 <strong>1~15</strong>(왼쪽이 작업장에 가까운 쪽). <strong>세로</strong> 열 순서는 <strong>맨 위가 A열 → 그 아래 B열 → 그 아래 C열 → 맨 아래 D열</strong>(B와 C 사이 점선은 등 맞춤 구간).
-          각 칸은 <strong>위→아래로 3층·2층·1층</strong>(층 순서는 맵 <strong>오른쪽</strong> 안내 줄 참고), 층마다 <strong>1</strong>=작업장 쪽 반칸·<strong>2</strong>=그 옆 반칸입니다. 코드 예: <code style="background:#f1f3f5;padding:2px 6px;border-radius:4px;">A-1-3-1</code>
+          각 칸은 <strong>위→아래로 3층·2층·1층</strong>(층 표시는 <strong>A~D 각 행 오른쪽</strong> 세로 안내 참고), 층마다 <strong>1</strong>=작업장 쪽 반칸·<strong>2</strong>=그 옆 반칸입니다. 코드 예: <code style="background:#f1f3f5;padding:2px 6px;border-radius:4px;">A-1-3-1</code>
         </p>
 
         <div class="pal-map-toolbar">
@@ -1279,7 +1290,7 @@
 
         <div class="pal-map-legend">
           <span><strong>열 순서</strong>: 위 <strong>A</strong> · <strong>B</strong> · <strong>C</strong> · 아래 <strong>D</strong></span>
-          <span>층 순서 안내는 맵 <strong>오른쪽</strong> 한 줄 (<strong>1층 · 2층 · 3층</strong>), 칸 안은 위→아래 <strong>3층·2층·1층</strong></span>
+          <span><strong>A~D 각 행</strong> 오른쪽에 <strong>3층 → 2층 → 1층</strong> 세로 표시 (칸 안 위→아래와 동일)</span>
           <span><i class="pal-leg-slot1"></i> 층 안 <strong>1</strong> (작업장 쪽)</span>
           <span><i class="pal-leg-slot2"></i> 층 안 <strong>2</strong></span>
           <span><strong style="color:#d63031;">X</strong> 사용불가 위치</span>
@@ -1895,7 +1906,7 @@
       for (var s = 1; s <= 15; s++) {
         html += '<div class="pal-map-slothead">' + s + '</div>';
       }
-      html += '<div class="pal-map-floor-colhead" title="각 칸 안은 위에서 아래로 3층·2층·1층 순서입니다.">1층 · 2층 · 3층</div>';
+      html += '<div class="pal-map-floor-colhead" aria-hidden="true">층</div>';
       lettersTopToBottom.forEach(function (c) {
         html += '<div class="pal-map-rowlabel" data-col="' + c + '">' + c + '</div>';
         for (var r = 1; r <= 15; r++) {
@@ -1931,7 +1942,11 @@
           }
           html += '</div>';
         }
-        html += '<div class="pal-map-floor-col-spacer" aria-hidden="true"></div>';
+        html += '<div class="pal-map-floor-rail" title="' + c + '열: 각 칸 안은 위에서 아래로 3층·2층·1층 순서입니다." aria-label="' + c + '열 층 표시">';
+        floorsOrder.forEach(function (floor) {
+          html += '<span class="pal-map-floor-rail-step">' + floor + '층</span>';
+        });
+        html += '</div>';
         if (c === 'B') {
           html += '<div class="pal-map-bc-divider" aria-hidden="true"></div>';
         }
