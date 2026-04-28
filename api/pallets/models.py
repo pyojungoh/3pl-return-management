@@ -11,6 +11,7 @@ from api.database.models import (
     USE_POSTGRESQL,
     is_company_deactivated,
     ensure_pallet_table_columns,
+    ensure_rack_sections_table,
 )
 
 # ========================================
@@ -241,7 +242,7 @@ def update_pallet_status(pallet_id: str, out_date: date = None,
         if USE_POSTGRESQL:
             cursor.execute('''
                 UPDATE pallets 
-                SET status = %s, out_date = %s, updated_at = CURRENT_TIMESTAMP
+                SET status = %s, out_date = %s, warehouse_use_status = NULL, updated_at = CURRENT_TIMESTAMP
                 WHERE pallet_id = %s
             ''', ('보관종료', out_date, pallet_id))
             
@@ -255,7 +256,7 @@ def update_pallet_status(pallet_id: str, out_date: date = None,
         else:
             cursor.execute('''
                 UPDATE pallets 
-                SET status = ?, out_date = ?, updated_at = CURRENT_TIMESTAMP
+                SET status = ?, out_date = ?, warehouse_use_status = NULL, updated_at = CURRENT_TIMESTAMP
                 WHERE pallet_id = ?
             ''', ('보관종료', out_date, pallet_id))
             
@@ -276,6 +277,162 @@ def update_pallet_status(pallet_id: str, out_date: date = None,
     except Exception as e:
         conn.rollback() if USE_POSTGRESQL else None
         return False, f"보관종료 처리 실패: {str(e)}", None
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def list_rack_sections() -> List[Dict]:
+    """랙 섹션 목록 (모바일 자체 QR용)."""
+    ensure_rack_sections_table()
+    conn = get_db_connection()
+    cursor = None
+    try:
+        if USE_POSTGRESQL:
+            from psycopg2.extras import RealDictCursor
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute(
+                'SELECT code, label, sort_order FROM rack_sections ORDER BY sort_order ASC, code ASC'
+            )
+            rows = cursor.fetchall()
+            return [dict(r) for r in rows]
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT code, label, sort_order FROM rack_sections ORDER BY sort_order ASC, code ASC'
+        )
+        cols = [col[0] for col in cursor.description]
+        return [dict(zip(cols, row)) for row in cursor.fetchall()]
+    finally:
+        if cursor:
+            cursor.close()
+        conn.close()
+
+
+def rack_section_exists(code: str) -> bool:
+    if not (code or '').strip():
+        return False
+    ensure_rack_sections_table()
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        c = code.strip()
+        if USE_POSTGRESQL:
+            cursor.execute('SELECT 1 FROM rack_sections WHERE code = %s LIMIT 1', (c,))
+        else:
+            cursor.execute('SELECT 1 FROM rack_sections WHERE code = ? LIMIT 1', (c,))
+        return cursor.fetchone() is not None
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def apply_pallet_mobile_track(
+    pallet_id: str,
+    action: str,
+    rack_section_code: Optional[str] = None,
+    processed_by: str = 'QR Mobile',
+) -> Tuple[bool, str, Optional[Dict]]:
+    """
+    모바일 자체 추적 QR 액션.
+    action: section_move | in_use | storage_end
+    """
+    ensure_pallet_table_columns()
+    ensure_rack_sections_table()
+    action = (action or '').strip()
+    if action not in ('section_move', 'in_use', 'storage_end'):
+        return False, '지원하지 않는 작업입니다.', None
+    pid = (pallet_id or '').strip()
+    if not pid:
+        return False, '파레트 ID가 필요합니다.', None
+
+    pallet = get_pallet_by_id(pid)
+    if not pallet:
+        return False, '파레트를 찾을 수 없습니다.', None
+    if pallet.get('status') == '보관종료':
+        return False, '이미 보관종료된 파레트입니다.', None
+
+    if action == 'storage_end':
+        return update_pallet_status(
+            pid,
+            processed_by=processed_by,
+            notes='모바일 자체 QR 보관종료',
+        )
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    qty = pallet.get('quantity', 1) or 1
+    try:
+        if action == 'in_use':
+            if USE_POSTGRESQL:
+                cursor.execute(
+                    '''UPDATE pallets SET warehouse_use_status = %s,
+                       updated_at = CURRENT_TIMESTAMP WHERE pallet_id = %s''',
+                    ('사용중', pid),
+                )
+                cursor.execute(
+                    '''INSERT INTO pallet_transactions (
+                         pallet_id, transaction_type, quantity, transaction_date,
+                         processed_by, notes, created_at)
+                       VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, CURRENT_TIMESTAMP)''',
+                    (pid, '상태변경', qty, processed_by, '모바일 자체 QR: 사용중 표시'),
+                )
+            else:
+                cursor.execute(
+                    '''UPDATE pallets SET warehouse_use_status = ?,
+                       updated_at = CURRENT_TIMESTAMP WHERE pallet_id = ?''',
+                    ('사용중', pid),
+                )
+                cursor.execute(
+                    '''INSERT INTO pallet_transactions (
+                         pallet_id, transaction_type, quantity, transaction_date,
+                         processed_by, notes, created_at)
+                       VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, CURRENT_TIMESTAMP)''',
+                    (pid, '상태변경', qty, processed_by, '모바일 자체 QR: 사용중 표시'),
+                )
+            conn.commit()
+            return True, '사용중으로 표시했습니다.', get_pallet_by_id(pid)
+
+        if action == 'section_move':
+            code = (rack_section_code or '').strip()
+            if not code:
+                return False, '섹션을 선택해 주세요.', None
+            if not rack_section_exists(code):
+                return False, '등록되지 않은 섹션입니다.', None
+            if USE_POSTGRESQL:
+                cursor.execute(
+                    '''UPDATE pallets SET rack_section_code = %s,
+                       updated_at = CURRENT_TIMESTAMP WHERE pallet_id = %s''',
+                    (code, pid),
+                )
+                cursor.execute(
+                    '''INSERT INTO pallet_transactions (
+                         pallet_id, transaction_type, quantity, transaction_date,
+                         processed_by, notes, created_at)
+                       VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, CURRENT_TIMESTAMP)''',
+                    (pid, '위치변경', qty, processed_by, f'모바일 자체 QR: 섹션 {code}'),
+                )
+            else:
+                cursor.execute(
+                    '''UPDATE pallets SET rack_section_code = ?,
+                       updated_at = CURRENT_TIMESTAMP WHERE pallet_id = ?''',
+                    (code, pid),
+                )
+                cursor.execute(
+                    '''INSERT INTO pallet_transactions (
+                         pallet_id, transaction_type, quantity, transaction_date,
+                         processed_by, notes, created_at)
+                       VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, CURRENT_TIMESTAMP)''',
+                    (pid, '위치변경', qty, processed_by, f'모바일 자체 QR: 섹션 {code}'),
+                )
+            conn.commit()
+            return True, f'섹션을 {code}(으)로 변경했습니다.', get_pallet_by_id(pid)
+
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return False, f'처리 실패: {str(e)}', None
     finally:
         cursor.close()
         conn.close()

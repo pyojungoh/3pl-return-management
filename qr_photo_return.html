@@ -686,6 +686,34 @@ body {
     </div>
   </div>
 
+  <div id="legacyGoogleFormModal" class="return-result-modal">
+    <div class="return-result-card" style="max-width: 340px;">
+      <div class="return-result-title">보관종료용 QR (구글폼)</div>
+      <div class="return-result-desc" style="font-size: 14px; text-align: left; line-height: 1.45;">
+        기존 구글폼 연동 QR입니다. 아래에서 구글폼을 열어 보관종료를 제출하거나, 창고에서 발급한 <strong>자체 추적 QR</strong>(주황 라벨)을 사용하세요.
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px;">
+        <button id="legacyGoogleFormOpenBtn" type="button" class="return-result-btn" style="background: #1976d2;">구글폼 열기</button>
+        <button id="legacyGoogleFormCloseBtn" type="button" class="return-result-btn" style="background: #546e7a;">닫고 다시 스캔</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="palletTrackModal" class="return-result-modal">
+    <div class="return-result-card" style="max-width: 360px; text-align: left;">
+      <div class="return-result-title" style="text-align: center;">자체 추적 QR</div>
+      <div id="palletTrackInfo" style="font-size: 14px; color: #333; margin: 12px 0; line-height: 1.45;"></div>
+      <label for="palletTrackSectionSelect" style="display:block;font-size:13px;margin-bottom:6px;color:#333;">랙 섹션 (이동 시 선택)</label>
+      <select id="palletTrackSectionSelect" style="width:100%;padding:10px;font-size:16px;border-radius:8px;margin-bottom:12px;"></select>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button id="palletTrackSectionBtn" type="button" class="return-result-btn" style="background:#ff9800;">섹션 이동 저장</button>
+        <button id="palletTrackUseBtn" type="button" class="return-result-btn" style="background:#43a047;">사용중 표시</button>
+        <button id="palletTrackEndBtn" type="button" class="return-result-btn" style="background:#c62828;">보관종료</button>
+        <button id="palletTrackCloseBtn" type="button" class="return-result-btn" style="background:#546e7a;">닫기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- JavaScript 모듈 (인라인) -->
   <script>
 /**
@@ -927,8 +955,11 @@ async function handleQRDetected(rawValue) {
 
     const parsed = parseScannedPayload(scannedText);
     if (parsed.mode === 'legacy_storage_qr') {
-        alert('이 QR은 보관종료용 기존 QR입니다. 반납 처리용으로는 반납QR을 새로 출력해 사용해주세요.');
-        setTimeout(() => startAutoQRScan(), 200);
+        showLegacyGoogleFormModal(scannedText);
+        return;
+    }
+    if (parsed.mode === 'pallet_track') {
+        await openPalletTrackFlow(parsed.palletId);
         return;
     }
     if (parsed.mode === 'vendor_return') {
@@ -1500,6 +1531,19 @@ function parseScannedPayload(rawValue) {
         }
     }
 
+    // 자체 추적 QR (랙 섹션·사용중·보관종료) — PALLET_TRACK|<id>|...
+    if (/^PALLET_TRACK\s*\|/i.test(decodedValue)) {
+        const parts = decodedValue.split('|');
+        const pid = (parts[1] || '').trim();
+        if (pid) {
+            return {
+                mode: 'pallet_track',
+                palletId: pid,
+                trackingNumber: pid
+            };
+        }
+    }
+
     // 기존 보관종료용 Google Form QR (반납 처리 대상 아님)
     if (decodedValue.indexOf('entry.419411235=') >= 0 && decodedValue.indexOf('entry.427884801=') >= 0) {
         return { mode: 'legacy_storage_qr', trackingNumber: value };
@@ -1568,6 +1612,119 @@ function parseScannedPayload(rawValue) {
     }
     
     return fallback;
+}
+
+function qrEscHtml(text) {
+    if (text == null || text === '') return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
+let legacyGoogleFormQrUrl = '';
+
+function showLegacyGoogleFormModal(url) {
+    legacyGoogleFormQrUrl = (url || '').trim();
+    const m = document.getElementById('legacyGoogleFormModal');
+    if (m) m.classList.add('show');
+}
+
+function closeLegacyGoogleFormModal() {
+    const m = document.getElementById('legacyGoogleFormModal');
+    if (m) m.classList.remove('show');
+    legacyGoogleFormQrUrl = '';
+    setTimeout(() => startAutoQRScan(), 200);
+}
+
+async function openPalletTrackFlow(palletId) {
+    const pid = (palletId || '').trim();
+    if (!pid) {
+        setTimeout(() => startAutoQRScan(), 200);
+        return;
+    }
+    try {
+        showQRStatus('파레트 정보 불러오는 중…', 'success');
+        const res = await fetch('/api/pallets/mobile-track/info?pallet_id=' + encodeURIComponent(pid));
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            alert((data && data.message) ? data.message : '불러오기 실패');
+            setTimeout(() => startAutoQRScan(), 300);
+            return;
+        }
+        fillAndShowPalletTrackModal(data.data);
+    } catch (err) {
+        console.error(err);
+        alert('네트워크 오류');
+        setTimeout(() => startAutoQRScan(), 300);
+    }
+}
+
+function fillAndShowPalletTrackModal(payload) {
+    const pallet = (payload && payload.pallet) ? payload.pallet : {};
+    const sections = (payload && payload.rack_sections) ? payload.rack_sections : [];
+    const infoEl = document.getElementById('palletTrackInfo');
+    const sel = document.getElementById('palletTrackSectionSelect');
+    const modal = document.getElementById('palletTrackModal');
+    if (!infoEl || !sel || !modal) return;
+    const lines = [
+        '<strong>품목</strong> · ' + qrEscHtml(pallet.product_name || '-'),
+        '<strong>화주사</strong> · ' + qrEscHtml(pallet.company_name || '-'),
+        '<strong>파레트 ID</strong> · ' + qrEscHtml(pallet.pallet_id || '-'),
+        '<strong>보관상태</strong> · ' + qrEscHtml(pallet.status || '-'),
+        '<strong>현재 섹션</strong> · ' + qrEscHtml(pallet.rack_section_code || '(미지정)'),
+        '<strong>사용 표시</strong> · ' + qrEscHtml(pallet.warehouse_use_status || '(없음)')
+    ];
+    infoEl.innerHTML = lines.join('<br>');
+    let opts = '<option value="">— 섹션 선택 —</option>';
+    sections.forEach(function (s) {
+        const c = (s.code || '').trim();
+        const lb = (s.label || c || '').trim();
+        opts += '<option value="' + qrEscHtml(c) + '">' + qrEscHtml(lb) + '</option>';
+    });
+    sel.innerHTML = opts;
+    const cur = (pallet.rack_section_code || '').trim();
+    if (cur) {
+        for (let i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === cur) {
+                sel.selectedIndex = i;
+                break;
+            }
+        }
+    }
+    window._palletTrackActiveId = pallet.pallet_id || '';
+    modal.classList.add('show');
+}
+
+function closePalletTrackModal() {
+    const m = document.getElementById('palletTrackModal');
+    if (m) m.classList.remove('show');
+    window._palletTrackActiveId = '';
+    setTimeout(() => startAutoQRScan(), 200);
+}
+
+async function postPalletTrackAction(action) {
+    const pid = window._palletTrackActiveId;
+    if (!pid) return;
+    const sel = document.getElementById('palletTrackSectionSelect');
+    const rack = sel ? (sel.value || '').trim() : '';
+    const body = { pallet_id: pid, action: action };
+    if (action === 'section_move') body.rack_section_code = rack;
+    try {
+        const res = await fetch('/api/pallets/mobile-track/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            alert((data && data.message) ? data.message : '처리 실패');
+            return;
+        }
+        alert(data.message || '처리되었습니다.');
+        closePalletTrackModal();
+    } catch (err) {
+        alert('오류: ' + (err.message || err));
+    }
 }
 
 async function processVendorReturnByQr(rawValue, parsed) {
@@ -1716,6 +1873,28 @@ function flashEffect() {
         style.remove();
     }, 200);
 }
+
+(function bindPalletTrackAndLegacyUi() {
+    var openLegacy = document.getElementById('legacyGoogleFormOpenBtn');
+    if (openLegacy) {
+        openLegacy.addEventListener('click', function() {
+            if (legacyGoogleFormQrUrl) window.open(legacyGoogleFormQrUrl, '_blank', 'noopener');
+        });
+    }
+    var closeLegacy = document.getElementById('legacyGoogleFormCloseBtn');
+    if (closeLegacy) closeLegacy.addEventListener('click', closeLegacyGoogleFormModal);
+    var secBtn = document.getElementById('palletTrackSectionBtn');
+    if (secBtn) secBtn.addEventListener('click', function() { postPalletTrackAction('section_move'); });
+    var useBtn = document.getElementById('palletTrackUseBtn');
+    if (useBtn) useBtn.addEventListener('click', function() { postPalletTrackAction('in_use'); });
+    var endBtn = document.getElementById('palletTrackEndBtn');
+    if (endBtn) endBtn.addEventListener('click', function() {
+        if (!confirm('이 파레트를 보관종료 처리할까요?')) return;
+        postPalletTrackAction('storage_end');
+    });
+    var closePt = document.getElementById('palletTrackCloseBtn');
+    if (closePt) closePt.addEventListener('click', closePalletTrackModal);
+})();
 
 // ========= 전역 함수 (HTML에서 호출) =========
 window.capturePhoto = capturePhoto;

@@ -85,7 +85,7 @@ def get_db_connection():
 _SETTLEMENT_RETURN_FEE_COLUMN_OK = False
 
 # pallets 확장 컬럼 (스키마 변경 시 버전만 올리면 재보강)
-_PALLETS_SCHEMA_ENSURE_VERSION = 2
+_PALLETS_SCHEMA_ENSURE_VERSION = 3
 _LAST_PALLETS_ENSURE_VERSION = 0
 
 
@@ -128,6 +128,10 @@ def ensure_pallet_table_columns():
                 )
             except Exception as ue:
                 print(f"[경고] pallets vendor_return_status 백필(ensure): {ue}")
+            if not col_exists('pallets', 'rack_section_code'):
+                cursor.execute('ALTER TABLE pallets ADD COLUMN rack_section_code TEXT')
+            if not col_exists('pallets', 'warehouse_use_status'):
+                cursor.execute('ALTER TABLE pallets ADD COLUMN warehouse_use_status TEXT')
         else:
             for sql in (
                 "ALTER TABLE pallets ADD COLUMN pallet_kind TEXT NOT NULL DEFAULT '일반'",
@@ -149,7 +153,18 @@ def ensure_pallet_table_columns():
                 )
             except Exception as ue:
                 print(f"[경고] pallets vendor_return_status 백필(ensure SQLite): {ue}")
+            for sql in (
+                'ALTER TABLE pallets ADD COLUMN rack_section_code TEXT',
+                'ALTER TABLE pallets ADD COLUMN warehouse_use_status TEXT',
+            ):
+                try:
+                    cursor.execute(sql)
+                except OperationalError as e:
+                    err = str(e).lower()
+                    if 'duplicate' not in err and 'already exists' not in err:
+                        raise
         conn.commit()
+        ensure_rack_sections_table()
         _LAST_PALLETS_ENSURE_VERSION = _PALLETS_SCHEMA_ENSURE_VERSION
         print('[성공] pallets 확장 컬럼 보강 완료')
     except Exception as e:
@@ -158,6 +173,72 @@ def ensure_pallet_table_columns():
         except Exception:
             pass
         print(f"[경고] ensure_pallet_table_columns 실패: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+
+_RACK_SECTIONS_ENSURED = False
+
+
+def ensure_rack_sections_table():
+    """랙 섹션 마스터 테이블 생성 및 초기 행 삽입 (파레트 위치 추적용)."""
+    global _RACK_SECTIONS_ENSURED
+    if _RACK_SECTIONS_ENSURED:
+        return
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    seeds = (
+        ('A-01', 'A구역 1열', 10),
+        ('A-02', 'A구역 2열', 20),
+        ('B-01', 'B구역 1열', 30),
+        ('B-02', 'B구역 2열', 40),
+    )
+    try:
+        if USE_POSTGRESQL:
+            cursor.execute(
+                '''
+                CREATE TABLE IF NOT EXISTS rack_sections (
+                    id SERIAL PRIMARY KEY,
+                    code TEXT NOT NULL UNIQUE,
+                    label TEXT NOT NULL,
+                    sort_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                '''
+            )
+            for code, label, so in seeds:
+                cursor.execute(
+                    '''INSERT INTO rack_sections (code, label, sort_order)
+                       VALUES (%s, %s, %s) ON CONFLICT (code) DO NOTHING''',
+                    (code, label, so),
+                )
+        else:
+            cursor.execute(
+                '''
+                CREATE TABLE IF NOT EXISTS rack_sections (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    code TEXT NOT NULL UNIQUE,
+                    label TEXT NOT NULL,
+                    sort_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                '''
+            )
+            for code, label, so in seeds:
+                cursor.execute(
+                    'INSERT OR IGNORE INTO rack_sections (code, label, sort_order) VALUES (?, ?, ?)',
+                    (code, label, so),
+                )
+        conn.commit()
+        _RACK_SECTIONS_ENSURED = True
+        print('[성공] rack_sections 테이블 준비 완료')
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        print(f'[경고] ensure_rack_sections_table 실패: {e}')
     finally:
         cursor.close()
         conn.close()

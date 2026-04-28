@@ -2042,6 +2042,14 @@
       return 'PALLET_RETURN|' + String(palletId || '') + '|' + v + '|' + p + '|' + k;
     }
 
+    /** 모바일 자체 추적 QR (랙 섹션·사용중·보관종료) — 구글폼형과 병행 */
+    function palBuildTrackQrText(palletId, vendor, product, palletKind) {
+      var v = (vendor || '').replace(/\|/g, ' ');
+      var p = (product || '').replace(/\|/g, ' ');
+      var k = (palletKind || '').replace(/\|/g, ' ');
+      return 'PALLET_TRACK|' + String(palletId || '') + '|' + v + '|' + p + '|' + k + '|v1';
+    }
+
     async function palQrTextToDataUrl(qrText, pixelSize) {
       var size = pixelSize || 200;
       if (typeof QRCode !== 'undefined') {
@@ -2203,12 +2211,15 @@
       var mode = o.mode || 'storage';
       var kind = o.kind || '';
       var isVendorReturn = (mode === 'vendor_return');
-      var titleText = isVendorReturn ? '반납 전용 QR' : '보관종료 QR';
-      var titleBg = isVendorReturn ? '#6f42c1' : '#17a2b8';
-      var qrSize = isVendorReturn ? 124 : 140;
+      var isTrack = (mode === 'track');
+      var titleText = isVendorReturn ? '반납 전용 QR' : (isTrack ? '자체 추적 QR' : '보관종료 QR');
+      var titleBg = isVendorReturn ? '#6f42c1' : (isTrack ? '#e65100' : '#17a2b8');
+      var qrSize = isVendorReturn ? 124 : (isTrack ? 150 : 140);
       var subLine = isVendorReturn
         ? ('화주사: ' + palEscapeHtml(vendor || '-') + ' / 종류: ' + palEscapeHtml(kind || '-'))
-        : ('화주사: ' + palEscapeHtml(vendor || ''));
+        : (isTrack
+          ? ('화주사: ' + palEscapeHtml(vendor || '-') + ' · 모바일에서 섹션·상태 처리')
+          : ('화주사: ' + palEscapeHtml(vendor || '')));
 
       return (
         '<div class="pal-qr-label-page">' +
@@ -3210,6 +3221,7 @@
                 <td>
                   <div style="display: flex; gap: 3px; align-items: center; justify-content: center;">
                     <button class="pal-btn" onclick="palViewQRCode('${pallet.pallet_id}', '${pallet.in_date || ''}')" style="padding: 4px 8px; font-size: 10px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;">QR</button>
+                    <button class="pal-btn" onclick="palViewTrackQRCode('${pallet.pallet_id}', '${pallet.in_date || ''}')" style="padding: 4px 8px; font-size: 10px; background: #e65100; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;">자체QR</button>
                     ${((pallet.pallet_kind || '') === '아주' || (pallet.pallet_kind || '') === 'kpp')
                       ? `<button class="pal-btn" onclick="palViewVendorReturnQRCode('${pallet.pallet_id}', '${pallet.in_date || ''}')" style="padding: 4px 8px; font-size: 10px; background: #6f42c1; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;">반납QR</button>`
                       : ''
@@ -3687,6 +3699,51 @@
         alert('반납 전용 QR을 불러오는 중 오류가 발생했습니다.');
       }
     }
+
+    async function palViewTrackQRCode(palletId, inDate) {
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/${palletId}`, {
+          headers: palGetUserHeaders()
+        });
+        const result = await response.json();
+        const palletInfo = result.success && result.data ? result.data : null;
+        if (!palletInfo) {
+          alert('파레트 정보를 찾을 수 없습니다.');
+          return;
+        }
+
+        palCurrentQRPalletId = palletId;
+        palCurrentQRInDate = palletInfo?.in_date || inDate || '';
+        palCurrentQRDataUrl = null;
+        palCurrentQRMeta = null;
+        palCurrentQRMode = 'track';
+
+        const modal = document.getElementById('palQRModal');
+        const titleEl = document.getElementById('palQRTitle');
+        const inDateEl = document.getElementById('palQRInDate');
+        const qrContainer = document.getElementById('palQRCodeContainer');
+        if (modal && titleEl && inDateEl && qrContainer) {
+          titleEl.textContent = '자체 추적 QR · ' + palletId;
+          inDateEl.textContent = '모바일에서 랙 섹션·사용중·보관종료 처리 · 입고일: ' + (palCurrentQRInDate || '-');
+          qrContainer.innerHTML = '<div style="padding:24px;color:#636e72;">QR 생성 중...</div>';
+          modal.style.display = 'block';
+
+          const vendor = palletInfo?.company_name || '';
+          const product = palletInfo?.product_name || '';
+          const kind = (palletInfo?.pallet_kind || '').trim();
+          const qrText = palBuildTrackQrText(palletId, vendor, product, kind);
+          const dataUrl = await palQrTextToDataUrl(qrText, 300);
+          palCurrentQRDataUrl = dataUrl;
+          palCurrentQRMeta = { vendor: vendor, product: product, pallet_kind: kind };
+          qrContainer.innerHTML = `<img src="${dataUrl}" alt="Track QR" style="max-width: 300px; width: 100%; height: auto;">`;
+        }
+      } catch (error) {
+        console.error('자체 추적 QR 모달 오류:', error);
+        alert('자체 추적 QR을 불러오는 중 오류가 발생했습니다.');
+      }
+    }
+    window.palViewTrackQRCode = palViewTrackQRCode;
+
     // QR 코드 모달 닫기
     function palCloseQRModal() {
       const modal = document.getElementById('palQRModal');
@@ -3725,10 +3782,13 @@
         }
         var qrText = palCurrentQRMode === 'vendor_return'
           ? palBuildVendorReturnQrText(palletId, vendor, product, palCurrentQRMeta && palCurrentQRMeta.pallet_kind)
-          : palBuildPalletQrText(palletId, vendor, product);
-        var dataUrl = await palQrTextToDataUrl(qrText, palCurrentQRMode === 'vendor_return' ? 124 : 140);
+          : palCurrentQRMode === 'track'
+            ? palBuildTrackQrText(palletId, vendor, product, palCurrentQRMeta && palCurrentQRMeta.pallet_kind)
+            : palBuildPalletQrText(palletId, vendor, product);
+        var px = palCurrentQRMode === 'vendor_return' ? 124 : palCurrentQRMode === 'track' ? 150 : 140;
+        var dataUrl = await palQrTextToDataUrl(qrText, px);
         var html = palBuildSingleLabelHtml(palletId, product, vendor, inDateStr, dataUrl, {
-          mode: palCurrentQRMode,
+          mode: palCurrentQRMode === 'track' ? 'track' : palCurrentQRMode,
           kind: (palCurrentQRMeta && palCurrentQRMeta.pallet_kind) || ''
         });
         await palExecuteRollQrPrint(html);

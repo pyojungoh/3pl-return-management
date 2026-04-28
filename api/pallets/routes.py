@@ -11,6 +11,7 @@ from api.pallets.models import (
     update_settlement_status, delete_settlement, delete_settlement,
     get_monthly_revenue, get_daily_fees_batch,
     get_vendor_return_pallets, update_vendor_return,
+    list_rack_sections, apply_pallet_mobile_track, _serialize_pallet_row_dates,
 )
 
 # Blueprint 생성
@@ -2044,6 +2045,69 @@ def pallet_vendor_return_by_qr():
         }), 200
     except Exception as e:
         print(f'vendor-return/by-qr 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@pallets_bp.route('/rack-sections', methods=['GET'])
+def pallet_rack_sections_list():
+    """랙 섹션 목록 (자체 추적 QR · 모바일)."""
+    try:
+        rows = list_rack_sections()
+        return jsonify({'success': True, 'data': rows}), 200
+    except Exception as e:
+        print(f'rack-sections 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@pallets_bp.route('/mobile-track/info', methods=['GET'])
+def pallet_mobile_track_info():
+    """자체 추적 QR 스캔 후 파레트 요약·섹션 목록."""
+    pallet_id = (request.args.get('pallet_id') or request.args.get('palletId') or '').strip()
+    if not pallet_id:
+        return jsonify({'success': False, 'message': 'pallet_id가 필요합니다.'}), 400
+    try:
+        pallet = get_pallet_by_id(pallet_id)
+        if not pallet:
+            return jsonify({'success': False, 'message': '파레트를 찾을 수 없습니다.'}), 404
+        sections = list_rack_sections()
+        return jsonify({
+            'success': True,
+            'data': {
+                'pallet': _serialize_pallet_row_dates(pallet),
+                'rack_sections': sections,
+            },
+        }), 200
+    except Exception as e:
+        print(f'mobile-track/info 오류: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@pallets_bp.route('/mobile-track/action', methods=['POST'])
+def pallet_mobile_track_action_route():
+    """모바일 자체 추적 QR — 섹션 이동 / 사용중 / 보관종료."""
+    try:
+        data = request.get_json(silent=True) or {}
+        pallet_id = (data.get('pallet_id') or data.get('palletId') or '').strip()
+        action = (data.get('action') or '').strip()
+        rack_section_code = (data.get('rack_section_code') or data.get('rackSectionCode') or '').strip()
+        ok, msg, updated = apply_pallet_mobile_track(
+            pallet_id,
+            action,
+            rack_section_code=rack_section_code or None,
+            processed_by='QR Mobile',
+        )
+        if not ok:
+            return jsonify({'success': False, 'message': msg}), 400
+        serialized = _serialize_pallet_row_dates(updated) if updated else None
+        return jsonify({'success': True, 'message': msg, 'data': serialized}), 200
+    except Exception as e:
+        print(f'mobile-track/action 오류: {e}')
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
