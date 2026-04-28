@@ -680,6 +680,9 @@
       align-items: stretch;
       margin-bottom: 14px;
     }
+    .pal-map-layout.pal-map-layout-reverse {
+      flex-direction: row-reverse;
+    }
     .pal-map-work-strip {
       flex: 0 0 42px;
       display: flex;
@@ -764,12 +767,12 @@
       line-height: 1.15;
       white-space: nowrap;
     }
-    .pal-map-bc-divider {
+    .pal-map-aisle-divider {
       grid-column: 1 / -1;
       height: 0;
-      margin: 5px 0;
+      margin: 6px 0;
       border: none;
-      border-bottom: 2px dashed #b2bec3;
+      border-bottom: 3px dashed #74b9ff;
       pointer-events: none;
     }
     .pal-map-rowlabel {
@@ -1066,6 +1069,28 @@
     .pal-map-zoom-empty {
       opacity: 0.7;
     }
+    .pal-map-zoom-blocked {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      font-size: 13px;
+      font-weight: 800;
+      color: #d63031;
+      letter-spacing: 0.02em;
+    }
+    .pal-map-zoom-cell .pal-map-slot-pass {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      font-size: 13px;
+      font-weight: 800;
+      color: #636e72;
+      letter-spacing: 0.02em;
+    }
     .pal-map-column-root {
       margin-top: 8px;
     }
@@ -1081,45 +1106,6 @@
       font-size: 18px;
       font-weight: 800;
       color: #ff6b35;
-    }
-    .pal-map-product-panel {
-      margin-top: 20px;
-      padding: 16px 18px;
-      background: #fff;
-      border-radius: 12px;
-      border: 1px solid #dfe6e9;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-    }
-    .pal-map-product-panel h4 {
-      margin: 0 0 12px 0;
-      font-size: 15px;
-      color: #2d3436;
-    }
-    .pal-map-product-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    .pal-map-product-table th,
-    .pal-map-product-table td {
-      padding: 10px 12px;
-      border: 1px solid #eceff1;
-      text-align: left;
-      vertical-align: top;
-    }
-    .pal-map-product-table th {
-      background: #f8f9fa;
-      font-weight: 700;
-      color: #636e72;
-      white-space: nowrap;
-    }
-    .pal-map-product-table tr:nth-child(even) td {
-      background: #fafbfc;
-    }
-    .pal-map-product-empty {
-      text-align: center;
-      color: #b2bec3;
-      padding: 20px !important;
     }
     .pal-map-legend {
       display: flex;
@@ -1550,6 +1536,7 @@
 
           <div class="pal-map-legend">
             <span><strong>열 순서</strong>: 위 <strong>A</strong> · <strong>B</strong> · <strong>C</strong> · 아래 <strong>D</strong> — <strong>열 글자를 클릭</strong>해 확대</span>
+            <span><strong>통로</strong>: <strong>A-B</strong>, <strong>C-D</strong> / <strong>B-C</strong>는 붙음</span>
             <span><strong>●</strong> 사용중 · <strong>빈 칸</strong> 미사용</span>
             <span><strong style="color:#d63031;">X</strong> 사용불가 위치</span>
             <span id="palMapCountHint">보관중 파레트만 집계합니다(사용불가 코드 제외).</span>
@@ -1570,26 +1557,10 @@
             </button>
           </div>
 
-          <div class="pal-map-layout">
-            <div class="pal-map-work-strip" title="작업장이 이 방향(왼쪽)에 있다고 가정한 맵입니다.">작업장</div>
+          <div id="palMapColumnLayout" class="pal-map-layout">
+            <div id="palMapColumnStrip" class="pal-map-work-strip" title="통로 방향 안내">통로</div>
             <div class="pal-map-grid-wrap">
               <div id="palSectionMapColumnGrid" class="pal-section-map-grid pal-section-map-grid--zoom" aria-live="polite"></div>
-            </div>
-          </div>
-
-          <div class="pal-map-product-panel">
-            <h4 id="palMapColumnProductHeading">해당 열 보관 목록</h4>
-            <div style="overflow-x: auto;">
-              <table class="pal-map-product-table" role="table">
-                <thead>
-                  <tr>
-                    <th>품목명</th>
-                    <th>입고일시</th>
-                    <th>비고</th>
-                  </tr>
-                </thead>
-                <tbody id="palMapColumnProductBody"></tbody>
-              </table>
             </div>
           </div>
 
@@ -2304,12 +2275,17 @@
       html += '<div class="pal-map-floor-colhead" aria-hidden="true">층</div>';
       var hasFullBtoC = lettersTopToBottom.indexOf('B') >= 0 && lettersTopToBottom.indexOf('C') >= 0;
       lettersTopToBottom.forEach(function (c) {
+        var displayFloors = floorsOrder;
+        // 전체 맵에서는 B/D 열만 층 체감을 반대로 보여줌 (1층↔3층)
+        if (mode === 'overview' && (c === 'B' || c === 'D')) {
+          displayFloors = [1, 2, 3];
+        }
         html += '<div class="pal-map-rowlabel' + (mode === 'overview' ? ' pal-map-rowlabel--clk' : '') + '" data-col="' + c + '"' +
           (mode === 'overview' ? ' role="button" tabindex="0" data-open-letter="' + c + '" title="' + c + '열 확대"' : '') + '>' + c + '</div>';
         for (var r = sFrom; r <= sTo; r++) {
           html += '<div class="pal-map-cell">';
-          for (var ti = 0; ti < floorsOrder.length; ti++) {
-            var floor = floorsOrder[ti];
+          for (var ti = 0; ti < displayFloors.length; ti++) {
+            var floor = displayFloors[ti];
             var code1 = c + '-' + r + '-' + floor + '-1';
             var code2 = c + '-' + r + '-' + floor + '-2';
             var blocked1 = palIsBlockedSectionCode(code1);
@@ -2327,13 +2303,14 @@
           }
           html += '</div>';
         }
-        html += '<div class="pal-map-floor-rail" title="' + c + '열 층 순서 (위→아래 3층·2층·1층)" aria-label="' + c + '열 층 표시">';
-        floorsOrder.forEach(function (floor) {
+        var floorOrderText = displayFloors.map(function (f) { return f + '층'; }).join('·');
+        html += '<div class="pal-map-floor-rail" title="' + c + '열 층 순서 (위→아래 ' + floorOrderText + ')" aria-label="' + c + '열 층 표시">';
+        displayFloors.forEach(function (floor) {
           html += '<span class="pal-map-floor-rail-step">' + floor + '층</span>';
         });
         html += '</div>';
-        if (c === 'B' && hasFullBtoC) {
-          html += '<div class="pal-map-bc-divider" aria-hidden="true"></div>';
+        if ((c === 'A' || c === 'C') && hasFullBtoC) {
+          html += '<div class="pal-map-aisle-divider" aria-hidden="true"></div>';
         }
       });
       html += '</div>';
@@ -2373,7 +2350,9 @@
       var container = document.getElementById('palSectionMapColumnGrid');
       if (!container) return;
       var letter = palMapFocusedLetter;
-      var floorsLeftToRight = [1, 2, 3];
+      var floorsLeftToRight = (letter === 'B' || letter === 'D') ? [3, 2, 1] : [1, 2, 3];
+      // 자리 표시는 위 1번, 아래 2번으로 고정
+      var positionOrder = [1, 2];
       var html = '<div class="pal-map-column-scroll">';
       html += '<div class="pal-map-zoom-head">';
       html += '<div class="pal-map-zoom-head-cell">칸</div>';
@@ -2385,7 +2364,7 @@
       for (var slot = 1; slot <= 15; slot++) {
         html += '<div class="pal-map-zoom-slot-group">';
         html += '<div class="pal-map-zoom-slot-no">' + slot + '</div>';
-        [1, 2].forEach(function (pos) {
+        positionOrder.forEach(function (pos) {
           html += '<div class="pal-map-zoom-pos pos-' + pos + '">' + pos + '번</div>';
           floorsLeftToRight.forEach(function (floor) {
             var code = letter + '-' + slot + '-' + floor + '-' + pos;
@@ -2400,9 +2379,8 @@
               if (isPassage) {
                 html += '<span class="pal-map-slot-pass">통로</span>';
               } else {
-                html += '<span class="pal-map-slot-x">X</span>';
+                html += '<span class="pal-map-zoom-blocked">사용 불가</span>';
               }
-              html += '<span class="pal-map-zoom-code">' + code + '</span>';
             } else {
               html += '<span class="pal-map-zoom-code">' + code + '</span>';
               if (used && meta) {
@@ -2433,7 +2411,6 @@
           palBuildColumnView();
         });
       });
-      palRenderColumnProductList();
     }
 
     function palOpenSectionMapColumn(letter) {
@@ -2448,8 +2425,17 @@
       if (cr) cr.style.display = 'block';
       var titleEl = document.getElementById('palMapColumnTitle');
       if (titleEl) titleEl.textContent = letter + '열 확대';
-      var headEl = document.getElementById('palMapColumnProductHeading');
-      if (headEl) headEl.textContent = letter + '열 보관 목록 (위치 코드 ' + letter + '-…)';
+      var columnLayout = document.getElementById('palMapColumnLayout');
+      var columnStrip = document.getElementById('palMapColumnStrip');
+      if (columnStrip) {
+        var isPassageSide = (letter === 'B' || letter === 'C');
+        columnStrip.textContent = isPassageSide ? '통로' : '작업장';
+        columnStrip.title = isPassageSide ? '통로 방향 안내' : '작업장 방향 안내';
+      }
+      if (columnLayout) {
+        // B/D 열은 통로가 오른쪽에 붙도록 레이아웃 반전
+        columnLayout.classList.toggle('pal-map-layout-reverse', letter === 'B' || letter === 'D');
+      }
       var codeEl = document.getElementById('palMapSelectedCode');
       if (codeEl) codeEl.textContent = '—';
       palBuildColumnView();
@@ -2463,33 +2449,13 @@
       var cr = document.getElementById('palMapColumnRoot');
       if (ov) ov.style.display = 'block';
       if (cr) cr.style.display = 'none';
+      var columnLayout = document.getElementById('palMapColumnLayout');
+      if (columnLayout) {
+        columnLayout.classList.remove('pal-map-layout-reverse');
+      }
       var codeEl = document.getElementById('palMapSelectedCode');
       if (codeEl) codeEl.textContent = '—';
       palBuildOverviewGrid();
-    }
-
-    function palRenderColumnProductList() {
-      var letter = palMapFocusedLetter;
-      var tbody = document.getElementById('palMapColumnProductBody');
-      if (!tbody || !letter) return;
-      var rows = [];
-      palMapInboundList.forEach(function (p) {
-        var key = palNormalizeSectionCode(p.rack_section_code);
-        if (!key || key.charAt(0) !== letter) return;
-        rows.push(p);
-      });
-      rows.sort(function (a, b) {
-        var ka = palNormalizeSectionCode(a.rack_section_code) || '';
-        var kb = palNormalizeSectionCode(b.rack_section_code) || '';
-        return ka.localeCompare(kb, 'en', { numeric: true });
-      });
-      if (rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="pal-map-product-empty">이 열에 섹션 코드가 지정된 보관중 파레트가 없습니다.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = rows.map(function (p) {
-        return '<tr><td>' + palEscapeHtml(p.product_name || '—') + '</td><td>' + palEscapeHtml(palFormatInboundWhen(p)) + '</td><td>' + palEscapeHtml((p.notes != null ? p.notes : '').toString()) + '</td></tr>';
-      }).join('');
     }
 
     async function palLoadSectionMapCounts() {
