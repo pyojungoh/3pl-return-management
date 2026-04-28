@@ -3183,6 +3183,10 @@
           if (filteredPallets.length === 0) {
             tbody.innerHTML = '<tr><td colspan="14" class="no-data">파레트가 없습니다.</td></tr>';
           } else {
+            var palListTodayYmd = (function () {
+              var d = new Date();
+              return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            })();
             tbody.innerHTML = filteredPallets.map(pallet => {
               // 상태 표시: 조회월 있으면 해당 월 말일 기준, 없으면 DB 현재값
               const statusText = palCalcEffectiveStatus(pallet, month || null);
@@ -3200,6 +3204,8 @@
               const kindSwatchHtml = showKindSwatch
                 ? ' <span title="' + palEscapeHtml(kcDisp) + '" style="display:inline-block;width:14px;height:14px;border-radius:3px;background:' + kcDisp + ';border:1px solid #b2bec3;vertical-align:middle;"></span>'
                 : '';
+              var inYmdForQr = (pallet.in_date || '').toString().slice(0, 10);
+              var qrOnlyTrack = inYmdForQr && inYmdForQr >= palListTodayYmd;
               
               return `
               <tr>
@@ -3220,6 +3226,7 @@
                 <td style="font-size: 11px; font-weight: 600;">${(pallet.current_fee || 0).toLocaleString()}원</td>
                 <td>
                   <div style="display: flex; gap: 3px; align-items: center; justify-content: center;">
+                    ${qrOnlyTrack ? '' : `<button class="pal-btn" onclick="palViewQRCode('${pallet.pallet_id}', '${pallet.in_date || ''}')" style="padding: 4px 8px; font-size: 10px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;">QR</button>`}
                     <button class="pal-btn" onclick="palViewTrackQRCode('${pallet.pallet_id}', '${pallet.in_date || ''}')" style="padding: 4px 8px; font-size: 10px; background: #e65100; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;">자체QR</button>
                     ${((pallet.pallet_kind || '') === '아주' || (pallet.pallet_kind || '') === 'kpp')
                       ? `<button class="pal-btn" onclick="palViewVendorReturnQRCode('${pallet.pallet_id}', '${pallet.in_date || ''}')" style="padding: 4px 8px; font-size: 10px; background: #6f42c1; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; line-height: 1.2;">반납QR</button>`
@@ -3610,6 +3617,41 @@
       var palCurrentQRMode = 'storage';
     }
     
+    async function palViewQRCode(palletId, inDate) {
+      try {
+        const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/${palletId}`, {
+          headers: palGetUserHeaders()
+        });
+        const result = await response.json();
+        const palletInfo = result.success && result.data ? result.data : null;
+        palCurrentQRPalletId = palletId;
+        palCurrentQRInDate = palletInfo?.in_date || inDate || '';
+        palCurrentQRDataUrl = null;
+        palCurrentQRMeta = null;
+        palCurrentQRMode = 'storage';
+        const modal = document.getElementById('palQRModal');
+        const titleEl = document.getElementById('palQRTitle');
+        const inDateEl = document.getElementById('palQRInDate');
+        const qrContainer = document.getElementById('palQRCodeContainer');
+        if (modal && titleEl && inDateEl && qrContainer) {
+          titleEl.textContent = `\ud30c\ub808\ud2b8 ID: ${palletId}`;
+          inDateEl.textContent = `\uc785\uace0\uc77c: ${palCurrentQRInDate || '-'}`;
+          qrContainer.innerHTML = '<div style="padding:24px;color:#636e72;">QR \uc0dd\uc131 \uc911...</div>';
+          modal.style.display = 'block';
+          const vendor = palletInfo?.company_name || '';
+          const product = palletInfo?.product_name || '';
+          const qrText = palBuildPalletQrText(palletId, vendor, product);
+          const dataUrl = await palQrTextToDataUrl(qrText, 300);
+          palCurrentQRDataUrl = dataUrl;
+          palCurrentQRMeta = { vendor: vendor, product: product, pallet_kind: palletInfo?.pallet_kind || '' };
+          qrContainer.innerHTML = `<img src="${dataUrl}" alt="QR Code" style="max-width: 300px; width: 100%; height: auto;">`;
+        }
+      } catch (error) {
+        console.error('QR \ucf54\ub4dc \ubaa8\ub2ec \uc5f4\uae30 \uc624\ub958:', error);
+        alert('QR \ucf54\ub4dc\ub97c \ubd88\ub7ec\uc624\ub294 \uc911 \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\ub2c8\ub2e4.');
+      }
+    }
+
     async function palViewVendorReturnQRCode(palletId, inDate) {
       try {
         const response = await fetch(`${PAL_API_BASE_URL}/api/pallets/${palletId}`, {
