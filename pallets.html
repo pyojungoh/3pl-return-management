@@ -845,6 +845,13 @@
       color: #d63031;
       line-height: 1;
     }
+    .pal-map-slot-pass {
+      font-size: 9px;
+      font-weight: 700;
+      color: #7f8c8d;
+      letter-spacing: 0.02em;
+      line-height: 1.1;
+    }
     .pal-map-slot-selected {
       outline: 3px solid #ff6b35;
       outline-offset: -2px;
@@ -887,10 +894,61 @@
       transform: translateY(-1px);
     }
     .pal-map-grid-inner--detail .pal-map-tier {
-      min-height: 40px;
+      min-height: 64px;
     }
     .pal-map-grid-inner--detail .pal-map-cell {
-      padding: 7px;
+      padding: 8px;
+    }
+    .pal-map-grid-inner--detail .pal-map-slot {
+      min-height: 62px;
+      align-items: flex-start;
+      justify-content: flex-start;
+      padding: 5px 5px 6px;
+      gap: 3px;
+      text-align: left;
+    }
+    .pal-map-grid-inner--detail .pal-map-slot-num {
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .pal-map-slot-info-title {
+      display: block;
+      width: 100%;
+      font-size: 10px;
+      font-weight: 700;
+      color: #2d3436;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pal-map-slot-info-sub {
+      display: block;
+      width: 100%;
+      font-size: 9px;
+      color: #636e72;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pal-map-detail-groups {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .pal-map-detail-group {
+      border: 1px solid #dfe6e9;
+      border-radius: 12px;
+      background: #fff;
+      padding: 10px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+    }
+    .pal-map-detail-group-title {
+      margin: 0 0 8px 0;
+      font-size: 13px;
+      font-weight: 800;
+      color: #636e72;
     }
     .pal-map-column-root {
       margin-top: 8px;
@@ -1995,6 +2053,9 @@
     if (typeof palMapCountIndex === 'undefined') {
       var palMapCountIndex = {};
     }
+    if (typeof palMapMetaIndex === 'undefined') {
+      var palMapMetaIndex = {};
+    }
     if (typeof palMapInboundList === 'undefined') {
       var palMapInboundList = [];
     }
@@ -2062,11 +2123,11 @@
       return '—';
     }
 
-    function palHtmlMapSlot(code, slotNum, mode, cnt, blocked, selected) {
+    function palHtmlMapSlot(code, slotNum, mode, cnt, blocked, selected, meta) {
       var halfClass = slotNum === 1 ? 'pal-map-slot-1' : 'pal-map-slot-2';
       var sel = selected ? ' pal-map-slot-selected' : '';
       if (blocked) {
-        return '<button type="button" class="pal-map-slot ' + halfClass + ' pal-map-slot-blocked" disabled aria-label="사용불가" data-code="' + code + '"><span class="pal-map-slot-x">X</span></button>';
+        return '<button type="button" class="pal-map-slot ' + halfClass + ' pal-map-slot-blocked" disabled aria-label="통로(사용불가)" data-code="' + code + '"><span class="pal-map-slot-pass">통로</span></button>';
       }
       if (mode === 'overview') {
         var used = (cnt || 0) > 0;
@@ -2078,17 +2139,31 @@
       var h = '<button type="button" class="pal-map-slot ' + halfClass + sel + '" data-code="' + code + '">';
       h += '<span class="pal-map-slot-num">' + slotNum + '</span>';
       if (cnt) h += '<span class="pal-map-slot-cnt">' + cnt + '</span>';
+      if (mode === 'detail' && meta) {
+        if (meta.product_name) {
+          h += '<span class="pal-map-slot-info-title">' + palEscapeHtml(meta.product_name) + '</span>';
+        }
+        var inLabel = '';
+        if (meta.in_date) inLabel += String(meta.in_date).slice(5, 10);
+        if (meta.notes) {
+          if (inLabel) inLabel += ' · ';
+          inLabel += String(meta.notes).slice(0, 10);
+        }
+        if (inLabel) h += '<span class="pal-map-slot-info-sub">' + palEscapeHtml(inLabel) + '</span>';
+      }
       h += '</button>';
       return h;
     }
 
-    function palBuildMapGrid(containerId, lettersTopToBottom, mode) {
+    function palBuildMapGrid(containerId, lettersTopToBottom, mode, startSlot, endSlot) {
       var container = document.getElementById(containerId);
       if (!container) return;
       var floorsOrder = [3, 2, 1];
+      var sFrom = startSlot || 1;
+      var sTo = endSlot || 15;
       var html = '<div class="pal-map-grid-inner' + (mode === 'detail' ? ' pal-map-grid-inner--detail' : ' pal-map-overview') + '" dir="ltr">';
       html += '<div class="pal-map-corner" aria-hidden="true"></div>';
-      for (var s = 1; s <= 15; s++) {
+      for (var s = sFrom; s <= sTo; s++) {
         html += '<div class="pal-map-slothead">' + s + '</div>';
       }
       html += '<div class="pal-map-floor-colhead" aria-hidden="true">층</div>';
@@ -2096,7 +2171,7 @@
       lettersTopToBottom.forEach(function (c) {
         html += '<div class="pal-map-rowlabel' + (mode === 'overview' ? ' pal-map-rowlabel--clk' : '') + '" data-col="' + c + '"' +
           (mode === 'overview' ? ' role="button" tabindex="0" data-open-letter="' + c + '" title="' + c + '열 확대"' : '') + '>' + c + '</div>';
-        for (var r = 1; r <= 15; r++) {
+        for (var r = sFrom; r <= sTo; r++) {
           html += '<div class="pal-map-cell">';
           for (var ti = 0; ti < floorsOrder.length; ti++) {
             var floor = floorsOrder[ti];
@@ -2108,9 +2183,11 @@
             var cnt2 = blocked2 ? 0 : (palMapCountIndex[code2] || 0);
             var sel1 = palMapSelectedCode === code1;
             var sel2 = palMapSelectedCode === code2;
+            var meta1 = blocked1 ? null : palMapMetaIndex[code1];
+            var meta2 = blocked2 ? null : palMapMetaIndex[code2];
             html += '<div class="pal-map-tier">';
-            html += palHtmlMapSlot(code1, 1, mode, cnt1, blocked1, sel1);
-            html += palHtmlMapSlot(code2, 2, mode, cnt2, blocked2, sel2);
+            html += palHtmlMapSlot(code1, 1, mode, cnt1, blocked1, sel1, meta1);
+            html += palHtmlMapSlot(code2, 2, mode, cnt2, blocked2, sel2, meta2);
             html += '</div>';
           }
           html += '</div>';
@@ -2158,7 +2235,31 @@
 
     function palBuildColumnView() {
       if (!palMapFocusedLetter) return;
-      palBuildMapGrid('palSectionMapColumnGrid', [palMapFocusedLetter], 'detail');
+      var container = document.getElementById('palSectionMapColumnGrid');
+      if (!container) return;
+      var letter = palMapFocusedLetter;
+      var html = '<div class="pal-map-detail-groups">';
+      html += '<div class="pal-map-detail-group"><h5 class="pal-map-detail-group-title">상단 구역 (1~7)</h5>';
+      html += '</div>';
+      html += '<div class="pal-map-detail-group"><h5 class="pal-map-detail-group-title">하단 구역 (8~14)</h5>';
+      html += '</div>';
+      html += '<div class="pal-map-detail-group"><h5 class="pal-map-detail-group-title">끝 구역 (15)</h5>';
+      html += '</div>';
+      html += '</div>';
+      container.innerHTML = html;
+      var groups = container.querySelectorAll('.pal-map-detail-group');
+      if (groups[0]) {
+        groups[0].insertAdjacentHTML('beforeend', '<div id="palSectionMapColumnGridTop"></div>');
+        palBuildMapGrid('palSectionMapColumnGridTop', [letter], 'detail', 1, 7);
+      }
+      if (groups[1]) {
+        groups[1].insertAdjacentHTML('beforeend', '<div id="palSectionMapColumnGridBottom"></div>');
+        palBuildMapGrid('palSectionMapColumnGridBottom', [letter], 'detail', 8, 14);
+      }
+      if (groups[2]) {
+        groups[2].insertAdjacentHTML('beforeend', '<div id="palSectionMapColumnGridTail"></div>');
+        palBuildMapGrid('palSectionMapColumnGridTail', [letter], 'detail', 15, 15);
+      }
       palRenderColumnProductList();
     }
 
@@ -2228,6 +2329,7 @@
         });
         var result = await response.json();
         palMapCountIndex = {};
+        palMapMetaIndex = {};
         palMapInboundList = Array.isArray(result.data) ? result.data : [];
         var n = 0;
         if (result.success && palMapInboundList.length) {
@@ -2237,6 +2339,13 @@
             if (palIsBlockedSectionCode(key)) return;
             n += 1;
             palMapCountIndex[key] = (palMapCountIndex[key] || 0) + 1;
+            if (!palMapMetaIndex[key]) {
+              palMapMetaIndex[key] = {
+                product_name: p.product_name || '',
+                in_date: p.in_date || '',
+                notes: (p.notes != null ? p.notes : '').toString()
+              };
+            }
           });
         }
         if (hint) {
