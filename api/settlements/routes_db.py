@@ -25,6 +25,21 @@ settlements_bp = Blueprint('settlements', __name__, url_prefix='/api/settlements
 RETURN_SETTLEMENT_FEE_PER_CASE = 500
 
 
+def _cursor_row_get(row, key, index=0):
+    """DB 커서 한 줄 접근: PostgreSQL RealDictCursor(dict)는 컬럼명, SQLite는 튜플 인덱스."""
+    if row is None:
+        return None
+    if isinstance(row, dict):
+        if key in row:
+            return row[key]
+        vals = list(row.values())
+        return vals[index] if len(vals) > index else None
+    try:
+        return row[index]
+    except (IndexError, TypeError):
+        return None
+
+
 def get_user_context():
     """사용자 컨텍스트 가져오기 (헤더 또는 세션)"""
     # 헤더에서 사용자 정보 가져오기
@@ -627,11 +642,15 @@ def get_data_sources():
         
         result = {
             'storage_fee': 0,  # 파레트 보관료
+            'storage_fee_matched': False,  # 파레트 정산에서 화주사 매칭 여부
             'special_work_fee': 0,  # 특수작업 비용
+            'special_works_count': 0,  # 특수작업 건수(해당월·화주 집계)
+            'special_work_match_mode': 'none',  # exact | keyword | none
             'error_wrong_delivery_count': 0,  # 오배송 건수
             'error_missing_count': 0,  # 누락 건수
             'error_details': [],  # 오배송/누락 상세
             'collect_on_delivery_fee': 0,  # 착불 택배비
+            'collect_cod_line_count': 0,  # 착불로 집계된 반품 행 수
             'return_count': 0,  # 해당 월 반품 건수 (화주사 매칭)
             'return_fee': 0  # 반품비 (건당 RETURN_SETTLEMENT_FEE_PER_CASE)
         }
@@ -649,6 +668,7 @@ def get_data_sources():
                 for settlement in pallet_settlements:
                     if normalize_company_name(settlement.get('company_name', '') or '') == filter_normalized:
                         result['storage_fee'] = settlement.get('total_fee', 0)
+                        result['storage_fee_matched'] = True
                         break
         except Exception as e:
             print(f'[경고] 파레트 보관료 조회 오류: {e}')
@@ -665,84 +685,95 @@ def get_data_sources():
                     cursor = conn.cursor()
                 
                 try:
-                    # 정산년월을 날짜 범위로 변환 (특수작업 메뉴와 동일한 방식: 해당 월의 마지막 날까지)
                     try:
                         year, month = map(int, settlement_year_month.split('-'))
                         start_date = f'{year}-{month:02d}-01'
-                        # 해당 월의 마지막 날 계산 (특수작업 메뉴와 동일한 방식)
-                        # JavaScript의 new Date(year, month, 0).getDate()와 동일
-                        from datetime import date
                         if month == 12:
-                            # 12월인 경우: date(다음해, 1, 0).day = 올해 12월 마지막 날
                             last_day = date(year + 1, 1, 0).day
                         else:
-                            # 다른 월: date(올해, 다음월, 0).day = 이번 달 마지막 날
                             last_day = date(year, month + 1, 0).day
                         end_date = f'{year}-{month:02d}-{last_day:02d}'
-                        print(f'[디버깅] 날짜 범위 계산: {settlement_year_month} -> {start_date} ~ {end_date}')
                     except (ValueError, AttributeError) as e:
                         print(f'[경고] 정산년월 파싱 오류: {settlement_year_month}, {e}')
                         start_date = None
                         end_date = None
                     
                     if start_date and end_date:
-                        # 디버깅: 조회 전 실제 데이터 확인
                         if USE_POSTGRESQL:
                             cursor.execute('''
-                                SELECT company_name, work_date, total_price
-                                FROM special_works
-                                WHERE company_name = %s 
-                                AND work_date >= %s 
-                                AND work_date <= %s
-                                LIMIT 5
-                            ''', (filter_company_name, start_date, end_date))
-                        else:
-                            cursor.execute('''
-                                SELECT company_name, work_date, total_price
-                                FROM special_works
-                                WHERE company_name = ? 
-                                AND work_date >= ? 
-                                AND work_date <= ?
-                                LIMIT 5
-                            ''', (filter_company_name, start_date, end_date))
-                        debug_rows = cursor.fetchall()
-                        print(f'[디버깅] 특수작업 조회 조건: company_name={filter_company_name}, start_date={start_date}, end_date={end_date}')
-                        print(f'[디버깅] 조회된 데이터 개수: {len(debug_rows)}')
-                        for debug_row in debug_rows:
-                            debug_data = dict(debug_row) if isinstance(debug_row, dict) else {
-                                'company_name': debug_row[0],
-                                'work_date': debug_row[1],
-                                'total_price': debug_row[2]
-                            }
-                            print(f'[디버깅] 발견된 데이터: {debug_data}')
-                        
-                        # 화주사명으로 조회 (정확한 매칭)
-                        if USE_POSTGRESQL:
-                            cursor.execute('''
-                                SELECT COALESCE(SUM(total_price), 0) as total
+                                SELECT COALESCE(SUM(total_price), 0) AS total,
+                                       COUNT(*)::bigint AS work_count
                                 FROM special_works
                                 WHERE company_name = %s
-                                AND work_date >= %s 
-                                AND work_date <= %s
+                                  AND work_date >= %s
+                                  AND work_date <= %s
                             ''', (filter_company_name, start_date, end_date))
                         else:
-                            # SQLite는 기본적으로 대소문자 구분 안 함 (TEXT 컬럼)
                             cursor.execute('''
-                                SELECT COALESCE(SUM(total_price), 0) as total
+                                SELECT COALESCE(SUM(total_price), 0) AS total,
+                                       COUNT(*) AS work_count
                                 FROM special_works
                                 WHERE company_name = ?
-                                AND work_date >= ? 
-                                AND work_date <= ?
+                                  AND work_date >= ?
+                                  AND work_date <= ?
                             ''', (filter_company_name, start_date, end_date))
                         
                         row = cursor.fetchone()
-                        if row:
-                            total = row[0] if isinstance(row, dict) else row[0]
-                            result['special_work_fee'] = int(total or 0)
-                            print(f'[정보] 특수작업 비용 조회 성공: {filter_company_name}, {settlement_year_month}, {result["special_work_fee"]}원')
+                        exact_total = int(_cursor_row_get(row, 'total', 0) or 0)
+                        exact_count = int(_cursor_row_get(row, 'work_count', 1) or 0)
+                        
+                        if exact_count > 0:
+                            result['special_work_fee'] = exact_total
+                            result['special_works_count'] = exact_count
+                            result['special_work_match_mode'] = 'exact'
+                            print(f'[정보] 특수작업 비용(정확매칭): {filter_company_name}, {settlement_year_month}, {exact_total}원, {exact_count}건')
                         else:
-                            result['special_work_fee'] = 0
-                            print(f'[정보] 특수작업 비용 조회 결과 없음: {filter_company_name}, {settlement_year_month}')
+                            try:
+                                company_keywords = get_company_search_keywords(filter_company_name)
+                                if not company_keywords:
+                                    company_keywords = [normalize_company_name(filter_company_name)]
+                            except Exception:
+                                company_keywords = [normalize_company_name(filter_company_name)]
+                            
+                            if USE_POSTGRESQL:
+                                cursor.execute('''
+                                    SELECT company_name, COALESCE(total_price, 0) AS total_price
+                                    FROM special_works
+                                    WHERE work_date >= %s AND work_date <= %s
+                                ''', (start_date, end_date))
+                            else:
+                                cursor.execute('''
+                                    SELECT company_name, COALESCE(total_price, 0) AS total_price
+                                    FROM special_works
+                                    WHERE work_date >= ? AND work_date <= ?
+                                ''', (start_date, end_date))
+                            
+                            fb_rows = cursor.fetchall()
+                            fb_total = 0
+                            fb_count = 0
+                            for sw_row in fb_rows:
+                                cn = (_cursor_row_get(sw_row, 'company_name', 0) or '')
+                                if isinstance(cn, str):
+                                    cn = cn.strip()
+                                else:
+                                    cn = str(cn or '').strip()
+                                tp = _cursor_row_get(sw_row, 'total_price', 1)
+                                if normalize_company_name(cn) not in company_keywords:
+                                    continue
+                                try:
+                                    fb_total += int(float(tp or 0))
+                                except (TypeError, ValueError):
+                                    continue
+                                fb_count += 1
+                            
+                            if fb_count > 0:
+                                result['special_work_fee'] = fb_total
+                                result['special_works_count'] = fb_count
+                                result['special_work_match_mode'] = 'keyword'
+                                print(f'[정보] 특수작업 비용(별칭·정규화 매칭): {filter_company_name}, {settlement_year_month}, {fb_total}원, {fb_count}건')
+                            else:
+                                result['special_work_match_mode'] = 'none'
+                                print(f'[정보] 특수작업 비용 없음: {filter_company_name}, {settlement_year_month}')
                 finally:
                     cursor.close()
                     conn.close()
@@ -750,9 +781,9 @@ def get_data_sources():
             print(f'[경고] 특수작업 비용 조회 오류: {e}')
             import traceback
             traceback.print_exc()
-            # 에러가 발생해도 기본값 0으로 계속 진행
             result['special_work_fee'] = 0
-        
+            result['special_works_count'] = 0
+            result['special_work_match_mode'] = 'none'
         # 3. 오배송/누락 차감 조회 (C/S 메뉴 - customer_service 테이블)
         # C/S 메뉴의 해당 월 데이터와 일치시켜 조회 (월 형식: 2025년01월, 2025년1월)
         try:
@@ -871,6 +902,7 @@ def get_data_sources():
                 
                 rows = cursor.fetchall()
                 total_collect_fee = 0
+                cod_line_count = 0
                 
                 for row in rows:
                     shipping_fee = row.get('shipping_fee', '') if isinstance(row, dict) else row[0]
@@ -887,10 +919,12 @@ def get_data_sources():
                             try:
                                 amount = int(amount_str)
                                 total_collect_fee += amount
+                                cod_line_count += 1
                             except ValueError:
                                 pass
                 
                 result['collect_on_delivery_fee'] = total_collect_fee
+                result['collect_cod_line_count'] = cod_line_count
                 print(f'[정보] 착불 택배비 집계: {filter_company_name}, {settlement_year_month}, {total_collect_fee}원')
             finally:
                 cursor.close()

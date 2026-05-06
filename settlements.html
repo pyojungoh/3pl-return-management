@@ -1079,6 +1079,20 @@
     </div>
   </div>
 
+  <!-- 일괄 불러오기 결과 요약 (관리자 정산 등록) -->
+  <div id="stDataSourcesSummaryModal" class="st-detail-modal-backdrop" onclick="if (event.target === this) stCloseDataSourcesSummaryModal()">
+    <div class="st-detail-modal-panel" onclick="event.stopPropagation()">
+      <div class="st-detail-modal-header">
+        <h2 class="st-detail-modal-title">일괄 불러오기 결과</h2>
+        <button type="button" class="st-detail-modal-close" onclick="stCloseDataSourcesSummaryModal()" aria-label="닫기">×</button>
+      </div>
+      <div id="stDataSourcesSummaryContent" class="st-detail-modal-body"></div>
+      <div class="st-detail-modal-footer">
+        <button type="button" class="st-btn" onclick="stCloseDataSourcesSummaryModal()">확인</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 정산 상태 변경 모달 (관리자 전용 - 독립 모듈: 삭제 시 이 모달만 제거하면 됨) -->
   <div id="stStatusChangeModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10002; overflow-y: auto;" onclick="if(event.target.id === 'stStatusChangeModal') stCloseStatusChangeModal()">
     <div style="max-width: 400px; margin: 50px auto; background: white; border-radius: 14px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);" onclick="event.stopPropagation()">
@@ -2308,7 +2322,108 @@
       }
     }
 
-    // 착불·보관료·특수작업·오배송/누락 일괄 불러오기
+    function stCloseDataSourcesSummaryModal() {
+      const el = document.getElementById('stDataSourcesSummaryModal');
+      if (el) el.classList.remove('st-detail-modal-open');
+    }
+    window.stCloseDataSourcesSummaryModal = stCloseDataSourcesSummaryModal;
+
+    function stShowDataSourcesSummaryModal(innerHtml) {
+      const content = document.getElementById('stDataSourcesSummaryContent');
+      const el = document.getElementById('stDataSourcesSummaryModal');
+      if (content) content.innerHTML = innerHtml;
+      if (el) el.classList.add('st-detail-modal-open');
+    }
+
+    /** API data-sources 응답으로 일괄 불러오기 요약 HTML */
+    function stBuildDataSourcesSummaryHtml(d, companyName, yearMonth) {
+      const fmt = (n) => (Number(n) || 0).toLocaleString();
+      const collect = d.collect_on_delivery_fee || 0;
+      const codLines = d.collect_cod_line_count || 0;
+      const retFee = d.return_fee || 0;
+      const retCnt = d.return_count || 0;
+      const stor = d.storage_fee || 0;
+      const storMatched = !!d.storage_fee_matched;
+      const spec = d.special_work_fee || 0;
+      const specCnt = d.special_works_count || 0;
+      const specMode = d.special_work_match_mode || 'none';
+      const wrong = d.error_wrong_delivery_count || 0;
+      const miss = d.error_missing_count || 0;
+
+      let specNote = '해당 월 집계된 특수작업 없음';
+      if (specMode === 'exact' && specCnt > 0) {
+        specNote = `작업 ${specCnt}건 합산 (DB 화주명 일치)`;
+      } else if (specMode === 'keyword' && specCnt > 0) {
+        specNote = `작업 ${specCnt}건 합산 (별칭·정규화 매칭)`;
+      } else if (spec > 0) {
+        specNote = specCnt > 0 ? `작업 ${specCnt}건 합산` : '금액 반영됨 (구버전 API는 건수 미제공)';
+      }
+
+      let storNote = storMatched
+        ? '파레트 정산에서 화주·정산월 매칭됨'
+        : '파레트 정산에서 해당 화주·정산월 행 없음 (보관료 0일 수 있음)';
+
+      const collectNote = collect > 0
+        ? `착불 금액 합산 (${codLines}건)`
+        : '착불 택배비 집계 없음 (해당 월 반품 중 착불 미표기 또는 0원)';
+
+      const retNote = retCnt > 0 ? `반품 ${retCnt}건 × 500원` : '해당 월 반품 건 없음 (키워드 매칭 기준)';
+
+      const errNote = (wrong + miss) > 0
+        ? `C/S 기준 오배송·누락 건수 (차감액은 별도 입력)`
+        : '해당 월 오배송·누락 건 없음 (키워드 매칭 기준)';
+
+      const rowStyle = 'border-bottom:1px solid #dfe6e9;';
+      const thStyle = 'text-align:left; padding:10px 8px; font-weight:700; color:#2d3436; background:#f1f2f6;';
+      const tdNStyle = 'padding:10px 8px; text-align:right; font-family:monospace; font-size:14px;';
+      const tdSStyle = 'padding:10px 8px; font-size:13px; color:#636e72;';
+
+      return `
+        <div class="st-detail-doc" style="margin-top:12px;">
+          <div style="padding:14px 16px; border-bottom:1px solid #dfe6e9; background:#fafbfc;">
+            <div style="font-size:15px; font-weight:700; color:#2d3436;">${yearMonth} · ${companyName}</div>
+            <div style="font-size:12px; color:#636e72; margin-top:4px;">아래 금액이 폼에 반영되었습니다. 0원인 항목은 소스에 데이터가 없거나 집계 결과가 0인 경우입니다.</div>
+          </div>
+          <table style="width:100%; border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th style="${thStyle}">항목</th>
+                <th style="${thStyle}; text-align:right; width:120px;">금액</th>
+                <th style="${thStyle}">상태·비고</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="${rowStyle}">
+                <td style="padding:10px 8px;">착불 택배비</td>
+                <td style="${tdNStyle}">${fmt(collect)}원</td>
+                <td style="${tdSStyle}">${collectNote}</td>
+              </tr>
+              <tr style="${rowStyle}">
+                <td style="padding:10px 8px;">반품비</td>
+                <td style="${tdNStyle}">${fmt(retFee)}원</td>
+                <td style="${tdSStyle}">${retNote}</td>
+              </tr>
+              <tr style="${rowStyle}">
+                <td style="padding:10px 8px;">보관료</td>
+                <td style="${tdNStyle}">${fmt(stor)}원</td>
+                <td style="${tdSStyle}">${storNote}</td>
+              </tr>
+              <tr style="${rowStyle}">
+                <td style="padding:10px 8px;">특수작업</td>
+                <td style="${tdNStyle}">${fmt(spec)}원</td>
+                <td style="${tdSStyle}">${specNote}</td>
+              </tr>
+              <tr style="${rowStyle}">
+                <td style="padding:10px 8px;">오배송 / 누락</td>
+                <td style="${tdNStyle}">—</td>
+                <td style="${tdSStyle}">오배송 ${wrong}건, 누락 ${miss}건 · ${errNote}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    // 착불·보관료·특수작업·오배송/누락 일괄 불러오기 (완료 후 요약 모달 항상 표시)
     function stLoadAllDataSources() {
       const companyInput = document.getElementById('stSettlementCompanyInput')?.value?.trim();
       const companyNameHidden = document.getElementById('stSettlementCompanyName')?.value?.trim();
@@ -2364,6 +2479,10 @@
             if (countsEl) countsEl.textContent = `오배송: ${wrongCount}건, 누락: ${missingCount}건`;
             
             stCalculateTotal();
+
+            stShowDataSourcesSummaryModal(stBuildDataSourcesSummaryHtml(d, companyName, yearMonth));
+          } else {
+            alert(data.message || '데이터를 불러올 수 없습니다.');
           }
         })
         .catch(error => {
