@@ -1,0 +1,116 @@
+---
+description: Google OAuth(Drive)·정산 업로드 환경변수·리프레시 실패 대응·한글 GCP 안내
+globs: api/uploads/oauth_drive.py,extract_oauth_token.py,renew_google_oauth_token.py,check_oauth_account.py,api/settlements/routes_db.py,settlements.html
+alwaysApply: false
+---
+
+# Google OAuth (Drive) · Vercel · 정산 파일 업로드 운영 노트
+
+정산 등록 시 작업비·입출고비·택배비 파일은 `api/uploads/oauth_drive.py`의 **사용자 OAuth**로 Google Drive에 업로드된다. **서비스 계정 JSON 키**와 **OAuth 데스크톱 클라이언트**는 서로 다른 파일이다.
+
+## 두 종류 구분 (혼동 금지)
+
+| 구분 | 어디서 받나 | 환경 변수 예 | `refresh_token` |
+|------|-------------|--------------|-----------------|
+| **OAuth 클라이언트** (데스크톱 앱) | API 및 서비스 → **사용자 인증 정보** → OAuth 2.0 클라이언트 ID | `GOOGLE_OAUTH_CREDENTIALS_JSON` (= `credentials.json` 전체) | 없음 (여기엔 `client_secret`만 있음) |
+| **사용자 토큰** (브라우저 로그인 후 추출) | 로컬 스크립트로 생성 | `GOOGLE_OAUTH_TOKEN_JSON` | **반드시 포함**해야 장기 자동 갱신 가능 |
+| **서비스 계정 키** | IAM → 서비스 계정 → **키** | `GOOGLE_SERVICE_ACCOUNT_JSON` 등 (별 경로) | 없음 (JWT로 액세스 토큰 발급) |
+
+서비스 계정 JSON에는 `"type": "service_account"`, `private_key`가 있다. OAuth 클라이언트 JSON에는 `"installed"` 또는 `"web"`과 `client_secret`이 있고 **`private_key`는 없다**.
+
+---
+
+## 현재 설정 요약 (아키텍처)
+
+- **코드:** `get_credentials()`가 **`GOOGLE_OAUTH_TOKEN_JSON`** 우선 로드 → 만료 시 **`refresh_token`**으로 `creds.refresh(Request())` (최대 3회).
+- **Vercel 필수:**  
+  - `GOOGLE_OAUTH_TOKEN_JSON` … `extract_oauth_token.py` 출력 JSON **전체** (`refresh_token` 필수).  
+  - `GOOGLE_OAUTH_CREDENTIALS_JSON` … OAuth 데스크톱 **`credentials.json` 전체** (토큰과 **동일 OAuth 클라이언트**여야 함).
+- **변경 후:** 반드시 **재배포(Redeploy)**. 로컬만 `.env`면 프로덕션에는 적용 안 됨.
+- **로컬 발급 순서:** `renew_google_oauth_token.py` → `token.pickle` → `extract_oauth_token.py` → JSON 복사 → Vercel 반영.
+
+---
+
+## 한글 Google Cloud Console — OAuth 데스크톱 클라이언트 받기
+
+프로젝트 예: `composite-dream-477907-c5` (상단 프로젝트 선택 확인).
+
+1. [Google Cloud Console](https://console.cloud.google.com/) 접속.
+2. 상단에서 프로젝트 **`composite-dream-477907-c5`** 선택.
+3. 왼쪽 **☰ 메뉴** → **API 및 서비스** → **사용자 인증 정보**.  
+   직결 URL 예: `https://console.cloud.google.com/apis/credentials?project=composite-dream-477907-c5`
+4. **OAuth 동의 화면**을 한 번도 안 만들었다면: **API 및 서비스** → **OAuth 동의 화면**에서 앱 정보 저장 후 다시 3번으로.
+5. **사용자 인증 정보** 페이지에서 **OAuth 2.0 클라이언트 ID** 목록 확인.
+   - **유형이 데스크톱 앱**인 클라이언트 선택 → 상세에서 필요 시 **JSON 다운로드**.  
+   - 새로 만들기: **+ 사용자 인증 정보 만들기** → **OAuth 클라이언트 ID** → 애플리케이션 유형 **데스크톱 앱** → 만들기 → JSON 다운로드 또는 나중에 목록에서 다운로드.
+6. **Google 인증 플랫폼**(신 UI)에서는 클라이언트 편집 화면에 JSON이 안 보일 수 있음 → **클라이언트 보안 비밀번호 추가**로 새 시크릿을 한 번 발급·복사 후, 아래 형식으로 `credentials.json` 수동 작성 가능 (값은 콘솔에서 복사):
+
+```json
+{
+  "installed": {
+    "client_id": "<콘솔에 표시된 클라이언트 ID>",
+    "project_id": "composite-dream-477907-c5",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_secret": "<새로 발급받은 클라이언트 보안 비밀번호>",
+    "redirect_uris": ["http://localhost"]
+  }
+}
+```
+
+7. 받은 파일을 저장소 루트 **`credentials.json`** 으로 두고 Git에 커밋하지 않는다 (`.gitignore` 유지).
+
+---
+
+## 로컬에서 리프레시 토큰·Vercel용 JSON 만들기
+
+1. 루트에 **`credentials.json`** (위 OAuth 클라이언트).
+2. `.env`에 예전 `GOOGLE_OAUTH_TOKEN_JSON`이 있으면 **재발급 동안 주석·삭제** 권장 (로컬이 구 토큰 우선할 수 있음).
+3. `python renew_google_oauth_token.py` … 브라우저 로그인 → **`token.pickle`** 생성.
+4. `python extract_oauth_token.py` … 출력 JSON 전체 복사 → **`refresh_token` 키 존재 확인** (`null`이면 안 됨).
+5. Vercel **Environment Variables**:  
+   `GOOGLE_OAUTH_TOKEN_JSON` = 위 JSON 전체,  
+   `GOOGLE_OAUTH_CREDENTIALS_JSON` = `credentials.json` 전체.  
+6. **재배포.**
+
+---
+
+## 리프레시가 안 될 때 (`invalid_grant` 등) 대처 순서
+
+1. **증상:** 업로드 실패 메시지에 `invalid_grant`, 또는 로그에 토큰 갱신 실패.
+2. **원인 후보:** 리프레시 토큰 폐기, **토큰 JSON과 `GOOGLE_OAUTH_CREDENTIALS_JSON`의 클라이언트 불일치**, 클라이언트 보안 비밀 재발급 후 Vercel 미반영, 구글 계정에서 앱 연결 해제.
+3. **조치:**  
+   - 위 **「로컬에서 리프레시 토큰…」** 절차를 **처음부터** 다시 (`renew` → `extract` → Vercel 두 변수 모두 같은 클라이언트 기준으로 갱신 → 재배포).  
+   - `credentials.json`과 Vercel의 `GOOGLE_OAUTH_CREDENTIALS_JSON`이 **동일 파일**인지 확인.
+4. **검증:** 로컬에서 두 변수를 주입한 뒤 `python check_oauth_account.py` → 이메일·이름 출력되면 토큰+클라이언트 짝이 살아 있는 것.  
+   PowerShell 예:  
+   `$env:GOOGLE_OAUTH_TOKEN_JSON = Get-Content -Raw .\oauth_token_for_vercel.json`  
+   `$env:GOOGLE_OAUTH_CREDENTIALS_JSON = Get-Content -Raw .\credentials.json`  
+   `python check_oauth_account.py`
+
+---
+
+## 자동 갱신이 “매달 수동 작업”을 없애는 조건
+
+- `GOOGLE_OAUTH_TOKEN_JSON`에 **`refresh_token` 문자열이 있는 상태**로 유지.
+- **`GOOGLE_OAUTH_CREDENTIALS_JSON`** 이 같은 OAuth 클라이언트 (`client_id` / `client_secret` 일치).
+- 액세스 토큰은 짧게 만료되어도 서버가 리프레시로 갱신; **환경 변수에 새 액세스 토큰을 다시 넣을 필요는 없음** (저장소 설계상).
+
+---
+
+## 보안
+
+- `client_secret`·전체 토큰 JSON을 채팅·스크린샷에 노출하지 않는다. 노출 시 GCP에서 **클라이언트 보안 비밀번호** 재발급 후 Vercel·`credentials.json` 동기화.
+- `credentials.json`·`token.pickle`·`oauth_token_for_vercel.json` 은 Git에 올리지 않는다.
+
+---
+
+## 관련 파일
+
+| 파일 | 역할 |
+|------|------|
+| `api/uploads/oauth_drive.py` | `get_credentials()`, Drive 업로드, Vercel용 환경 변수 로드 |
+| `renew_google_oauth_token.py` | 로컬 브라우저 OAuth → `token.pickle` |
+| `extract_oauth_token.py` | `token.pickle` → Vercel용 JSON 출력 |
+| `check_oauth_account.py` | 토큰으로 연결된 Google 계정 이메일 확인 |

@@ -31,6 +31,13 @@ def extract_token():
             'client_secret': creds.client_secret,
             'scopes': list(creds.scopes) if creds.scopes else []
         }
+
+        if not creds.refresh_token:
+            print("\n" + "!" * 60)
+            print("⚠️  경고: refresh_token 이 없습니다. Vercel에서는 곧 invalid_grant 가 납니다.")
+            print("   조치: python renew_google_oauth_token.py 로 다시 로그인한 뒤 이 스크립트를 다시 실행하세요.")
+            print("   (Google 계정 → 보안 → 타사 앱 연결 에서 해당 앱 제거 후 재시도하면 refresh_token이 나오는 경우가 많습니다.)")
+            print("!" * 60 + "\n")
         
         # JSON으로 변환
         token_json = json.dumps(token_dict, indent=2)

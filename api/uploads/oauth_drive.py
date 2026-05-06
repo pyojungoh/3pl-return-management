@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import List, Optional
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
+from google.auth.exceptions import RefreshError
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
@@ -30,6 +31,69 @@ CREDENTIALS_FILE = os.path.join(os.path.dirname(__file__), '../../credentials.js
 # 서버리스 환경: 한 번 갱신된 토큰 캐시 (동일 인스턴스 내 순차 요청에서 재사용)
 _oauth_creds_cache = None
 _last_oauth_error = None  # 마지막 OAuth 오류 (사용자 안내용)
+
+# 로컬 브라우저 인증 시 refresh_token 발급을 확실히 받기 위한 OAuth 파라미터
+_OAUTH_AUTH_URL_KWARGS = {'access_type': 'offline', 'prompt': 'consent'}
+
+
+def _format_oauth_refresh_failure_message(exc: Exception) -> str:
+    """토큰 갱신 실패 시 사용자·운영자용 안내 (invalid_grant 등)."""
+    raw = str(exc).lower()
+    if 'invalid_grant' in raw:
+        return (
+            "invalid_grant: Google이 리프레시 토큰 교환을 거부했습니다.\n"
+            "가능한 원인:\n"
+            "  1) GOOGLE_OAUTH_TOKEN_JSON의 refresh_token이 폐기됨 (앱 연결 해제, 비밀번호 변경, 오래된 토큰)\n"
+            "  2) GOOGLE_OAUTH_CREDENTIALS_JSON과 토큰이 서로 다른 OAuth 클라이언트(client_id/secret 불일치)\n"
+            "  3) Google Cloud Console에서 해당 OAuth 클라이언트의 비밀번호를 재생성함\n\n"
+            "조치 (로컬 PC에서):\n"
+            "  A) 프로젝트 루트에 credentials.json이 **지금 Vercel에 넣은 GOOGLE_OAUTH_CREDENTIALS_JSON과 동일한 클라이언트**인지 확인\n"
+            "  B) .env에 GOOGLE_OAUTH_TOKEN_JSON이 있으면 **잠시 제거 또는 주석** (로컬이 예전 토큰을 쓰는 것 방지)\n"
+            "  C) python renew_google_oauth_token.py 실행 → 브라우저 로그인 → token.pickle 생성\n"
+            "  D) python extract_oauth_token.py 실행 → 출력 JSON 전체를 Vercel GOOGLE_OAUTH_TOKEN_JSON에 붙여넣기\n"
+            "  E) GOOGLE_OAUTH_CREDENTIALS_JSON도 **같은 credentials.json** 내용으로 맞춘 뒤 재배포\n\n"
+            f"(원본 오류: {exc})"
+        )
+    return str(exc)
+
+
+def run_local_oauth_interactive_and_pickle() -> Credentials:
+    """
+    로컬에서만 실행. credentials.json으로 브라우저 로그인 후 token.pickle 저장.
+    Vercel용 JSON은 extract_oauth_token.py 로 추출한다.
+    """
+    if os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV'):
+        raise RuntimeError('Vercel 환경에서는 실행할 수 없습니다. 로컬 PC에서 실행하세요.')
+    if not os.path.exists(CREDENTIALS_FILE):
+        raise FileNotFoundError(
+            f'credentials.json이 없습니다: {CREDENTIALS_FILE}\n'
+            'Google Cloud Console → APIs & Services → Credentials 에서 OAuth 클라이언트 JSON을 받아 '
+            '프로젝트 루트에 credentials.json 으로 저장하세요.'
+        )
+    with open(CREDENTIALS_FILE, 'r', encoding='utf-8') as f:
+        creds_data = json.load(f)
+    if 'installed' not in creds_data and 'web' not in creds_data:
+        raise ValueError(
+            "credentials.json에 'installed' 또는 'web' 키가 있어야 합니다."
+        )
+    print('OAuth 브라우저 창이 열리면 동일 Google 계정으로 로그인하고 권한을 허용하세요.')
+    flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+    creds = flow.run_local_server(
+        port=0,
+        open_browser=True,
+        **_OAUTH_AUTH_URL_KWARGS,
+    )
+    if not getattr(creds, 'refresh_token', None):
+        print(
+            '\n⚠️ 경고: refresh_token이 비어 있습니다. '
+            '다른 Google 계정으로 이미 승인된 적이 있으면 prompt=consent가 무시될 수 있습니다. '
+            'Google 계정 → 보안 → 타사 앱 연결 에서 해당 앱을 제거한 뒤 다시 실행해 보세요.\n'
+        )
+    os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
+    with open(TOKEN_FILE, 'wb') as token:
+        pickle.dump(creds, token)
+    print(f'✅ token.pickle 저장 완료: {TOKEN_FILE}')
+    return creds
 
 
 def get_credentials():
@@ -112,12 +176,22 @@ def get_credentials():
                             time.sleep(1)
                 if refresh_error:
                     creds = None
-                    _last_oauth_error = str(refresh_error)
+                    _last_oauth_error = _format_oauth_refresh_failure_message(refresh_error)
             
             if creds and creds.valid:
                 _oauth_creds_cache = creds
                 _last_oauth_error = None
                 return creds
+
+            # env에서 읽었으나 유효하지 않음 (리프레시 실패·refresh_token 없음 등)
+            if creds is not None and not creds.valid:
+                if not creds.refresh_token:
+                    _last_oauth_error = (
+                        'GOOGLE_OAUTH_TOKEN_JSON에 refresh_token이 없습니다. '
+                        '로컬에서 python renew_google_oauth_token.py 실행 후 '
+                        'python extract_oauth_token.py 로 출력된 JSON 전체를 Vercel에 설정하세요.'
+                    )
+                creds = None
         except Exception as e:
             _last_oauth_error = str(e)
             print(f"⚠️ 환경 변수에서 토큰 로드 실패: {e}")
@@ -176,6 +250,12 @@ def get_credentials():
                 # 갱신된 토큰 저장
                 with open(TOKEN_FILE, 'wb') as token:
                     pickle.dump(creds, token)
+            except RefreshError as e:
+                print(f"❌ 토큰 갱신 실패: {e}")
+                print(_format_oauth_refresh_failure_message(e))
+                import traceback
+                traceback.print_exc()
+                creds = None
             except Exception as e:
                 print(f"❌ 토큰 갱신 실패: {e}")
                 import traceback
@@ -190,16 +270,17 @@ def get_credentials():
                 print(f"[디버깅] Vercel 환경에서 토큰 없음 - 예외 발생")
                 err_detail = ""
                 if _last_oauth_error:
-                    err_detail = f"\n\n상세 오류: {_last_oauth_error}"
+                    err_detail = f"\n\n상세:\n{_last_oauth_error}"
                 raise Exception(
                     f"Vercel 배포 환경에서 OAuth 2.0 토큰을 가져올 수 없습니다.\n\n"
                     f"환경 변수 확인:\n"
                     f"- GOOGLE_OAUTH_TOKEN_JSON: {'✅ 설정됨' if oauth_token_json else '❌ 없음'}\n"
                     f"- GOOGLE_OAUTH_CREDENTIALS_JSON: {'✅ 설정됨' if oauth_credentials_json else '❌ 없음'}\n\n"
-                    f"토큰이 만료되었을 수 있습니다. 로컬에서 다시 인증 후:\n"
-                    f"1. python extract_oauth_token.py 실행\n"
-                    f"2. 출력된 JSON 전체를 Vercel 환경 변수 GOOGLE_OAUTH_TOKEN_JSON에 설정\n"
-                    f"3. 재배포{err_detail}"
+                    f"invalid_grant 등으로 갱신이 막힌 경우, 로컬 PC에서 **같은** credentials.json으로 다시 발급하세요:\n"
+                    f"1. python renew_google_oauth_token.py  (브라우저 로그인 → token.pickle)\n"
+                    f"2. python extract_oauth_token.py  (출력 JSON → Vercel GOOGLE_OAUTH_TOKEN_JSON)\n"
+                    f"3. Vercel의 GOOGLE_OAUTH_CREDENTIALS_JSON이 위 credentials.json과 동일한지 확인 후 재배포\n"
+                    f"{err_detail}"
                 )
             if not os.path.exists(CREDENTIALS_FILE):
                 raise Exception(
@@ -236,7 +317,11 @@ def get_credentials():
                     f"(현재 '웹 애플리케이션' 타입은 redirect_uri_mismatch 오류가 발생할 수 있습니다)"
                 )
             
-            creds = flow.run_local_server(port=0, open_browser=True)
+            creds = flow.run_local_server(
+                port=0,
+                open_browser=True,
+                **_OAUTH_AUTH_URL_KWARGS,
+            )
             print("✅ OAuth 2.0 인증 완료")
             
             # 토큰 저장

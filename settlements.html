@@ -801,7 +801,7 @@
       </button>
       <div id="stAdminSettlementForm" class="st-toggle-content">
         <h3 style="margin: 0 0 20px 0; color: #ff6b35; font-weight: 700;">정산 등록</h3>
-        <form id="stSettlementForm" onsubmit="stAdminHandleSettlementSubmit(event)">
+        <form id="stSettlementForm" onsubmit="event.preventDefault(); return false;">
           <input type="hidden" id="stSettlementId">
           
           <!-- 상단: 화주사, 정산년월, 일괄 불러오기 -->
@@ -963,7 +963,7 @@
           </div>
           
           <div style="display: flex; gap: 12px; margin-top: 24px; padding-top: 24px; border-top: 2px solid #ffeaa7;">
-            <button type="submit" class="st-btn">💾 저장</button>
+            <button type="button" class="st-btn" id="stSettlementSaveBtn" onclick="stAdminHandleSettlementSubmit(event)">💾 저장</button>
             <button type="button" class="st-btn-secondary" onclick="stAdminResetSettlementForm()">🔄 초기화</button>
           </div>
         </form>
