@@ -1223,6 +1223,23 @@
       });
   }
 
+  function sortCsListPinHold(list, baseList) {
+    if (!list || list.length < 2) return list || [];
+    var order = {};
+    (baseList || list).forEach(function (item, idx) { order[item.id] = idx; });
+    var holds = [];
+    var rest = [];
+    list.forEach(function (item) {
+      if ((item.status || '') === '보류') holds.push(item);
+      else rest.push(item);
+    });
+    if (!holds.length) return list;
+    var cmp = function (a, b) { return (order[a.id] || 0) - (order[b.id] || 0); };
+    holds.sort(cmp);
+    rest.sort(cmp);
+    return holds.concat(rest);
+  }
+
   function filteredList() {
     var arr = state.csList.slice();
     if (state.filter === 'pending') {
@@ -1241,6 +1258,9 @@
     var listEl = $('mopCsList');
     if (!listEl) return;
     var rows = filteredList();
+    if (state.filter === 'all') {
+      rows = sortCsListPinHold(rows, state.csList);
+    }
     if (!rows.length) {
       listEl.innerHTML = '<div class="mop-empty">표시할 C/S가 없습니다.</div>';
       return;
@@ -1259,8 +1279,9 @@
       if (comp) metaParts.push(comp);
       if (dt) metaParts.push(dt);
       var metaLine = metaParts.join(' · ');
+      var holdClass = st === '보류' ? ' mop-card--hold' : '';
       return (
-        '<button type="button" class="mop-card" data-csid="' + Number(cs.id) + '">' +
+        '<button type="button" class="mop-card' + holdClass + '" data-csid="' + Number(cs.id) + '">' +
         '<div class="mop-card__row">' +
         '<div class="mop-card__row-left">' +
         '<span class="' + issueTypeBadgeClass(cs.issue_type) + '">' + type + '</span>' +
