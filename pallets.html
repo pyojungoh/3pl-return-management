@@ -1638,6 +1638,9 @@
           <div class="pal-filter-group pal-admin-only">
             <button type="button" class="pal-btn" onclick="palPrintSelectedQrLabels()" style="height: 40px; background: #17a2b8; color: white;">🖨️ 선택 QR 인쇄</button>
           </div>
+          <div class="pal-filter-group pal-admin-only">
+            <button type="button" class="pal-btn" onclick="palPrintSelectedVendorReturnQrs('pallets')" style="height: 40px; background: #6f42c1; color: white;">🖨️ 선택 반납QR 인쇄</button>
+          </div>
         </div>
         
         <div class="pal-table-container">
@@ -1704,7 +1707,7 @@
             <button type="button" class="pal-btn" onclick="palLoadVendorReturnList()" style="height: 40px;">조회</button>
           </div>
           <div class="pal-filter-group">
-            <button type="button" class="pal-btn" onclick="palPrintSelectedVendorReturnQrs()" style="height: 40px; background: #6f42c1; color: #fff;">🖨️ 선택 반납QR 인쇄</button>
+            <button type="button" class="pal-btn" onclick="palPrintSelectedVendorReturnQrs('collect')" style="height: 40px; background: #6f42c1; color: #fff;">🖨️ 선택 반납QR 인쇄</button>
           </div>
         </div>
         <div class="pal-table-container">
@@ -3001,11 +3004,9 @@
     }
 
     function palBuildVendorReturnQrText(palletId, vendor, product, palletKind) {
-      var v = (vendor || '').replace(/\|/g, ' ');
-      var p = (product || '').replace(/\|/g, ' ');
-      var k = (palletKind || '').replace(/\|/g, ' ');
-      // 보관종료 QR과 완전히 분리된 반납 전용 QR 포맷
-      return 'PALLET_RETURN|' + String(palletId || '') + '|' + v + '|' + p + '|' + k;
+      // qr_photo_return 스캔은 pallet_id(parts[1])만 사용. vendor/product/kind는 라벨 HTML에 표시.
+      var pid = String(palletId || '').trim().replace(/\|/g, ' ');
+      return 'PALLET_RETURN|' + pid;
     }
 
     /** 모바일 자체 추적 QR (랙 섹션·사용중·보관종료) — 구글폼형과 병행 */
@@ -4354,8 +4355,13 @@
       palUpdateVendorReturnSelection();
     }
 
-    async function palPrintSelectedVendorReturnQrs() {
-      const ids = Array.from(document.querySelectorAll('.pal-vr-checkbox:checked'))
+    async function palPrintSelectedVendorReturnQrs(source) {
+      if (palCurrentRole !== '\uad00\ub9ac\uc790') {
+        alert('\uad00\ub9ac\uc790\ub9cc \uc0ac\uc6a9\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4.');
+        return;
+      }
+      var checkboxSel = (source === 'pallets') ? '.pal-pallet-checkbox:checked' : '.pal-vr-checkbox:checked';
+      const ids = Array.from(document.querySelectorAll(checkboxSel))
         .map(function (cb) { return cb.getAttribute('data-pallet-id'); })
         .filter(Boolean);
       if (ids.length === 0) {
@@ -4366,6 +4372,7 @@
         if (!confirm(ids.length + '건입니다. 계속하시겠습니까?')) return;
       }
       const parts = [];
+      var skipped = 0;
       try {
         for (let i = 0; i < ids.length; i++) {
           const pid = ids[i];
@@ -4374,9 +4381,12 @@
           if (!json.success || !json.data) continue;
           const row = json.data;
           const kind = (row.pallet_kind || '').trim();
-          if (!(kind === '아주' || kind === 'kpp')) continue;
+          if (!(kind === '아주' || kind === 'kpp')) {
+            skipped++;
+            continue;
+          }
           const qrText = palBuildVendorReturnQrText(row.pallet_id, row.company_name || '', row.product_name || '', kind);
-          const dataUrl = await palQrTextToDataUrl(qrText, palCurrentQRMode === 'vendor_return' ? 124 : 140);
+          const dataUrl = await palQrTextToDataUrl(qrText, 150);
           const inStr = palFormatPalletInDateForLabel(row.in_date || '');
           parts.push(palBuildSingleLabelHtml(row.pallet_id, row.product_name, row.company_name, inStr, dataUrl, {
             mode: 'vendor_return',
@@ -4384,8 +4394,11 @@
           }));
         }
         if (parts.length === 0) {
-          alert('인쇄 가능한 아주/kpp 파레트가 없습니다.');
+          alert('인쇄 가능한 아주/kpp 파레트가 없습니다.' + (skipped > 0 ? '\n(선택 ' + ids.length + '건 중 아주/kpp가 아닌 항목은 제외됩니다.)' : ''));
           return;
+        }
+        if (skipped > 0) {
+          if (!confirm('선택 ' + ids.length + '건 중 아주/kpp ' + parts.length + '건만 인쇄합니다. (제외 ' + skipped + '건) 계속할까요?')) return;
         }
         await palExecuteRollQrPrint(parts.join(''));
       } catch (e) {
