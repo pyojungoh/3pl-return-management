@@ -18,6 +18,7 @@
   
   <!-- jsQR 라이브러리 (QR 코드 스캔용) -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <link rel="stylesheet" href="/static/css/mobile-ops-portal.css?v=mop20260522">
   
   <!-- 스타일 모듈 (인라인) -->
   <style>
@@ -35,6 +36,23 @@
   --radius: 8px;
   --gap: 20px;
   --thumb: clamp(100px, 30vw, 150px);
+  --qr-nav-offset: calc(env(safe-area-inset-top, 0px) + var(--mop-touch, 48px));
+}
+
+/* QR 페이지 상단 탭 (C/S·특수작업·QR) */
+.qr-portal-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 350;
+  padding-top: env(safe-area-inset-top, 0px);
+  background: var(--mop-surface, #1a222c);
+  border-bottom: 1px solid var(--mop-border, rgba(255, 255, 255, 0.08));
+}
+
+.qr-portal-nav .mop-tab--active {
+  cursor: default;
 }
 
 * {
@@ -60,7 +78,10 @@ body {
 /* ========= QR 스캔 모드 ========= */
 .qr-scan-mode {
   position: fixed;
-  inset: 0;
+  top: var(--qr-nav-offset);
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -152,7 +173,10 @@ body {
 /* ========= 사진 촬영 모드 ========= */
 .photo-mode {
   position: fixed;
-  inset: 0;
+  top: var(--qr-nav-offset);
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: none;
   flex-direction: column;
   background: #000;
@@ -603,6 +627,12 @@ body {
   </style>
 </head>
 <body>
+  <nav class="qr-portal-nav mop-tabs" aria-label="주 메뉴">
+    <a href="/mobile" class="mop-tab mop-tab--link">C/S</a>
+    <a href="/mobile?pane=sw" class="mop-tab mop-tab--link">특수작업</a>
+    <span class="mop-tab mop-tab--active" aria-current="page">QR</span>
+  </nav>
+
   <!-- QR 스캔 모드 -->
   <div class="qr-scan-mode">
     <div class="qr-video-container">

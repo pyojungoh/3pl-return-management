@@ -146,6 +146,7 @@
     mopPane: 'cs',
     swList: [],
     swWorkTypes: [],
+    swCompanyNames: [],
     swModalPhotos: [],
     swDetailIds: [],
     swDetailLines: [],
@@ -237,6 +238,16 @@
     add(a);
     add(b);
     return Object.keys(set).join(',');
+  }
+
+  function getInitialMopPane() {
+    try {
+      var params = new URLSearchParams(global.location.search || '');
+      var pane = (params.get('pane') || '').trim().toLowerCase();
+      return pane === 'sw' ? 'sw' : 'cs';
+    } catch (e) {
+      return 'cs';
+    }
   }
 
   function setMopPane(pane) {
@@ -490,27 +501,191 @@
       });
   }
 
-  function fillSwModalCompanySelect() {
-    var dst = $('mopSwFormCompany');
-    var src = $('mopCompany');
-    if (!dst || !src) return;
-    dst.innerHTML = '';
-    for (var j = 0; j < src.options.length; j++) {
-      var o = src.options[j];
-      if (!o.value) continue;
-      var n = document.createElement('option');
-      n.value = o.value;
-      n.textContent = o.textContent;
-      dst.appendChild(n);
+  var swCompanyPickerBound = false;
+  var swCompanyPickerActiveIdx = -1;
+
+  var CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+
+  function getChosung(text) {
+    if (!text) return '';
+    var result = '';
+    for (var i = 0; i < text.length; i++) {
+      var code = text.charCodeAt(i);
+      if (code >= 0xAC00 && code <= 0xD7A3) {
+        result += CHOSUNG_LIST[Math.floor((code - 0xAC00) / 588)];
+      } else {
+        result += text.charAt(i);
+      }
     }
-    if (!dst.options.length) {
-      var ph = document.createElement('option');
-      ph.value = '';
-      ph.textContent = '화주사 없음';
-      dst.appendChild(ph);
+    return result;
+  }
+
+  function matchChosung(text, query) {
+    if (!query) return true;
+    var t = String(text || '');
+    var q = String(query || '').trim();
+    if (!q) return true;
+    if (t.toLowerCase().indexOf(q.toLowerCase()) >= 0) return true;
+    return getChosung(t).indexOf(getChosung(q)) >= 0;
+  }
+
+  function loadSwCompanyNames() {
+    if (state.swCompanyNames && state.swCompanyNames.length) {
+      return Promise.resolve(state.swCompanyNames);
+    }
+    return fetch(state.apiBase + '/api/auth/companies', { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (result) {
+        state.swCompanyNames = (result.success && result.companies)
+          ? result.companies.filter(function (c) { return c.role !== '관리자'; })
+            .map(function (c) { return (c.company_name || '').trim(); })
+            .filter(Boolean)
+          : [];
+        state.swCompanyNames.sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+        return state.swCompanyNames;
+      })
+      .catch(function () {
+        state.swCompanyNames = [];
+        return state.swCompanyNames;
+      });
+  }
+
+  function closeSwCompanyDropdown() {
+    var dropdown = $('mopSwFormCompanyDropdown');
+    if (dropdown) dropdown.classList.remove('mop-dropdown-list--open');
+    swCompanyPickerActiveIdx = -1;
+  }
+
+  function selectSwCompany(name) {
+    var input = $('mopSwFormCompanyInput');
+    var hidden = $('mopSwFormCompany');
+    var val = (name || '').trim();
+    if (input) input.value = val;
+    if (hidden) hidden.value = val;
+    closeSwCompanyDropdown();
+  }
+
+  function resetSwCompanyField() {
+    var input = $('mopSwFormCompanyInput');
+    var hidden = $('mopSwFormCompany');
+    if (input) input.value = '';
+    if (hidden) hidden.value = '';
+    closeSwCompanyDropdown();
+  }
+
+  function setSwCompanyActiveItem(index) {
+    var dropdown = $('mopSwFormCompanyDropdown');
+    if (!dropdown) return;
+    var items = dropdown.querySelectorAll('.mop-dropdown-item');
+    swCompanyPickerActiveIdx = index;
+    items.forEach(function (item, idx) {
+      item.classList.toggle('mop-dropdown-item--active', idx === index);
+      if (idx === index) item.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  function filterSwCompanyDropdown(query) {
+    var dropdown = $('mopSwFormCompanyDropdown');
+    if (!dropdown) return;
+    var q = (query || '').trim();
+    if (!state.swCompanyNames.length) {
+      dropdown.innerHTML = '<div class="mop-dropdown-empty">화주사 목록을 불러오는 중…</div>';
+      dropdown.classList.add('mop-dropdown-list--open');
       return;
     }
-    dst.selectedIndex = 0;
+    var filtered = state.swCompanyNames.filter(function (name) {
+      return matchChosung(name, q);
+    });
+    if (!filtered.length) {
+      dropdown.innerHTML = '<div class="mop-dropdown-empty">검색 결과가 없습니다.</div>';
+    } else {
+      dropdown.innerHTML = filtered.map(function (name) {
+        return '<button type="button" class="mop-dropdown-item" data-company="' + escapeHtml(name) + '">' + escapeHtml(name) + '</button>';
+      }).join('');
+      dropdown.querySelectorAll('.mop-dropdown-item').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          selectSwCompany(btn.getAttribute('data-company') || btn.textContent);
+        });
+      });
+    }
+    dropdown.classList.add('mop-dropdown-list--open');
+    swCompanyPickerActiveIdx = -1;
+  }
+
+  function bindSwCompanySearchableDropdown() {
+    if (swCompanyPickerBound) return;
+    swCompanyPickerBound = true;
+    var input = $('mopSwFormCompanyInput');
+    var dropdown = $('mopSwFormCompanyDropdown');
+    var wrap = $('mopSwCompanyWrap');
+    if (!input || !dropdown) return;
+
+    input.addEventListener('input', function () {
+      if ($('mopSwFormCompany')) $('mopSwFormCompany').value = '';
+      filterSwCompanyDropdown(input.value);
+    });
+
+    input.addEventListener('focus', function () {
+      filterSwCompanyDropdown(input.value);
+    });
+
+    input.addEventListener('keydown', function (e) {
+      var items = dropdown.querySelectorAll('.mop-dropdown-item');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (!dropdown.classList.contains('mop-dropdown-list--open')) filterSwCompanyDropdown(input.value);
+        setSwCompanyActiveItem(Math.min(swCompanyPickerActiveIdx + 1, items.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSwCompanyActiveItem(Math.max(swCompanyPickerActiveIdx - 1, 0));
+      } else if (e.key === 'Enter') {
+        if (swCompanyPickerActiveIdx >= 0 && items[swCompanyPickerActiveIdx]) {
+          e.preventDefault();
+          selectSwCompany(items[swCompanyPickerActiveIdx].getAttribute('data-company') || items[swCompanyPickerActiveIdx].textContent);
+        }
+      } else if (e.key === 'Escape') {
+        closeSwCompanyDropdown();
+      }
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!wrap || wrap.contains(e.target)) return;
+      closeSwCompanyDropdown();
+    });
+  }
+
+  function resolveSwCompanyName() {
+    var hidden = $('mopSwFormCompany');
+    var input = $('mopSwFormCompanyInput');
+    var picked = (hidden && hidden.value || '').trim();
+    if (picked) return picked;
+    var typed = (input && input.value || '').trim();
+    if (!typed) return '';
+    if (state.swCompanyNames.indexOf(typed) >= 0) {
+      selectSwCompany(typed);
+      return typed;
+    }
+    var matches = state.swCompanyNames.filter(function (n) { return matchChosung(n, typed); });
+    if (matches.length === 1) {
+      selectSwCompany(matches[0]);
+      return matches[0];
+    }
+    var lower = typed.toLowerCase();
+    for (var i = 0; i < state.swCompanyNames.length; i++) {
+      if (state.swCompanyNames[i].toLowerCase() === lower) {
+        selectSwCompany(state.swCompanyNames[i]);
+        return state.swCompanyNames[i];
+      }
+    }
+    return '';
+  }
+
+  function fillSwModalCompanySelect() {
+    bindSwCompanySearchableDropdown();
+    resetSwCompanyField();
+    return loadSwCompanyNames().then(function () {
+      filterSwCompanyDropdown('');
+    });
   }
 
   function fetchSwWorkTypes() {
@@ -636,9 +811,10 @@
       return;
     }
     closeSwDetailModal();
-    fillSwModalCompanySelect();
     bindSwFormRowsDelegation();
-    return fetchSwWorkTypes().then(function (types) {
+    return fillSwModalCompanySelect().then(function () {
+      return fetchSwWorkTypes();
+    }).then(function (types) {
       if (!types.length) {
         toast('등록된 작업 종류가 없습니다. PC 대시보드에서 먼저 등록해 주세요.', true);
         return;
@@ -899,15 +1075,14 @@
 
   function submitSwModal() {
     var btn = $('mopSwFormSubmit');
-    var companySel = $('mopSwFormCompany');
     var dateEl = $('mopSwFormDate');
     var memoEl = $('mopSwFormMemo');
     var host = $('mopSwFormRows');
-    var companyName = (companySel && companySel.value || '').trim();
+    var companyName = resolveSwCompanyName();
     var workDate = (dateEl && dateEl.value || '').trim();
     var memo = (memoEl && memoEl.value || '').trim();
     if (!companyName) {
-      toast('화주사를 선택해 주세요.', true);
+      toast('화주사를 검색 후 목록에서 선택해 주세요.', true);
       return;
     }
     if (!workDate) {
@@ -1042,8 +1217,7 @@
     if (sub) {
       sub.textContent = state.company + (state.role === '관리자' ? ' · 관리자' : '') + ' (' + state.username + ')';
     }
-    state.mopPane = 'cs';
-    setMopPane('cs');
+    setMopPane(getInitialMopPane());
     updateSwRegisterBtn();
     loadCompaniesIfAdmin();
     loadMonths().then(function () {
