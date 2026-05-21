@@ -658,28 +658,30 @@ body.mop-body {
   position: fixed;
   inset: 0;
   z-index: 250;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--mop-surface);
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
   padding: 0;
 }
 
 .mop-picker {
   width: 100%;
-  max-width: 520px;
-  /* 모바일: 화면 절반 정도 높이, 목록은 내부 스크롤 */
-  height: clamp(280px, 48dvh, 400px);
-  max-height: clamp(280px, 48dvh, 400px);
+  max-width: none;
+  flex: 1;
+  min-height: 0;
+  height: 100dvh;
+  max-height: 100dvh;
   background: var(--mop-surface);
-  border-radius: var(--mop-radius) var(--mop-radius) 0 0;
-  border: 1px solid var(--mop-border);
-  border-bottom: none;
+  border-radius: 0;
+  border: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: var(--mop-shadow);
+  box-shadow: none;
   animation: mop-picker-slide-up 0.22s ease;
+  padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
