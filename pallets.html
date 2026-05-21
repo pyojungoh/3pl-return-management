@@ -3010,54 +3010,70 @@
 
     /** 모바일 자체 추적 QR (랙 섹션·사용중·보관종료) — 구글폼형과 병행 */
     function palBuildTrackQrText(palletId, vendor, product, palletKind) {
-      var v = (vendor || '').replace(/\|/g, ' ');
-      var p = (product || '').replace(/\|/g, ' ');
-      var k = (palletKind || '').replace(/\|/g, ' ');
-      return 'PALLET_TRACK|' + String(palletId || '') + '|' + v + '|' + p + '|' + k + '|v1';
+      // qr_photo_return 스캔은 pallet_id(parts[1])만 사용. vendor/product/kind는 라벨 HTML에 표시.
+      var pid = String(palletId || '').trim().replace(/\|/g, ' ');
+      return 'PALLET_TRACK|' + pid + '|v1';
+    }
+
+    function palQrTextToDataUrlWithLevel(qrText, size, correctLevel) {
+      return new Promise(function (resolve, reject) {
+        var wrap = document.createElement('div');
+        wrap.style.position = 'fixed';
+        wrap.style.left = '-9999px';
+        wrap.style.top = '0';
+        document.body.appendChild(wrap);
+        try {
+          new QRCode(wrap, {
+            text: qrText,
+            width: size,
+            height: size,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: correctLevel
+          });
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              try {
+                var canvas = wrap.querySelector('canvas');
+                if (canvas) {
+                  var url = canvas.toDataURL('image/png');
+                  document.body.removeChild(wrap);
+                  resolve(url);
+                } else {
+                  document.body.removeChild(wrap);
+                  reject(new Error('QR canvas missing'));
+                }
+              } catch (e) {
+                try { document.body.removeChild(wrap); } catch (e2) {}
+                reject(e);
+              }
+            });
+          });
+        } catch (e) {
+          try { document.body.removeChild(wrap); } catch (e2) {}
+          reject(e);
+        }
+      });
     }
 
     async function palQrTextToDataUrl(qrText, pixelSize) {
       var size = pixelSize || 200;
       if (typeof QRCode !== 'undefined') {
-        return new Promise(function (resolve, reject) {
-          var wrap = document.createElement('div');
-          wrap.style.position = 'fixed';
-          wrap.style.left = '-9999px';
-          wrap.style.top = '0';
-          document.body.appendChild(wrap);
+        var CL = QRCode.CorrectLevel || { M: 0, L: 1 };
+        var levels = [CL.M, CL.L];
+        var lastErr = null;
+        for (var i = 0; i < levels.length; i++) {
           try {
-            var CL = QRCode.CorrectLevel || { M: 0 };
-            new QRCode(wrap, {
-              text: qrText,
-              width: size,
-              height: size,
-              colorDark: '#000000',
-              colorLight: '#ffffff',
-              correctLevel: CL.M
-            });
-            requestAnimationFrame(function () {
-              requestAnimationFrame(function () {
-                try {
-                  var canvas = wrap.querySelector('canvas');
-                  if (canvas) {
-                    var url = canvas.toDataURL('image/png');
-                    document.body.removeChild(wrap);
-                    resolve(url);
-                  } else {
-                    document.body.removeChild(wrap);
-                    reject(new Error('QR canvas missing'));
-                  }
-                } catch (e) {
-                  try { document.body.removeChild(wrap); } catch (e2) {}
-                  reject(e);
-                }
-              });
-            });
+            return await palQrTextToDataUrlWithLevel(qrText, size, levels[i]);
           } catch (e) {
-            try { document.body.removeChild(wrap); } catch (e2) {}
-            reject(e);
+            lastErr = e;
+            var msg = String(e && e.message ? e.message : e);
+            if (msg.indexOf('overflow') < 0 || i === levels.length - 1) {
+              throw e;
+            }
           }
-        });
+        }
+        if (lastErr) throw lastErr;
       }
       var chartUrl = 'https://quickchart.io/qr?text=' + encodeURIComponent(qrText) + '&size=' + size + '&margin=1';
       var res = await fetch(chartUrl);
@@ -3226,10 +3242,14 @@
           var json = await res.json();
           if (!json.success || !json.data) continue;
           var row = json.data;
-          var qrText = palBuildPalletQrText(row.pallet_id, row.company_name || '', row.product_name || '');
+          var kind = (row.pallet_kind || '').trim();
+          var qrText = palBuildTrackQrText(row.pallet_id, row.company_name || '', row.product_name || '', kind);
           var dataUrl = await palQrTextToDataUrl(qrText, 150);
           var inStr = palFormatPalletInDateForLabel(row.in_date || '');
-          parts.push(palBuildSingleLabelHtml(row.pallet_id, row.product_name, row.company_name, inStr, dataUrl));
+          parts.push(palBuildSingleLabelHtml(row.pallet_id, row.product_name, row.company_name, inStr, dataUrl, {
+            mode: 'track',
+            kind: kind
+          }));
         }
         if (parts.length === 0) {
           alert('\ub370\uc774\ud130\ub97c \ubd88\ub7ec\uc62c \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.');
