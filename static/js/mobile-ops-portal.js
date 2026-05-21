@@ -279,6 +279,7 @@
   }
 
   function closeSwModal() {
+    closeSwCompanyPicker();
     var bd = $('mopSwModalBackdrop');
     if (bd) bd.classList.add('mop-hidden');
     state.swModalPhotos = [];
@@ -550,90 +551,165 @@
       });
   }
 
-  function closeSwCompanyDropdown() {
-    var dropdown = $('mopSwFormCompanyDropdown');
-    if (dropdown) dropdown.classList.remove('mop-dropdown-list--open');
+  function closeSwCompanyPicker() {
+    var backdrop = $('mopSwCompanyPickerBackdrop');
+    var trigger = $('mopSwFormCompanyTrigger');
+    if (backdrop) backdrop.classList.add('mop-hidden');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
     swCompanyPickerActiveIdx = -1;
   }
 
-  function selectSwCompany(name) {
+  function updateSwCompanyTriggerLabel(name) {
+    var label = $('mopSwFormCompanyLabel');
+    var val = (name || '').trim();
+    if (!label) return;
+    label.textContent = val || '화주사 선택';
+    label.classList.toggle('mop-combobox__value--placeholder', !val);
+  }
+
+  function updateSwCompanySearchClear() {
     var input = $('mopSwFormCompanyInput');
+    var clearBtn = $('mopSwCompanySearchClear');
+    if (!clearBtn) return;
+    var hasQuery = !!(input && (input.value || '').trim());
+    clearBtn.classList.toggle('mop-hidden', !hasQuery);
+  }
+
+  function openSwCompanyPicker() {
+    var backdrop = $('mopSwCompanyPickerBackdrop');
+    var trigger = $('mopSwFormCompanyTrigger');
+    var input = $('mopSwFormCompanyInput');
+    if (!backdrop) return;
+    backdrop.classList.remove('mop-hidden');
+    if (trigger) trigger.setAttribute('aria-expanded', 'true');
+    if (input) {
+      input.value = '';
+      updateSwCompanySearchClear();
+    }
+    filterSwCompanyDropdown('');
+    if (input) {
+      setTimeout(function () {
+        try { input.focus(); } catch (e) { /* ignore */ }
+      }, 120);
+    }
+  }
+
+  function selectSwCompany(name) {
     var hidden = $('mopSwFormCompany');
     var val = (name || '').trim();
-    if (input) input.value = val;
     if (hidden) hidden.value = val;
-    closeSwCompanyDropdown();
+    updateSwCompanyTriggerLabel(val);
+    closeSwCompanyPicker();
   }
 
   function resetSwCompanyField() {
-    var input = $('mopSwFormCompanyInput');
     var hidden = $('mopSwFormCompany');
-    if (input) input.value = '';
     if (hidden) hidden.value = '';
-    closeSwCompanyDropdown();
+    updateSwCompanyTriggerLabel('');
+    closeSwCompanyPicker();
+    var input = $('mopSwFormCompanyInput');
+    if (input) input.value = '';
+    updateSwCompanySearchClear();
   }
 
   function setSwCompanyActiveItem(index) {
     var dropdown = $('mopSwFormCompanyDropdown');
     if (!dropdown) return;
-    var items = dropdown.querySelectorAll('.mop-dropdown-item');
+    var items = dropdown.querySelectorAll('.mop-picker__item');
     swCompanyPickerActiveIdx = index;
     items.forEach(function (item, idx) {
-      item.classList.toggle('mop-dropdown-item--active', idx === index);
+      item.classList.toggle('mop-picker__item--active', idx === index);
       if (idx === index) item.scrollIntoView({ block: 'nearest' });
     });
+  }
+
+  function updateSwCompanyPickerHint(count, query) {
+    var hint = $('mopSwCompanyPickerHint');
+    if (!hint) return;
+    var q = (query || '').trim();
+    if (!state.swCompanyNames.length) {
+      hint.textContent = '화주사 목록을 불러오는 중…';
+      return;
+    }
+    if (count === 0) {
+      hint.textContent = q ? '검색 결과 없음 · 다른 검색어를 입력해 보세요' : '등록된 화주사가 없습니다';
+      return;
+    }
+    hint.textContent = count + '개 · 한 줄씩 아래로 스크롤하여 선택';
   }
 
   function filterSwCompanyDropdown(query) {
     var dropdown = $('mopSwFormCompanyDropdown');
     if (!dropdown) return;
     var q = (query || '').trim();
+    var selected = ($('mopSwFormCompany') && $('mopSwFormCompany').value || '').trim();
     if (!state.swCompanyNames.length) {
-      dropdown.innerHTML = '<div class="mop-dropdown-empty">화주사 목록을 불러오는 중…</div>';
-      dropdown.classList.add('mop-dropdown-list--open');
+      dropdown.innerHTML = '<div class="mop-picker__empty">화주사 목록을 불러오는 중…</div>';
+      updateSwCompanyPickerHint(0, q);
       return;
     }
     var filtered = state.swCompanyNames.filter(function (name) {
       return matchChosung(name, q);
     });
+    updateSwCompanyPickerHint(filtered.length, q);
     if (!filtered.length) {
-      dropdown.innerHTML = '<div class="mop-dropdown-empty">검색 결과가 없습니다.</div>';
+      dropdown.innerHTML = '<div class="mop-picker__empty">검색 결과가 없습니다.<br>다른 검색어를 입력해 보세요.</div>';
     } else {
       dropdown.innerHTML = filtered.map(function (name) {
-        return '<button type="button" class="mop-dropdown-item" data-company="' + escapeHtml(name) + '">' + escapeHtml(name) + '</button>';
+        var isSel = name === selected;
+        return (
+          '<button type="button" class="mop-picker__item' + (isSel ? ' mop-picker__item--selected' : '') + '" data-company="' + escapeHtml(name) + '" role="option" aria-selected="' + (isSel ? 'true' : 'false') + '">' +
+          '<span class="mop-picker__item-text">' + escapeHtml(name) + '</span>' +
+          '<span class="mop-picker__item-check" aria-hidden="true">✓</span>' +
+          '</button>'
+        );
       }).join('');
-      dropdown.querySelectorAll('.mop-dropdown-item').forEach(function (btn) {
+      dropdown.querySelectorAll('.mop-picker__item').forEach(function (btn) {
         btn.addEventListener('click', function () {
           selectSwCompany(btn.getAttribute('data-company') || btn.textContent);
         });
       });
     }
-    dropdown.classList.add('mop-dropdown-list--open');
     swCompanyPickerActiveIdx = -1;
   }
 
   function bindSwCompanySearchableDropdown() {
     if (swCompanyPickerBound) return;
     swCompanyPickerBound = true;
+    var trigger = $('mopSwFormCompanyTrigger');
     var input = $('mopSwFormCompanyInput');
     var dropdown = $('mopSwFormCompanyDropdown');
-    var wrap = $('mopSwCompanyWrap');
-    if (!input || !dropdown) return;
+    var backdrop = $('mopSwCompanyPickerBackdrop');
+    var closeBtn = $('mopSwCompanyPickerClose');
+    var clearBtn = $('mopSwCompanySearchClear');
+    if (!trigger || !input || !dropdown || !backdrop) return;
+
+    trigger.addEventListener('click', function () {
+      openSwCompanyPicker();
+    });
+
+    closeBtn && closeBtn.addEventListener('click', closeSwCompanyPicker);
+
+    backdrop.addEventListener('click', function (ev) {
+      if (ev.target.id === 'mopSwCompanyPickerBackdrop') closeSwCompanyPicker();
+    });
 
     input.addEventListener('input', function () {
-      if ($('mopSwFormCompany')) $('mopSwFormCompany').value = '';
+      updateSwCompanySearchClear();
       filterSwCompanyDropdown(input.value);
     });
 
-    input.addEventListener('focus', function () {
-      filterSwCompanyDropdown(input.value);
+    clearBtn && clearBtn.addEventListener('click', function () {
+      input.value = '';
+      updateSwCompanySearchClear();
+      filterSwCompanyDropdown('');
+      input.focus();
     });
 
     input.addEventListener('keydown', function (e) {
-      var items = dropdown.querySelectorAll('.mop-dropdown-item');
+      var items = dropdown.querySelectorAll('.mop-picker__item');
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        if (!dropdown.classList.contains('mop-dropdown-list--open')) filterSwCompanyDropdown(input.value);
         setSwCompanyActiveItem(Math.min(swCompanyPickerActiveIdx + 1, items.length - 1));
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
@@ -644,48 +720,22 @@
           selectSwCompany(items[swCompanyPickerActiveIdx].getAttribute('data-company') || items[swCompanyPickerActiveIdx].textContent);
         }
       } else if (e.key === 'Escape') {
-        closeSwCompanyDropdown();
+        closeSwCompanyPicker();
       }
-    });
-
-    document.addEventListener('click', function (e) {
-      if (!wrap || wrap.contains(e.target)) return;
-      closeSwCompanyDropdown();
     });
   }
 
   function resolveSwCompanyName() {
     var hidden = $('mopSwFormCompany');
-    var input = $('mopSwFormCompanyInput');
     var picked = (hidden && hidden.value || '').trim();
     if (picked) return picked;
-    var typed = (input && input.value || '').trim();
-    if (!typed) return '';
-    if (state.swCompanyNames.indexOf(typed) >= 0) {
-      selectSwCompany(typed);
-      return typed;
-    }
-    var matches = state.swCompanyNames.filter(function (n) { return matchChosung(n, typed); });
-    if (matches.length === 1) {
-      selectSwCompany(matches[0]);
-      return matches[0];
-    }
-    var lower = typed.toLowerCase();
-    for (var i = 0; i < state.swCompanyNames.length; i++) {
-      if (state.swCompanyNames[i].toLowerCase() === lower) {
-        selectSwCompany(state.swCompanyNames[i]);
-        return state.swCompanyNames[i];
-      }
-    }
     return '';
   }
 
   function fillSwModalCompanySelect() {
     bindSwCompanySearchableDropdown();
     resetSwCompanyField();
-    return loadSwCompanyNames().then(function () {
-      filterSwCompanyDropdown('');
-    });
+    return loadSwCompanyNames();
   }
 
   function fetchSwWorkTypes() {
@@ -1082,7 +1132,7 @@
     var workDate = (dateEl && dateEl.value || '').trim();
     var memo = (memoEl && memoEl.value || '').trim();
     if (!companyName) {
-      toast('화주사를 검색 후 목록에서 선택해 주세요.', true);
+      toast('화주사를 선택해 주세요.', true);
       return;
     }
     if (!workDate) {

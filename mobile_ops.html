@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
   <link rel="apple-touch-icon" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
   <link rel="apple-touch-icon" sizes="180x180" href="https://res.cloudinary.com/dokk81rjh/image/upload/v1763517440/jayjay_favicon_512_sxrfoo.png">
-  <link rel="stylesheet" href="/static/css/mobile-ops-portal.css?v=mop20260522">
+  <link rel="stylesheet" href="/static/css/mobile-ops-portal.css?v=mop20260525">
 </head>
 <body class="mop-body">
   <!-- 로그인: 대시보드와 동일 localStorage 키 사용 -->
@@ -106,11 +106,13 @@
         <button type="button" class="mop-sheet__close" id="mopSwModalClose" aria-label="닫기">×</button>
       </div>
       <div class="mop-modal__body">
-        <label class="mop-sheet__label" for="mopSwFormCompanyInput">화주사</label>
-        <div class="mop-searchable-select" id="mopSwCompanyWrap">
-          <input type="text" id="mopSwFormCompanyInput" class="mop-input mop-select--full" placeholder="화주사 검색 (초성 가능, 예: ㅂ)" autocomplete="off" aria-autocomplete="list" aria-controls="mopSwFormCompanyDropdown">
+        <label class="mop-sheet__label" for="mopSwFormCompanyTrigger">화주사</label>
+        <div class="mop-combobox" id="mopSwCompanyWrap">
+          <button type="button" id="mopSwFormCompanyTrigger" class="mop-combobox__trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="mopSwFormCompanyDropdown">
+            <span id="mopSwFormCompanyLabel" class="mop-combobox__value mop-combobox__value--placeholder">화주사 선택</span>
+            <span class="mop-combobox__chev" aria-hidden="true">▾</span>
+          </button>
           <input type="hidden" id="mopSwFormCompany" value="">
-          <div class="mop-dropdown-list" id="mopSwFormCompanyDropdown" role="listbox" aria-label="화주사 목록"></div>
         </div>
         <label class="mop-sheet__label" for="mopSwFormDate">작업일</label>
         <input type="date" id="mopSwFormDate" class="mop-input">
@@ -148,8 +150,23 @@
     </div>
   </div>
 
+  <div id="mopSwCompanyPickerBackdrop" class="mop-picker-backdrop mop-hidden" role="presentation">
+    <div class="mop-picker" role="dialog" aria-modal="true" aria-labelledby="mopSwCompanyPickerTitle" onclick="event.stopPropagation();">
+      <div class="mop-picker__head">
+        <h3 class="mop-picker__title" id="mopSwCompanyPickerTitle">화주사 선택</h3>
+        <button type="button" class="mop-sheet__close" id="mopSwCompanyPickerClose" aria-label="닫기">×</button>
+      </div>
+      <div class="mop-picker__search">
+        <input type="search" id="mopSwFormCompanyInput" class="mop-picker__search-input" placeholder="이름 또는 초성 검색 (예: ㅂ)" autocomplete="off" enterkeyhint="search" inputmode="search" aria-controls="mopSwFormCompanyDropdown">
+        <button type="button" id="mopSwCompanySearchClear" class="mop-picker__search-clear mop-hidden" aria-label="검색어 지우기">×</button>
+      </div>
+      <p id="mopSwCompanyPickerHint" class="mop-picker__hint">화주사를 한 줄씩 선택 · 아래로 스크롤</p>
+      <div id="mopSwFormCompanyDropdown" class="mop-picker__list" role="listbox" aria-label="화주사 목록"></div>
+    </div>
+  </div>
+
   <div id="mopToast" class="mop-toast" role="status" aria-live="polite"></div>
 
-  <script src="/static/js/mobile-ops-portal.js?v=mop20260523" defer></script>
+  <script src="/static/js/mobile-ops-portal.js?v=mop20260525" defer></script>
 </body>
 </html>
