@@ -178,6 +178,48 @@ def ensure_pallet_table_columns():
         conn.close()
 
 
+_CS_COLUMNS_ENSURED = False
+
+
+def ensure_customer_service_columns():
+    """customer_service 테이블 누락 컬럼 보강 (last_notification_at — 보류·텔레그램 반복 알림용)."""
+    global _CS_COLUMNS_ENSURED
+    if _CS_COLUMNS_ENSURED:
+        return
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if USE_POSTGRESQL:
+            cursor.execute(
+                """SELECT 1 FROM information_schema.columns
+                   WHERE table_schema = 'public' AND table_name = 'customer_service'
+                     AND column_name = 'last_notification_at' LIMIT 1"""
+            )
+            if cursor.fetchone() is None:
+                cursor.execute(
+                    'ALTER TABLE customer_service ADD COLUMN last_notification_at TIMESTAMP'
+                )
+        else:
+            cursor.execute('PRAGMA table_info(customer_service)')
+            cols = [row[1] for row in cursor.fetchall()]
+            if 'last_notification_at' not in cols:
+                cursor.execute(
+                    'ALTER TABLE customer_service ADD COLUMN last_notification_at TIMESTAMP'
+                )
+        conn.commit()
+        _CS_COLUMNS_ENSURED = True
+        print('[성공] customer_service last_notification_at 컬럼 보강 완료')
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        print(f"[경고] ensure_customer_service_columns 실패: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+
 _RACK_SECTIONS_ENSURED = False
 
 

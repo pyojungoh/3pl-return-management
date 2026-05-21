@@ -43,6 +43,7 @@ from api.database.models import (
     fix_missing_return_ids,
     ensure_pallet_table_columns,
     ensure_homepage_portal_table,
+    ensure_customer_service_columns,
 )
 
 # NOTE:
@@ -80,6 +81,11 @@ def ensure_db_ready():
         ensure_homepage_portal_table()
     except Exception as e:
         print(f"[경고] homepage_portal_settings 테이블 보강 중 오류 (무시 가능): {e}")
+
+    try:
+        ensure_customer_service_columns()
+    except Exception as e:
+        print(f"[경고] customer_service 컬럼 보강 중 오류 (무시 가능): {e}")
     
     # 기존 반품 데이터에 ID가 없는 경우 ID 생성
     if DB_READY:

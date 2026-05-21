@@ -4,7 +4,8 @@ C/S 접수 관리 API 라우트
 from flask import Blueprint, request, jsonify, Response
 from api.database.models import (
     get_db_connection,
-    USE_POSTGRESQL
+    USE_POSTGRESQL,
+    ensure_customer_service_columns,
 )
 from datetime import datetime, timezone, timedelta
 import csv
@@ -243,13 +244,25 @@ def update_cs_status(cs_id: int, status: str, admin_message: str = None, process
                 conn.commit()
                 return cursor.rowcount > 0
             if status == '보류':
-                # 확인 후 처리 예정: 반복 텔레그램 대상 제외(status≠접수) + 타이머 리셋
-                cursor.execute('''
-                    UPDATE customer_service
-                    SET status = %s, admin_message = %s, processor = %s, processed_at = NULL,
-                        last_notification_at = NULL, updated_at = %s
-                    WHERE id = %s
-                ''', (status, admin_message, processor, updated_at, cs_id))
+                ensure_customer_service_columns()
+                hold_params = (status, admin_message, processor, updated_at, cs_id)
+                try:
+                    cursor.execute('''
+                        UPDATE customer_service
+                        SET status = %s, admin_message = %s, processor = %s, processed_at = NULL,
+                            last_notification_at = NULL, updated_at = %s
+                        WHERE id = %s
+                    ''', hold_params)
+                except Exception as hold_err:
+                    err_msg = str(hold_err).lower()
+                    if 'last_notification_at' in err_msg:
+                        cursor.execute('''
+                            UPDATE customer_service
+                            SET status = %s, admin_message = %s, processor = %s, processed_at = NULL, updated_at = %s
+                            WHERE id = %s
+                        ''', hold_params)
+                    else:
+                        raise
                 conn.commit()
                 return cursor.rowcount > 0
             if admin_message and processor:
@@ -297,12 +310,25 @@ def update_cs_status(cs_id: int, status: str, admin_message: str = None, process
                 conn.commit()
                 return cursor.rowcount > 0
             if status == '보류':
-                cursor.execute('''
-                    UPDATE customer_service
-                    SET status = ?, admin_message = ?, processor = ?, processed_at = NULL,
-                        last_notification_at = NULL, updated_at = ?
-                    WHERE id = ?
-                ''', (status, admin_message, processor, updated_at, cs_id))
+                ensure_customer_service_columns()
+                hold_params = (status, admin_message, processor, updated_at, cs_id)
+                try:
+                    cursor.execute('''
+                        UPDATE customer_service
+                        SET status = ?, admin_message = ?, processor = ?, processed_at = NULL,
+                            last_notification_at = NULL, updated_at = ?
+                        WHERE id = ?
+                    ''', hold_params)
+                except Exception as hold_err:
+                    err_msg = str(hold_err).lower()
+                    if 'last_notification_at' in err_msg:
+                        cursor.execute('''
+                            UPDATE customer_service
+                            SET status = ?, admin_message = ?, processor = ?, processed_at = NULL, updated_at = ?
+                            WHERE id = ?
+                        ''', hold_params)
+                    else:
+                        raise
                 conn.commit()
                 return cursor.rowcount > 0
             if admin_message and processor:
@@ -521,6 +547,7 @@ def update_cs_last_notification(cs_id: int, notification_time: datetime = None) 
     PostgreSQL: DB의 NOW() 사용 (타임존 변환 문제 완전 회피)
     SQLite: Python datetime 전달
     """
+    ensure_customer_service_columns()
     conn = get_db_connection()
     cursor = None
     try:
@@ -898,8 +925,8 @@ def get_available_months():
 def update_cs_status_route(cs_id):
     """C/S 접수 상태 업데이트 (관리자용 - 접수/보류/처리완료/처리불가)"""
     try:
-        data = request.get_json()
-        status = data.get('status', '').strip()
+        data = request.get_json(silent=True) or {}
+        status = (data.get('status') or '').strip()
         admin_message = data.get('admin_message', '').strip() if data.get('admin_message') else None
         processor = data.get('processor', '').strip() if data.get('processor') else None
         
