@@ -22,7 +22,7 @@ def extract_token():
         with open(TOKEN_FILE, 'rb') as f:
             creds = pickle.load(f)
         
-        # 토큰 정보 추출
+        # 토큰 정보 추출 (expiry 포함 — Vercel에서 불필요한 매 요청 refresh 방지)
         token_dict = {
             'token': creds.token,
             'refresh_token': creds.refresh_token,
@@ -31,6 +31,8 @@ def extract_token():
             'client_secret': creds.client_secret,
             'scopes': list(creds.scopes) if creds.scopes else []
         }
+        if getattr(creds, 'expiry', None):
+            token_dict['expiry'] = creds.expiry.isoformat()
 
         if not creds.refresh_token:
             print("\n" + "!" * 60)

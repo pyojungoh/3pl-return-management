@@ -29,31 +29,32 @@ def main():
     
     try:
         from google.oauth2.credentials import Credentials
-        from google.auth.transport.requests import Request
         import urllib.request
         
-        creds_info = json.loads(oauth_creds)
-        src = creds_info.get('installed') or creds_info.get('web') or creds_info
-        if isinstance(src, dict):
-            client_id = src.get('client_id', '')
-            client_secret = src.get('client_secret', '')
-        else:
-            client_id = creds_info.get('client_id', '')
-            client_secret = creds_info.get('client_secret', '')
-        
         token_info = json.loads(oauth_token)
+
+        # oauth_drive와 동일: CREDENTIALS_JSON 우선
+        from api.uploads.oauth_drive import _client_credentials_from_env, _parse_token_expiry, _refresh_credentials
+
+        client_id, client_secret = _client_credentials_from_env(token_info, oauth_creds)
         creds = Credentials(
             token=token_info.get('token'),
             refresh_token=token_info.get('refresh_token'),
             token_uri=token_info.get('token_uri', 'https://oauth2.googleapis.com/token'),
             client_id=client_id,
             client_secret=client_secret,
-            scopes=token_info.get('scopes', ['https://www.googleapis.com/auth/drive'])
+            scopes=token_info.get('scopes', ['https://www.googleapis.com/auth/drive']),
+            expiry=_parse_token_expiry(token_info.get('expiry'))
         )
-        
+
+        print(f'client_id(앞 12자): {str(client_id)[:12]}...')
         if creds.expired and creds.refresh_token:
-            print("토큰 갱신 중...")
-            creds.refresh(Request())
+            print('토큰 갱신 중...')
+            refreshed = _refresh_credentials(creds)
+            if not refreshed or not refreshed.valid:
+                print('❌ 토큰 갱신 실패 — invalid_grant 이면 renew → extract 후 Vercel 두 변수를 함께 갱신하세요.')
+                return 1
+            creds = refreshed
         
         access_token = creds.token
         if not access_token:

@@ -36,6 +36,77 @@ _last_oauth_error = None  # 마지막 OAuth 오류 (사용자 안내용)
 _OAUTH_AUTH_URL_KWARGS = {'access_type': 'offline', 'prompt': 'consent'}
 
 
+def _parse_token_expiry(expiry_value):
+    """환경 변수 JSON의 expiry 문자열 → datetime (없으면 None)."""
+    if not expiry_value:
+        return None
+    if isinstance(expiry_value, str):
+        return datetime.fromisoformat(expiry_value.replace('Z', '+00:00'))
+    if hasattr(expiry_value, 'isoformat'):
+        return expiry_value
+    return None
+
+
+def _client_credentials_from_env(token_info, oauth_credentials_json):
+    """
+    OAuth client_id / client_secret 해석.
+    Vercel에 GOOGLE_OAUTH_CREDENTIALS_JSON이 있으면 **항상** 그 값을 우선한다.
+    (토큰 JSON에 예전 client_secret이 남아 있어도 env와 불일치하지 않도록)
+    """
+    client_id = token_info.get('client_id')
+    client_secret = token_info.get('client_secret')
+
+    if oauth_credentials_json:
+        creds_info = json.loads(oauth_credentials_json)
+        if 'installed' in creds_info:
+            client_id = creds_info['installed']['client_id']
+            client_secret = creds_info['installed']['client_secret']
+        elif 'web' in creds_info:
+            client_id = creds_info['web']['client_id']
+            client_secret = creds_info['web']['client_secret']
+        else:
+            client_id = creds_info.get('client_id', client_id)
+            client_secret = creds_info.get('client_secret', client_secret)
+
+    if not client_id or not client_secret:
+        raise ValueError(
+            'client_id/client_secret을 확인할 수 없습니다. '
+            'GOOGLE_OAUTH_CREDENTIALS_JSON(credentials.json 전체)을 Vercel에 설정하세요.'
+        )
+
+    return client_id, client_secret
+
+
+def _refresh_credentials(creds, max_attempts=3):
+    """만료된 access token만 refresh. 성공 시 인스턴스 캐시 갱신."""
+    global _oauth_creds_cache, _last_oauth_error
+
+    if not creds or not creds.refresh_token:
+        return creds
+
+    if not creds.expired:
+        return creds
+
+    refresh_error = None
+    for attempt in range(max_attempts):
+        try:
+            print(f'🔄 토큰 갱신 중... (시도 {attempt + 1}/{max_attempts})')
+            creds.refresh(Request())
+            print('✅ 토큰 갱신 성공')
+            _last_oauth_error = None
+            _oauth_creds_cache = creds
+            return creds
+        except Exception as e:
+            refresh_error = e
+            print(f'❌ 토큰 갱신 실패 (시도 {attempt + 1}/{max_attempts}): {e}')
+            if attempt < max_attempts - 1:
+                import time
+                time.sleep(1)
+
+    _last_oauth_error = _format_oauth_refresh_failure_message(refresh_error)
+    return None
+
+
 def _format_oauth_refresh_failure_message(exc: Exception) -> str:
     """토큰 갱신 실패 시 사용자·운영자용 안내 (invalid_grant 등)."""
     raw = str(exc).lower()
@@ -92,7 +163,7 @@ def run_local_oauth_interactive_and_pickle() -> Credentials:
     os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
     with open(TOKEN_FILE, 'wb') as token:
         pickle.dump(creds, token)
-    print(f'✅ token.pickle 저장 완료: {TOKEN_FILE}')
+    print(f'[OK] token.pickle 저장 완료: {TOKEN_FILE}')
     return creds
 
 
@@ -117,35 +188,9 @@ def get_credentials():
     if oauth_token_json:
         try:
             token_info = json.loads(oauth_token_json)
-            
-            # client_id, client_secret: 토큰에 있으면 사용, 없으면 credentials에서
-            client_id = token_info.get('client_id')
-            client_secret = token_info.get('client_secret')
-            if not client_id or not client_secret:
-                if oauth_credentials_json:
-                    creds_info = json.loads(oauth_credentials_json)
-                    if 'installed' in creds_info:
-                        client_id = creds_info['installed']['client_id']
-                        client_secret = creds_info['installed']['client_secret']
-                    elif 'web' in creds_info:
-                        client_id = creds_info['web']['client_id']
-                        client_secret = creds_info['web']['client_secret']
-                    else:
-                        client_id = creds_info.get('client_id')
-                        client_secret = creds_info.get('client_secret')
-                else:
-                    raise ValueError("client_id/client_secret이 토큰에 없고 GOOGLE_OAUTH_CREDENTIALS_JSON도 없습니다.")
-            
-            # expiry 파싱 (ISO 형식 또는 None)
-            expiry = None
-            if token_info.get('expiry'):
-                expiry_str = token_info['expiry']
-                if isinstance(expiry_str, str):
-                    expiry = datetime.fromisoformat(expiry_str.replace('Z', '+00:00'))
-                elif hasattr(expiry_str, 'isoformat'):
-                    expiry = expiry_str
-            
-            # Credentials 객체 생성
+            client_id, client_secret = _client_credentials_from_env(token_info, oauth_credentials_json)
+            expiry = _parse_token_expiry(token_info.get('expiry'))
+
             creds = Credentials(
                 token=token_info.get('token'),
                 refresh_token=token_info.get('refresh_token'),
@@ -155,43 +200,35 @@ def get_credentials():
                 scopes=token_info.get('scopes', SCOPES),
                 expiry=expiry
             )
-            
-            print("✅ 환경 변수에서 OAuth 토큰 로드 성공 (Vercel 배포 환경)")
-            
-            # 토큰이 만료되었거나 만료 정보가 없으면 갱신 (최대 3회 재시도)
-            if creds.refresh_token and (creds.expired or creds.expiry is None):
-                refresh_error = None
-                for attempt in range(3):
-                    try:
-                        print(f"🔄 토큰 갱신 중... (시도 {attempt + 1}/3)")
-                        creds.refresh(Request())
-                        print("✅ 토큰 갱신 성공")
-                        refresh_error = None
-                        break
-                    except Exception as e:
-                        refresh_error = e
-                        print(f"❌ 토큰 갱신 실패 (시도 {attempt + 1}/3): {e}")
-                        if attempt < 2:
-                            import time
-                            time.sleep(1)
-                if refresh_error:
-                    creds = None
-                    _last_oauth_error = _format_oauth_refresh_failure_message(refresh_error)
-            
+
+            print('✅ 환경 변수에서 OAuth 토큰 로드 성공 (Vercel 배포 환경)')
+            if oauth_credentials_json:
+                print(f'   client_id(앞 12자): {str(client_id)[:12]}...')
+            if not creds.refresh_token:
+                _last_oauth_error = (
+                    'GOOGLE_OAUTH_TOKEN_JSON에 refresh_token이 없습니다. '
+                    '로컬에서 python renew_google_oauth_token.py 실행 후 '
+                    'python extract_oauth_token.py 로 출력된 JSON 전체를 Vercel에 설정하세요.'
+                )
+                creds = None
+            elif creds.expired:
+                creds = _refresh_credentials(creds)
+            elif creds.valid:
+                _oauth_creds_cache = creds
+                _last_oauth_error = None
+                return creds
+            else:
+                # access token 없음·만료 정보 없음 등 — refresh 시도
+                creds = _refresh_credentials(creds)
+
             if creds and creds.valid:
                 _oauth_creds_cache = creds
                 _last_oauth_error = None
                 return creds
 
-            # env에서 읽었으나 유효하지 않음 (리프레시 실패·refresh_token 없음 등)
-            if creds is not None and not creds.valid:
-                if not creds.refresh_token:
-                    _last_oauth_error = (
-                        'GOOGLE_OAUTH_TOKEN_JSON에 refresh_token이 없습니다. '
-                        '로컬에서 python renew_google_oauth_token.py 실행 후 '
-                        'python extract_oauth_token.py 로 출력된 JSON 전체를 Vercel에 설정하세요.'
-                    )
-                creds = None
+            if creds is not None and not creds.valid and not _last_oauth_error:
+                _last_oauth_error = 'OAuth access token이 유효하지 않습니다.'
+            creds = None
         except Exception as e:
             _last_oauth_error = str(e)
             print(f"⚠️ 환경 변수에서 토큰 로드 실패: {e}")
@@ -242,22 +279,22 @@ def get_credentials():
     # 토큰이 없거나 만료된 경우
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            # 토큰 갱신
             try:
-                print("🔄 토큰 갱신 중...")
-                creds.refresh(Request())
-                print("✅ 토큰 갱신 성공")
-                # 갱신된 토큰 저장
-                with open(TOKEN_FILE, 'wb') as token:
-                    pickle.dump(creds, token)
+                refreshed = _refresh_credentials(creds)
+                if refreshed and refreshed.valid:
+                    creds = refreshed
+                    with open(TOKEN_FILE, 'wb') as token:
+                        pickle.dump(creds, token)
+                else:
+                    creds = None
             except RefreshError as e:
-                print(f"❌ 토큰 갱신 실패: {e}")
+                print(f'❌ 토큰 갱신 실패: {e}')
                 print(_format_oauth_refresh_failure_message(e))
                 import traceback
                 traceback.print_exc()
                 creds = None
             except Exception as e:
-                print(f"❌ 토큰 갱신 실패: {e}")
+                print(f'❌ 토큰 갱신 실패: {e}')
                 import traceback
                 traceback.print_exc()
                 creds = None
