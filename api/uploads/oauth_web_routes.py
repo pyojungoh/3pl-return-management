@@ -3,7 +3,7 @@ Google Drive OAuth 웹 재연결 (관리자 — Vercel 환경 변수 수동 갱�
 """
 import json
 import os
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 from flask import Blueprint, jsonify, redirect, request, make_response
 from google_auth_oauthlib.flow import Flow
@@ -42,9 +42,46 @@ def _redirect_base() -> str:
 
 
 def _callback_uri() -> str:
+    """
+    Google Cloud Console에 등록된 redirect URI와 100% 일치해야 함 (redirect_uri_mismatch 방지).
+    우선순위: GOOGLE_OAUTH_REDIRECT_URI → credentials JSON redirect_uris(요청 host 매칭) → fallback
+    """
     custom = (os.environ.get('GOOGLE_OAUTH_REDIRECT_URI') or '').strip()
     if custom:
         return custom
+
+    try:
+        raw = _load_credentials_config()
+        uris = list((raw.get('web') or {}).get('redirect_uris') or [])
+        host = (request.host or '').split(':')[0].lower()
+
+        if host in ('localhost', '127.0.0.1'):
+            for uri in uris:
+                if 'localhost' in uri or '127.0.0.1' in uri:
+                    return uri
+
+        for uri in uris:
+            parsed = urlparse(uri)
+            if parsed.hostname and parsed.hostname.lower() == host:
+                return uri
+
+        if host.startswith('www.'):
+            alt_host = host[4:]
+        else:
+            alt_host = f'www.{host}'
+        for uri in uris:
+            parsed = urlparse(uri)
+            if parsed.hostname and parsed.hostname.lower() == alt_host:
+                return uri
+
+        for uri in uris:
+            if uri.startswith('https://') and 'localhost' not in uri:
+                return uri
+        if uris:
+            return uris[0]
+    except Exception:
+        pass
+
     return f'{_redirect_base()}/api/uploads/oauth/callback'
 
 
