@@ -95,6 +95,7 @@ def _refresh_credentials(creds, max_attempts=3):
             print('✅ 토큰 갱신 성공')
             _last_oauth_error = None
             _oauth_creds_cache = creds
+            _persist_credentials_after_refresh(creds)
             return creds
         except Exception as e:
             refresh_error = e
@@ -104,6 +105,65 @@ def _refresh_credentials(creds, max_attempts=3):
                 time.sleep(1)
 
     _last_oauth_error = _format_oauth_refresh_failure_message(refresh_error)
+    return None
+
+
+def _persist_credentials_after_refresh(creds):
+    """갱신된 access token을 DB에 저장 (refresh_token은 동일)."""
+    if not creds or not creds.refresh_token:
+        return
+    try:
+        from api.uploads.oauth_token_store import save_credentials_object
+        save_credentials_object(creds)
+    except Exception as e:
+        print(f'[경고] OAuth DB 저장 실패 (업로드는 계속): {e}')
+
+
+def _credentials_from_token_info(token_info, oauth_credentials_json, source_label=''):
+    """token JSON dict → Credentials (만료 시 refresh)."""
+    global _oauth_creds_cache, _last_oauth_error
+
+    client_id, client_secret = _client_credentials_from_env(token_info, oauth_credentials_json)
+    expiry = _parse_token_expiry(token_info.get('expiry'))
+    creds = Credentials(
+        token=token_info.get('token'),
+        refresh_token=token_info.get('refresh_token'),
+        token_uri=token_info.get('token_uri', 'https://oauth2.googleapis.com/token'),
+        client_id=client_id,
+        client_secret=client_secret,
+        scopes=token_info.get('scopes', SCOPES),
+        expiry=expiry,
+    )
+
+    label = source_label or 'OAuth'
+    print(f'✅ {label}에서 OAuth 토큰 로드')
+    if oauth_credentials_json:
+        print(f'   client_id(앞 12자): {str(client_id)[:12]}...')
+
+    if not creds.refresh_token:
+        _last_oauth_error = (
+            'refresh_token이 없습니다. 정산 관리 → Google Drive 재연결 또는 '
+            'renew_google_oauth_token.py 후 extract_oauth_token.py 를 실행하세요.'
+        )
+        return None
+
+    if creds.expired:
+        creds = _refresh_credentials(creds)
+    elif creds.valid:
+        _oauth_creds_cache = creds
+        _last_oauth_error = None
+        return creds
+    else:
+        creds = _refresh_credentials(creds)
+
+    if creds and creds.valid:
+        _persist_credentials_after_refresh(creds)
+        _oauth_creds_cache = creds
+        _last_oauth_error = None
+        return creds
+
+    if not _last_oauth_error:
+        _last_oauth_error = 'OAuth access token이 유효하지 않습니다.'
     return None
 
 
@@ -117,12 +177,10 @@ def _format_oauth_refresh_failure_message(exc: Exception) -> str:
             "  1) GOOGLE_OAUTH_TOKEN_JSON의 refresh_token이 폐기됨 (앱 연결 해제, 비밀번호 변경, 오래된 토큰)\n"
             "  2) GOOGLE_OAUTH_CREDENTIALS_JSON과 토큰이 서로 다른 OAuth 클라이언트(client_id/secret 불일치)\n"
             "  3) Google Cloud Console에서 해당 OAuth 클라이언트의 비밀번호를 재생성함\n\n"
-            "조치 (로컬 PC에서):\n"
-            "  A) 프로젝트 루트에 credentials.json이 **지금 Vercel에 넣은 GOOGLE_OAUTH_CREDENTIALS_JSON과 동일한 클라이언트**인지 확인\n"
-            "  B) .env에 GOOGLE_OAUTH_TOKEN_JSON이 있으면 **잠시 제거 또는 주석** (로컬이 예전 토큰을 쓰는 것 방지)\n"
-            "  C) python renew_google_oauth_token.py 실행 → 브라우저 로그인 → token.pickle 생성\n"
-            "  D) python extract_oauth_token.py 실행 → 출력 JSON 전체를 Vercel GOOGLE_OAUTH_TOKEN_JSON에 붙여넣기\n"
-            "  E) GOOGLE_OAUTH_CREDENTIALS_JSON도 **같은 credentials.json** 내용으로 맞춘 뒤 재배포\n\n"
+            "조치:\n"
+            "  1) 정산 관리 화면 → Google Drive 연결 → 재연결 (권장)\n"
+            "  2) 로컬 PC: python renew_google_oauth_token.py → extract_oauth_token.py\n"
+            "  3) Vercel GOOGLE_OAUTH_TOKEN_JSON·GOOGLE_OAUTH_CREDENTIALS_JSON 동일 클라이언트로 갱신\n\n"
             f"(원본 오류: {exc})"
         )
     return str(exc)
@@ -170,103 +228,61 @@ def run_local_oauth_interactive_and_pickle() -> Credentials:
 def get_credentials():
     """
     OAuth 2.0을 사용하여 사용자 계정 인증 정보 가져오기
-    Vercel 환경 변수에서 토큰을 읽거나, 로컬 파일에서 읽습니다.
+    우선순위: 메모리 캐시 → DB → 환경 변수 → 로컬 token.pickle
     """
     global _oauth_creds_cache, _last_oauth_error
-    
-    # 캐시된 유효한 토큰이 있으면 즉시 반환 (서버리스 순차 요청 시 재사용)
+
     if _oauth_creds_cache is not None and _oauth_creds_cache.valid:
         return _oauth_creds_cache
-    
+
     creds = None
-    
-    # 1. 환경 변수에서 토큰 읽기 (Vercel 등 서버리스 환경 우선)
     oauth_token_json = os.environ.get('GOOGLE_OAUTH_TOKEN_JSON')
     oauth_credentials_json = os.environ.get('GOOGLE_OAUTH_CREDENTIALS_JSON')
-    
-    # 토큰 JSON만 있어도 동작 (extract_oauth_token.py 출력은 client_id/secret 포함)
+    is_vercel = os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV')
+
+    # 1. DB (관리자 재연결·refresh 후 저장분)
+    try:
+        from api.uploads.oauth_token_store import load_stored_token_dict, save_stored_token_dict
+        stored = load_stored_token_dict()
+        if stored:
+            creds = _credentials_from_token_info(stored, oauth_credentials_json, 'DB')
+            if creds and creds.valid:
+                return creds
+    except Exception as e:
+        print(f'[경고] DB OAuth 토큰 로드 실패: {e}')
+        creds = None
+
+    # 2. 환경 변수 (초기 설정·마이그레이션용)
     if oauth_token_json:
         try:
             token_info = json.loads(oauth_token_json)
-            client_id, client_secret = _client_credentials_from_env(token_info, oauth_credentials_json)
-            expiry = _parse_token_expiry(token_info.get('expiry'))
-
-            creds = Credentials(
-                token=token_info.get('token'),
-                refresh_token=token_info.get('refresh_token'),
-                token_uri=token_info.get('token_uri', 'https://oauth2.googleapis.com/token'),
-                client_id=client_id,
-                client_secret=client_secret,
-                scopes=token_info.get('scopes', SCOPES),
-                expiry=expiry
-            )
-
-            print('✅ 환경 변수에서 OAuth 토큰 로드 성공 (Vercel 배포 환경)')
-            if oauth_credentials_json:
-                print(f'   client_id(앞 12자): {str(client_id)[:12]}...')
-            if not creds.refresh_token:
-                _last_oauth_error = (
-                    'GOOGLE_OAUTH_TOKEN_JSON에 refresh_token이 없습니다. '
-                    '로컬에서 python renew_google_oauth_token.py 실행 후 '
-                    'python extract_oauth_token.py 로 출력된 JSON 전체를 Vercel에 설정하세요.'
-                )
-                creds = None
-            elif creds.expired:
-                creds = _refresh_credentials(creds)
-            elif creds.valid:
-                _oauth_creds_cache = creds
-                _last_oauth_error = None
-                return creds
-            else:
-                # access token 없음·만료 정보 없음 등 — refresh 시도
-                creds = _refresh_credentials(creds)
-
+            creds = _credentials_from_token_info(token_info, oauth_credentials_json, '환경 변수')
             if creds and creds.valid:
-                _oauth_creds_cache = creds
-                _last_oauth_error = None
+                try:
+                    from api.uploads.oauth_token_store import save_stored_token_dict
+                    save_stored_token_dict({
+                        'token': creds.token,
+                        'refresh_token': creds.refresh_token,
+                        'token_uri': creds.token_uri,
+                        'client_id': creds.client_id,
+                        'client_secret': creds.client_secret,
+                        'scopes': list(creds.scopes) if creds.scopes else SCOPES,
+                        'expiry': creds.expiry.isoformat() if creds.expiry else None,
+                    })
+                except Exception as migrate_err:
+                    print(f'[경고] env→DB OAuth 마이그레이션 실패: {migrate_err}')
                 return creds
-
-            if creds is not None and not creds.valid and not _last_oauth_error:
-                _last_oauth_error = 'OAuth access token이 유효하지 않습니다.'
             creds = None
         except Exception as e:
             _last_oauth_error = str(e)
-            print(f"⚠️ 환경 변수에서 토큰 로드 실패: {e}")
-            print(f"   GOOGLE_OAUTH_TOKEN_JSON 존재: {bool(oauth_token_json)}")
-            print(f"   GOOGLE_OAUTH_CREDENTIALS_JSON 존재: {bool(oauth_credentials_json)}")
-            if oauth_token_json:
-                print(f"   GOOGLE_OAUTH_TOKEN_JSON 길이: {len(oauth_token_json)} 문자")
-                print(f"   GOOGLE_OAUTH_TOKEN_JSON 처음 100자: {oauth_token_json[:100]}")
-            if oauth_credentials_json:
-                print(f"   GOOGLE_OAUTH_CREDENTIALS_JSON 길이: {len(oauth_credentials_json)} 문자")
-                print(f"   GOOGLE_OAUTH_CREDENTIALS_JSON 처음 100자: {oauth_credentials_json[:100]}")
+            print(f'⚠️ 환경 변수에서 토큰 로드 실패: {e}')
             import traceback
             traceback.print_exc()
             creds = None
-    
-    # 2. 로컬 파일에서 토큰 읽기 (로컬 환경)
-    # 배포 환경에서는 환경 변수를 사용해야 하므로, 환경 변수가 없으면 명확한 오류 메시지
-    is_vercel = os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV')
-    
-    if not oauth_token_json:
-        if is_vercel:
-            print(f"❌ Vercel 배포 환경에서 OAuth 2.0 환경 변수가 설정되지 않았습니다.")
-            print(f"   GOOGLE_OAUTH_TOKEN_JSON: {'✅' if oauth_token_json else '❌'}")
-            raise Exception(
-                f"Vercel 배포 환경에서 OAuth 2.0 환경 변수가 설정되지 않았습니다.\n\n"
-                f"필수 환경 변수:\n"
-                f"  GOOGLE_OAUTH_TOKEN_JSON: python extract_oauth_token.py 실행 후 출력 JSON 전체\n\n"
-                f"선택 환경 변수 (토큰에 client_id/secret이 없을 때만):\n"
-                f"  GOOGLE_OAUTH_CREDENTIALS_JSON: credentials.json 전체 내용\n\n"
-                f"설정 방법:\n"
-                f"1. Vercel 대시보드 → Settings → Environment Variables\n"
-                f"2. GOOGLE_OAUTH_TOKEN_JSON 추가 (Production, Preview, Development 모두 선택)\n"
-                f"3. 재배포\n\n"
-                f"자세한 내용은 Vercel_환경변수_설정_단계별_가이드.md 참고"
-            )
-        else:
-            print(f"⚠️ 로컬 환경: 환경 변수가 없으므로 로컬 파일을 시도합니다.")
-    
+
+    if not is_vercel:
+        print('⚠️ 로컬 환경: DB/환경 변수 없음 → token.pickle 시도')
+
     if os.path.exists(TOKEN_FILE):
         try:
             with open(TOKEN_FILE, 'rb') as token:
@@ -303,21 +319,14 @@ def get_credentials():
         if not creds:
             print(f"[디버깅] 토큰이 없음 - OAuth 2.0 플로우 시작 또는 오류 발생")
             if is_vercel:
-                # Vercel 환경에서는 환경 변수만 사용 가능
-                print(f"[디버깅] Vercel 환경에서 토큰 없음 - 예외 발생")
-                err_detail = ""
-                if _last_oauth_error:
-                    err_detail = f"\n\n상세:\n{_last_oauth_error}"
+                print('[디버깅] Vercel 환경에서 OAuth 토큰 없음')
+                err_detail = f'\n\n상세:\n{_last_oauth_error}' if _last_oauth_error else ''
                 raise Exception(
-                    f"Vercel 배포 환경에서 OAuth 2.0 토큰을 가져올 수 없습니다.\n\n"
-                    f"환경 변수 확인:\n"
-                    f"- GOOGLE_OAUTH_TOKEN_JSON: {'✅ 설정됨' if oauth_token_json else '❌ 없음'}\n"
-                    f"- GOOGLE_OAUTH_CREDENTIALS_JSON: {'✅ 설정됨' if oauth_credentials_json else '❌ 없음'}\n\n"
-                    f"invalid_grant 등으로 갱신이 막힌 경우, 로컬 PC에서 **같은** credentials.json으로 다시 발급하세요:\n"
-                    f"1. python renew_google_oauth_token.py  (브라우저 로그인 → token.pickle)\n"
-                    f"2. python extract_oauth_token.py  (출력 JSON → Vercel GOOGLE_OAUTH_TOKEN_JSON)\n"
-                    f"3. Vercel의 GOOGLE_OAUTH_CREDENTIALS_JSON이 위 credentials.json과 동일한지 확인 후 재배포\n"
-                    f"{err_detail}"
+                    'Google Drive OAuth가 연결되지 않았거나 refresh_token이 만료되었습니다.\n\n'
+                    '해결 방법 (택1):\n'
+                    '1) 정산 관리 → Google Drive 연결 → 재연결 버튼 (권장, Vercel 수정 불필요)\n'
+                    '2) 로컬 renew → extract 후 Vercel GOOGLE_OAUTH_TOKEN_JSON 갱신\n'
+                    f'{err_detail}'
                 )
             if not os.path.exists(CREDENTIALS_FILE):
                 raise Exception(

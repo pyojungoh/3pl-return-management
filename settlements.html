@@ -994,9 +994,22 @@
           <button class="st-btn st-admin-only" onclick="stBulkDeleteSettlements()" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">🗑️ 일괄 삭제</button>
         </div>
       </div>
+      <div id="stGoogleDriveOAuthBox" class="st-section" style="margin-top:12px;padding:12px 14px;background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;">
+          <div>
+            <strong style="color:#2d3436;">Google Drive 연결</strong>
+            <span id="stGoogleDriveOAuthStatus" style="display:block;font-size:12px;color:#636e72;margin-top:4px;">상태 확인 중...</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="st-btn-secondary" style="padding:8px 12px;font-size:12px;" onclick="stRefreshGoogleDriveOAuthStatus()">새로고침</button>
+            <button type="button" class="st-btn" style="padding:8px 12px;font-size:12px;" onclick="stReconnectGoogleDrive()">Google Drive 재연결</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#666;margin-top:8px;line-height:1.45;">
+          access token은 서버가 자동 갱신합니다. invalid_grant 등 오류 시에만 재연결 버튼으로 Google 로그인하면 됩니다 (Vercel 환경 변수 수정 불필요).
+        </div>
+      </div>
     </div>
-    
-    <!-- 화주사 전용 필터 섹션 (제거됨 - 전체 리스트 표시) -->
     
     <!-- 정산 목록 테이블 -->
     <div id="stCommonTableSection" class="st-section">
@@ -1451,6 +1464,65 @@
       };
     }
 
+    // Google Drive OAuth (관리자 — 정산 파일 업로드용)
+    async function stRefreshGoogleDriveOAuthStatus() {
+      const el = document.getElementById('stGoogleDriveOAuthStatus');
+      if (!el) return;
+      el.textContent = '상태 확인 중...';
+      try {
+        const resp = await fetch('/api/uploads/oauth/status', {
+          credentials: 'include',
+          headers: stGetUserHeaders()
+        });
+        const data = await resp.json();
+        if (!data.success) {
+          el.textContent = data.message || '상태를 확인할 수 없습니다.';
+          el.style.color = '#c0392b';
+          return;
+        }
+        if (data.connected) {
+          const email = data.google_email ? ` (${data.google_email})` : '';
+          const exp = data.expiry ? ` · access 만료 ${data.expiry}` : '';
+          el.textContent = `연결됨${email}${exp} · refresh_token ${data.has_refresh_token ? '있음' : '없음'}`;
+          el.style.color = '#155724';
+        } else {
+          el.textContent = data.last_error
+            ? `미연결 — ${String(data.last_error).split('\n')[0]}`
+            : '미연결 — 재연결 버튼으로 Google 로그인하세요.';
+          el.style.color = '#c0392b';
+        }
+      } catch (e) {
+        el.textContent = '상태 확인 오류: ' + (e.message || e);
+        el.style.color = '#c0392b';
+      }
+    }
+
+    async function stReconnectGoogleDrive() {
+      if (!confirm('Google Drive 계정으로 다시 로그인합니다. 제이제이솔루션 폴더 권한이 있는 계정을 선택하세요.')) {
+        return;
+      }
+      try {
+        const resp = await fetch('/api/uploads/oauth/authorize-url', {
+          credentials: 'include',
+          headers: stGetUserHeaders()
+        });
+        const data = await resp.json();
+        if (!data.success || !data.url) {
+          alert(data.message || '연결 URL을 가져올 수 없습니다.');
+          return;
+        }
+        window.location.href = data.url;
+      } catch (e) {
+        alert('Google Drive 재연결 오류: ' + (e.message || e));
+      }
+    }
+
+    window.addEventListener('message', function (ev) {
+      if (ev.data && ev.data.type === 'google-oauth-done' && ev.data.status === 'success') {
+        stRefreshGoogleDriveOAuthStatus();
+      }
+    });
+
     // 관리자 초기화 함수
     function stAdminInit() {
       console.log('[ST] stAdminInit 시작');
@@ -1465,6 +1537,8 @@
       
       // 정산 목록 로드 (전체 목록)
       stAdminLoadSettlements();
+
+      stRefreshGoogleDriveOAuthStatus();
     }
 
     // 화주사 초기화 함수
