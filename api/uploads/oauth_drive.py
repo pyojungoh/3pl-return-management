@@ -206,12 +206,26 @@ def run_local_oauth_interactive_and_pickle() -> Credentials:
             "credentials.json에 'installed' 또는 'web' 키가 있어야 합니다."
         )
     print('OAuth 브라우저 창이 열리면 동일 Google 계정으로 로그인하고 권한을 허용하세요.')
-    flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-    creds = flow.run_local_server(
-        port=0,
-        open_browser=True,
-        **_OAUTH_AUTH_URL_KWARGS,
-    )
+    if 'web' in creds_data:
+        redirect_uri = 'http://localhost:5000/api/uploads/oauth/callback'
+        print(f'   웹 OAuth 클라이언트 — redirect: {redirect_uri}')
+        flow = InstalledAppFlow.from_client_secrets_file(
+            CREDENTIALS_FILE, SCOPES, redirect_uri=redirect_uri
+        )
+        creds = flow.run_local_server(
+            host='localhost',
+            port=5000,
+            open_browser=True,
+            redirect_uri_trailing_slash=False,
+            **_OAUTH_AUTH_URL_KWARGS,
+        )
+    else:
+        flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+        creds = flow.run_local_server(
+            port=0,
+            open_browser=True,
+            **_OAUTH_AUTH_URL_KWARGS,
+        )
     if not getattr(creds, 'refresh_token', None):
         print(
             '\n⚠️ 경고: refresh_token이 비어 있습니다. '
