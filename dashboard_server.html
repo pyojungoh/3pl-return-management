@@ -4402,11 +4402,10 @@
       if (registerTabBtn) {
         registerTabBtn.style.display = isAdmin ? 'inline-block' : 'none';
       }
-      // 매출정산 탭 버튼 (jjay 최고관리자 전용)
+      // 매출정산 탭 버튼 (관리자 전용)
       const salesSettlementTabBtn = document.getElementById('salesSettlementTabBtn');
       if (salesSettlementTabBtn) {
-        const isJjay = (currentUsername || '').toString().trim().toLowerCase() === 'jjay';
-        salesSettlementTabBtn.style.display = (isAdmin && isJjay) ? 'inline-block' : 'none';
+        salesSettlementTabBtn.style.display = isAdmin ? 'inline-block' : 'none';
       }
       const invoiceTabBtn = document.getElementById('invoiceTabBtn');
       if (invoiceTabBtn) {
@@ -4424,9 +4423,7 @@
         // 관리자면 저장된 탭 정보 확인 (F5 새로고침 시 현재 탭 유지)
         const savedTab = localStorage.getItem('activeAdminTab');
         const validTabs = ['returns', 'cs', 'scheduleCalendar', 'board', 'popup', 'homepageSettings', 'specialWorks', 'pallets', 'settlements', 'register', 'salesSettlement', 'invoice'];
-        const isJjay = (currentUsername || '').toString().trim().toLowerCase() === 'jjay';
         let activeTab = savedTab && validTabs.includes(savedTab) ? savedTab : 'returns';
-        if (activeTab === 'salesSettlement' && !isJjay) activeTab = 'returns';
         console.log('저장된 탭:', savedTab, '활성화할 탭:', activeTab);
         // 약간의 지연을 두고 탭 전환 (DOM이 완전히 로드된 후)
         setTimeout(() => {
@@ -7784,7 +7781,7 @@
     window.loadSettlementsContent = loadSettlementsContent;
 
     /**
-     * 매출정산 콘텐츠 로드 (jjay 최고관리자 전용)
+     * 매출정산 콘텐츠 로드 (관리자 전용)
      */
     function loadSalesSettlementContent() {
       let container = document.getElementById('salesSettlementTab');

@@ -165,7 +165,7 @@ print("[앱 시작] 파레트 보관료 관리 시스템 Blueprint 등록 완료
 app.register_blueprint(settlements_bp)
 app.register_blueprint(sales_settlement_bp)
 print("[앱 시작] 정산 관리 시스템 Blueprint 등록 완료")
-print("[앱 시작] 매출정산(jjay 전용) Blueprint 등록 완료")
+print("[앱 시작] 매출정산(관리자 전용) Blueprint 등록 완료")
 app.register_blueprint(invoice_bp)
 print("[앱 시작] 거래명세서(관리자 전용) Blueprint 등록 완료")
 app.register_blueprint(homepage_bp)
@@ -271,7 +271,7 @@ def test_excel_upload():
 
 @app.route('/sales_settlement.html')
 def sales_settlement():
-    """매출정산 페이지 (jjay 최고관리자 전용)"""
+    """매출정산 페이지 (관리자 전용)"""
     try:
         return send_file('sales_settlement.html')
     except FileNotFoundError:

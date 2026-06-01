@@ -1,5 +1,5 @@
 """
-매출정산 API 라우트 (jjay 최고관리자 전용)
+매출정산 API 라우트 (관리자 전용)
 - 월별/연별 정산 요약
 - 기존 settlements API 재사용 (목록, 상세, 상태변경)
 """
@@ -13,10 +13,6 @@ if USE_POSTGRESQL:
     from psycopg2.extras import RealDictCursor
 
 sales_settlement_bp = Blueprint('sales_settlement', __name__, url_prefix='/api/sales_settlement')
-
-# jjay만 접근 가능
-JJAY_USERNAME = 'jjay'
-
 
 def _settlement_statement_ready(item: dict) -> bool:
     """정산 명세서(엑셀) 생성에 쓸 금액·첨부가 갖춰졌는지 여부 (전달 건 표시·정렬용)."""
@@ -70,19 +66,19 @@ def get_user_context():
     }
 
 
-def _check_jjay():
-    """jjay 권한 확인, 실패 시 (None, response) 반환"""
+def _check_admin():
+    """관리자 권한 확인, 실패 시 (None, response) 반환"""
     ctx = get_user_context()
-    if ctx['username'].strip().lower() != JJAY_USERNAME or ctx['role'] != '관리자':
-        return None, (jsonify({'success': False, 'message': '접근 권한이 없습니다. (jjay 전용)'}), 403)
+    if ctx['role'] != '관리자':
+        return None, (jsonify({'success': False, 'message': '접근 권한이 없습니다. (관리자 전용)'}), 403)
     return ctx, None
 
 
 @sales_settlement_bp.route('/check-access', methods=['GET'])
 def check_access():
-    """jjay 접근 권한 확인 (프론트엔드 탭 표시용)"""
+    """관리자 접근 권한 확인 (프론트엔드 탭 표시용)"""
     ctx = get_user_context()
-    has_access = ctx['username'].strip().lower() == JJAY_USERNAME and ctx['role'] == '관리자'
+    has_access = ctx['role'] == '관리자'
     return jsonify({
         'success': True,
         'has_access': has_access
@@ -96,7 +92,7 @@ def get_summary():
     - year_month: 2025-01 (월별) 또는 비워두면 전체
     - year: 2025 (연별 - 해당 연도 전체)
     """
-    ctx, err = _check_jjay()
+    ctx, err = _check_admin()
     if err:
         return err[0], err[1]
     try:
@@ -232,7 +228,7 @@ def get_analytics():
     연별 매출 통계 (월별·연별 시계열, 화주사 순위, KPI)
     Query: months_back (기본 24), year_from, year_to (연도 필터, 선택)
     """
-    ctx, err = _check_jjay()
+    ctx, err = _check_admin()
     if err:
         return err[0], err[1]
     try:
@@ -291,7 +287,7 @@ def get_analytics():
 @sales_settlement_bp.route('/available-months', methods=['GET'])
 def get_available_months():
     """정산 데이터가 있는 년월 목록"""
-    ctx, err = _check_jjay()
+    ctx, err = _check_admin()
     if err:
         return err[0], err[1]
     try:
