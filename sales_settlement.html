@@ -435,10 +435,35 @@
         date.setMonth(date.getMonth() - 1);
         monthInput.value = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
       }
+      ssEnsureClickDelegates();
       ssLoadData();
       ssInitialized = true;
     }
     window.ssCommonInit = ssCommonInit;
+
+    /** 상태변경 버튼: onclick 대신 위임 (따옴표·대기 등 모든 상태에서 모달 오픈) */
+    function ssEnsureClickDelegates() {
+      const root = document.getElementById('ssContainer');
+      if (!root || root.dataset.ssClickDelegates === '1') return;
+      root.dataset.ssClickDelegates = '1';
+      root.addEventListener('click', function (e) {
+        const btn = e.target.closest('.ss-status-modal-btn');
+        if (!btn || !root.contains(btn)) return;
+        e.preventDefault();
+        const sid = parseInt(String(btn.getAttribute('data-ss-id') || ''), 10);
+        const enc = btn.getAttribute('data-ss-status');
+        let st = '대기';
+        try {
+          st = enc != null && enc !== '' ? decodeURIComponent(enc) : '대기';
+        } catch (err) {
+          st = '대기';
+        }
+        if (sid && typeof ssShowStatusModal === 'function') {
+          ssShowStatusModal(sid, st);
+        }
+      });
+    }
+    window.ssEnsureClickDelegates = ssEnsureClickDelegates;
 
     function ssLoadData() {
       const month = document.getElementById('ssFilterMonth')?.value || '';
@@ -497,7 +522,7 @@
                 <div style="margin-bottom: 8px;"><span class="ss-status-badge ${statusClass}">${status}</span>${deliveryNote}</div>
                 <div class="ss-company-actions">
                   <button class="ss-btn ss-btn-small" onclick="ssShowDetail(${item.id})">상세</button>
-                  <button class="ss-btn" onclick="ssShowStatusModal(${item.id}, ${JSON.stringify(status)})" style="padding: 6px 12px; font-size: 12px;">상태변경</button>
+                  <button type="button" class="ss-btn ss-status-modal-btn" data-ss-id="${item.id}" data-ss-status="${encodeURIComponent(status)}" style="padding: 6px 12px; font-size: 12px;">상태변경</button>
                   ${status === '정산확인' ? '<button class="ss-btn" onclick="ssCompletePayment(' + item.id + ')" style="padding: 6px 12px; font-size: 12px; background: linear-gradient(135deg, #00a085 0%, #008874 100%);">입금확인</button>' : ''}
                 </div>
               </div>
@@ -564,18 +589,26 @@
     }
 
     function ssShowStatusModal(id, currentStatus) {
+      const statusNorm = (currentStatus == null || currentStatus === ''
+        ? '대기'
+        : String(currentStatus)).trim() || '대기';
       ssCurrentStatusModalId = id;
-      document.getElementById('ssCurrentStatus').textContent = currentStatus || '대기';
+      const statusEl = document.getElementById('ssCurrentStatus');
+      if (statusEl) statusEl.textContent = statusNorm;
       document.querySelectorAll('input[name="ssStatus"]').forEach(r => {
-        r.checked = (r.value === currentStatus);
+        r.checked = (r.value === statusNorm);
       });
-      document.getElementById('ssStatusModal').style.display = 'block';
+      const modal = document.getElementById('ssStatusModal');
+      if (modal) modal.style.display = 'block';
     }
+    window.ssShowStatusModal = ssShowStatusModal;
 
     function ssCloseStatusModal() {
-      document.getElementById('ssStatusModal').style.display = 'none';
+      const modal = document.getElementById('ssStatusModal');
+      if (modal) modal.style.display = 'none';
       ssCurrentStatusModalId = null;
     }
+    window.ssCloseStatusModal = ssCloseStatusModal;
 
     function ssSaveStatus() {
       if (!ssCurrentStatusModalId) return;
